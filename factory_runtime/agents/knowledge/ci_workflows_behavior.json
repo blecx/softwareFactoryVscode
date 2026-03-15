@@ -1,0 +1,92 @@
+{
+  "github_actions_caching": {
+    "workflow_reruns_use_cached_payload": {
+      "rule": "GitHub Actions workflow reruns use the pull_request event payload from original trigger",
+      "problem": "When you update PR description via gh pr edit or API, then rerun CI with 'gh run rerun', the workflow run uses the OLD PR description from when it was first triggered",
+      "implication": "Updating PR description via API does NOT update existing workflow run payloads",
+      "root_cause": "GitHub Actions caches the webhook event payload at workflow trigger time. Reruns replay the original event, not fetching fresh data.",
+      "symptoms": [
+        "CI keeps failing with 'missing sections' error after you added them",
+        "PR description updated successfully but CI doesn't see changes",
+        "Workflow run created_at timestamp is before PR updated_at timestamp"
+      ],
+      "solution_1": {
+        "method": "Push new commit (even empty) to trigger fresh pull_request event",
+        "command": "git commit --allow-empty -m 'chore: trigger CI with updated PR description' && git push",
+        "why": "New commit = new pull_request event = fresh payload with current PR description",
+        "preferred": true
+      },
+      "solution_2": {
+        "method": "Close and reopen PR to force new pull_request event",
+        "commands": [
+          "gh pr close <pr>",
+          "gh pr reopen <pr>"
+        ],
+        "why": "Reopen creates fresh pull_request event with current data",
+        "preferred": false,
+        "downside": "Loses 'Checks' history, may confuse reviewers"
+      },
+      "anti_patterns": [
+        {
+          "action": "Using 'gh run rerun' after updating PR description",
+          "why_bad": "Reruns use OLD cached payload, not updated description",
+          "detection": "CI fails with same error after you fixed PR body"
+        },
+        {
+          "action": "Updating PR body multiple times expecting CI to see it",
+          "why_bad": "Existing workflow runs never see updates",
+          "detection": "Manual refresh shows updated description but CI still complains"
+        }
+      ],
+      "detection_methods": {
+        "check_timestamps": "Compare workflow run created_at vs PR updated_at. If run is older, it has stale payload.",
+        "check_payload": "In workflow logs, check github.event.pull_request.body to see what PR description the workflow actually received",
+        "verify_update": "After gh pr edit, check if new workflow run was triggered. If not, push commit."
+      },
+      "best_practices": [
+        "Always prefer pushing new commit over using gh run rerun after PR updates",
+        "Validate PR body BEFORE creating PR (use validate-pr-template.sh)",
+        "If CI fails on PR body validation, fix locally and push commit (don't edit PR body then rerun)",
+        "Use gh run rerun only for transient failures (network, rate limits), not PR body issues"
+      ],
+      "examples": {
+        "pr_128_case": {
+          "issue": "Updated PR description to fix CI validation, but CI kept failing",
+          "mistake": "Used gh api to update body, then gh run rerun",
+          "why_failed": "Rerun used original payload without updates",
+          "solution_used": "Rebased branch and pushed (force-push), triggering fresh CI run",
+          "lesson": "PR body updates require new commit to take effect in CI"
+        }
+      },
+      "metrics": {
+        "tracked": "ci_rerun_after_pr_update_errors",
+        "goal": 0,
+        "current_pattern": "~40% of PR #128-type confusion incidents"
+      }
+    },
+    "workflow_dispatch_vs_pull_request": {
+      "rule": "workflow_dispatch events have different payload structure than pull_request events",
+      "implication": "Manually triggering workflows may not have PR context",
+      "solution": "Always prefer pushing commits to trigger pull_request events for PR validation"
+    }
+  },
+  "best_practice_summary": {
+    "pr_body_validation_workflow": [
+      "1. Write PR body in .tmp/pr-body.md",
+      "2. Run scripts/validate-pr-template.sh --body-file .tmp/pr-body.md",
+      "3. Fix any validation errors",
+      "4. Create PR with gh pr create",
+      "5. If CI fails on body validation after PR creation:",
+      "   a. Fix PR body locally in .tmp/pr-body.md",
+      "   b. Re-validate with validate-pr-template.sh",
+      "   c. Commit changes to branch (any change works, even docs)",
+      "   d. Push commit (triggers fresh CI with current PR description)",
+      "   e. DO NOT use gh run rerun - it will use stale payload"
+    ],
+    "time_saved": {
+      "without_knowledge": "10-20 minutes debugging 'why didn't my fix work?'",
+      "with_knowledge": "0 minutes - know to push commit immediately",
+      "incidents_prevented": "PR #128-type confusion (40% of multi-step PR creation scenarios)"
+    }
+  }
+}

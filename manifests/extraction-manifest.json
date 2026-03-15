@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "blecx/maestro",
+    "defaultBranch": "main",
+    "extractionDate": "2026-03-14",
+    "notes": "Starter template for extracting softwareFactoryVscode from maestro. Replace placeholders with the exact source ref and finalized path decisions during execution."
+  },
+  "target": {
+    "repository": "softwareFactoryVscode",
+    "defaultBranch": "main",
+    "installPathDefault": ".factory/softwareFactoryVscode"
+  },
+  "rules": {
+    "neutralizeSourceIdentity": true,
+    "forbidHostGlobalTmp": true,
+    "canonicalWorkspacePathVariable": "TARGET_WORKSPACE_PATH",
+    "runtimeMetaSeparationRequired": true
+  },
+  "include": [
+    {
+      "source": ".vscode/settings.json",
+      "target": ".vscode/settings.json",
+      "mode": "adapt",
+      "notes": "Neutralize workspace-specific naming while preserving MCP wiring, task expectations, and auto-approve behavior."
+    },
+    {
+      "source": ".vscode/tasks.json",
+      "target": ".vscode/tasks.json",
+      "mode": "adapt",
+      "notes": "Retain reusable setup, validation, runtime, and maintenance tasks only."
+    },
+    {
+      "source": ".vscode/extensions.json",
+      "target": ".vscode/extensions.json",
+      "mode": "adapt",
+      "notes": "Keep the neutralized extension recommendation matrix."
+    },
+    {
+      "source": ".copilot/config",
+      "target": ".copilot/config",
+      "mode": "adapt",
+      "notes": "Preserve reusable package-owned Copilot config and projection inputs."
+    },
+    {
+      "source": ".copilot/skills",
+      "target": ".copilot/skills",
+      "mode": "adapt",
+      "notes": "Retain reusable workflow and policy skills only."
+    },
+    {
+      "source": ".github/agents",
+      "target": ".github/agents",
+      "mode": "adapt",
+      "notes": "Keep thin reusable discovery wrappers, not Maestro-specific policy bodies."
+    },
+    {
+      "source": "apps/mcp",
+      "target": "factory_runtime/apps/mcp",
+      "mode": "adapt",
+      "notes": "Extract reusable MCP services and update imports/paths as needed."
+    },
+    {
+      "source": "apps/approval_gate",
+      "target": "factory_runtime/apps/approval_gate",
+      "mode": "adapt",
+      "notes": "Carry over approval gate runtime implementation if part of the final package profile."
+    },
+    {
+      "source": "apps/mock_llm_gateway",
+      "target": "factory_runtime/apps/mock_llm_gateway",
+      "mode": "conditional",
+      "notes": "Include only if deterministic local validation remains part of the package contract."
+    },
+    {
+      "source": "agents",
+      "target": "factory_runtime/agents",
+      "mode": "split",
+      "notes": "Keep only runtime-relevant orchestration code; exclude Maestro-specific training or repo-specific issue logic."
+    },
+    {
+      "source": "docker",
+      "target": "docker",
+      "mode": "adapt",
+      "notes": "Carry over required Dockerfiles and support assets for the packaged runtime."
+    },
+    {
+      "source": "docker-compose*.yml",
+      "target": "compose/",
+      "mode": "split",
+      "notes": "Normalize compose files under compose/ and unify env variable usage."
+    },
+    {
+      "source": "configs",
+      "target": "configs",
+      "mode": "adapt",
+      "notes": "Retain reusable defaults only; keep live secrets out of versioned files."
+    },
+    {
+      "source": "tests/test_agent_boundaries.py",
+      "target": "tests/contracts/test_agent_boundaries.py",
+      "mode": "adapt",
+      "notes": "Preserve runtime/meta boundary validation."
+    },
+    {
+      "source": "softwareFactoryVscode.md",
+      "target": "softwareFactoryVscode.md",
+      "mode": "copy",
+      "notes": "Authoritative extraction contract."
+    },
+    {
+      "source": "externalDevendenciesSoftwareFactory.md",
+      "target": "externalDevendenciesSoftwareFactory.md",
+      "mode": "copy",
+      "notes": "Authoritative external dependency and remote GitHub contract."
+    },
+    {
+      "source": "SoftwareFactoryVsocdeTestsuite.md",
+      "target": "SoftwareFactoryVsocdeTestsuite.md",
+      "mode": "copy",
+      "notes": "Authoritative validation contract."
+    },
+    {
+      "source": "howto-extract-softwareFactory.md",
+      "target": "howto-extract-softwareFactory.md",
+      "mode": "copy",
+      "notes": "Operator runbook for executing the extraction."
+    }
+  ],
+  "exclude": [
+    {
+      "source": "apps/api",
+      "reason": "Maestro application backend, not part of the reusable factory package."
+    },
+    {
+      "source": "_external/maestro-Client",
+      "reason": "Explicit non-goal and product-specific client dependency."
+    },
+    {
+      "source": "Maestro-freeing-plan.md",
+      "reason": "Historical source planning artefact; keep only if cited in migration docs."
+    },
+    {
+      "source": "software_factory_independance_plan.md",
+      "reason": "Historical source planning artefact; extract decisions into canonical docs instead of copying verbatim."
+    },
+    {
+      "source": "projectDocs",
+      "reason": "Host/project content area, not part of the standalone factory package."
+    }
+  ],
+  "followUpDeliverables": [
+    ".github/workflows/ci.yml",
+    ".github/ISSUE_TEMPLATE/feature_request.yml",
+    ".github/pull_request_template.md",
+    "docs/EXTRACTION-SOURCE-MAP.md",
+    "scripts/bootstrap_github_repo.py",
+    "scripts/verify_github_repo.py"
+  ]
+}

@@ -1,0 +1,180 @@
+###############################################################################
+# MAESTRO Stack — docker-compose.maestro.yml
+#
+# Services:
+#   mcp-memory      :3030  — knowledge graph memory (SQLite)
+#   mcp-agent-bus   :3031  — shared context bus (SQLite)
+#   approval-gate   :8001  — human-in-the-loop plan review (FastAPI)
+#   agent-worker           — MaestroOrchestrator queue loop
+#
+# Usage:
+#   cp .env.maestro.example .env.maestro
+#   # Edit .env.maestro — set OPENAI_API_KEY, GITHUB_TOKEN at minimum
+#   docker compose -f docker-compose.maestro.yml --env-file .env.maestro up --build
+#
+# Health checks:
+#   curl http://localhost:3030/health
+#   curl http://localhost:3031/health
+#   curl http://localhost:8001/health
+#
+# See: docs/agents/MAESTRO-DESIGN.md
+###############################################################################
+
+services:
+  # ---------------------------------------------------------------------------
+  # mock-llm-gateway — deterministic responses for testing
+  # ---------------------------------------------------------------------------
+  mock-llm-gateway:
+    build:
+      context: .
+      dockerfile: docker/mock-llm-gateway/Dockerfile
+    image: maestro/mock-llm-gateway:latest
+    restart: unless-stopped
+    ports:
+      - "${PORT_TUI:-9090}:9090"
+    networks:
+      - maestro_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9090/admin/mocks')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+
+  # ---------------------------------------------------------------------------
+  # mcp-memory — knowledge graph for long-term agent memory
+  # ---------------------------------------------------------------------------
+  mcp-memory:
+    build:
+      context: .
+      dockerfile: docker/mcp-memory/Dockerfile
+    image: maestro/mcp-memory:latest
+    restart: unless-stopped
+    environment:
+      PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      MEMORY_MCP_PORT: "${MEMORY_MCP_PORT:-3030}"
+      MEMORY_DB_PATH: "/data/memory.db"
+    volumes:
+      - maestro_memory_data:/data
+    ports:
+      - "${MEMORY_MCP_PORT:-3030}:3030"
+    networks:
+      - maestro_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3030/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # mcp-agent-bus — shared context bus for task runs
+  # ---------------------------------------------------------------------------
+  mcp-agent-bus:
+    build:
+      context: .
+      dockerfile: docker/mcp-agent-bus/Dockerfile
+    image: maestro/mcp-agent-bus:latest
+    restart: unless-stopped
+    environment:
+      PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      AGENT_BUS_PORT: "${AGENT_BUS_PORT:-3031}"
+      AGENT_BUS_DB_PATH: "/data/agent_bus.db"
+    volumes:
+      - maestro_bus_data:/data
+    ports:
+      - "${AGENT_BUS_PORT:-3031}:3031"
+    networks:
+      - maestro_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3031/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # approval-gate — human-in-the-loop FastAPI plan review server
+  # ---------------------------------------------------------------------------
+  approval-gate:
+    build:
+      context: .
+      dockerfile: docker/approval-gate/Dockerfile
+    image: maestro/approval-gate:latest
+    restart: unless-stopped
+    depends_on:
+      mcp-agent-bus:
+        condition: service_healthy
+    environment:
+      PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      APPROVAL_GATE_PORT: "${APPROVAL_GATE_PORT:-8001}"
+      AGENT_BUS_URL: "http://mcp-agent-bus:3031"
+    ports:
+      - "${APPROVAL_GATE_PORT:-8001}:8001"
+    networks:
+      - maestro_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # agent-worker — MaestroOrchestrator queue loop
+  # ---------------------------------------------------------------------------
+  agent-worker:
+    build:
+      context: .
+      dockerfile: docker/agent-worker/Dockerfile
+    image: maestro/agent-worker:latest
+    restart: unless-stopped
+    depends_on:
+      mcp-memory:
+        condition: service_healthy
+      mcp-agent-bus:
+        condition: service_healthy
+      approval-gate:
+        condition: service_healthy
+    environment:
+      PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY}"
+      GITHUB_TOKEN: "${GITHUB_TOKEN}"
+      MEMORY_MCP_URL: "http://mcp-memory:3030"
+      AGENT_BUS_URL: "http://mcp-agent-bus:3031"
+      APPROVAL_GATE_URL: "http://approval-gate:8001"
+      AGENT_REPO: "${AGENT_REPO:-.}"
+      AGENT_WORKSPACE: "/target"
+    volumes:
+      # Mount the workspace so the worker can edit files
+      - type: bind
+        source: "${WORKSPACE_PATH:-.}"
+        target: /target
+    networks:
+      - maestro_net
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  maestro_memory_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${MAESTRO_DATA_DIR:-/data/maestro}/memory/${MAESTRO_INSTANCE_ID:-default}
+      o: bind
+  maestro_bus_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${MAESTRO_DATA_DIR:-/data/maestro}/bus/${MAESTRO_INSTANCE_ID:-default}
+      o: bind
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  maestro_net:
+    driver: bridge
+    name: "maestro_net_${MAESTRO_INSTANCE_ID:-default}"

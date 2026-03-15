@@ -1,0 +1,16 @@
+{
+    "recommendations": [
+        "GitHub.copilot",
+        "GitHub.copilot-chat",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "GitHub.vscode-pull-request-github",
+        "ms-vscode-remote.remote-containers",
+        "ms-azuretools.vscode-docker"
+    ],
+    "unwantedRecommendations": [
+        "maestro.issueagent"
+    ]
+}

@@ -1,0 +1,43 @@
+{
+  "workspace": {
+    "chat.agent.maxRequests": 50,
+    "issueagent.customAgent": "resolve-issue",
+    "chat.allowAnonymousAccess": true,
+    "chat.checkpoints.showFileChanges": true,
+    "chat.customAgentInSubagent.enabled": true,
+    "mcp": {
+      "servers": {
+        "context7": {
+          "url": "http://127.0.0.1:3010/mcp",
+          "headers": {
+            "CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}"
+          }
+        },
+        "bashGateway": {
+          "url": "http://127.0.0.1:3011/mcp"
+        },
+        "git": {
+          "url": "http://127.0.0.1:3012/mcp"
+        },
+        "search": {
+          "url": "http://127.0.0.1:3013/mcp"
+        },
+        "filesystem": {
+          "url": "http://127.0.0.1:3014/mcp"
+        },
+        "dockerCompose": {
+          "url": "http://127.0.0.1:3015/mcp"
+        },
+        "testRunner": {
+          "url": "http://127.0.0.1:3016/mcp"
+        },
+        "offlineDocs": {
+          "url": "http://127.0.0.1:3017/mcp"
+        },
+        "githubOps": {
+          "url": "http://127.0.0.1:3018/mcp"
+        }
+      }
+    }
+  }
+}
