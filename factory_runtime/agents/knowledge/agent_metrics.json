@@ -1,0 +1,112 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-01-19T21:17:49.073624",
+  "agents": {
+    "workflow_agent": {
+      "version": "1.0.0",
+      "created": "2026-01-19",
+      "trained_on_issues": 1,
+      "success_rate": 0.0,
+      "manual_intervention_rate": 0.0,
+      "avg_time_saved_hours": 0.0,
+      "problems_prevented": 0,
+      "total_runs": 0,
+      "last_updated": "2026-01-19T21:17:43.027864",
+      "update_recommendations": [
+        {
+          "priority": "medium",
+          "agent": "workflow_agent",
+          "update_type": "problem_detection",
+          "description": "Add 0 new problem detection patterns",
+          "details": [],
+          "effort_minutes": 15
+        },
+        {
+          "priority": "low",
+          "agent": "workflow_agent",
+          "update_type": "command_sequences",
+          "description": "Add 51 new command sequences",
+          "details": {
+            "other": [
+              "PR review gate failed:",
+              "- Build passes: Evidence must be filled (not placeholder).",
+              "-F body=\"$(cat pr-description.md)\"",
+              "\u2139 Validating PR description format...",
+              "\u26a0\ufe0f  PR template validation WARNINGS:",
+              "\u26a0\ufe0f  Automated checks evidence appears empty (inline format required)",
+              "Continue despite warnings? (y/N):",
+              "========================================",
+              "Step 7: Verification and Summary",
+              "========================================",
+              "\u2139 Verifying PR merge status...",
+              "\u2705 \u2713 PR #61 is MERGED",
+              "\u2139 Verifying issue closure...",
+              "\u2705 \u2713 Issue #25 is CLOSED (at 2026-01-18T18:12:28Z)",
+              "\u2139 Verifying issue closing message...",
+              "\u2705 \u2713 Comprehensive closing message posted",
+              "\u2705 All verifications passed!",
+              "cafb22f - feat(prmerge): Add PR template validation and lessons learned",
+              "21430bd - docs: Add comprehensive summary of prmerge enhancements",
+              "8d02309 - docs: Add link to Issue #25 enhancement story",
+              "wc -l docs/NEXT-ISSUE-COMMAND.md  # 462 lines",
+              "cd /home/sw/work/maestro",
+              "cd /home/sw/work/maestro-Client",
+              "cat file.txt",
+              "head -n 50 file.txt",
+              "tail -n 50 file.txt",
+              "wc -l file.txt",
+              "grep -r \"pattern\" directory/",
+              "grep -A 5 \"pattern\" file.txt",
+              "echo \"content\" > file.txt",
+              "cat > file.txt << 'EOF'",
+              "content",
+              "EOF",
+              "cd apps/web",
+              "./setup.sh",
+              "source .venv/bin/activate",
+              "cd apps/api",
+              "PROJECT_DOCS_PATH=../../projectDocs uvicorn main:app --reload",
+              "578cac4 - docs: Add Issue #25 learnings to workflow",
+              "411c1fe - chore: Record Issue #25 completion in knowledge base",
+              "a81a14e - docs: Add comprehensive issue resolution workflow",
+              "b29afba - docs: Update workflow with user guidance",
+              "ad68c42 - docs: Update next-issue command with Issue #25 learnings",
+              "cafb22f - feat(prmerge): Add PR template validation and lessons learned",
+              "21430bd - docs: Add comprehensive summary of prmerge enhancements",
+              "8d02309 - docs: Add link to Issue #25 enhancement story",
+              "756f028 - feat(#25): Implement React Router v6",
+              "36fa516 - fix(#25): Restore chat functionality",
+              "7fb74df - refactor(#25): Address Copilot review feedback",
+              "fa01b89 - chore: Trigger CI with updated PR description",
+              "78993cb - Merge PR #61 (squash)"
+            ]
+          },
+          "effort_minutes": 20
+        },
+        {
+          "priority": "critical",
+          "agent": "NEW AGENT NEEDED",
+          "update_type": "new_agent",
+          "description": "Workflow pattern significantly different from standard",
+          "details": [
+            "New phases: Workflow Documentation Creation, prmerge Command Enhancements, Review Cycle (2 cycles), Quality Checks, PR Merge Process & CI Validation Fixes, Issue #25 Implementation - React Router v6, Workflow Documentation Updates, CI & PR",
+            "Missing phases: Testing, Merge, Planning, Context Gathering, Review"
+          ],
+          "effort_minutes": 120
+        }
+      ]
+    }
+  },
+  "knowledge_base_status": {
+    "workflow_patterns_count": 1,
+    "problem_solutions_count": 40,
+    "confidence_level": "low",
+    "ready_for_production": false
+  },
+  "update_thresholds": {
+    "min_issues_for_update": 5,
+    "min_new_problems_for_update": 2,
+    "time_variance_threshold": 0.1,
+    "confidence_threshold": 20
+  }
+}

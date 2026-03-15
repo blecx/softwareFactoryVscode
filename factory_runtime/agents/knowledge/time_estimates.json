@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-01-19T21:17:43.026942",
+  "completed_issues": [
+    {
+      "issue_num": 25,
+      "estimated_hours": 0.0,
+      "actual_hours": 28.433333333333334,
+      "multiplier": 1.0
+    }
+  ],
+  "statistics": {
+    "avg_multiplier": 1.0,
+    "median_multiplier": 1.0,
+    "std_deviation": 0.0,
+    "sample_size": 1
+  },
+  "phase_averages": {
+    "context": 0.0,
+    "planning": 0.0,
+    "implementation": 0.0,
+    "testing": 0.0,
+    "review": 0.0,
+    "merge": 0.0
+  }
+}

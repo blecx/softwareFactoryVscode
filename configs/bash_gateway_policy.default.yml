@@ -1,0 +1,14 @@
+policy:
+  version: 1.0
+  description: "Neutral default policy for isolated Maestro runtime"
+  allow:
+    - "^ls"
+    - "^pwd"
+    - "^cat"
+    - "^grep"
+    - "^find"
+  deny:
+    - "rm -rf /"
+    - "^mkfs"
+  sandbox_dir: ".tmp/maestro/sandbox"
+  max_execution_time_seconds: 30

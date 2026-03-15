@@ -1,0 +1,33 @@
+
+services:
+  docker-compose-mcp:
+    build:
+      context: .
+      dockerfile: docker/mcp-devops-docker-compose/Dockerfile
+    restart: unless-stopped
+    environment:
+      - DOCKER_COMPOSE_MCP_PORT=3015
+      - DOCKER_COMPOSE_MCP_HOST=0.0.0.0
+      - DOCKER_COMPOSE_MCP_REPO_ROOT=/target
+      - DOCKER_COMPOSE_MCP_AUDIT_DIR=/target/.tmp/mcp-docker-compose
+    ports:
+      - "127.0.0.1:${PORT_TEST:-3015}:3015"
+    volumes:
+      - ${PROJECT_WORKSPACE_DIR:-.}:/target
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  test-runner-mcp:
+    build:
+      context: .
+      dockerfile: docker/mcp-devops-test-runner/Dockerfile
+    restart: unless-stopped
+    environment:
+      - TEST_RUNNER_MCP_PORT=3016
+      - TEST_RUNNER_MCP_HOST=0.0.0.0
+      - TEST_RUNNER_MCP_REPO_ROOT=/target
+      - TEST_RUNNER_MCP_AUDIT_DIR=/target/.tmp/mcp-test-runner
+      - TEST_RUNNER_PYTHON=python3
+    ports:
+      - "127.0.0.1:${PORT_COMPOSE:-3016}:3016"
+    volumes:
+      - ${PROJECT_WORKSPACE_DIR:-.}:/target

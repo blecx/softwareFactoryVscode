@@ -1,0 +1,343 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-01-19T21:17:43.025753",
+  "problems": [
+    {
+      "problem": "#25 Implementation & prmerge Enhancements",
+      "solution": "Not documented",
+      "category": "pr_template_issues",
+      "line": 1,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 Complete Workflow + prmerge Enhancements",
+      "solution": "Not documented",
+      "category": "ci_cd_issues",
+      "line": 4,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 (Add project management routing) including:",
+      "solution": "Created comprehensive WORK-ISSUE-WORKFLOW.md (831 lines, 6 phases)",
+      "category": "pr_template_issues",
+      "line": 10,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 implementation (React Router v6)",
+      "solution": "Created comprehensive WORK-ISSUE-WORKFLOW.md (831 lines, 6 phases)",
+      "category": "other",
+      "line": 12,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "closure and completion recording",
+      "solution": "Created comprehensive WORK-ISSUE-WORKFLOW.md (831 lines, 6 phases)",
+      "category": "other",
+      "line": 14,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25: React Router v6 infrastructure (3.5h vs 4.0h estimated)",
+      "solution": "Merged PR #61 after fixing CI validation issues",
+      "category": "other",
+      "line": 20,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 lessons into automation",
+      "solution": "Updated all workflow documentation with learnings",
+      "category": "other",
+      "line": 23,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 49,
+      "first_seen_issue": 25,
+      "occurrences": 2
+    },
+    {
+      "problem": "#25 Implementation - React Router v6",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 55,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "** #25 - Add project management routing",
+      "solution": "Not documented",
+      "category": "pr_template_issues",
+      "line": 57,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "Agent removed chat functionality",
+      "solution": "Restored chat as /chat route",
+      "category": "other",
+      "line": 100,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "Layout inconsistency (breadcrumb above chat header)",
+      "solution": "Conditional breadcrumb rendering (hidden on /chat)",
+      "category": "other",
+      "line": 105,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "on PR description format",
+      "solution": "Not documented",
+      "category": "pr_template_issues",
+      "line": 118,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 auto-closed** by GitHub",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 153,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "view 25 --json state,closedAt,url",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 174,
+      "first_seen_issue": 25,
+      "occurrences": 2
+    },
+    {
+      "problem": "is CLOSED with timestamp",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 215,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "closure...",
+      "solution": "\u2713 Issue #25 is CLOSED (at 2026-01-18T18:12:28Z)",
+      "category": "other",
+      "line": 226,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 is CLOSED (at 2026-01-18T18:12:28Z)",
+      "solution": "\u2713 Comprehensive closing message posted",
+      "category": "other",
+      "line": 227,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "closing message...",
+      "solution": "\u2713 Comprehensive closing message posted",
+      "category": "other",
+      "line": 228,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 or infrastructure issues:**",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 236,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 learnings",
+      "solution": "steps",
+      "category": "other",
+      "line": 250,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 enhancement story",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 259,
+      "first_seen_issue": 25,
+      "occurrences": 2
+    },
+    {
+      "problem": "#25\" section (99 lines)",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 287,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 section with concrete results",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 298,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "command with Issue #25 learnings",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 300,
+      "first_seen_issue": 25,
+      "occurrences": 2
+    },
+    {
+      "problem": "operations",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 353,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "close 25 --comment \"completion message\"",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 355,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "selection",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 411,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 Implementation:**",
+      "solution": "React Router v6 infrastructure complete",
+      "category": "other",
+      "line": 427,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 closed",
+      "solution": "3.5 hours actual vs 4.0 estimated (-12.5% improvement)",
+      "category": "other",
+      "line": 431,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 learnings captured in both documents",
+      "solution": "User principles integrated (no hallucinations, approval for decisions)",
+      "category": "other",
+      "line": 437,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 pattern)",
+      "solution": "Documentation complete (prmerge-command.md + enhancements doc)",
+      "category": "other",
+      "line": 443,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25)",
+      "solution": "Success factors expanded (6 factors)",
+      "category": "other",
+      "line": 448,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 recorded)",
+      "solution": "workflow",
+      "category": "other",
+      "line": 467,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 learnings to workflow",
+      "solution": "workflow",
+      "category": "ci_cd_issues",
+      "line": 471,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25 completion in knowledge base",
+      "solution": "workflow",
+      "category": "other",
+      "line": 472,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "resolution workflow",
+      "solution": "Not documented",
+      "category": "ci_cd_issues",
+      "line": 473,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25:**",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 492,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#25: 3.5h actual vs 4.0h estimated (-12.5%)",
+      "solution": "Not documented",
+      "category": "other",
+      "line": 510,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    },
+    {
+      "problem": "#26",
+      "solution": "Complete",
+      "category": "other",
+      "line": 527,
+      "first_seen_issue": 25,
+      "occurrences": 1
+    }
+  ],
+  "categories": {
+    "build_errors": [],
+    "test_failures": [],
+    "ci_cd_issues": [
+      "#25 Complete Workflow + prmerge Enhancements",
+      "#25 learnings to workflow",
+      "resolution workflow"
+    ],
+    "pr_template_issues": [
+      "#25 Implementation & prmerge Enhancements",
+      "#25 (Add project management routing) including:",
+      "** #25 - Add project management routing",
+      "on PR description format"
+    ],
+    "merge_conflicts": [],
+    "dependencies": []
+  }
+}

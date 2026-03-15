@@ -1,0 +1,12 @@
+
+services:
+  context7:
+    build:
+      context: .
+      dockerfile: docker/context7/Dockerfile
+    restart: unless-stopped
+    environment:
+      - CONTEXT7_PORT=3010
+      - CONTEXT7_API_KEY=${CONTEXT7_API_KEY:-}
+    ports:
+      - "127.0.0.1:${PORT_CONTEXT7:-3010}:3010"
