@@ -532,7 +532,6 @@ Minimum set to classify:
 
 - `GITHUB_TOKEN` / `GH_TOKEN`
 - `CONTEXT7_API_KEY`
-- `OPENAI_API_KEY`
 - `ANTHROPIC_API_KEY`
 
 ### Step 9.4 — Add remote-bootstrap tooling

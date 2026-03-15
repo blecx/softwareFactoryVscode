@@ -30,7 +30,6 @@ def main():
             f.write(f"PROJECT_WORKSPACE_ID={project_id}\n")
             f.write(f"COMPOSE_PROJECT_NAME=factory_{project_id}\n")
             f.write("CONTEXT7_API_KEY=\n")
-            f.write("OPENAI_API_KEY=\n")
         print(f"   [{factory_env_path}] created.")
     else:
         print(f"   [{factory_env_path}] already exists.")
