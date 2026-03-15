@@ -1,23 +1,23 @@
 ###############################################################################
-# MAESTRO Stack — docker-compose.maestro.yml
+# FACTORY Stack — docker-compose.factory.yml
 #
 # Services:
 #   mcp-memory      :3030  — knowledge graph memory (SQLite)
 #   mcp-agent-bus   :3031  — shared context bus (SQLite)
 #   approval-gate   :8001  — human-in-the-loop plan review (FastAPI)
-#   agent-worker           — MaestroOrchestrator queue loop
+#   agent-worker           — FactoryOrchestrator queue loop
 #
 # Usage:
-#   cp .env.maestro.example .env.maestro
-#   # Edit .env.maestro — set OPENAI_API_KEY, GITHUB_TOKEN at minimum
-#   docker compose -f docker-compose.maestro.yml --env-file .env.maestro up --build
+#   cp .env.factory.example .env.factory
+#   # Edit .env.factory — set OPENAI_API_KEY, GITHUB_TOKEN at minimum
+#   docker compose -f docker-compose.factory.yml --env-file .env.factory up --build
 #
 # Health checks:
 #   curl http://localhost:3030/health
 #   curl http://localhost:3031/health
 #   curl http://localhost:8001/health
 #
-# See: docs/agents/MAESTRO-DESIGN.md
+# See: docs/agents/FACTORY-DESIGN.md
 ###############################################################################
 
 services:
@@ -28,12 +28,12 @@ services:
     build:
       context: .
       dockerfile: docker/mock-llm-gateway/Dockerfile
-    image: maestro/mock-llm-gateway:latest
+    image: factory/mock-llm-gateway:latest
     restart: unless-stopped
     ports:
       - "${PORT_TUI:-9090}:9090"
     networks:
-      - maestro_net
+      - factory_net
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9090/admin/mocks')"]
       interval: 15s
@@ -49,18 +49,18 @@ services:
     build:
       context: .
       dockerfile: docker/mcp-memory/Dockerfile
-    image: maestro/mcp-memory:latest
+    image: factory/mcp-memory:latest
     restart: unless-stopped
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
       MEMORY_MCP_PORT: "${MEMORY_MCP_PORT:-3030}"
       MEMORY_DB_PATH: "/data/memory.db"
     volumes:
-      - maestro_memory_data:/data
+      - factory_memory_data:/data
     ports:
       - "${MEMORY_MCP_PORT:-3030}:3030"
     networks:
-      - maestro_net
+      - factory_net
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3030/health')"]
       interval: 15s
@@ -75,18 +75,18 @@ services:
     build:
       context: .
       dockerfile: docker/mcp-agent-bus/Dockerfile
-    image: maestro/mcp-agent-bus:latest
+    image: factory/mcp-agent-bus:latest
     restart: unless-stopped
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
       AGENT_BUS_PORT: "${AGENT_BUS_PORT:-3031}"
       AGENT_BUS_DB_PATH: "/data/agent_bus.db"
     volumes:
-      - maestro_bus_data:/data
+      - factory_bus_data:/data
     ports:
       - "${AGENT_BUS_PORT:-3031}:3031"
     networks:
-      - maestro_net
+      - factory_net
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3031/health')"]
       interval: 15s
@@ -101,7 +101,7 @@ services:
     build:
       context: .
       dockerfile: docker/approval-gate/Dockerfile
-    image: maestro/approval-gate:latest
+    image: factory/approval-gate:latest
     restart: unless-stopped
     depends_on:
       mcp-agent-bus:
@@ -113,7 +113,7 @@ services:
     ports:
       - "${APPROVAL_GATE_PORT:-8001}:8001"
     networks:
-      - maestro_net
+      - factory_net
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 15s
@@ -122,13 +122,13 @@ services:
       start_period: 15s
 
   # ---------------------------------------------------------------------------
-  # agent-worker — MaestroOrchestrator queue loop
+  # agent-worker — FactoryOrchestrator queue loop
   # ---------------------------------------------------------------------------
   agent-worker:
     build:
       context: .
       dockerfile: docker/agent-worker/Dockerfile
-    image: maestro/agent-worker:latest
+    image: factory/agent-worker:latest
     restart: unless-stopped
     depends_on:
       mcp-memory:
@@ -152,29 +152,29 @@ services:
         source: "${WORKSPACE_PATH:-.}"
         target: /target
     networks:
-      - maestro_net
+      - factory_net
 
 # ---------------------------------------------------------------------------
 # Volumes
 # ---------------------------------------------------------------------------
 volumes:
-  maestro_memory_data:
+  factory_memory_data:
     driver: local
     driver_opts:
       type: none
-      device: ${MAESTRO_DATA_DIR:-/data/maestro}/memory/${MAESTRO_INSTANCE_ID:-default}
+      device: ${FACTORY_DATA_DIR:-/data/factory}/memory/${FACTORY_INSTANCE_ID:-default}
       o: bind
-  maestro_bus_data:
+  factory_bus_data:
     driver: local
     driver_opts:
       type: none
-      device: ${MAESTRO_DATA_DIR:-/data/maestro}/bus/${MAESTRO_INSTANCE_ID:-default}
+      device: ${FACTORY_DATA_DIR:-/data/factory}/bus/${FACTORY_INSTANCE_ID:-default}
       o: bind
 
 # ---------------------------------------------------------------------------
 # Networks
 # ---------------------------------------------------------------------------
 networks:
-  maestro_net:
+  factory_net:
     driver: bridge
-    name: "maestro_net_${MAESTRO_INSTANCE_ID:-default}"
+    name: "factory_net_${FACTORY_INSTANCE_ID:-default}"

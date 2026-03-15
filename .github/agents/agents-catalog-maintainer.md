@@ -28,7 +28,7 @@ Produce a complete, accurate, and verifiable conversion of all agent-like workfl
 2. Gap analysis: what exists outside `.github/agents` and why.
 3. Conversion actions:
    - create/update missing `.md` wrappers,
-   - update `docs/maestro/AGENT_ROLES.md`,
+   - update `docs/factory/AGENT_ROLES.md`,
    - update `.github/agents/AUTOMATIONS.md`.
 4. Validation report with changed files and any unresolved blockers.
 

@@ -5,13 +5,13 @@ into one namespace, and routes call_tool(name, args) to the correct server.
 
 Protocol: MCP Streamable HTTP (JSON-RPC 2.0) over POST /mcp
 
-Used by all MAESTRO agents (router, coder, orchestrator) to access:
+Used by all FACTORY agents (router, coder, orchestrator) to access:
   - mcp-memory   (:3030)  — knowledge graph and lessons
   - mcp-agent-bus(:3031)  — task run context bus
   - mcp-bash-gateway (:3011) — shell execution (in Docker worker)
   - mcp-github-ops (:3018) — PR creation
 
-See: docs/agents/MAESTRO-DESIGN.md
+See: docs/agents/FACTORY-DESIGN.md
 Implements: GitHub issue #711
 """
 

@@ -25,7 +25,7 @@ def _load_service() -> OfflineDocsService:
 
 
 service = _load_service()
-mcp = FastMCP("maestro Offline Docs MCP", json_response=True)
+mcp = FastMCP("factory Offline Docs MCP", json_response=True)
 
 
 @mcp.tool()

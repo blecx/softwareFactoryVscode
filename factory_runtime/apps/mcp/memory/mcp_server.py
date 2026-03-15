@@ -11,7 +11,7 @@ Exposes MemoryStore through 5 MCP tools:
 Port: MEMORY_MCP_PORT (default 3030)
 DB:   MEMORY_DB_PATH   (default /data/memory.db — use :memory: for tests)
 
-See: docs/agents/MAESTRO-DESIGN.md
+See: docs/agents/FACTORY-DESIGN.md
 Implements: GitHub issue #708
 """
 

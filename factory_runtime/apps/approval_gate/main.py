@@ -24,7 +24,7 @@ from fastapi.responses import JSONResponse
 from .bus_client import BusClient
 from .plan_card import ApprovalRequest, PendingRun, PlanCard
 
-app = FastAPI(title="MAESTRO Approval Gate", version="1.0.0")
+app = FastAPI(title="FACTORY Approval Gate", version="1.0.0")
 
 _bus = BusClient(base_url=os.getenv("AGENT_BUS_URL", "http://localhost:3031"))
 

@@ -25,7 +25,7 @@ def _load_service() -> GitHubOpsService:
 
 
 service = _load_service()
-mcp = FastMCP("maestro GitHub Ops MCP", json_response=True)
+mcp = FastMCP("factory GitHub Ops MCP", json_response=True)
 
 
 def _wrap_error(exc: Exception) -> ValueError:

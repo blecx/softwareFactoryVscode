@@ -7,5 +7,5 @@
     "timeout": 60,
     "rate_limit_delay": 1.0,
     "max_retries": 3,
-    "system_prompt_template": "You are a helpful Maestro system assistant."
+    "system_prompt_template": "You are a helpful Factory system assistant."
 }

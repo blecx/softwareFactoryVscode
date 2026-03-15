@@ -20,4 +20,4 @@ COPY apps/mcp/ apps/mcp/
 
 # Workspace is mounted at runtime via volume
 # CMD runs the orchestrator queue loop
-CMD ["python", "-m", "agents.maestro_cli", "run-queue"]
+CMD ["python", "-m", "agents.factory_cli", "run-queue"]

@@ -19,7 +19,7 @@ def _now() -> str:
 
 
 class MemoryStore:
-    """SQLite-backed memory store for MAESTRO agent memory layers."""
+    """SQLite-backed memory store for FACTORY agent memory layers."""
 
     def __init__(self, db_path: str = ":memory:") -> None:
         self._db_path = db_path

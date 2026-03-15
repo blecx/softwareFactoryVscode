@@ -13,7 +13,7 @@ Exposes AgentBus through 8 MCP tools:
 Port: AGENT_BUS_PORT (default 3031)
 DB:   AGENT_BUS_DB_PATH  (default /data/agent_bus.db — use :memory: for tests)
 
-See: docs/agents/MAESTRO-DESIGN.md
+See: docs/agents/FACTORY-DESIGN.md
 Implements: GitHub issue #710
 """
 
@@ -155,7 +155,7 @@ def bus_approve_run(run_id: str, feedback: str = "") -> dict[str, Any]:
 def bus_read_context_packet(run_id: str) -> dict[str, Any]:
     """Read the full context packet for a run in one call.
 
-    This is the core MAESTRO primitive. Any agent calls this once
+    This is the core FACTORY primitive. Any agent calls this once
     to get the complete run state: issue metadata, approved plan,
     every file snapshot, and recent validation results.
 

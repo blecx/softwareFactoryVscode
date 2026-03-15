@@ -329,7 +329,7 @@ def _resolve_working_directory(working_directory: str) -> str:
     if provided_path.exists():
         return working_directory
 
-    if working_directory in {"maestro", "./maestro"}:
+    if working_directory in {"factory", "./factory"}:
         return str(repo_root)
 
     candidate = repo_root / working_directory

@@ -46,7 +46,7 @@ def _load_service() -> DockerComposeService:
 
 
 service = _load_service()
-mcp = FastMCP("maestro Docker Compose MCP", json_response=True)
+mcp = FastMCP("factory Docker Compose MCP", json_response=True)
 
 
 @mcp.tool()

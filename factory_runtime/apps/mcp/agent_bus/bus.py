@@ -49,7 +49,7 @@ class InvalidStatusTransitionError(ValueError):
 
 
 class AgentBus:
-    """SQLite-backed context bus for MAESTRO agent task runs."""
+    """SQLite-backed context bus for FACTORY agent task runs."""
 
     def __init__(self, db_path: str = ":memory:") -> None:
         self._db_path = db_path
@@ -372,11 +372,11 @@ class AgentBus:
         return result
 
     # ------------------------------------------------------------------
-    # Context packet (the key MAESTRO primitive)
+    # Context packet (the key FACTORY primitive)
     # ------------------------------------------------------------------
 
     def read_context_packet(self, run_id: str) -> dict[str, Any]:
-        """Return all run data in one call - the core MAESTRO primitive.
+        """Return all run data in one call - the core FACTORY primitive.
 
         Any agent can call this once to get the full issue context,
         approved plan, all file snapshots, and recent validation results.
