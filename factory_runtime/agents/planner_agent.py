@@ -15,9 +15,9 @@ import re
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
-    from agents.mcp_client import MCPMultiClient
+    from factory_runtime.agents.mcp_client import MCPMultiClient
 
-from agents.llm_client import LLMClientFactory
+from factory_runtime.agents.llm_client import LLMClientFactory
 
 _SYSTEM_PROMPT = """You are the MAESTRO PlannerAgent.
 Your job is to read a GitHub issue, search the codebase using MCP tools to understand the 

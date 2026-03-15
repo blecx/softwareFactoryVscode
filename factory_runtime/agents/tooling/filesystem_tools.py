@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from agents.tooling.contracts import ToolResult
+from factory_runtime.agents.tooling.contracts import ToolResult
 
 
 def read_file_content_typed(

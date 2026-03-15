@@ -21,29 +21,29 @@ from typing import Dict, List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from agents.base_agent import AgentPhase, BaseAgent  # noqa: E402
-from agents.workflow_error_recovery import (  # noqa: E402
+from factory_runtime.agents.base_agent import AgentPhase, BaseAgent  # noqa: E402
+from factory_runtime.agents.workflow_error_recovery import (  # noqa: E402
     ErrorRecovery,
     ParallelValidator,
     SmartRetry,
 )
-from agents.workflow_phase_helpers import (  # noqa: E402
+from factory_runtime.agents.workflow_phase_helpers import (  # noqa: E402
     DocUpdater,
     IncrementalKnowledgeBase,
     IssuePreflight,
     SmartValidation,
 )
-from agents.workflow_phase_services import (  # noqa: E402
+from factory_runtime.agents.workflow_phase_services import (  # noqa: E402
     WorkflowPhaseService,
     build_default_phase_services,
 )
-from agents.workflow_side_effect_adapters import (  # noqa: E402
+from factory_runtime.agents.workflow_side_effect_adapters import (  # noqa: E402
     CommandExecutionResult,
     SubprocessWorkflowSideEffectAdapter,
     WorkflowSideEffectAdapter,
     WorkflowSideEffectError,
 )
-from agents.workflow_state import CrossRepoContext  # noqa: E402
+from factory_runtime.agents.workflow_state import CrossRepoContext  # noqa: E402
 
 
 class WorkflowAgent(BaseAgent):

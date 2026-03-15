@@ -7,7 +7,7 @@ skill-based acceptance criteria and explicit specialist review gates.
 
 from pathlib import Path
 
-from agents.maestro_adapter import MaestroAdapter
+from factory_runtime.agents.maestro_adapter import MaestroAdapter
 
 
 class RalphAgent(MaestroAdapter):

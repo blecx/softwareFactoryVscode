@@ -29,7 +29,7 @@ from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
-    from agents.mcp_client import MCPMultiClient
+    from factory_runtime.agents.mcp_client import MCPMultiClient
 
 
 # ---------------------------------------------------------------------------
@@ -259,7 +259,7 @@ class CoderAgent:
     async def _chat(self, user_message: str) -> str:
         """Add user message, call LLM, return assistant reply. Accumulates history."""
         if self._llm is None:
-            from agents.llm_client import LLMClientFactory
+            from factory_runtime.agents.llm_client import LLMClientFactory
 
             self._llm = LLMClientFactory.create_client_for_role("coding")
 

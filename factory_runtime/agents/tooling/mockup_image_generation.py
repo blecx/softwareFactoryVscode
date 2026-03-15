@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
 
-from agents.tooling.mockup_artifacts import get_mockup_dir, write_mockup_index_html
-from agents.tooling.openai_images_client import (
+from factory_runtime.agents.tooling.mockup_artifacts import get_mockup_dir, write_mockup_index_html
+from factory_runtime.agents.tooling.openai_images_client import (
     OpenAIAPIKeyMissingError,
     OpenAIImagesClient,
     OpenAIImagesGenerateParams,

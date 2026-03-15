@@ -11,7 +11,7 @@ from pathlib import Path
 import time
 from typing import Any, Dict, Protocol
 
-from agents.validation_profiles import get_validation_commands
+from factory_runtime.agents.validation_profiles import get_validation_commands
 
 
 def _detect_validation_repo_type(agent: Any) -> str:
