@@ -1,0 +1,54 @@
+name: Feature request
+description: Propose a new softwareFactoryVscode capability or enhancement
+title: "feat: "
+labels: ["status:ready"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal / Problem Statement
+      description: What problem does this change solve?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What's in scope and out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: List concrete, testable acceptance criteria.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: API / Projection / Runtime Contract
+      description: Describe any host-facing contract changes, env vars, compose, workspace, or GitHub asset impacts.
+    validations:
+      required: false
+  - type: textarea
+    id: approach
+    attributes:
+      label: Technical Approach
+      description: Outline the implementation strategy.
+    validations:
+      required: true
+  - type: textarea
+    id: testing
+    attributes:
+      label: Testing Requirements
+      description: Which checks, tests, or workflows must pass?
+    validations:
+      required: true
+  - type: textarea
+    id: docs
+    attributes:
+      label: Documentation Updates
+      description: Which docs/manifests/templates need to change?
+    validations:
+      required: true
