@@ -25,10 +25,10 @@ from typing import Any, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
 
-from agents.mcp_client import MCPMultiClient
-from agents.router_agent import RouterAgent, RoutingDecision
-from agents.planner_agent import PlannerAgent
-from agents.coder_agent import CoderAgent, CoderResult
+from factory_runtime.agents.mcp_client import MCPMultiClient
+from factory_runtime.agents.router_agent import RouterAgent, RoutingDecision
+from factory_runtime.agents.planner_agent import PlannerAgent
+from factory_runtime.agents.coder_agent import CoderAgent, CoderResult
 
 
 # ---------------------------------------------------------------------------

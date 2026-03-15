@@ -18,9 +18,9 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from agents.mcp_client import MCPMultiClient
+    from factory_runtime.agents.mcp_client import MCPMultiClient
 
-from agents.complexity_scorer import ComplexityScorer
+from factory_runtime.agents.complexity_scorer import ComplexityScorer
 
 
 # ---------------------------------------------------------------------------

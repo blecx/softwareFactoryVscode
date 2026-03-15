@@ -5,7 +5,7 @@ This bridges `scripts/work-issue.py` to `agents/maestro.py`.
 
 from typing import Optional
 from pathlib import Path
-from agents.maestro import MaestroOrchestrator
+from factory_runtime.agents.maestro import MaestroOrchestrator
 
 
 class MaestroAdapter:

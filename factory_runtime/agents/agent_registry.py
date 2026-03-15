@@ -3,8 +3,8 @@
 from importlib import import_module
 from typing import Type
 
-from agents.maestro_adapter import MaestroAdapter
-from agents.ralph_agent import RalphAgent
+from factory_runtime.agents.maestro_adapter import MaestroAdapter
+from factory_runtime.agents.ralph_agent import RalphAgent
 
 
 AGENT_ALIASES = {

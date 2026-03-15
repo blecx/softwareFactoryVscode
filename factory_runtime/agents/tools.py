@@ -15,26 +15,26 @@ import time
 from pathlib import Path
 from typing import Annotated, Optional
 
-from agents.command_cache import get_cache
-from agents.coverage_analyzer import get_coverage_analyzer
-from agents.time_estimator import TimeEstimator
-from agents.tooling.filesystem_tools import (
+from factory_runtime.agents.command_cache import get_cache
+from factory_runtime.agents.coverage_analyzer import get_coverage_analyzer
+from factory_runtime.agents.time_estimator import TimeEstimator
+from factory_runtime.agents.tooling.filesystem_tools import (
     list_directory_contents_typed,
     read_file_content_typed,
     write_file_content_typed,
 )
-from agents.tooling.git_tools import (
+from factory_runtime.agents.tooling.git_tools import (
     create_feature_branch_typed,
     get_changed_files_typed,
     git_commit_typed,
 )
-from agents.tooling.github_tools import (
+from factory_runtime.agents.tooling.github_tools import (
     create_github_pr_typed,
     fetch_github_issue_typed,
     list_github_issues_typed,
 )
 
-from agents.tooling.mockup_image_generation import generate_issue_mockup_artifacts
+from factory_runtime.agents.tooling.mockup_image_generation import generate_issue_mockup_artifacts
 
 
 # ============================================================================

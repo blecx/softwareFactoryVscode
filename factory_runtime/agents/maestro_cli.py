@@ -17,8 +17,8 @@ import json
 import sys
 from pathlib import Path
 
-from agents.maestro import MaestroOrchestrator
-from agents.mcp_lifecycle import MCPBootloader
+from factory_runtime.agents.maestro import MaestroOrchestrator
+from factory_runtime.agents.mcp_lifecycle import MCPBootloader
 
 
 def _build_parser() -> argparse.ArgumentParser:

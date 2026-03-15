@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-from agents.tooling.gh_throttle import run_gh_throttled
+from factory_runtime.agents.tooling.gh_throttle import run_gh_throttled
 
 
 class BaseAgent(ABC):

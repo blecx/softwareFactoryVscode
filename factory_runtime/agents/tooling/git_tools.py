@@ -2,7 +2,7 @@
 
 import subprocess
 
-from agents.tooling.contracts import ToolResult
+from factory_runtime.agents.tooling.contracts import ToolResult
 
 
 def git_commit_typed(

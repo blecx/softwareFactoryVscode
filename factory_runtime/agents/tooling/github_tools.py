@@ -3,8 +3,8 @@
 import subprocess
 from typing import Optional
 
-from agents.tooling.contracts import ToolResult
-from agents.tooling.gh_throttle import run_gh_throttled
+from factory_runtime.agents.tooling.contracts import ToolResult
+from factory_runtime.agents.tooling.gh_throttle import run_gh_throttled
 
 
 def fetch_github_issue_typed(
