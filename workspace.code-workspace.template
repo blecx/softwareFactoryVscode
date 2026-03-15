@@ -1,0 +1,13 @@
+{
+  "folders": [
+    {
+      "name": "Host Project (Root)",
+      "path": "."
+    },
+    {
+      "name": "AI Agent Factory",
+      "path": ".softwareFactoryVscode"
+    }
+  ],
+  "settings": {}
+}
