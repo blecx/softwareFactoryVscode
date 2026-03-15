@@ -274,7 +274,7 @@ def generate_mockup_artifacts(
 ) -> str:
     """Generate UI mockup images under `.tmp/mockups/issue-<n>/`.
 
-    Reads `OPENAI_API_KEY` from the environment. If missing, returns a structured
+    Requires dynamic external overrides. If missing, returns a structured
     error message without raising.
     """
     result = generate_issue_mockup_artifacts(
@@ -291,7 +291,7 @@ def generate_mockup_artifacts(
         "images": [str(p) for p in result.image_paths],
     }
     if not result.ok:
-        payload["suggestion"] = "Set OPENAI_API_KEY and retry."
+        payload["suggestion"] = "Provide dynamic configuration overrides."
 
     return json.dumps(payload, indent=2)
 

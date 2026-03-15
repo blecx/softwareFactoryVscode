@@ -9,7 +9,6 @@
 #
 # Usage:
 #   cp .env.factory.example .env.factory
-#   # Edit .env.factory — set OPENAI_API_KEY, GITHUB_TOKEN at minimum
 #   docker compose -f docker-compose.factory.yml --env-file .env.factory up --build
 #
 # Health checks:
@@ -139,7 +138,6 @@ services:
         condition: service_healthy
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
-      OPENAI_API_KEY: "${OPENAI_API_KEY}"
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
       MEMORY_MCP_URL: "http://mcp-memory:3030"
       AGENT_BUS_URL: "http://mcp-agent-bus:3031"

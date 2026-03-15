@@ -68,7 +68,6 @@ COMPOSE_PROJECT_NAME=factory_my-project
 
 # Required for AI/MCP connectivity
 CONTEXT7_API_KEY=your_context7_key_here
-OPENAI_API_KEY=your_openai_key_here
 ```
 
 ---

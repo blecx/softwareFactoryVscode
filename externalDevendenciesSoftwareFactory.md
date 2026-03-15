@@ -115,7 +115,7 @@ Examples:
 
 - `GITHUB_TOKEN` / `GH_TOKEN`
 - `CONTEXT7_API_KEY`
-- provider keys such as `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+- provider keys such as `ANTHROPIC_API_KEY` (if used)
 - repository variables such as default target repo slugs or workflow flags, if adopted
 
 ### Bucket D — Local operator prerequisites
@@ -372,7 +372,6 @@ Mandatory principle:
 
 Therefore:
 
-- `OPENAI_API_KEY` must be optional for baseline CI
 - `ANTHROPIC_API_KEY` must be optional for baseline CI
 - `CONTEXT7_API_KEY` must be optional unless a specific workflow mode requires it
 
@@ -387,7 +386,6 @@ If any extended workflow requires those values, document them as **optional exte
 ### Optional local/remote secrets
 
 - `CONTEXT7_API_KEY`
-- `OPENAI_API_KEY`
 - `ANTHROPIC_API_KEY`
 
 ### Forbidden practice

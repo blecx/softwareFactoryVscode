@@ -3,7 +3,7 @@
 Minimal wrapper around the OpenAI Images API for generating UI mockup images.
 
 Notes:
-- Reads API key from `OPENAI_API_KEY` if not provided.
+- Optional: Can use `OPENAI_API_KEY` for experimental image capabilities if not provided.
 - Does not persist secrets to disk.
 """
 
