@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-CONFIG_PATH = Path(__file__).parent.parent / ".copilot/config/vscode-agent-settings.json"
+CONFIG_PATH = (
+    Path(__file__).parent.parent / ".copilot/config/vscode-agent-settings.json"
+)
 WORKSPACE_SETTINGS_PATH = Path(__file__).parent.parent / ".vscode/settings.json"
 
 MANAGED_PREFIXES = (
@@ -40,7 +42,9 @@ def load_json(path: Path) -> Dict[str, Any]:
         return json.load(handle)
 
 
-def reconcile_settings(existing: Dict[str, Any], new: Dict[str, Any]) -> tuple[Dict[str, Any], list[str]]:
+def reconcile_settings(
+    existing: Dict[str, Any], new: Dict[str, Any]
+) -> tuple[Dict[str, Any], list[str]]:
     """Reconciles owned keys completely from canonical config, returning updated dict and list of removed keys."""
     result = {}
     removed_keys = []
@@ -65,7 +69,9 @@ def collect_drift(expected: Any, actual: Any, path: str = "") -> list[str]:
 
     if isinstance(expected, dict):
         if not isinstance(actual, dict):
-            drifts.append(f"{path or '<root>'}: expected object, found {type(actual).__name__}")
+            drifts.append(
+                f"{path or '<root>'}: expected object, found {type(actual).__name__}"
+            )
             return drifts
 
         for key, value in expected.items():
@@ -74,7 +80,7 @@ def collect_drift(expected: Any, actual: Any, path: str = "") -> list[str]:
                 drifts.append(f"{child_path}: missing")
                 continue
             drifts.extend(collect_drift(value, actual[key], child_path))
-            
+
         # Check for extra keys in actual
         for key in actual:
             child_path = f"{path}.{key}" if path else key
@@ -86,7 +92,7 @@ def collect_drift(expected: Any, actual: Any, path: str = "") -> list[str]:
                 # Inside an owned root, any extra key is drift
                 if key not in expected:
                     drifts.append(f"{child_path}: extra managed key")
-                    
+
         return drifts
 
     if expected != actual:
@@ -137,7 +143,7 @@ def main() -> int:
         return 1
 
     updated, removed_keys = reconcile_settings(existing, expected)
-    
+
     if args.dry_run:
         print("🔍 Dry Run: Previewing settings projection...")
         drifts = collect_drift(expected, existing)
