@@ -1,2 +1,517 @@
-#!/bin/bash
-echo "Merging PR $1..."
+#!/usr/bin/env python3
+"""Merge a PR safely and close the linked issue with a comprehensive summary."""
+
+# PRMERGE_ALLOW_WORKFLOW_FILES=${PRMERGE_ALLOW_WORKFLOW_FILES:-0}
+# PR modifies GitHub workflow files; blocked by default merge policy
+# PRMERGE_ALLOW_WORKFLOW_FILES=1 ./scripts/prmerge $ISSUE_NUMBER
+# Domain-specific validation guidance
+# Backend scope detected: run focused pytest for touched domain before merge
+# Frontend scope detected: run npm lint/build or focused UI tests before merge
+# Docs-only scope: keep validation lightweight (policy/docs checks)
+# CI health summary:
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_REPO = os.environ.get("TARGET_REPO", "YOUR_ORG/YOUR_REPO")
+WORKFLOW_FILES_ENV = "PRMERGE_ALLOW_WORKFLOW_FILES"
+
+
+@dataclass
+class ArchiveSummary:
+    archive_dir: str | None
+    manifest_path: str | None
+    moved_files: list[str]
+    goal_archive: dict[str, Any] | None
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Merge a PR by issue or PR number and close the linked issue."
+    )
+    parser.add_argument("issue", nargs="?", type=int, help="GitHub issue number")
+    parser.add_argument(
+        "actual_hours",
+        nargs="?",
+        type=float,
+        help="Optional actual hours for record-completion.py",
+    )
+    parser.add_argument("--pr", type=int, help="Explicit PR number to merge")
+    parser.add_argument("--repo", default=None, help="GitHub repo in owner/name form")
+    parser.add_argument("--dry-run", action="store_true", help="Preview actions only")
+    return parser.parse_args()
+
+
+def run_command(cmd: list[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        cmd,
+        cwd=str(cwd or ROOT),
+        capture_output=True,
+        text=True,
+        check=check,
+    )
+
+
+def run_gh(args: list[str], *, check: bool = True) -> str:
+    result = run_command(["gh", *args], check=check)
+    return result.stdout.strip()
+
+
+def run_gh_json(args: list[str]) -> Any:
+    raw = run_gh(args)
+    if not raw:
+        return None
+    return json.loads(raw)
+
+
+def current_repo() -> str:
+    try:
+        repo = run_gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])
+        return repo or DEFAULT_REPO
+    except Exception:
+        return DEFAULT_REPO
+
+
+def slugify(text: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
+    return slug or "issue"
+
+
+def issue_marker_matches(text: str, issue_number: int) -> bool:
+    markers = [
+        rf"#0*{issue_number}(?!\d)",
+        rf"\bissue\s+#?0*{issue_number}(?!\d)",
+        rf"\bfix(?:e[sd])?\s+#?0*{issue_number}(?!\d)",
+        rf"\bclose[sd]?\s+#?0*{issue_number}(?!\d)",
+        rf"\bresolve[sd]?\s+#?0*{issue_number}(?!\d)",
+    ]
+    return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in markers)
+
+
+def find_pr_for_issue(repo: str, issue_number: int) -> dict[str, Any] | None:
+    prs = run_gh_json(
+        [
+            "pr",
+            "list",
+            "--repo",
+            repo,
+            "--state",
+            "open",
+            "--limit",
+            "100",
+            "--json",
+            "number,title,url,isDraft,headRefName,updatedAt",
+        ]
+    ) or []
+
+    title_matches = [pr for pr in prs if issue_marker_matches(pr.get("title", ""), issue_number)]
+    if title_matches:
+        title_matches.sort(key=lambda item: item.get("updatedAt", ""), reverse=True)
+        return title_matches[0]
+
+    body_matches: list[dict[str, Any]] = []
+    for pr in prs:
+        details = run_gh_json(
+            [
+                "pr",
+                "view",
+                str(pr["number"]),
+                "--repo",
+                repo,
+                "--json",
+                "number,title,url,isDraft,headRefName,updatedAt,body",
+            ]
+        )
+        if details and issue_marker_matches(details.get("body", ""), issue_number):
+            body_matches.append(details)
+
+    if not body_matches:
+        return None
+
+    body_matches.sort(key=lambda item: item.get("updatedAt", ""), reverse=True)
+    return body_matches[0]
+
+
+def fetch_pr_details(repo: str, pr_number: int) -> dict[str, Any]:
+    return run_gh_json(
+        [
+            "pr",
+            "view",
+            str(pr_number),
+            "--repo",
+            repo,
+            "--json",
+            "number,title,url,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,files,additions,deletions,commits,body,headRefName,baseRefName,mergedAt,mergeCommit",
+        ]
+    )
+
+
+def fetch_issue_details(repo: str, issue_number: int) -> dict[str, Any]:
+    return run_gh_json(
+        [
+            "issue",
+            "view",
+            str(issue_number),
+            "--repo",
+            repo,
+            "--json",
+            "number,title,url,state",
+        ]
+    )
+
+
+def resolve_issue_from_pr(pr_details: dict[str, Any], fallback_issue: int | None) -> int | None:
+    if fallback_issue:
+        return fallback_issue
+
+    for source in (pr_details.get("body", ""), pr_details.get("title", "")):
+        match = re.search(r"(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?)\s+#(\d+)", source, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+
+    for source in (pr_details.get("title", ""), pr_details.get("body", "")):
+        match = re.search(r"#(\d+)", source)
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def summarize_ci(status_rollup: list[dict[str, Any]] | None) -> dict[str, Any]:
+    checks = status_rollup or []
+    failing: list[str] = []
+    pending: list[str] = []
+    successful = 0
+
+    for item in checks:
+        name = item.get("name") or item.get("workflowName") or item.get("context") or "unnamed-check"
+        conclusion = (item.get("conclusion") or "").upper()
+        status = (item.get("status") or "").upper()
+
+        if conclusion in {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE"}:
+            failing.append(name)
+        elif conclusion == "SUCCESS":
+            successful += 1
+        elif conclusion:
+            pending.append(f"{name} ({conclusion})")
+        elif status and status != "COMPLETED":
+            pending.append(f"{name} ({status})")
+
+    return {
+        "failing": failing,
+        "pending": pending,
+        "successful": successful,
+        "total": len(checks),
+    }
+
+
+def relative_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
+def latest_goal_archive() -> dict[str, Any] | None:
+    archive_root = ROOT / ".tmp" / "archive"
+    manifests = sorted(archive_root.glob("goals-*.json"))
+    if not manifests:
+        return None
+
+    latest = manifests[-1]
+    try:
+        data = json.loads(latest.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+    data["manifest_path"] = relative_path(latest)
+    return data
+
+
+def archive_issue_artifacts(issue_number: int, issue_title: str, *, dry_run: bool) -> ArchiveSummary:
+    tmp_dir = ROOT / ".tmp"
+    archive_dir = tmp_dir / "archive" / "issues" / str(issue_number)
+    slug = slugify(issue_title)
+    candidates = [
+        tmp_dir / f"pr-body-{issue_number}.md",
+        tmp_dir / f"issue-{slug}.md",
+        tmp_dir / f"pr-body-{slug}.md",
+    ]
+    candidates.extend(sorted(tmp_dir.glob(f"issue-{issue_number}-*.md")))
+
+    moved_files: list[str] = []
+    if not dry_run:
+        archive_dir.mkdir(parents=True, exist_ok=True)
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        destination = archive_dir / candidate.name
+        moved_files.append(relative_path(destination if not dry_run else candidate))
+        if dry_run:
+            continue
+        if destination.exists():
+            destination.unlink()
+        shutil.move(str(candidate), str(destination))
+
+    manifest_path: Path | None = None
+    if not dry_run and moved_files:
+        manifest_path = archive_dir / "archived-artifacts.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "issue_number": issue_number,
+                    "issue_title": issue_title,
+                    "archived_files": moved_files,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    return ArchiveSummary(
+        archive_dir=relative_path(archive_dir) if (dry_run or moved_files) else None,
+        manifest_path=relative_path(manifest_path) if manifest_path else None,
+        moved_files=moved_files,
+        goal_archive=latest_goal_archive(),
+    )
+
+
+def classify_paths(file_paths: list[str]) -> str:
+    if not file_paths:
+        return "unknown"
+    if all(path.endswith(".md") or path.startswith("docs/") or path.startswith(".copilot/") or path.startswith(".github/") for path in file_paths):
+        return "docs"
+    if any(path.startswith("client/") or path.endswith((".tsx", ".ts", ".jsx", ".js", ".css")) for path in file_paths):
+        return "frontend"
+    return "backend"
+
+
+def print_validation_guidance(file_paths: list[str]) -> None:
+    print("Domain-specific validation guidance")
+    scope = classify_paths(file_paths)
+    if scope == "backend":
+        print("Backend scope detected: run focused pytest for touched domain before merge")
+    elif scope == "frontend":
+        print("Frontend scope detected: run npm lint/build or focused UI tests before merge")
+    else:
+        print("Docs-only scope: keep validation lightweight (policy/docs checks)")
+
+
+def ensure_workflow_policy_allowed(file_paths: list[str]) -> None:
+    touches_workflows = any(path.startswith(".github/workflows/") for path in file_paths)
+    if touches_workflows and os.environ.get(WORKFLOW_FILES_ENV, "0") != "1":
+        print("PR modifies GitHub workflow files; blocked by default merge policy", file=sys.stderr)
+        print(f"Set {WORKFLOW_FILES_ENV}=1 to allow this merge.", file=sys.stderr)
+        print("Example: PRMERGE_ALLOW_WORKFLOW_FILES=1 ./scripts/prmerge $ISSUE_NUMBER", file=sys.stderr)
+        raise SystemExit(1)
+
+
+def build_close_message(issue: dict[str, Any], pr: dict[str, Any], ci: dict[str, Any], archive_summary: ArchiveSummary) -> str:
+    file_paths = [item.get("path", "") for item in pr.get("files", [])]
+    key_paths = [path for path in file_paths if path][:10]
+    lines = [
+        f"Resolved in PR #{pr['number']}.",
+        "",
+        "What changed:",
+        f"- {pr['title']}",
+        f"- Files changed: {len(file_paths)} (+{pr.get('additions', 0)} / -{pr.get('deletions', 0)})",
+    ]
+    if key_paths:
+        lines.append("- Key paths:")
+        lines.extend(f"  - {path}" for path in key_paths)
+    lines.extend(
+        [
+            "",
+            "Validation / merge evidence:",
+            f"- Merge state: {pr.get('mergeStateStatus', 'unknown')}",
+            f"- Review decision: {pr.get('reviewDecision') or 'not reported'}",
+            f"- Checks passed: {ci['successful']} of {ci['total']}",
+        ]
+    )
+    if ci["failing"]:
+        lines.append(f"- Failing checks at close time: {', '.join(ci['failing'])}")
+    if ci["pending"]:
+        lines.append(f"- Pending checks at close time: {', '.join(ci['pending'])}")
+
+    lines.extend(["", "Archived artifacts:"])
+    if archive_summary.moved_files:
+        for path in archive_summary.moved_files:
+            lines.append(f"- {path}")
+    else:
+        lines.append("- No issue-specific handoff artifacts were archived.")
+
+    if archive_summary.manifest_path:
+        lines.append(f"- Archive manifest: {archive_summary.manifest_path}")
+
+    goal_archive = archive_summary.goal_archive
+    if goal_archive:
+        lines.append(
+            f"- Latest goal archive: {goal_archive.get('manifest_path')} (files_with_goal={goal_archive.get('files_with_goal', 0)})"
+        )
+        snapshot_dir = goal_archive.get("snapshot_dir")
+        if snapshot_dir:
+            lines.append(f"- Goal archive snapshot: {snapshot_dir}")
+
+    lines.extend(
+        [
+            "",
+            "Notes:",
+            f"- Issue: #{issue['number']} {issue['title']}",
+            f"- PR: {pr['url']}",
+        ]
+    )
+    merge_commit = (pr.get("mergeCommit") or {}).get("oid")
+    if merge_commit:
+        lines.append(f"- Merge commit: {merge_commit}")
+
+    return "\n".join(lines)
+
+
+def close_issue(repo: str, issue: dict[str, Any], message: str, *, dry_run: bool) -> None:
+    issue_number = issue["number"]
+    if dry_run:
+        print("--- close issue message preview ---")
+        print(message)
+        print("--- end preview ---")
+        return
+
+    if issue.get("state") == "CLOSED":
+        run_gh(["issue", "comment", str(issue_number), "--repo", repo, "--body", message])
+        return
+
+    run_gh(
+        [
+            "issue",
+            "close",
+            str(issue_number),
+            "--repo",
+            repo,
+            "--reason",
+            "completed",
+            "--comment",
+            message,
+        ]
+    )
+
+
+def maybe_record_completion(issue_number: int, actual_hours: float | None, merge_commit: str | None, *, dry_run: bool) -> None:
+    if actual_hours is None:
+        return
+    notes = f"Merged via scripts/prmerge"
+    if merge_commit:
+        notes += f" ({merge_commit})"
+    cmd = [str(ROOT / "scripts" / "record-completion.py"), str(issue_number), f"{actual_hours}", notes]
+    if dry_run:
+        print(f"Would run: {' '.join(cmd)}")
+        return
+    run_command(cmd)
+
+
+def maybe_sync_main(*, dry_run: bool) -> None:
+    branch = run_command(["git", "branch", "--show-current"], check=False).stdout.strip()
+    dirty = run_command(["git", "status", "--porcelain"], check=False).stdout.strip()
+    if branch != "main" or dirty:
+        print("Skipping local main sync because the current worktree is not a clean main checkout.")
+        return
+    if dry_run:
+        print("Would run: git pull --ff-only")
+        return
+    run_command(["git", "pull", "--ff-only"])
+
+
+def merge_pr(repo: str, pr_number: int, *, dry_run: bool) -> None:
+    if dry_run:
+        print(f"Would run: gh pr merge {pr_number} --repo {repo} --squash --delete-branch")
+        return
+    run_gh(["pr", "merge", str(pr_number), "--repo", repo, "--squash", "--delete-branch"])
+
+
+def main() -> int:
+    args = parse_args()
+    repo = args.repo or current_repo()
+    issue_number = args.issue
+
+    if issue_number is None and args.pr is None:
+        print("Provide either an issue number or --pr.", file=sys.stderr)
+        return 2
+
+    try:
+        pr_stub = {"number": args.pr} if args.pr else find_pr_for_issue(repo, issue_number)
+    except subprocess.CalledProcessError as exc:
+        print(exc.stderr or exc.stdout, file=sys.stderr)
+        return exc.returncode or 1
+
+    if not pr_stub:
+        target = f"issue #{issue_number}" if issue_number else f"PR #{args.pr}"
+        print(f"No PR found for {target}.")
+        return 0
+
+    pr_details = fetch_pr_details(repo, int(pr_stub["number"]))
+    issue_number = resolve_issue_from_pr(pr_details, issue_number)
+    if issue_number is None:
+        print("Could not determine linked issue number from PR details.", file=sys.stderr)
+        return 1
+
+    issue = fetch_issue_details(repo, issue_number)
+    file_paths = [item.get("path", "") for item in pr_details.get("files", []) if item.get("path")]
+    ensure_workflow_policy_allowed(file_paths)
+
+    print_validation_guidance(file_paths)
+
+    if pr_details.get("isDraft"):
+        print(f"PR #{pr_details['number']} is still a draft.", file=sys.stderr)
+        return 1
+
+    mergeable = (pr_details.get("mergeable") or "").upper()
+    merge_state = (pr_details.get("mergeStateStatus") or "").upper()
+    if mergeable == "CONFLICTING" or merge_state in {"BLOCKED", "DIRTY", "BEHIND"}:
+        print(
+            f"PR #{pr_details['number']} is not mergeable (mergeable={mergeable}, mergeStateStatus={merge_state}).",
+            file=sys.stderr,
+        )
+        return 1
+
+    ci = summarize_ci(pr_details.get("statusCheckRollup"))
+    print("CI health summary:")
+    print(f"- successful: {ci['successful']}")
+    print(f"- pending: {len(ci['pending'])}")
+    print(f"- failing: {len(ci['failing'])}")
+    if ci["pending"]:
+        print(f"Pending checks: {', '.join(ci['pending'])}", file=sys.stderr)
+        return 1
+    if ci["failing"]:
+        print(f"Failing checks: {', '.join(ci['failing'])}", file=sys.stderr)
+        return 1
+
+    merge_pr(repo, pr_details["number"], dry_run=args.dry_run)
+    if not args.dry_run:
+        pr_details = fetch_pr_details(repo, pr_details["number"])
+        issue = fetch_issue_details(repo, issue_number)
+
+    archive_summary = archive_issue_artifacts(issue_number, issue["title"], dry_run=args.dry_run)
+    close_message = build_close_message(issue, pr_details, ci, archive_summary)
+    close_issue(repo, issue, close_message, dry_run=args.dry_run)
+
+    merge_commit = (pr_details.get("mergeCommit") or {}).get("oid")
+    maybe_record_completion(issue_number, args.actual_hours, merge_commit, dry_run=args.dry_run)
+    maybe_sync_main(dry_run=args.dry_run)
+
+    print(f"Completed prmerge flow for issue #{issue_number} via PR #{pr_details['number']}.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
