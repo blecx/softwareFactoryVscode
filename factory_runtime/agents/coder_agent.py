@@ -1,4 +1,4 @@
-"""CoderAgent — single persistent thread coder for MAESTRO.
+"""CoderAgent — single persistent thread coder for FACTORY.
 
 Replaces the old 3-agent chain (planning→coding→review) with ONE ChatAgent
 thread that holds all context across every phase. Nothing is lost between
@@ -14,7 +14,7 @@ Lifecycle:
   7. Write file snapshots + validation results to agent-bus
   8. Return CoderResult
 
-See: docs/agents/MAESTRO-DESIGN.md
+See: docs/agents/FACTORY-DESIGN.md
 Implements: GitHub issue #714
 """
 
@@ -47,7 +47,7 @@ _MODEL_MAP = {
 }
 
 _SYSTEM_PROMPT = """\
-You are MAESTRO CoderAgent — an expert software engineer implementing GitHub issues.
+You are FACTORY CoderAgent — an expert software engineer implementing GitHub issues.
 
 Your workflow:
 1. Read the full context packet (issue, plan, snapshots, validations).

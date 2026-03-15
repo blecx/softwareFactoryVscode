@@ -1,4 +1,4 @@
-"""RouterAgent — complexity scoring and model tier assignment for MAESTRO.
+"""RouterAgent — complexity scoring and model tier assignment for FACTORY.
 
 Given a GitHub issue, RouterAgent:
   1. Scores complexity (0-10) using ComplexityScorer heuristics
@@ -7,7 +7,7 @@ Given a GitHub issue, RouterAgent:
   4. Creates a task run on mcp-agent-bus and transitions status to "routing"
   5. Returns a RoutingDecision with all metadata
 
-See: docs/agents/MAESTRO-DESIGN.md
+See: docs/agents/FACTORY-DESIGN.md
 Implements: GitHub issue #713
 """
 

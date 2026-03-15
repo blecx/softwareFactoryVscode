@@ -24,7 +24,7 @@ def _load_service() -> GitService:
 
 
 service = _load_service()
-mcp = FastMCP("maestro Git MCP", json_response=True)
+mcp = FastMCP("factory Git MCP", json_response=True)
 
 
 @mcp.tool()

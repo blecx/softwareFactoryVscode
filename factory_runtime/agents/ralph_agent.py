@@ -7,10 +7,10 @@ skill-based acceptance criteria and explicit specialist review gates.
 
 from pathlib import Path
 
-from factory_runtime.agents.maestro_adapter import MaestroAdapter
+from factory_runtime.agents.factory_adapter import FactoryAdapter
 
 
-class RalphAgent(MaestroAdapter):
+class RalphAgent(FactoryAdapter):
     """High-discipline issue resolver with skill and review gates."""
 
     def _load_github_agent_overlay(self) -> str:

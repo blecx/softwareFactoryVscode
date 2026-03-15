@@ -19,7 +19,7 @@ class Learning:
     content: str
     timestamp: datetime
     domain: str  # e.g., "backend", "frontend", "testing"
-    repository: str  # e.g., "maestro", "maestro-Client"
+    repository: str  # e.g., "factory", "factory-Client"
     success_rate: float = 1.0  # 0.0 to 1.0
     application_count: int = 0
     issue_number: Optional[int] = None

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "source": {
-    "repository": "blecx/maestro",
+    "repository": "blecx/factory",
     "defaultBranch": "main",
     "extractionDate": "2026-03-14",
-    "notes": "Starter template for extracting softwareFactoryVscode from maestro. Replace placeholders with the exact source ref and finalized path decisions during execution."
+    "notes": "Starter template for extracting softwareFactoryVscode from factory. Replace placeholders with the exact source ref and finalized path decisions during execution."
   },
   "target": {
     "repository": "softwareFactoryVscode",
@@ -52,7 +52,7 @@
       "source": ".github/agents",
       "target": ".github/agents",
       "mode": "adapt",
-      "notes": "Keep thin reusable discovery wrappers, not Maestro-specific policy bodies."
+      "notes": "Keep thin reusable discovery wrappers, not Factory-specific policy bodies."
     },
     {
       "source": "apps/mcp",
@@ -76,7 +76,7 @@
       "source": "agents",
       "target": "factory_runtime/agents",
       "mode": "split",
-      "notes": "Keep only runtime-relevant orchestration code; exclude Maestro-specific training or repo-specific issue logic."
+      "notes": "Keep only runtime-relevant orchestration code; exclude Factory-specific training or repo-specific issue logic."
     },
     {
       "source": "docker",
@@ -130,14 +130,14 @@
   "exclude": [
     {
       "source": "apps/api",
-      "reason": "Maestro application backend, not part of the reusable factory package."
+      "reason": "Factory application backend, not part of the reusable factory package."
     },
     {
-      "source": "_external/maestro-Client",
+      "source": "_external/factory-Client",
       "reason": "Explicit non-goal and product-specific client dependency."
     },
     {
-      "source": "Maestro-freeing-plan.md",
+      "source": "Factory-freeing-plan.md",
       "reason": "Historical source planning artefact; keep only if cited in migration docs."
     },
     {

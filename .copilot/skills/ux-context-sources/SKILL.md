@@ -19,7 +19,7 @@ Derive product intent from:
 - `README.md`
 - `docs/development.md`
 - `docs/WORK-ISSUE-WORKFLOW.md`
-- active UI code under `../maestro-client/client/`
+- active UI code under `../factory-client/client/`
 
 Always summarize inferred intent before proposing navigation/layout changes.
 

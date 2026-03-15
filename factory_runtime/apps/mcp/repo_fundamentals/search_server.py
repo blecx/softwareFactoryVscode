@@ -25,7 +25,7 @@ def _load_service() -> SearchService:
 
 
 service = _load_service()
-mcp = FastMCP("maestro Search MCP", json_response=True)
+mcp = FastMCP("factory Search MCP", json_response=True)
 
 
 @mcp.tool()

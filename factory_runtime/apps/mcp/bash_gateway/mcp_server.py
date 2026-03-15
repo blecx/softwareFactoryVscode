@@ -39,7 +39,7 @@ def _load_gateway() -> BashGatewayServer:
 
 
 gateway = _load_gateway()
-mcp = FastMCP("maestro Bash Gateway", json_response=True)
+mcp = FastMCP("factory Bash Gateway", json_response=True)
 
 
 @mcp.tool()

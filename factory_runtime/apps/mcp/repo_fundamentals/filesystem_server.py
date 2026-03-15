@@ -24,7 +24,7 @@ def _load_service() -> FilesystemService:
 
 
 service = _load_service()
-mcp = FastMCP("maestro Filesystem MCP", json_response=True)
+mcp = FastMCP("factory Filesystem MCP", json_response=True)
 
 
 @mcp.tool()

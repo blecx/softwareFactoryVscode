@@ -3,19 +3,18 @@
 from importlib import import_module
 from typing import Type
 
-from factory_runtime.agents.maestro_adapter import MaestroAdapter
-from factory_runtime.agents.ralph_agent import RalphAgent
+from factory_runtime.agents.factory_adapter import FactoryAdapter
 
 AGENT_ALIASES = {
-    "autonomous": "agents.maestro_adapter:MaestroAdapter",
-    "default": "agents.maestro_adapter:MaestroAdapter",
+    "autonomous": "agents.factory_adapter:FactoryAdapter",
+    "default": "agents.factory_adapter:FactoryAdapter",
     "ralph": "agents.ralph_agent:RalphAgent",
     "ralph-agent": "agents.ralph_agent:RalphAgent",
-    "resolve-issue": "agents.maestro_adapter:MaestroAdapter",
+    "resolve-issue": "agents.factory_adapter:FactoryAdapter",
 }
 
 
-def _load_agent_class(spec: str) -> Type[MaestroAdapter]:
+def _load_agent_class(spec: str) -> Type[FactoryAdapter]:
     if ":" not in spec:
         raise ValueError(
             f"Invalid agent spec '{spec}'. Expected format 'module.path:ClassName'."
@@ -28,8 +27,8 @@ def _load_agent_class(spec: str) -> Type[MaestroAdapter]:
         raise ValueError(
             f"Agent class '{class_name}' not found in module '{module_name}'."
         )
-    if not issubclass(cls, MaestroAdapter):
-        raise ValueError(f"Agent class '{class_name}' must inherit MaestroAdapter.")
+    if not issubclass(cls, FactoryAdapter):
+        raise ValueError(f"Agent class '{class_name}' must inherit FactoryAdapter.")
     return cls
 
 
@@ -45,7 +44,7 @@ def create_issue_agent(
     agent_name_or_spec: str,
     issue_number: int,
     dry_run: bool,
-) -> MaestroAdapter:
+) -> FactoryAdapter:
     spec = resolve_agent_spec(agent_name_or_spec)
     cls = _load_agent_class(spec)
     return cls(issue_number=issue_number, dry_run=dry_run)

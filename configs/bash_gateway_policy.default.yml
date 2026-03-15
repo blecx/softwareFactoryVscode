@@ -1,6 +1,6 @@
 policy:
   version: 1.0
-  description: "Neutral default policy for isolated Maestro runtime"
+  description: "Neutral default policy for isolated Factory runtime"
   allow:
     - "^ls"
     - "^pwd"
@@ -10,5 +10,5 @@ policy:
   deny:
     - "rm -rf /"
     - "^mkfs"
-  sandbox_dir: ".tmp/maestro/sandbox"
+  sandbox_dir: ".tmp/factory/sandbox"
   max_execution_time_seconds: 30

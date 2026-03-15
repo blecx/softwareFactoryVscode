@@ -21,7 +21,7 @@ Provides context and instructions for the `resolve-issue-workflow` skill module.
 4. Implement minimal code changes in a dedicated branch.
 5. Run required validations for touched areas explicitly using the active venv environment (NEVER global python):
    - Backend: `./.venv/bin/python -m black apps/api/`, `./.venv/bin/python -m flake8 apps/api/`, `./.venv/bin/python -m pytest tests/`
-   - Frontend: `cd ../maestro-client/client && npm run lint`, `npm run build`, tests if configured.
+   - Frontend: `cd ../factory-client/client && npm run lint`, `npm run build`, tests if configured.
 6. Commit with `Fixes #<issue>` and push.
 7. Create PR via GitHub CLI using the generated `.tmp` markdown file:
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`

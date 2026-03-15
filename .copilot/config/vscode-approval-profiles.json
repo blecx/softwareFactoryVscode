@@ -146,7 +146,7 @@
       "resolve-issue": true,
       "pr-merge": true,
       "ralph-agent": true,
-      "maestro-operator": true,
+      "factory-operator": true,
       "workflow": true,
       "continue-backend": true,
       "continue-phase-2": true,

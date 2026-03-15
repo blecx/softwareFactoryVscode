@@ -11,6 +11,6 @@
         "ms-azuretools.vscode-docker"
     ],
     "unwantedRecommendations": [
-        "maestro.issueagent"
+        "factory.issueagent"
     ]
 }

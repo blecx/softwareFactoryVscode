@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 from factory_runtime.agents.llm_client import LLMClientFactory
 
-_SYSTEM_PROMPT = """You are the MAESTRO PlannerAgent.
+_SYSTEM_PROMPT = """You are the FACTORY PlannerAgent.
 Your job is to read a GitHub issue, search the codebase using MCP tools to understand the 
 context, and then write a precise implementation plan broken down into actionable steps.
 
@@ -40,7 +40,7 @@ You MUST output a final JSON block bounded by ```json ... ``` that perfectly mat
 
 
 class PlannerAgent:
-    """Creates execution plans for MAESTRO using premium models."""
+    """Creates execution plans for FACTORY using premium models."""
 
     def __init__(
         self,

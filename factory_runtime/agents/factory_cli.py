@@ -1,10 +1,10 @@
-"""MAESTRO CLI — run the orchestrator from the command line.
+"""FACTORY CLI — run the orchestrator from the command line.
 
 Usage:
-    python -m agents.maestro_cli --issue 42 --repo YOUR_ORG/YOUR_REPO
+    python -m agents.factory_cli --issue 42 --repo YOUR_ORG/YOUR_REPO
 
 Or import and call directly:
-    python agents/maestro_cli.py --issue 42 --repo YOUR_ORG/YOUR_REPO
+    python agents/factory_cli.py --issue 42 --repo YOUR_ORG/YOUR_REPO
 
 Implements: GitHub issue #715
 """
@@ -17,14 +17,14 @@ import json
 import sys
 from pathlib import Path
 
-from factory_runtime.agents.maestro import MaestroOrchestrator
+from factory_runtime.agents.factory import FactoryOrchestrator
 from factory_runtime.agents.mcp_lifecycle import MCPBootloader
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="maestro",
-        description="MAESTRO: AI agent pipeline for GitHub issue implementation",
+        prog="factory",
+        description="FACTORY: AI agent pipeline for GitHub issue implementation",
     )
     parser.add_argument(
         "--issue",
@@ -100,7 +100,7 @@ async def _run(args: argparse.Namespace) -> int:
     await bootloader.initialize()
 
     try:
-        orq = MaestroOrchestrator(workspace_root=workspace_root)
+        orq = FactoryOrchestrator(workspace_root=workspace_root)
         result = await orq.run_issue(
             issue_number=args.issue,
             repo=args.repo,
@@ -138,7 +138,7 @@ async def _run(args: argparse.Namespace) -> int:
 def _print_result(result) -> None:
     """Human-readable result output."""
     icon = "✅" if result.success else "❌"
-    print(f"\n{icon} MAESTRO run complete for issue #{result.issue_number}")
+    print(f"\n{icon} FACTORY run complete for issue #{result.issue_number}")
     print(f"   Repo:       {result.repo}")
     print(f"   Run ID:     {result.run_id or 'N/A'}")
     print(f"   Complexity: {result.complexity_score} ({result.model_tier})")

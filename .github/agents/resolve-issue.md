@@ -25,7 +25,7 @@ This file is a VS Code discovery wrapper. Keep workflow logic in `.copilot/skill
 
 ## Boundary Focus
 - **Do not** answer general planning or conversational questions (use `@workflow`).
-- **Do not** manually orchestrate terminal scripts outside of the PR pipeline (use `@maestro-operator`).
+- **Do not** manually orchestrate terminal scripts outside of the PR pipeline (use `@factory-operator`).
 
 ## Use This Agent When
 

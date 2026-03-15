@@ -12,7 +12,7 @@ Score 6-10 → model_tier "full" (gpt-4o)
 
 No LLM required — fully deterministic from issue body text and file paths.
 
-See: docs/agents/MAESTRO-DESIGN.md
+See: docs/agents/FACTORY-DESIGN.md
 Implements: GitHub issue #713
 """
 
