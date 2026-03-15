@@ -10,9 +10,11 @@ services:
       - OFFLINE_DOCS_MCP_PORT=3017
       - OFFLINE_DOCS_MCP_HOST=0.0.0.0
       - OFFLINE_DOCS_MCP_REPO_ROOT=/target
-      - OFFLINE_DOCS_INDEX_DB=/target/.tmp/mcp-offline-docs/docs_index.db
+      - OFFLINE_DOCS_INDEX_DB=/factory/.tmp/mcp-offline-docs/docs_index.db
       - OFFLINE_DOCS_INDEX_SOURCES=docs,README.md,QUICKSTART.md,templates
     ports:
       - "127.0.0.1:${PORT_DOCS:-3017}:3017"
     volumes:
       - ${PROJECT_WORKSPACE_DIR:-.}:/target
+      - ${FACTORY_DIR:-.}:/factory
+      - ${FACTORY_DIR:-.}:/factory

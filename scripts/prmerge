@@ -1,0 +1,2 @@
+#!/bin/bash
+echo "Merging PR $1..."

@@ -8,9 +8,10 @@ services:
       - BASH_GATEWAY_MCP_PORT=3011
       - BASH_GATEWAY_MCP_HOST=0.0.0.0
       - BASH_GATEWAY_REPO_ROOT=/target
-      - BASH_GATEWAY_POLICY_PATH=${BASH_GATEWAY_POLICY_PATH:-/target/configs/bash_gateway_policy.default.yml}
-      - BASH_GATEWAY_AUDIT_DIR=/target/.tmp/agent-script-runs
+      - BASH_GATEWAY_POLICY_PATH=${BASH_GATEWAY_POLICY_PATH:-/factory/configs/bash_gateway_policy.default.yml}
+      - BASH_GATEWAY_AUDIT_DIR=/factory/.tmp/agent-script-runs
     ports:
       - "127.0.0.1:${PORT_BASH:-3011}:3011"
     volumes:
       - ${PROJECT_WORKSPACE_DIR:-.}:/target
+      - ${FACTORY_DIR:-.}:/factory
