@@ -20,16 +20,15 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
 
-from factory_runtime.agents.mcp_client import MCPMultiClient
-from factory_runtime.agents.router_agent import RouterAgent, RoutingDecision
-from factory_runtime.agents.planner_agent import PlannerAgent
 from factory_runtime.agents.coder_agent import CoderAgent, CoderResult
-
+from factory_runtime.agents.mcp_client import MCPMultiClient
+from factory_runtime.agents.planner_agent import PlannerAgent
+from factory_runtime.agents.router_agent import RouterAgent, RoutingDecision
 
 # ---------------------------------------------------------------------------
 # Default server URLs (overridden by env or constructor arg)

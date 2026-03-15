@@ -3,8 +3,9 @@ Adapter to wrap MAESTRO inside the v1 AutonomousWorkflowAgent interface.
 This bridges `scripts/work-issue.py` to `agents/maestro.py`.
 """
 
-from typing import Optional
 from pathlib import Path
+from typing import Optional
+
 from factory_runtime.agents.maestro import MaestroOrchestrator
 
 

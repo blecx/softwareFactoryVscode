@@ -6,7 +6,6 @@ from typing import Type
 from factory_runtime.agents.maestro_adapter import MaestroAdapter
 from factory_runtime.agents.ralph_agent import RalphAgent
 
-
 AGENT_ALIASES = {
     "autonomous": "agents.maestro_adapter:MaestroAdapter",
     "default": "agents.maestro_adapter:MaestroAdapter",

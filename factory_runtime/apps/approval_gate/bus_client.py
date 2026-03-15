@@ -6,8 +6,9 @@ All methods are async.
 
 from __future__ import annotations
 
-import httpx
 from typing import Any, Optional
+
+import httpx
 
 
 class BusClient:

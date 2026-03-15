@@ -13,7 +13,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Protocol, Sequence, Union
 
-
 CommandInput = Union[str, Sequence[str]]
 
 

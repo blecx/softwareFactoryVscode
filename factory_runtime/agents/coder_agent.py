@@ -25,10 +25,11 @@ import json
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
+
     from factory_runtime.agents.mcp_client import MCPMultiClient
 
 

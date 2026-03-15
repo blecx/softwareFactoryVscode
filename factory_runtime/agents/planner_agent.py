@@ -9,9 +9,9 @@ Implements: GitHub issue #720
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from typing import Any, Optional, TYPE_CHECKING
 import re
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from openai import AsyncOpenAI

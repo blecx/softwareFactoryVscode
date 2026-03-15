@@ -29,9 +29,9 @@ Environment:
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
-import signal
 import time
 from datetime import datetime
 from pathlib import Path

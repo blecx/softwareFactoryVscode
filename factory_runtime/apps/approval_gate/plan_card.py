@@ -1,6 +1,7 @@
 """Pydantic models for the Approval Gate API."""
 
 from typing import Any, Optional
+
 from pydantic import BaseModel
 
 

@@ -33,11 +33,9 @@ from factory_runtime.agents.tooling.github_tools import (
     fetch_github_issue_typed,
     list_github_issues_typed,
 )
-
 from factory_runtime.agents.tooling.mockup_image_generation import (
     generate_issue_mockup_artifacts,
 )
-
 
 # ============================================================================
 # GitHub Tools

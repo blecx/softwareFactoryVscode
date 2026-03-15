@@ -160,7 +160,7 @@ class MCPBootloader:
     def _wait_for_health_checks(self, timeout: int = 15):
         """Wait for required ports to be accepting connections."""
         import urllib.request
-        from urllib.error import URLError, HTTPError
+        from urllib.error import HTTPError, URLError
 
         logger.info("Running health-check handshakes to MCP ports...")
         start_time = time.time()

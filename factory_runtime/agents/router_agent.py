@@ -15,13 +15,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from factory_runtime.agents.mcp_client import MCPMultiClient
 
 from factory_runtime.agents.complexity_scorer import ComplexityScorer
-
 
 # ---------------------------------------------------------------------------
 # Data model

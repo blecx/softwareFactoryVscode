@@ -50,7 +50,8 @@ class OpenAIImagesClient:
     ):
         resolved_key = api_key or os.getenv("OPENAI_API_KEY")
         # --- Check Dynamic Overrides ---
-        import os, json
+        import json
+        import os
 
         override_path = os.getenv("LLM_OVERRIDE_PATH", "configs/runtime_override.json")
         if os.path.exists(override_path):
