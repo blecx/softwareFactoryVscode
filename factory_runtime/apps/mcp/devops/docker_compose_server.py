@@ -6,7 +6,6 @@ from mcp.server.fastmcp import FastMCP
 
 from .docker_compose_service import DockerComposeService, DockerComposeServiceError
 
-
 DEFAULT_TARGETS = {
     "main": "docker-compose.yml",
     "context7": "docker-compose.context7.yml",

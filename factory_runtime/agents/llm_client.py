@@ -4,14 +4,14 @@ This project standardizes on GitHub Models (Copilot) for all agent roles.
 Configuration is loaded from the active config (see LLMClientFactory.get_config_path).
 """
 
+import asyncio
 import json
 import os
-import subprocess
-import asyncio
 import random
+import subprocess
 import time
 from pathlib import Path
-from typing import Optional, Dict, Callable, Awaitable
+from typing import Awaitable, Callable, Dict, Optional
 
 import httpx
 from openai import AsyncOpenAI

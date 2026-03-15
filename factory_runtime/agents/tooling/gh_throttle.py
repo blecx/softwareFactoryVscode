@@ -4,7 +4,6 @@ import subprocess
 import time
 from typing import Optional, Sequence
 
-
 _LAST_GH_CALL_TS: Optional[float] = None
 
 

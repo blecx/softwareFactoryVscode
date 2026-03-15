@@ -6,10 +6,10 @@ success rate, and application frequency to ensure agents apply the most
 relevant learnings to current issues.
 """
 
+import math
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
-import math
 
 
 @dataclass

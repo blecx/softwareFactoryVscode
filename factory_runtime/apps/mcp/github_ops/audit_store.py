@@ -6,7 +6,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-
 _TOKEN_PATTERNS: list[re.Pattern[str]] = [
     re.compile(r"\b(GH_TOKEN|GITHUB_TOKEN)\s*=\s*[^\s\"]+"),
     re.compile(r"ghp_[A-Za-z0-9]{20,}"),

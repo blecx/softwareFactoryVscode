@@ -5,10 +5,10 @@ This module implements a structured commit strategy that breaks down changes
 into logical stages: tests, implementation, documentation, and refactoring.
 """
 
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
-import subprocess
 
 
 @dataclass

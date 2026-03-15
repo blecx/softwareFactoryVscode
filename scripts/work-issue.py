@@ -450,8 +450,8 @@ def _cleanup_split_transient_files(issue_number: int) -> None:
 
 def _check_prerequisites() -> bool:
     """Check that required tools are available."""
-    import subprocess
     import shutil
+    import subprocess
 
     checks = []
 

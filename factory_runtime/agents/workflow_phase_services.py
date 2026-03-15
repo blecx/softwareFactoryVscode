@@ -6,9 +6,9 @@ agent remains an orchestration shell and phase internals live in dedicated
 service classes.
 """
 
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-import time
 from typing import Any, Dict, Protocol
 
 from factory_runtime.agents.validation_profiles import get_validation_commands

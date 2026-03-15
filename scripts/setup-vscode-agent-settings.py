@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-
 CONFIG_PATH = (
     Path(__file__).parent.parent / ".copilot/config/vscode-agent-settings.json"
 )

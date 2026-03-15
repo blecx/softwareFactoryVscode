@@ -3,10 +3,9 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import List
-import re
-
 
 _NON_ACTIONABLE_STEP_PREFIXES = (
     "current plan estimate:",
