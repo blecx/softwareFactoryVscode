@@ -36,7 +36,9 @@ RepoKey = Literal["backend", "client"]
 
 REPOS: dict[RepoKey, str] = {
     "backend": os.environ.get("TARGET_REPO", "YOUR_ORG/YOUR_REPO"),
-    "client": os.environ.get("CLIENT_REPO", os.environ.get("CLIENT_REPO", "YOUR_ORG/YOUR_CLIENT_REPO")),
+    "client": os.environ.get(
+        "CLIENT_REPO", os.environ.get("CLIENT_REPO", "YOUR_ORG/YOUR_CLIENT_REPO")
+    ),
 }
 
 DEFAULT_GH_MIN_INTERVAL_SECONDS = 1.0
@@ -79,7 +81,9 @@ def _throttle_gh_requests() -> None:
 
     min_interval = max(
         0.0,
-        float(os.getenv("NEXT_PR_GH_MIN_INTERVAL", str(DEFAULT_GH_MIN_INTERVAL_SECONDS))),
+        float(
+            os.getenv("NEXT_PR_GH_MIN_INTERVAL", str(DEFAULT_GH_MIN_INTERVAL_SECONDS))
+        ),
     )
     if min_interval <= 0:
         _GH_LAST_REQUEST_TS = time.monotonic()
@@ -111,10 +115,12 @@ def _summarize_checks(status_rollup: list[dict[str, Any]] | None) -> dict[str, A
             conclusions.append(str(concl).upper())
 
     uniq = sorted(set(conclusions))
-    has_failure = any(c in {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"} for c in uniq)
+    has_failure = any(
+        c in {"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"} for c in uniq
+    )
     has_success = "SUCCESS" in uniq
 
-    all_success = (len(uniq) == 1 and uniq[0] == "SUCCESS" and pending == 0)
+    all_success = len(uniq) == 1 and uniq[0] == "SUCCESS" and pending == 0
 
     return {
         "conclusions": uniq,
@@ -126,7 +132,14 @@ def _summarize_checks(status_rollup: list[dict[str, Any]] | None) -> dict[str, A
     }
 
 
-def _score_pr(*, is_draft: bool, mergeable: str, merge_state_status: str, checks: dict[str, Any], review_decision: str) -> int:
+def _score_pr(
+    *,
+    is_draft: bool,
+    mergeable: str,
+    merge_state_status: str,
+    checks: dict[str, Any],
+    review_decision: str,
+) -> int:
     score = 0
 
     if is_draft:
@@ -197,7 +210,9 @@ def _fetch_pr_details(repo: str, number: int) -> dict[str, Any]:
     )
 
 
-def recommend(repo_filter: Literal["backend", "client", "both"], limit: int) -> list[PrCandidate]:
+def recommend(
+    repo_filter: Literal["backend", "client", "both"], limit: int
+) -> list[PrCandidate]:
     repo_keys: list[RepoKey]
     if repo_filter == "both":
         repo_keys = ["client", "backend"]
@@ -243,7 +258,9 @@ def recommend(repo_filter: Literal["backend", "client", "both"], limit: int) -> 
 
 
 def main(argv: list[str]) -> int:
-    parser = argparse.ArgumentParser(description="Recommend the next PR to merge (PR-first)")
+    parser = argparse.ArgumentParser(
+        description="Recommend the next PR to merge (PR-first)"
+    )
     parser.add_argument("--repo", choices=["backend", "client", "both"], default="both")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--json", action="store_true")
@@ -278,9 +295,13 @@ def main(argv: list[str]) -> int:
         print(json.dumps({"recommended": payload[:1], "candidates": payload}, indent=2))
         return 0
 
-    print("================================================================================")
+    print(
+        "================================================================================"
+    )
     print("NEXT PR RECOMMENDATION")
-    print("================================================================================")
+    print(
+        "================================================================================"
+    )
 
     if not candidates:
         print("No open PRs found.")
@@ -297,7 +318,9 @@ def main(argv: list[str]) -> int:
         f" (pending={top.checks_summary.get('pending')}, all_success={top.checks_summary.get('all_success')})"
     )
     print(f"Score: {top.score}")
-    print("--------------------------------------------------------------------------------")
+    print(
+        "--------------------------------------------------------------------------------"
+    )
     print("Top candidates:")
 
     for c in candidates[: min(10, len(candidates))]:

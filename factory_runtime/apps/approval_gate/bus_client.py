@@ -35,6 +35,7 @@ class BusClient:
             content = result.get("content", [])
             if content:
                 import json as _json
+
                 raw = content[0].get("text", "{}")
                 return _json.loads(raw)
             return result

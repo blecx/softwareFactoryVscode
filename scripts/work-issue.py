@@ -271,7 +271,10 @@ Token Budget Mode:
             created = _create_split_issues_via_gh(
                 issue_number=args.issue,
                 drafts=split_drafts,
-                repo=os.environ.get("WORK_ISSUE_REPO", os.environ.get("TARGET_REPO", "YOUR_ORG/YOUR_REPO")),
+                repo=os.environ.get(
+                    "WORK_ISSUE_REPO",
+                    os.environ.get("TARGET_REPO", "YOUR_ORG/YOUR_REPO"),
+                ),
             )
             _cleanup_split_transient_files(args.issue)
             print(f"\nSPLIT_ISSUES_CREATED: {len(created)}")
@@ -710,7 +713,9 @@ def _ensure_dev_stack(mode: str) -> bool:
     print(
         f"  Backend: {'✅ ready' if backend_ready else '❌ not ready'} ({backend_health_url})"
     )
-    print(f"  Frontend: {'✅ ready' if frontend_ready else '❌ not ready'} ({frontend_url})")
+    print(
+        f"  Frontend: {'✅ ready' if frontend_ready else '❌ not ready'} ({frontend_url})"
+    )
 
     if backend_ready and frontend_ready:
         return True
@@ -737,7 +742,9 @@ def _is_url_ready(url: str, timeout_seconds: float = 2.0) -> bool:
         return False
 
 
-def _wait_for_url(url: str, timeout_seconds: int = 30, poll_seconds: float = 1.0) -> bool:
+def _wait_for_url(
+    url: str, timeout_seconds: int = 30, poll_seconds: float = 1.0
+) -> bool:
     """Wait until URL responds or timeout is reached."""
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:

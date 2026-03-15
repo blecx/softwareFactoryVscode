@@ -103,7 +103,9 @@ def _ensure_label_exists(name: str, sleep_seconds: float) -> None:
     )
     names = {entry.get("name", "") for entry in (data or [])}
     if name not in names:
-        raise RuntimeError(f"Required label missing: {name}. Create it before applying.")
+        raise RuntimeError(
+            f"Required label missing: {name}. Create it before applying."
+        )
 
 
 def _desired_status(number: int, first_open: int | None) -> str | None:
@@ -153,7 +155,15 @@ def _sync_tracker_checklist(
     messages.append(f"tracker-checklist: {updates} line(s) updated")
     if apply:
         _run_gh(
-            ["issue", "edit", str(TRACKER_ISSUE), "--repo", REPO, "--body", "\n".join(lines)],
+            [
+                "issue",
+                "edit",
+                str(TRACKER_ISSUE),
+                "--repo",
+                REPO,
+                "--body",
+                "\n".join(lines),
+            ],
             sleep_seconds=sleep_seconds,
         )
         messages.append("tracker-checklist: applied")
@@ -165,8 +175,14 @@ def _sync_tracker_checklist(
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Enforce Step 2 backend queue labels")
     parser.add_argument("--apply", action="store_true", help="Apply label/body changes")
-    parser.add_argument("--sync-tracker", action="store_true", help="Sync tracker checklist with issue state")
-    parser.add_argument("--dry-run", action="store_true", help="Show intended changes without writing")
+    parser.add_argument(
+        "--sync-tracker",
+        action="store_true",
+        help="Sync tracker checklist with issue state",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Show intended changes without writing"
+    )
     parser.add_argument(
         "--fail-on-drift",
         action="store_true",
@@ -191,9 +207,13 @@ def main(argv: list[str]) -> int:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
 
-    issue_states = {number: _read_issue(number, sleep_seconds=sleep_seconds) for number in QUEUE}
+    issue_states = {
+        number: _read_issue(number, sleep_seconds=sleep_seconds) for number in QUEUE
+    }
 
-    first_open = next((number for number in QUEUE if issue_states[number].is_open), None)
+    first_open = next(
+        (number for number in QUEUE if issue_states[number].is_open), None
+    )
 
     print(f"Repository: {REPO}")
     print(f"Mode: {'APPLY' if apply else 'DRY-RUN'}")
@@ -205,14 +225,24 @@ def main(argv: list[str]) -> int:
 
     for number in QUEUE:
         current = issue_states[number]
-        desired_status = _desired_status(number, first_open) if current.is_open else None
+        desired_status = (
+            _desired_status(number, first_open) if current.is_open else None
+        )
 
         if TRACK_LABEL not in current.labels:
             planned_changes.append(f"#{number}: add {TRACK_LABEL}")
             drift_detected = True
             if apply:
                 _run_gh(
-                    ["issue", "edit", str(number), "--repo", REPO, "--add-label", TRACK_LABEL],
+                    [
+                        "issue",
+                        "edit",
+                        str(number),
+                        "--repo",
+                        REPO,
+                        "--add-label",
+                        TRACK_LABEL,
+                    ],
                     sleep_seconds=sleep_seconds,
                 )
 
@@ -223,7 +253,15 @@ def main(argv: list[str]) -> int:
                     drift_detected = True
                     if apply:
                         _run_gh(
-                            ["issue", "edit", str(number), "--repo", REPO, "--add-label", READY_LABEL],
+                            [
+                                "issue",
+                                "edit",
+                                str(number),
+                                "--repo",
+                                REPO,
+                                "--add-label",
+                                READY_LABEL,
+                            ],
                             sleep_seconds=sleep_seconds,
                         )
                 if BLOCKED_LABEL in current.labels:
@@ -231,7 +269,15 @@ def main(argv: list[str]) -> int:
                     drift_detected = True
                     if apply:
                         _run_gh(
-                            ["issue", "edit", str(number), "--repo", REPO, "--remove-label", BLOCKED_LABEL],
+                            [
+                                "issue",
+                                "edit",
+                                str(number),
+                                "--repo",
+                                REPO,
+                                "--remove-label",
+                                BLOCKED_LABEL,
+                            ],
                             sleep_seconds=sleep_seconds,
                         )
             elif desired_status == BLOCKED_LABEL:
@@ -240,7 +286,15 @@ def main(argv: list[str]) -> int:
                     drift_detected = True
                     if apply:
                         _run_gh(
-                            ["issue", "edit", str(number), "--repo", REPO, "--add-label", BLOCKED_LABEL],
+                            [
+                                "issue",
+                                "edit",
+                                str(number),
+                                "--repo",
+                                REPO,
+                                "--add-label",
+                                BLOCKED_LABEL,
+                            ],
                             sleep_seconds=sleep_seconds,
                         )
                 if READY_LABEL in current.labels:
@@ -248,24 +302,52 @@ def main(argv: list[str]) -> int:
                     drift_detected = True
                     if apply:
                         _run_gh(
-                            ["issue", "edit", str(number), "--repo", REPO, "--remove-label", READY_LABEL],
+                            [
+                                "issue",
+                                "edit",
+                                str(number),
+                                "--repo",
+                                REPO,
+                                "--remove-label",
+                                READY_LABEL,
+                            ],
                             sleep_seconds=sleep_seconds,
                         )
         else:
             if READY_LABEL in current.labels:
-                planned_changes.append(f"#{number}: remove {READY_LABEL} (closed issue)")
+                planned_changes.append(
+                    f"#{number}: remove {READY_LABEL} (closed issue)"
+                )
                 drift_detected = True
                 if apply:
                     _run_gh(
-                        ["issue", "edit", str(number), "--repo", REPO, "--remove-label", READY_LABEL],
+                        [
+                            "issue",
+                            "edit",
+                            str(number),
+                            "--repo",
+                            REPO,
+                            "--remove-label",
+                            READY_LABEL,
+                        ],
                         sleep_seconds=sleep_seconds,
                     )
             if BLOCKED_LABEL in current.labels:
-                planned_changes.append(f"#{number}: remove {BLOCKED_LABEL} (closed issue)")
+                planned_changes.append(
+                    f"#{number}: remove {BLOCKED_LABEL} (closed issue)"
+                )
                 drift_detected = True
                 if apply:
                     _run_gh(
-                        ["issue", "edit", str(number), "--repo", REPO, "--remove-label", BLOCKED_LABEL],
+                        [
+                            "issue",
+                            "edit",
+                            str(number),
+                            "--repo",
+                            REPO,
+                            "--remove-label",
+                            BLOCKED_LABEL,
+                        ],
                         sleep_seconds=sleep_seconds,
                     )
 
@@ -275,7 +357,15 @@ def main(argv: list[str]) -> int:
         drift_detected = True
         if apply:
             _run_gh(
-                ["issue", "edit", str(TRACKER_ISSUE), "--repo", REPO, "--add-label", TRACK_LABEL],
+                [
+                    "issue",
+                    "edit",
+                    str(TRACKER_ISSUE),
+                    "--repo",
+                    REPO,
+                    "--add-label",
+                    TRACK_LABEL,
+                ],
                 sleep_seconds=sleep_seconds,
             )
 

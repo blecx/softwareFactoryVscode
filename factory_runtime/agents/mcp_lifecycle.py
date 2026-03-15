@@ -144,7 +144,6 @@ class MCPBootloader:
                 ["docker", "compose"] + compose_args + ["up", "-d"],
                 cwd=self.workspace_root,
                 check=True,
-                
             )
             return False
         else:
@@ -225,7 +224,6 @@ class MCPBootloader:
                 subprocess.run(
                     cmd,
                     check=True,
-                    
                     cwd=self.workspace_root,
                     capture_output=True,
                     timeout=120,
@@ -278,7 +276,6 @@ class MCPBootloader:
                     cmd_check_empty,
                     cwd=self.workspace_root,
                     capture_output=True,
-                    
                 )
 
                 # If exit code is 0, it is empty and we should hydrate
@@ -353,7 +350,6 @@ class MCPBootloader:
                 ],
                 cwd=self.workspace_root,
                 check=True,
-                
                 capture_output=True,
                 timeout=120,
             )
@@ -367,7 +363,6 @@ class MCPBootloader:
                 ],
                 cwd=self.workspace_root,
                 check=True,
-                
                 capture_output=True,
                 timeout=120,
             )
@@ -388,7 +383,6 @@ class MCPBootloader:
                 ],
                 cwd=self.workspace_root,
                 check=True,
-                
                 capture_output=True,
                 timeout=120,
             )
@@ -402,7 +396,6 @@ class MCPBootloader:
                 ],
                 cwd=self.workspace_root,
                 check=True,
-                
                 capture_output=True,
                 timeout=120,
             )
@@ -418,7 +411,6 @@ class MCPBootloader:
                 subprocess.run(
                     cmd,
                     check=True,
-                    
                     cwd=self.workspace_root,
                     capture_output=True,
                     timeout=120,
