@@ -43,10 +43,7 @@
       "label": "\u2699\ufe0f Configure Approval Profile (Safe)",
       "type": "shell",
       "command": "bash",
-      "args": [
-        "${workspaceFolder}/scripts/setup-low-approval.sh",
-        "safe"
-      ],
+      "args": ["${workspaceFolder}/scripts/setup-low-approval.sh", "safe"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -62,9 +59,7 @@
       "label": "\u2699\ufe0f Configure Workspace Agent Settings",
       "type": "shell",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "args": [
-        "${workspaceFolder}/scripts/setup-vscode-agent-settings.py"
-      ],
+      "args": ["${workspaceFolder}/scripts/setup-vscode-agent-settings.py"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -148,9 +143,7 @@
       "label": "\ud83d\udd00 Merge PR",
       "type": "shell",
       "command": "${workspaceFolder}/scripts/prmerge",
-      "args": [
-        "${input:issueNumber}"
-      ],
+      "args": ["${input:issueNumber}"],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -164,9 +157,7 @@
       "label": "\ud83d\udd01 Issue PR Merge Cleanup Loop",
       "type": "shell",
       "command": "bash",
-      "args": [
-        "${workspaceFolder}/scripts/issue-pr-merge-cleanup-loop.sh"
-      ],
+      "args": ["${workspaceFolder}/scripts/issue-pr-merge-cleanup-loop.sh"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -204,9 +195,7 @@
       "label": "\ud83d\uddc4\ufe0f Archive Goals (.tmp)",
       "type": "shell",
       "command": "bash",
-      "args": [
-        "${workspaceFolder}/scripts/archive-goals-safe.sh"
-      ],
+      "args": ["${workspaceFolder}/scripts/archive-goals-safe.sh"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -223,10 +212,7 @@
       "label": "\ud83d\uddc4\ufe0f Archive Goals (.tmp, move)",
       "type": "shell",
       "command": "bash",
-      "args": [
-        "${workspaceFolder}/scripts/archive-goals-safe.sh",
-        "--move"
-      ],
+      "args": ["${workspaceFolder}/scripts/archive-goals-safe.sh", "--move"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -243,11 +229,7 @@
       "label": "\ud83d\udc33 Docker: Build & Start",
       "type": "shell",
       "command": "docker",
-      "args": [
-        "compose",
-        "up",
-        "--build"
-      ],
+      "args": ["compose", "up", "--build"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -276,10 +258,7 @@
       "label": "\ud83d\uded1 Docker: Stop",
       "type": "shell",
       "command": "docker",
-      "args": [
-        "compose",
-        "down"
-      ],
+      "args": ["compose", "down"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -293,18 +272,14 @@
     },
     {
       "label": "\ud83d\ude80 Start: Full Stack (Dev)",
-      "dependsOn": [
-        "\ud83d\ude80 Dev Stack: Supervised"
-      ],
+      "dependsOn": ["\ud83d\ude80 Dev Stack: Supervised"],
       "problemMatcher": []
     },
     {
       "label": "\ud83e\uddea Dev Stack: Smoke Test",
       "type": "shell",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "args": [
-        "${workspaceFolder}/scripts/dev_stack_smoke_test.py"
-      ],
+      "args": ["${workspaceFolder}/scripts/dev_stack_smoke_test.py"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -405,6 +380,72 @@
         "focus": true,
         "clear": true
       }
+    },
+    {
+      "label": "🛂 Verify: Installation Compliance",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/verify_factory_install.py",
+        "--target",
+        "${workspaceFolder}/.."
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      },
+      "group": "test"
+    },
+    {
+      "label": "🩺 Verify: Runtime Compliance",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/verify_factory_install.py",
+        "--target",
+        "${workspaceFolder}/..",
+        "--runtime"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      },
+      "group": "test"
+    },
+    {
+      "label": "🩺 Verify: Runtime Compliance + MCP",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/verify_factory_install.py",
+        "--target",
+        "${workspaceFolder}/..",
+        "--runtime",
+        "--check-vscode-mcp"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      },
+      "group": "test"
     }
   ],
   "inputs": [

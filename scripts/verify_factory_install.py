@@ -1,0 +1,544 @@
+#!/usr/bin/env python3
+"""Verify that a Software Factory installation complies with the host contract."""
+
+from __future__ import annotations
+
+import argparse
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import bootstrap_host
+
+DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
+DEFAULT_RUNTIME_TIMEOUT = 2.0
+REQUIRED_FACTORY_FILES = [
+    Path("scripts") / "bootstrap_host.py",
+    Path("scripts") / "install_factory.py",
+    Path("scripts") / "verify_factory_install.py",
+]
+REQUIRED_WORKSPACE_FOLDERS = [
+    ("Host Project (Root)", "."),
+    ("AI Agent Factory", bootstrap_host.FACTORY_DIRNAME),
+]
+RUNTIME_SERVICES = {
+    "mock-llm-gateway": {
+        "health_url": "http://127.0.0.1:9090/admin/mocks",
+        "require_healthy_status": True,
+    },
+    "mcp-memory": {
+        "health_url": "http://127.0.0.1:3030/health",
+        "require_healthy_status": True,
+    },
+    "mcp-agent-bus": {
+        "health_url": "http://127.0.0.1:3031/health",
+        "require_healthy_status": True,
+    },
+    "approval-gate": {
+        "health_url": "http://127.0.0.1:8001/health",
+        "require_healthy_status": True,
+    },
+    "agent-worker": {
+        "health_url": None,
+        "require_healthy_status": False,
+    },
+}
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Verify a target repository after Software Factory installation."
+    )
+    parser.add_argument(
+        "--target",
+        default=".",
+        help="Target repository root (default: current directory)",
+    )
+    parser.add_argument(
+        "--workspace-file",
+        default=DEFAULT_WORKSPACE_FILENAME,
+        help=(
+            "Workspace filename to verify in the target repository "
+            f"(default: {DEFAULT_WORKSPACE_FILENAME})"
+        ),
+    )
+    parser.add_argument(
+        "--skip-workspace-check",
+        action="store_true",
+        help="Skip verification of the generated workspace file.",
+    )
+    parser.add_argument(
+        "--skip-gitignore-check",
+        action="store_true",
+        help="Skip verification of the target repository .gitignore entries.",
+    )
+    parser.add_argument(
+        "--no-smoke-prompt",
+        action="store_true",
+        help="Suppress printing the non-mutating VS Code smoke prompt on success.",
+    )
+    parser.add_argument(
+        "--runtime",
+        action="store_true",
+        help="Also verify the core runtime stack after services have been started.",
+    )
+    parser.add_argument(
+        "--check-vscode-mcp",
+        action="store_true",
+        help="With --runtime, also verify the VS Code MCP localhost endpoints are reachable.",
+    )
+    parser.add_argument(
+        "--runtime-timeout",
+        type=float,
+        default=DEFAULT_RUNTIME_TIMEOUT,
+        help=f"HTTP runtime probe timeout in seconds (default: {DEFAULT_RUNTIME_TIMEOUT})",
+    )
+    return parser.parse_args(argv)
+
+
+def parse_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
+
+
+def render_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
+    return "\n".join(
+        [
+            "Please perform a read-only smoke test for this installed Software Factory workspace.",
+            f"Target repository: `{target_dir}`",
+            f"Open/use workspace file: `{workspace_file}`",
+            "",
+            "Rules:",
+            "1. Do not create, modify, delete, stage, commit, or rename any file.",
+            "2. Do not run docker, git, or terminal commands that change state.",
+            "3. If you need shell commands, use read-only inspection commands only.",
+            "4. Treat `.factory.env` as sensitive and redact secrets if you mention it.",
+            "",
+            "Please verify and report PASS/FAIL with evidence for:",
+            "- The workspace shows both the host project root and `.softwareFactoryVscode`.",
+            "- `.factory.lock.json`, `.factory.env`, and the workspace file exist.",
+            "- `.softwareFactoryVscode/scripts/verify_factory_install.py` appears present.",
+            "- The installation looks compliant with Option B and ready for VS Code usage.",
+            "",
+            "Do not make any edits; only inspect and summarize.",
+        ]
+    )
+
+
+def render_runtime_smoke_prompt(target_dir: Path) -> str:
+    return "\n".join(
+        [
+            "Please perform a read-only runtime smoke test for this Software Factory installation.",
+            f"Target repository: `{target_dir}`",
+            "",
+            "Rules:",
+            "1. Do not modify files, environment variables, docker configuration, or git state.",
+            "2. Do not start, stop, rebuild, or restart containers during this smoke test.",
+            "3. Use read-only inspection only and report observable evidence.",
+            "",
+            "Please verify and report PASS/FAIL with evidence for:",
+            "- The core compose services are running and healthy where health checks exist.",
+            "- The health endpoints on ports 3030, 3031, and 8001 respond.",
+            "- If MCP endpoints are part of this runtime, confirm whether localhost ports 3010-3018 appear reachable.",
+            "",
+            "Do not make any edits; only inspect and summarize.",
+        ]
+    )
+
+
+def run_command(
+    command: list[str],
+    *,
+    cwd: Path | None = None,
+    capture_output: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        command,
+        cwd=str(cwd) if cwd else None,
+        check=True,
+        text=True,
+        capture_output=capture_output,
+    )
+
+
+def probe_http_url(
+    url: str,
+    *,
+    timeout: float,
+    allow_http_error: bool,
+) -> str | None:
+    try:
+        with urlopen(url, timeout=timeout):
+            return None
+    except HTTPError as exc:
+        if allow_http_error:
+            return None
+        return f"HTTP probe failed for {url}: HTTP {exc.code}"
+    except URLError as exc:
+        return f"HTTP probe failed for {url}: {exc.reason}"
+
+
+def collect_running_services(compose_project_name: str) -> dict[str, str]:
+    format_string = '{{.Label "com.docker.compose.service"}}|{{.Status}}'
+    result = run_command(
+        [
+            "docker",
+            "ps",
+            "--filter",
+            f"label=com.docker.compose.project={compose_project_name}",
+            "--format",
+            format_string,
+        ],
+        capture_output=True,
+    )
+    services: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        if not line.strip() or "|" not in line:
+            continue
+        service, status = line.split("|", 1)
+        services[service.strip()] = status.strip()
+    return services
+
+
+def load_vscode_mcp_server_urls(target_dir: Path) -> dict[str, str]:
+    config_path = (
+        target_dir
+        / bootstrap_host.FACTORY_DIRNAME
+        / ".copilot"
+        / "config"
+        / "vscode-agent-settings.json"
+    )
+    config_data = bootstrap_host.load_json(config_path)
+    servers = config_data.get("workspace", {}).get("mcp", {}).get("servers", {})
+    urls: dict[str, str] = {}
+    if not isinstance(servers, dict):
+        return urls
+    for name, data in servers.items():
+        if isinstance(data, dict) and isinstance(data.get("url"), str):
+            urls[name] = data["url"]
+    return urls
+
+
+def check_factory_tree(target_dir: Path, violations: list[str]) -> Path | None:
+    factory_dir = target_dir / bootstrap_host.FACTORY_DIRNAME
+    if not factory_dir.is_dir():
+        violations.append(f"Missing factory directory: {factory_dir}")
+        return None
+
+    if not (factory_dir / ".git").exists():
+        violations.append(f"Factory directory is not a git checkout: {factory_dir}")
+
+    for relative_path in REQUIRED_FACTORY_FILES:
+        candidate = factory_dir / relative_path
+        if not candidate.exists():
+            violations.append(f"Missing required factory file: {candidate}")
+
+    return factory_dir
+
+
+def check_factory_env(target_dir: Path, violations: list[str]) -> None:
+    env_path = target_dir / ".factory.env"
+    if not env_path.exists():
+        violations.append(f"Missing environment contract: {env_path}")
+        return
+
+    values = parse_env_file(env_path)
+    expected_workspace = str(target_dir)
+    if values.get("TARGET_WORKSPACE_PATH") != expected_workspace:
+        violations.append(
+            "TARGET_WORKSPACE_PATH does not match the target repository "
+            f"(expected `{expected_workspace}`, found `{values.get('TARGET_WORKSPACE_PATH', '')}`)."
+        )
+
+    project_id = values.get("PROJECT_WORKSPACE_ID", "")
+    if not project_id:
+        violations.append("PROJECT_WORKSPACE_ID is missing or empty in .factory.env")
+
+    compose_name = values.get("COMPOSE_PROJECT_NAME", "")
+    if not compose_name:
+        violations.append("COMPOSE_PROJECT_NAME is missing or empty in .factory.env")
+    elif not compose_name.startswith("factory_"):
+        violations.append(
+            f"COMPOSE_PROJECT_NAME should start with `factory_` (found `{compose_name}`)."
+        )
+
+    if "CONTEXT7_API_KEY" not in values:
+        violations.append("CONTEXT7_API_KEY entry is missing in .factory.env")
+
+
+def check_lock_file(
+    target_dir: Path, workspace_file: str, violations: list[str]
+) -> None:
+    lock_path = target_dir / ".factory.lock.json"
+    if not lock_path.exists():
+        violations.append(f"Missing installation metadata lock file: {lock_path}")
+        return
+
+    lock_data = bootstrap_host.load_json(lock_path)
+    if not lock_data.get("version"):
+        violations.append(".factory.lock.json is missing `version`")
+    if not lock_data.get("installed_at"):
+        violations.append(".factory.lock.json is missing `installed_at`")
+    if not lock_data.get("updated_at"):
+        violations.append(".factory.lock.json is missing `updated_at`")
+
+    factory_data = lock_data.get("factory")
+    if not isinstance(factory_data, dict):
+        violations.append(".factory.lock.json is missing `factory` metadata")
+        return
+
+    if factory_data.get("install_path") != bootstrap_host.FACTORY_DIRNAME:
+        violations.append(
+            ".factory.lock.json `factory.install_path` does not match the hidden-tree install path"
+        )
+    if factory_data.get("workspace_file") != workspace_file:
+        violations.append(
+            ".factory.lock.json `factory.workspace_file` does not match the expected workspace filename"
+        )
+    if not factory_data.get("repo_url"):
+        violations.append(".factory.lock.json `factory.repo_url` is missing")
+    if not factory_data.get("commit"):
+        violations.append(".factory.lock.json `factory.commit` is missing")
+
+
+def check_workspace_file(
+    target_dir: Path,
+    workspace_file: str,
+    *,
+    skip_workspace_check: bool,
+    violations: list[str],
+) -> None:
+    if skip_workspace_check:
+        return
+
+    workspace_path = target_dir / workspace_file
+    if not workspace_path.exists():
+        violations.append(f"Missing host-facing workspace file: {workspace_path}")
+        return
+
+    workspace_data = bootstrap_host.load_json(workspace_path)
+    folders = workspace_data.get("folders")
+    if not isinstance(folders, list):
+        violations.append(
+            f"Workspace file does not contain a valid `folders` array: {workspace_path}"
+        )
+        return
+
+    actual_folders = [
+        (entry.get("name"), entry.get("path"))
+        for entry in folders
+        if isinstance(entry, dict)
+    ]
+    for expected in REQUIRED_WORKSPACE_FOLDERS:
+        if expected not in actual_folders:
+            violations.append(
+                "Workspace file is missing required folder mapping "
+                f"`name={expected[0]}`, `path={expected[1]}`"
+            )
+
+
+def check_gitignore(
+    target_dir: Path,
+    *,
+    skip_gitignore_check: bool,
+    violations: list[str],
+) -> None:
+    if skip_gitignore_check:
+        return
+
+    gitignore_path = target_dir / ".gitignore"
+    if not gitignore_path.exists():
+        violations.append(f"Missing .gitignore file: {gitignore_path}")
+        return
+
+    lines = gitignore_path.read_text(encoding="utf-8").splitlines()
+    missing = [entry for entry in bootstrap_host.GITIGNORE_BLOCK if entry not in lines]
+    for entry in missing:
+        violations.append(
+            f".gitignore is missing required factory ignore entry: {entry}"
+        )
+
+
+def verify_installation(
+    target_dir: Path,
+    *,
+    workspace_file: str,
+    skip_workspace_check: bool,
+    skip_gitignore_check: bool,
+) -> list[str]:
+    violations: list[str] = []
+    check_factory_tree(target_dir, violations)
+    check_factory_env(target_dir, violations)
+    check_lock_file(target_dir, workspace_file, violations)
+    check_workspace_file(
+        target_dir,
+        workspace_file,
+        skip_workspace_check=skip_workspace_check,
+        violations=violations,
+    )
+    check_gitignore(
+        target_dir,
+        skip_gitignore_check=skip_gitignore_check,
+        violations=violations,
+    )
+    return violations
+
+
+def verify_runtime(
+    target_dir: Path,
+    *,
+    timeout: float,
+    check_vscode_mcp: bool,
+) -> list[str]:
+    violations: list[str] = []
+
+    if shutil.which("docker") is None:
+        return [
+            "Docker CLI is not available on PATH, so runtime compliance cannot be verified."
+        ]
+
+    env_path = target_dir / ".factory.env"
+    if not env_path.exists():
+        return [
+            f"Missing environment contract required for runtime verification: {env_path}"
+        ]
+
+    env_values = parse_env_file(env_path)
+    compose_project_name = env_values.get("COMPOSE_PROJECT_NAME", "")
+    if not compose_project_name:
+        return ["COMPOSE_PROJECT_NAME is missing or empty in .factory.env"]
+
+    try:
+        running_services = collect_running_services(compose_project_name)
+    except subprocess.CalledProcessError:
+        return [
+            "Failed to query Docker runtime state. Ensure Docker is running and the current user can access it."
+        ]
+
+    if not running_services:
+        violations.append(
+            f"No running Docker containers were found for compose project `{compose_project_name}`."
+        )
+        return violations
+
+    for service_name, metadata in RUNTIME_SERVICES.items():
+        status = running_services.get(service_name)
+        if not status:
+            violations.append(
+                "Required runtime service "
+                f"`{service_name}` is not running for compose project "
+                f"`{compose_project_name}`."
+            )
+            continue
+
+        if metadata["require_healthy_status"] and "healthy" not in status.lower():
+            violations.append(
+                f"Runtime service `{service_name}` is not healthy (docker status: `{status}`)."
+            )
+        elif "up" not in status.lower():
+            violations.append(
+                f"Runtime service `{service_name}` is not reported as running (docker status: `{status}`)."
+            )
+
+        health_url = metadata["health_url"]
+        if health_url:
+            error = probe_http_url(
+                health_url,
+                timeout=timeout,
+                allow_http_error=False,
+            )
+            if error:
+                violations.append(error)
+
+    if check_vscode_mcp:
+        server_urls = load_vscode_mcp_server_urls(target_dir)
+        if not server_urls:
+            violations.append(
+                "Could not load VS Code MCP server URLs from "
+                "`.softwareFactoryVscode/.copilot/config/vscode-agent-settings.json`."
+            )
+        for server_name, url in server_urls.items():
+            if not url.startswith("http://127.0.0.1") and not url.startswith(
+                "http://localhost"
+            ):
+                continue
+            error = probe_http_url(url, timeout=timeout, allow_http_error=True)
+            if error:
+                violations.append(
+                    "VS Code MCP endpoint "
+                    f"`{server_name}` is not reachable at {url}: {error}"
+                )
+
+    return violations
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    target_dir = bootstrap_host.resolve_target_dir(args.target)
+
+    print("=================================================")
+    print("🔎 Verifying Software Factory Installation")
+    print("=================================================")
+    print(f"Target Project: {target_dir}")
+
+    violations = verify_installation(
+        target_dir,
+        workspace_file=args.workspace_file,
+        skip_workspace_check=args.skip_workspace_check,
+        skip_gitignore_check=args.skip_gitignore_check,
+    )
+    if violations:
+        print("❌ Installation compliance failed:")
+        for violation in violations:
+            print(f"  - {violation}")
+        return 1
+
+    print("✅ Installation compliance passed.")
+    print(
+        "The hidden-tree install, host contract, and Option B workspace entrypoint look correct."
+    )
+
+    runtime_violations: list[str] = []
+    if args.runtime:
+        print("\n🔁 Verifying runtime compliance...")
+        runtime_violations = verify_runtime(
+            target_dir,
+            timeout=args.runtime_timeout,
+            check_vscode_mcp=args.check_vscode_mcp,
+        )
+        if runtime_violations:
+            print("❌ Runtime compliance failed:")
+            for violation in runtime_violations:
+                print(f"  - {violation}")
+            return 1
+        print("✅ Runtime compliance passed.")
+        print(
+            "The core compose services and requested runtime endpoints are reachable."
+        )
+
+    if not args.no_smoke_prompt:
+        print(
+            "\n🧪 Non-mutating VS Code smoke prompt (copy into Copilot Chat if desired):\n"
+        )
+        print(render_smoke_prompt(target_dir, args.workspace_file))
+        if args.runtime:
+            print("\n🧪 Non-mutating runtime smoke prompt:\n")
+            print(render_runtime_smoke_prompt(target_dir))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
