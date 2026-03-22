@@ -41,20 +41,20 @@ class TestRunnerService:
                 command=[
                     "bash",
                     "-lc",
-                    f"{python_bin} -m black apps/api/ && {python_bin} -m flake8 apps/api/",
+                    f"{python_bin} -m black . && {python_bin} -m flake8 .",
                 ],
                 timeout_sec=900,
             ),
             "backend.tests": TestProfile(
                 name="backend.tests",
                 cwd=".",
-                command=[python_bin, "-m", "pytest", "tests/", "-v"],
+                command=[python_bin, "-m", "pytest", "-v"],
                 timeout_sec=1800,
             ),
             "backend.tests_quick": TestProfile(
                 name="backend.tests_quick",
                 cwd=".",
-                command=[python_bin, "-m", "pytest", "tests/", "-q", "--tb=short"],
+                command=[python_bin, "-m", "pytest", "-q", "--tb=short"],
                 timeout_sec=1200,
             ),
             "frontend.lint": TestProfile(

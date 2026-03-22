@@ -12,16 +12,16 @@ from typing import List
 _PROFILE_MAP = {
     "backend": {
         "full": [
-            "python -m black apps/api/",
-            "python -m flake8 apps/api/",
+            "python -m black .",
+            "python -m flake8 .",
             "pytest",
         ],
         "test_only": [
-            "python -m black apps/api/",
-            "python -m flake8 apps/api/",
+            "python -m black .",
+            "python -m flake8 .",
             "pytest",
         ],
-        "type_only": ["python -m mypy apps/api/"],
+        "type_only": ["python -m mypy ."],
         "doc_only": [],
     },
     "client": {

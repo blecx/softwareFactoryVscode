@@ -37,16 +37,6 @@ _TEST_GAP_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
-# Core service directories — cross-service if > 1 service is touched
-_SERVICE_DIRS = [
-    "apps/api/",
-    "apps/tui/",
-    "apps/mcp/",
-    "agents/",
-    "client/",
-    "_external/",
-]
-
 # Core domain names — recognized from paths and text
 _DOMAIN_PATTERN = re.compile(
     r"\b(template|blueprint|proposal|artifact|raid|workflow|audit|project|command|governance)\b",
@@ -125,13 +115,17 @@ class ComplexityScorer:
         return 2
 
     def _score_cross_service(self, files: list[str]) -> int:
-        """Editing multiple top-level services → higher score.  0: 1,  1: 2,  2: ≥3"""
+        """Editing multiple top-level directories → higher score.  0: 1,  1: 2,  2: ≥3"""
         touched = set()
         for f in files:
-            for svc in _SERVICE_DIRS:
-                if f.startswith(svc):
-                    touched.add(svc)
-                    break
+            parts = [p for p in f.split("/") if p and p not in (".", "..")]
+            if not parts:
+                continue
+            if len(parts) >= 2:
+                # Group by first two levels to differentiate src/frontend and src/backend etc.
+                touched.add(f"{parts[0]}/{parts[1]}")
+            else:
+                touched.add(parts[0])
         n = len(touched)
         if n <= 1:
             return 0

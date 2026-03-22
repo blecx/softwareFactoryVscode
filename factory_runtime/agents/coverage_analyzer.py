@@ -100,9 +100,7 @@ class CoverageAnalyzer:
             subprocess.run(
                 [
                     "pytest",
-                    "tests/",
-                    "--cov=apps/api",
-                    "--cov=apps/tui",
+                    "--cov=.",
                     "--cov-report=json",
                     "-q",
                 ],
