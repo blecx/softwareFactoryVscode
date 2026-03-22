@@ -5,6 +5,7 @@
 # Close Issue Workflow (Module)
 
 ## Objective
+
 Provides context and instructions for the `close-issue-workflow` skill module.
 
 Use this skill as the canonical implementation source for `close-issue`.
@@ -15,6 +16,7 @@ Use this skill as the canonical implementation source for `close-issue`.
 - An issue should be closed as completed or not planned with traceable evidence.
 
 ## When Not to Use
+
 - Do not use this when the current task does not involve close issue workflow.
 
 ## Instructions
@@ -58,5 +60,5 @@ Return a concise result that states:
 - close reason,
 - PR/commit traceability,
 - final close status or blocker.
-</file>
-</skill>
+  </file>
+  </skill>
