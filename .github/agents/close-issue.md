@@ -27,6 +27,7 @@ This file is a VS Code discovery wrapper. Keep closure logic in `.copilot/skills
 
 - `.copilot/skills/close-issue-workflow/SKILL.md`
 - `.copilot/skills/ux-delegation-policy/SKILL.md`
+- `.github/issue-closing-template.md`
 
 ## Hard Rules
 

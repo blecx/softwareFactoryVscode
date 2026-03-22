@@ -16,10 +16,13 @@ Provides context and instructions for the `issue-creation-workflow` skill module
 ## Instructions
 1. Search for duplicates and related issues using `gh issue list`.
 2. Select repository (backend/client) and estimate size (S/M/L).
-3. Draft issue body by strictly adhering to the template sections found in `.github/ISSUE_TEMPLATE/feature_request.yml`.
-4. Add testable acceptance criteria and validation commands.
-5. Add cross-repo impact and dependencies.
-6. Save draft under `.tmp/issue-<number>-draft.md`, review, then create the issue explicitly using:
+3. Decide whether the work is a feature/enhancement or a bug/defect.
+4. Draft issue body by strictly adhering to the matching template sections found in:
+   - `.github/ISSUE_TEMPLATE/feature_request.yml` for features/enhancements
+   - `.github/ISSUE_TEMPLATE/bug_report.yml` for defects
+5. Add testable acceptance criteria and validation commands.
+6. Add cross-repo impact and dependencies.
+7. Save draft under `.tmp/issue-<number>-draft.md`, review, then create the issue explicitly using:
    `gh issue create --repo <repo> --title "<title>" --body-file .tmp/issue-<number>-draft.md`
 
 ## Required Sections
@@ -36,6 +39,7 @@ Provides context and instructions for the `issue-creation-workflow` skill module
 - No unresolved placeholders remain.
 - Repo constraints included (`projectDocs/`, `configs/llm.json`).
 - Cross-repo link exists when downstream work is needed.
+- Selected issue template matches the issue type instead of defaulting every request to a feature template.
 
 ## Completion Contract
 Return:
