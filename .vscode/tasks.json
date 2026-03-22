@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "\u2699\ufe0f Configure Approval Profile (Low-Friction)",
+      "label": "⚙️ Configure Approval Profile (Low-Friction)",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -21,7 +21,24 @@
       }
     },
     {
-      "label": "\u2699\ufe0f Configure Approval Profile (Trusted Workflow)",
+      "label": "🐍 Setup: Repository Python Env",
+      "type": "shell",
+      "command": "bash",
+      "args": ["${workspaceFolder}/setup.sh"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      },
+      "group": "build"
+    },
+    {
+      "label": "⚙️ Configure Approval Profile (Trusted Workflow)",
       "type": "shell",
       "command": "bash",
       "args": [
@@ -40,7 +57,7 @@
       }
     },
     {
-      "label": "\u2699\ufe0f Configure Approval Profile (Safe)",
+      "label": "⚙️ Configure Approval Profile (Safe)",
       "type": "shell",
       "command": "bash",
       "args": ["${workspaceFolder}/scripts/setup-low-approval.sh", "safe"],

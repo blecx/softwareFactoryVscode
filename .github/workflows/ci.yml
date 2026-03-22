@@ -14,25 +14,23 @@ jobs:
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.13"
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r factory_runtime/agents/requirements.txt
-          pip install -r requirements.dev.txt
+          bash ./setup.sh
 
       - name: Check code formatting (Black)
-        run: black --check factory_runtime/ scripts/ tests/
+        run: ./.venv/bin/black --check factory_runtime/ scripts/ tests/
 
       - name: Check imports strictly (isort)
-        run: isort --check-only factory_runtime/ scripts/ tests/
+        run: ./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/
 
       - name: Lint codebase (Flake8)
-        run: flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841
+        run: ./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841
 
       - name: Run unit tests
-        run: pytest tests/ || true
+        run: ./.venv/bin/pytest tests/
 
   integration-test:
     name: "Architectural Boundary Tests"
