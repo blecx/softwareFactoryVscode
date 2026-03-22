@@ -28,13 +28,13 @@ Use these Copilot agents in VS Code Chat:
 - PR descriptions must follow `.github/pull_request_template.md` exactly.
 - Before opening or finalizing a PR, run the local equivalents of `.github/workflows/ci.yml`:
 
-   ```text
-   ./.venv/bin/black --check factory_runtime/ scripts/ tests/
-   ./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/
-   ./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841
-   ./.venv/bin/pytest tests/
-   ./tests/run-integration-test.sh
-   ```
+  ```text
+  ./.venv/bin/black --check factory_runtime/ scripts/ tests/
+  ./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/
+  ./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841
+  ./.venv/bin/pytest tests/
+  ./tests/run-integration-test.sh
+  ```
 
 - Validate generated PR bodies locally with `./scripts/validate-pr-template.sh` before asking GitHub to enforce the same template in CI.
 - Keep the remote repository protections aligned with `docs/setup-github-repository.md` so required status checks and PR-before-merge rules backstop the local workflow.

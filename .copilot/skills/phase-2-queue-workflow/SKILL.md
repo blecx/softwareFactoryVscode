@@ -5,6 +5,7 @@
 # Phase 2 Queue Workflow
 
 ## Objective
+
 Provides context and instructions for the `phase-2-queue-workflow` skill module.
 
 ## Role Contract
@@ -52,6 +53,7 @@ Use this specific loop-reporting template before pausing for operator approval:
 
 ```markdown
 ### 🔄 Phase 2 Queue Status
+
 - **Last Resolved Issue:** [#<number> - <title>]
 - **Result:** [Merged | Blocked | Failed]
 - **Next in Queue:** [#<number> - <title>]
@@ -61,5 +63,5 @@ Use this specific loop-reporting template before pausing for operator approval:
 ## Instructions
 
 - Follow domain guidelines.
-</file>
-</skill>
+  </file>
+  </skill>

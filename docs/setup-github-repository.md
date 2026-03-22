@@ -11,7 +11,7 @@ chmod +x scripts/setup-github-repo.sh
 ./scripts/setup-github-repo.sh
 ```
 
-*(Note: Requires the GitHub CLI `gh` to be installed and authenticated: `gh auth login`)*
+_(Note: Requires the GitHub CLI `gh` to be installed and authenticated: `gh auth login`)_
 
 ## Manual Setup Requirements
 
