@@ -8,8 +8,8 @@
 #   agent-worker           — FactoryOrchestrator queue loop
 #
 # Usage:
-#   cp .env.factory.example .env.factory
-#   docker compose -f docker-compose.factory.yml --env-file .env.factory up --build
+#   cp .factory.env.example .factory.env (or just create it)
+#   docker compose -f docker-compose.factory.yml --env-file ../.factory.env up --build
 #
 # Health checks:
 #   curl http://localhost:3030/health
@@ -34,12 +34,17 @@ services:
     networks:
       - factory_net
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9090/admin/mocks')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:9090/admin/mocks')",
+        ]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 10s
-
 
   # ---------------------------------------------------------------------------
   # mcp-memory — knowledge graph for long-term agent memory
@@ -61,7 +66,13 @@ services:
     networks:
       - factory_net
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3030/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:3030/health')",
+        ]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -87,7 +98,13 @@ services:
     networks:
       - factory_net
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:3031/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:3031/health')",
+        ]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -114,7 +131,13 @@ services:
     networks:
       - factory_net
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')",
+        ]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -147,7 +170,7 @@ services:
     volumes:
       # Mount the workspace so the worker can edit files
       - type: bind
-        source: "${WORKSPACE_PATH:-.}"
+        source: "${TARGET_WORKSPACE_PATH:-.}"
         target: /target
     networks:
       - factory_net

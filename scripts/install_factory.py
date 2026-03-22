@@ -252,6 +252,9 @@ def main(argv: list[str] | None = None) -> int:
 
         commit_sha = head_commit(factory_dir)
 
+        print("➡️ Bootstrapping factory virtual environment (setup.sh)...")
+        run_command(["bash", "setup.sh"], cwd=factory_dir)
+
         if args.skip_bootstrap:
             print("✅ Factory tree ready. Bootstrap skipped by request.")
             print(
