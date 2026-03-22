@@ -98,13 +98,23 @@ CONTEXT7_API_KEY=your_context7_key_here
 
 ## Starting Services
 
-Once installed and bootstrapped, you can start the completely isolated Factory container stack from within the hidden tree:
+Once installed and bootstrapped, use the canonical runtime helper inside the hidden tree:
 
 ```bash
-cd .softwareFactoryVscode
-docker compose --env-file ../.factory.env -f compose/docker-compose.factory.yml up -d
-cd ..
+python3 .softwareFactoryVscode/scripts/factory_stack.py start --build
 ```
+
+The matching canonical stop path is:
+
+```bash
+python3 .softwareFactoryVscode/scripts/factory_stack.py stop
+```
+
+The helper preserves the supported runtime contract:
+
+- compose files come from `.softwareFactoryVscode/compose/`
+- environment comes from the host-facing `.factory.env`
+- startup remains deterministic via `up -d --build --wait --wait-timeout ...`
 
 After starting the stack, you can run runtime compliance verification:
 

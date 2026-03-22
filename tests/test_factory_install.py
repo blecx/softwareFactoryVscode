@@ -10,6 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 INSTALL_SCRIPT = REPO_ROOT / "scripts" / "install_factory.py"
 BOOTSTRAP_SCRIPT = REPO_ROOT / "scripts" / "bootstrap_host.py"
 VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify_factory_install.py"
+FACTORY_STACK_SCRIPT = REPO_ROOT / "scripts" / "factory_stack.py"
 WORKSPACE_TEMPLATE = REPO_ROOT / "workspace.code-workspace.template"
 ROOT_GITIGNORE = REPO_ROOT / ".gitignore"
 
@@ -25,6 +26,7 @@ def load_module(module_name: str, path: Path):
 install_factory = load_module("install_factory_under_test", INSTALL_SCRIPT)
 bootstrap_host = load_module("bootstrap_host_under_test", BOOTSTRAP_SCRIPT)
 verify_factory_install = load_module("verify_factory_install_under_test", VERIFY_SCRIPT)
+factory_stack = load_module("factory_stack_under_test", FACTORY_STACK_SCRIPT)
 
 
 def git(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -552,3 +554,68 @@ def test_verify_factory_runtime_fails_when_required_service_missing(
     exit_code = verify_factory_install.main(["--target", str(target_repo), "--runtime"])
 
     assert exit_code == 1
+
+
+def test_factory_stack_resolves_env_file_from_repo_or_parent(tmp_path: Path) -> None:
+    repo_root = tmp_path / ".softwareFactoryVscode"
+    repo_root.mkdir(parents=True, exist_ok=True)
+
+    local_env = repo_root / ".factory.env"
+    local_env.write_text("COMPOSE_PROJECT_NAME=factory_local\n", encoding="utf-8")
+    assert factory_stack.resolve_env_file(repo_root) == local_env.resolve()
+
+    local_env.unlink()
+    parent_env = tmp_path / ".factory.env"
+    parent_env.write_text("COMPOSE_PROJECT_NAME=factory_parent\n", encoding="utf-8")
+    assert factory_stack.resolve_env_file(repo_root) == parent_env.resolve()
+
+
+def test_factory_stack_builds_full_compose_command(tmp_path: Path) -> None:
+    repo_root = tmp_path / ".softwareFactoryVscode"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    env_file = tmp_path / ".factory.env"
+
+    command = factory_stack.build_compose_command(repo_root, env_file, ["up", "-d"])
+
+    assert command[:4] == ["docker", "compose", "--env-file", str(env_file)]
+    for compose_file in factory_stack.COMPOSE_FILES:
+        assert str((repo_root / compose_file).resolve()) in command
+    assert command[-2:] == ["up", "-d"]
+
+
+def test_validate_throwaway_install_uses_canonical_stack_helper(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    validator = load_module(
+        "validate_throwaway_install_under_test",
+        REPO_ROOT / "scripts" / "validate_throwaway_install.py",
+    )
+    repo_root = tmp_path / ".softwareFactoryVscode"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    env_file = tmp_path / ".factory.env"
+    env_file.write_text("COMPOSE_PROJECT_NAME=factory_test\n", encoding="utf-8")
+    calls: list[tuple[str, Path, Path, bool | int]] = []
+
+    monkeypatch.setattr(
+        validator,
+        "stop_factory_stack",
+        lambda repo_root_arg, *, env_file, remove_volumes=False: calls.append(
+            ("stop", repo_root_arg, env_file, remove_volumes)
+        ),
+    )
+    monkeypatch.setattr(
+        validator,
+        "start_factory_stack",
+        lambda repo_root_arg, *, env_file, build=True, wait=True, wait_timeout=0: calls.append(
+            ("start", repo_root_arg, env_file, wait_timeout)
+        ),
+    )
+
+    assert validator.maybe_stop_stack(repo_root, env_file, remove_volumes=True) is True
+    validator.start_stack(repo_root, env_file, build=True)
+
+    assert calls == [
+        ("stop", repo_root, env_file, True),
+        ("start", repo_root, env_file, factory_stack.DEFAULT_WAIT_TIMEOUT),
+    ]
