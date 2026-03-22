@@ -241,14 +241,10 @@
     {
       "label": "\ud83d\udc33 Docker: Build & Start",
       "type": "shell",
-      "command": "docker",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
-        "compose",
-        "-f",
-        "compose/docker-compose.factory.yml",
-        "--env-file",
-        ".factory.env",
-        "up",
+        "${workspaceFolder}/scripts/factory_stack.py",
+        "start",
         "--build"
       ],
       "options": {
@@ -278,15 +274,8 @@
     {
       "label": "\ud83d\uded1 Docker: Stop",
       "type": "shell",
-      "command": "docker",
-      "args": [
-        "compose",
-        "-f",
-        "compose/docker-compose.factory.yml",
-        "--env-file",
-        ".factory.env",
-        "down"
-      ],
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["${workspaceFolder}/scripts/factory_stack.py", "stop"],
       "options": {
         "cwd": "${workspaceFolder}"
       },
