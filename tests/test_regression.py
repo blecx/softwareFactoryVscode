@@ -1,4 +1,6 @@
+import importlib.util
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -292,3 +294,109 @@ def test_setup_repo_doc_matches_current_ci_checks():
     assert "Python Code Quality (Lint & Format)" in setup_doc
     assert "Architectural Boundary Tests" in setup_doc
     assert "PR Template Conformance" in setup_doc
+
+
+def _load_next_pr_module():
+    repo_root = Path(__file__).parent.parent
+    next_pr_path = repo_root / "scripts" / "next-pr.py"
+    spec = importlib.util.spec_from_file_location("next_pr_module", next_pr_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_next_issue_module():
+    repo_root = Path(__file__).parent.parent
+    next_issue_path = repo_root / "scripts" / "next-issue.py"
+    spec = importlib.util.spec_from_file_location("next_issue_module", next_issue_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_next_pr_resolves_current_backend_repo_and_skips_placeholder_client(
+    monkeypatch,
+):
+    module = _load_next_pr_module()
+
+    monkeypatch.delenv("TARGET_REPO", raising=False)
+    monkeypatch.delenv("CLIENT_REPO", raising=False)
+    monkeypatch.setattr(
+        module, "_detect_current_repo", lambda: "blecx/softwareFactoryVscode"
+    )
+
+    repos = module._resolve_repos()
+
+    assert repos["backend"] == "blecx/softwareFactoryVscode"
+    assert repos["client"] == ""
+
+
+def test_next_pr_returns_clear_error_for_explicit_missing_client_repo(
+    monkeypatch, capsys
+):
+    module = _load_next_pr_module()
+
+    monkeypatch.delenv("TARGET_REPO", raising=False)
+    monkeypatch.delenv("CLIENT_REPO", raising=False)
+    monkeypatch.setattr(
+        module, "_detect_current_repo", lambda: "blecx/softwareFactoryVscode"
+    )
+
+    exit_code = module.main(["--repo", "client"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "no configured repository found for --repo client" in captured.err
+
+
+def test_next_issue_selector_uses_defaults_when_tracking_file_is_missing(tmp_path):
+    module = _load_next_issue_module()
+
+    class DummyKnowledge:
+        data = {"completed_issues": []}
+
+        @staticmethod
+        def get_adjusted_estimate(estimated_hours: float) -> float:
+            return estimated_hours
+
+    class DummyGitHub:
+        @staticmethod
+        def get_open_issues(limit: int = 100):
+            return [
+                {
+                    "number": 12,
+                    "title": "Test issue",
+                    "state": "OPEN",
+                }
+            ]
+
+        @staticmethod
+        def is_issue_resolved(issue_number: int) -> bool:
+            return True
+
+        verbose = False
+
+    missing_tracking = tmp_path / "missing-tracker.md"
+    selector = module.IssueSelector(missing_tracking, DummyKnowledge(), DummyGitHub())
+
+    assert selector.issues[0]["number"] == 12
+    assert selector.issues[0]["phase"] == "Unknown"
+    assert selector.issues[0]["priority"] == "Medium"
+    assert selector.get_issue_context(12).startswith("No local Step-1 tracking file")
+
+
+def test_next_issue_resolves_current_repo_when_target_repo_is_placeholder(
+    monkeypatch,
+):
+    module = _load_next_issue_module()
+
+    monkeypatch.setenv("TARGET_REPO", "YOUR_ORG/YOUR_REPO")
+    monkeypatch.setattr(
+        module, "_detect_current_repo", lambda: "blecx/softwareFactoryVscode"
+    )
+
+    assert module._resolve_github_repo() == "blecx/softwareFactoryVscode"
