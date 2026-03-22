@@ -5,15 +5,19 @@
 # Issue Creation Workflow
 
 ## Objective
+
 Provides context and instructions for the `issue-creation-workflow` skill module.
 
 ## When to Use
+
 - Use this when working on tasks related to issue creation, tracking roadmap items, or writing specifications.
 
 ## When Not to Use
+
 - Do not use this when the current task does not involve creating or plotting out GitHub issues.
 
 ## Instructions
+
 1. Search for duplicates and related issues using `gh issue list`.
 2. Select repository (backend/client) and estimate size (S/M/L).
 3. Decide whether the work is a feature/enhancement or a bug/defect.
@@ -26,6 +30,7 @@ Provides context and instructions for the `issue-creation-workflow` skill module
    `gh issue create --repo <repo> --title "<title>" --body-file .tmp/issue-<number>-draft.md`
 
 ## Required Sections
+
 - Goal / Problem Statement
 - Scope (In / Out / Dependencies)
 - Acceptance Criteria
@@ -35,6 +40,7 @@ Provides context and instructions for the `issue-creation-workflow` skill module
 - Documentation Updates
 
 ## Quality Checks
+
 - Criteria are specific and measurable.
 - No unresolved placeholders remain.
 - Repo constraints included (`projectDocs/`, `configs/llm.json`).
@@ -42,11 +48,13 @@ Provides context and instructions for the `issue-creation-workflow` skill module
 - Selected issue template matches the issue type instead of defaulting every request to a feature template.
 
 ## Completion Contract
+
 Return:
+
 - selected repository,
 - issue title,
 - issue URL/number,
 - short scope summary,
 - implementation handoff note.
-</file>
-</skill>
+  </file>
+  </skill>
