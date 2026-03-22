@@ -1,4 +1,3 @@
-
 services:
   docker-compose-mcp:
     build:
@@ -13,7 +12,7 @@ services:
     ports:
       - "127.0.0.1:${PORT_TEST:-3015}:3015"
     volumes:
-      - ${PROJECT_WORKSPACE_DIR:-.}:/target
+      - ${TARGET_WORKSPACE_PATH:-.}:/target
       - ${FACTORY_DIR:-.}:/factory
       - /var/run/docker.sock:/var/run/docker.sock
 
@@ -31,5 +30,5 @@ services:
     ports:
       - "127.0.0.1:${PORT_COMPOSE:-3016}:3016"
     volumes:
-      - ${PROJECT_WORKSPACE_DIR:-.}:/target
+      - ${TARGET_WORKSPACE_PATH:-.}:/target
       - ${FACTORY_DIR:-.}:/factory
