@@ -163,7 +163,7 @@ class Reconciler:
             )
             return False
         except Exception as e:
-            print(f"\n❌ Reconciliation error: {e}", file=sys.stderr)
+            print("\n❌ Reconciliation error: {e}", file=sys.stderr)
             return False
 
     def _reconcile_merged_prs(self):
@@ -359,7 +359,7 @@ class Reconciler:
 
             if result.returncode == 0:
                 if self.verbose:
-                    print(f"  ✅ Committed changes", file=sys.stderr)
+                    print("  ✅ Committed changes", file=sys.stderr)
 
                 # Push to remote
                 push_result = subprocess.run(
@@ -368,13 +368,13 @@ class Reconciler:
 
                 if push_result.returncode == 0:
                     if self.verbose:
-                        print(f"  ✅ Pushed to remote", file=sys.stderr)
+                        print("  ✅ Pushed to remote", file=sys.stderr)
                 else:
                     print(f"  ⚠️  Push failed: {push_result.stderr}", file=sys.stderr)
             else:
                 if "nothing to commit" in result.stdout:
                     if self.verbose:
-                        print(f"  ℹ️  No changes to commit", file=sys.stderr)
+                        print("  ℹ️  No changes to commit", file=sys.stderr)
                 else:
                     print(f"  ❌ Commit failed: {result.stderr}", file=sys.stderr)
 
@@ -458,7 +458,7 @@ class GitHubClient:
             print(f"⚠️  Failed to parse GitHub response: {e}", file=sys.stderr)
         except FileNotFoundError:
             print(
-                f"❌ 'gh' CLI not found. Install: https://cli.github.com/",
+                "❌ 'gh' CLI not found. Install: https://cli.github.com/",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -931,7 +931,7 @@ def format_issue_recommendation(
     output.append(f"      gh issue view {issue['number']} --repo {GITHUB_REPO}")
     output.append("")
     output.append("   2. Create feature branch:")
-    output.append(f"      git checkout main && git pull origin main")
+    output.append("      git checkout main && git pull origin main")
     output.append(f"      git checkout -b issue/{issue['number']}-<description>")
     output.append("")
     output.append("   3. Follow STEP-1-IMPLEMENTATION-WORKFLOW.md (10-step protocol)")
@@ -975,7 +975,7 @@ def main():
 
     # Set up signal handler for overall timeout
     def timeout_handler(signum, frame):
-        print(f"\n❌ Operation timed out after {args.timeout}s")
+        print("\n❌ Operation timed out after {args.timeout}s")
         print("   Consider running with --skip-reconcile if reconciliation is slow")
         sys.exit(124)  # Standard timeout exit code
 
@@ -985,10 +985,10 @@ def main():
     try:
         return _main_impl(args)
     except TimeoutError:
-        print(f"\n❌ Operation timed out")
+        print("\n❌ Operation timed out")
         return 124
     except KeyboardInterrupt:
-        print(f"\n\n⚠️  Interrupted by user")
+        print("\n\n⚠️  Interrupted by user")
         return 130
     finally:
         signal.alarm(0)  # Cancel alarm

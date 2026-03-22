@@ -233,7 +233,7 @@ class GitHubOpsService:
                 "--repo",
                 repo,
                 "--json",
-                "number,title,state,url,headRefName,isDraft,mergeable,mergeStateStatus,reviewDecision,body,mergeCommit,statusCheckRollup",
+                "number,title,state,url,headRefName,isDraft,mergeable,mergeStateStatus,reviewDecision,body,mergeCommit,statusCheckRollup",  # noqa: E501
             ],
         )
         return {"run_id": payload["run_id"], "pr": payload["data"]}

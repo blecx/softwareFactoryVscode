@@ -33,7 +33,7 @@ class FactoryAdapter:
             return True
 
         if self.plan_only:
-            print(f"FACTORY Adapter: plan_only is not fully supported yet.")
+            print("FACTORY Adapter: plan_only is not fully supported yet.")
 
         # Injects any specific instructions into the issue body if needed
         full_body = issue_summary
