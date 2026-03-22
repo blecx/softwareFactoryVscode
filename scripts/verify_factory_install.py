@@ -11,6 +11,8 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
+import yaml
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
@@ -24,6 +26,8 @@ REQUIRED_FACTORY_FILES = [
     Path("scripts") / "install_factory.py",
     Path("scripts") / "verify_factory_install.py",
 ]
+BASH_GATEWAY_POLICY_PATH = Path("configs") / "bash_gateway_policy.default.yml"
+BASH_GATEWAY_SETTINGS_PATH = Path(".copilot") / "config" / "vscode-agent-settings.json"
 REQUIRED_WORKSPACE_FOLDERS = [
     ("Host Project (Root)", "."),
     ("AI Agent Factory", bootstrap_host.FACTORY_DIRNAME),
@@ -249,6 +253,69 @@ def check_factory_tree(target_dir: Path, violations: list[str]) -> Path | None:
     return factory_dir
 
 
+def check_bash_gateway_configuration(target_dir: Path, violations: list[str]) -> None:
+    factory_dir = target_dir / bootstrap_host.FACTORY_DIRNAME
+
+    settings_path = factory_dir / BASH_GATEWAY_SETTINGS_PATH
+    if not settings_path.exists():
+        violations.append(
+            f"Missing VS Code MCP settings file for bash gateway: {settings_path}"
+        )
+    else:
+        try:
+            settings = bootstrap_host.load_json(settings_path)
+        except Exception as exc:
+            violations.append(
+                f"Unable to parse VS Code MCP settings JSON at {settings_path}: {exc}"
+            )
+        else:
+            bash_url = (
+                settings.get("workspace", {})
+                .get("mcp", {})
+                .get("servers", {})
+                .get("bashGateway", {})
+                .get("url")
+            )
+            if not isinstance(bash_url, str) or not bash_url:
+                violations.append(
+                    "VS Code MCP settings are missing `workspace.mcp.servers.bashGateway.url`."
+                )
+
+    policy_path = factory_dir / BASH_GATEWAY_POLICY_PATH
+    if not policy_path.exists():
+        violations.append(f"Missing bash gateway policy file: {policy_path}")
+        return
+
+    try:
+        policy_data = yaml.safe_load(policy_path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        violations.append(
+            f"Unable to parse bash gateway policy YAML at {policy_path}: {exc}"
+        )
+        return
+
+    profiles = policy_data.get("profiles") if isinstance(policy_data, dict) else None
+    if not isinstance(profiles, dict) or not profiles:
+        violations.append(
+            "Bash gateway policy must define a non-empty top-level `profiles` mapping."
+        )
+        return
+
+    for profile_name, profile_data in profiles.items():
+        if not isinstance(profile_data, dict):
+            violations.append(
+                f"Bash gateway profile `{profile_name}` must be a mapping of settings."
+            )
+            continue
+        scripts = profile_data.get("scripts")
+        if not isinstance(scripts, list) or not all(
+            isinstance(item, str) and item for item in scripts
+        ):
+            violations.append(
+                f"Bash gateway profile `{profile_name}` must define a non-empty string list for `scripts`."
+            )
+
+
 def check_factory_env(target_dir: Path, violations: list[str]) -> None:
     env_path = target_dir / ".factory.env"
     if not env_path.exists():
@@ -381,6 +448,7 @@ def verify_installation(
 ) -> list[str]:
     violations: list[str] = []
     check_factory_tree(target_dir, violations)
+    check_bash_gateway_configuration(target_dir, violations)
     check_factory_env(target_dir, violations)
     check_lock_file(target_dir, workspace_file, violations)
     check_workspace_file(

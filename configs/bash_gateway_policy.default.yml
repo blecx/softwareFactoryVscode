@@ -1,14 +1,18 @@
-policy:
-  version: 1.0
-  description: "Neutral default policy for isolated Factory runtime"
-  allow:
-    - "^ls"
-    - "^pwd"
-    - "^cat"
-    - "^grep"
-    - "^find"
-  deny:
-    - "rm -rf /"
-    - "^mkfs"
-  sandbox_dir: ".tmp/factory/sandbox"
-  max_execution_time_seconds: 30
+profiles:
+  safe-readonly:
+    scripts:
+      - scripts/validate-pr-template.sh
+      - tests/run-integration-test.sh
+    default_timeout_sec: 300
+    max_timeout_sec: 900
+    default_dry_run: true
+
+  repo-maintenance:
+    scripts:
+      - scripts/archive-goals-safe.sh
+      - scripts/issue-pr-merge-cleanup-loop.sh
+      - scripts/setup-github-repo.sh
+      - setup.sh
+    default_timeout_sec: 300
+    max_timeout_sec: 900
+    default_dry_run: true
