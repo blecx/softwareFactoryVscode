@@ -33,12 +33,7 @@ from typing import Any, Literal
 RepoKey = Literal["backend", "client"]
 
 
-REPOS: dict[RepoKey, str] = {
-    "backend": os.environ.get("TARGET_REPO", "YOUR_ORG/YOUR_REPO"),
-    "client": os.environ.get(
-        "CLIENT_REPO", os.environ.get("CLIENT_REPO", "YOUR_ORG/YOUR_CLIENT_REPO")
-    ),
-}
+PLACEHOLDER_REPOS = {"YOUR_ORG/YOUR_REPO", "YOUR_ORG/YOUR_CLIENT_REPO"}
 
 DEFAULT_GH_MIN_INTERVAL_SECONDS = 1.0
 _GH_LAST_REQUEST_TS: float | None = None
@@ -59,6 +54,38 @@ class PrCandidate:
     review_decision: str
     checks_summary: dict[str, Any]
     score: int
+
+
+def _looks_like_placeholder_repo(repo: str) -> bool:
+    return repo.strip() in PLACEHOLDER_REPOS
+
+
+def _detect_current_repo() -> str:
+    _throttle_gh_requests()
+    cmd = ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]
+    try:
+        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError:
+        return ""
+    return out.decode("utf-8", errors="replace").strip()
+
+
+def _resolve_repos() -> dict[RepoKey, str]:
+    detected_repo = _detect_current_repo()
+
+    backend_repo = os.environ.get("TARGET_REPO", "YOUR_ORG/YOUR_REPO").strip()
+    client_repo = os.environ.get("CLIENT_REPO", "YOUR_ORG/YOUR_CLIENT_REPO").strip()
+
+    if _looks_like_placeholder_repo(backend_repo):
+        backend_repo = detected_repo
+
+    if _looks_like_placeholder_repo(client_repo):
+        client_repo = ""
+
+    return {
+        "backend": backend_repo,
+        "client": client_repo,
+    }
 
 
 def _run_gh_json(args: list[str]) -> Any:
@@ -212,6 +239,7 @@ def _fetch_pr_details(repo: str, number: int) -> dict[str, Any]:
 def recommend(
     repo_filter: Literal["backend", "client", "both"], limit: int
 ) -> list[PrCandidate]:
+    repos = _resolve_repos()
     repo_keys: list[RepoKey]
     if repo_filter == "both":
         repo_keys = ["client", "backend"]
@@ -219,9 +247,18 @@ def recommend(
         repo_keys = [repo_filter]
 
     candidates: list[PrCandidate] = []
+    seen_repos: set[str] = set()
 
     for repo_key in repo_keys:
-        repo = REPOS[repo_key]
+        repo = repos[repo_key].strip()
+        if not repo:
+            continue
+        if _looks_like_placeholder_repo(repo):
+            continue
+        if repo in seen_repos:
+            continue
+        seen_repos.add(repo)
+
         prs = _fetch_open_prs(repo, limit)
         for pr in prs:
             number = int(pr["number"])
@@ -264,6 +301,16 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
+
+    repos = _resolve_repos()
+    requested_repo = repos[args.repo] if args.repo != "both" else ""
+    if args.repo != "both" and not requested_repo:
+        print(
+            f"ERROR: no configured repository found for --repo {args.repo}. "
+            "Set the corresponding environment variable or run inside the target GitHub repo.",
+            file=sys.stderr,
+        )
+        return 2
 
     try:
         candidates = recommend(args.repo, args.limit)

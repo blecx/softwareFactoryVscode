@@ -44,6 +44,42 @@ if str(REPO_ROOT) not in sys.path:
 
 from factory_runtime.agents.tooling.gh_throttle import run_gh_throttled
 
+PLACEHOLDER_REPOS = {"YOUR_ORG/YOUR_REPO", "YOUR_ORG/YOUR_CLIENT_REPO"}
+
+
+def _looks_like_placeholder_repo(repo: str) -> bool:
+    return repo.strip() in PLACEHOLDER_REPOS
+
+
+def _detect_current_repo() -> str:
+    try:
+        result = run_gh_throttled(
+            ["gh", "repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            min_interval_seconds=0,
+        )
+    except Exception:
+        return ""
+
+    if result.returncode != 0:
+        return ""
+
+    return (result.stdout or "").strip()
+
+
+def _resolve_github_repo() -> str:
+    configured_repo = os.environ.get("TARGET_REPO", "YOUR_ORG/YOUR_REPO").strip()
+    if not _looks_like_placeholder_repo(configured_repo):
+        return configured_repo
+
+    detected_repo = _detect_current_repo()
+    if detected_repo:
+        return detected_repo
+
+    return configured_repo
+
 
 def _resolve_step1_file(primary: Path, fallback: Path) -> Path:
     """Resolve the current location of Step-1 workflow files.
@@ -65,7 +101,7 @@ STATUS_FILE = _resolve_step1_file(
 KNOWLEDGE_FILE = REPO_ROOT / ".issue-resolution-knowledge.json"
 
 # GitHub repository
-GITHUB_REPO = os.environ.get("TARGET_REPO", "YOUR_ORG/YOUR_REPO")
+GITHUB_REPO = _resolve_github_repo()
 
 # Configuration
 DEFAULT_TIMEOUT = 15  # seconds for individual operations
@@ -142,7 +178,15 @@ class Reconciler:
             self._reconcile_merged_prs()
 
             # Step 2: Update local tracking to match GitHub (most important)
-            self._update_tracking_file()
+            if self.tracking_file.exists():
+                self._update_tracking_file()
+            elif self.verbose:
+                print(
+                    "\nℹ️  Tracking file not found; skipping local tracker reconciliation.",
+                    file=sys.stderr,
+                )
+            else:
+                print("ℹ️  No legacy tracking file found; using GitHub-only selection.")
 
             # Step 3: Commit and sync if changes were made
             if self.changes_made:
@@ -163,7 +207,7 @@ class Reconciler:
             )
             return False
         except Exception as e:
-            print("\n❌ Reconciliation error: {e}", file=sys.stderr)
+            print(f"\n❌ Reconciliation error: {e}", file=sys.stderr)
             return False
 
     def _reconcile_merged_prs(self):
@@ -265,6 +309,9 @@ class Reconciler:
 
     def _update_tracking_file(self):
         """Update local tracking file to match GitHub state"""
+        if not self.tracking_file.exists():
+            return
+
         if self.verbose:
             print("\n📝 Updating local tracking file...", file=sys.stderr)
 
@@ -336,6 +383,14 @@ class Reconciler:
             print("\n💾 Committing and syncing changes...", file=sys.stderr)
 
         try:
+            if not self.tracking_file.exists():
+                if self.verbose:
+                    print(
+                        "  ℹ️  No tracking file present; no local tracker changes to commit.",
+                        file=sys.stderr,
+                    )
+                return
+
             # Add tracking file
             subprocess.run(
                 ["git", "add", str(self.tracking_file)],
@@ -715,6 +770,9 @@ class IssueSelector:
 
     def _parse_tracking_file(self) -> Dict[int, Dict]:
         """Parse tracking file to extract metadata (not state!) - optimized version"""
+        if not self.tracking_file.exists():
+            return {}
+
         metadata = {}
         content = self.tracking_file.read_text()
 
@@ -847,6 +905,12 @@ class IssueSelector:
 
     def get_issue_context(self, issue_num: int) -> str:
         """Get full context for an issue from tracking file"""
+        if not self.tracking_file.exists():
+            return (
+                "No local Step-1 tracking file is present in this repository. "
+                "Use the live GitHub issue as the source of truth for planning and implementation context."
+            )
+
         content = self.tracking_file.read_text()
 
         # Find the issue section (handles both ### and ** formats)
