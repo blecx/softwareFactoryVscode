@@ -6,11 +6,11 @@ from typing import Type
 from factory_runtime.agents.factory_adapter import FactoryAdapter
 
 AGENT_ALIASES = {
-    "autonomous": "agents.factory_adapter:FactoryAdapter",
-    "default": "agents.factory_adapter:FactoryAdapter",
-    "ralph": "agents.ralph_agent:RalphAgent",
-    "ralph-agent": "agents.ralph_agent:RalphAgent",
-    "resolve-issue": "agents.factory_adapter:FactoryAdapter",
+    "autonomous": "factory_runtime.agents.factory_adapter:FactoryAdapter",
+    "default": "factory_runtime.agents.factory_adapter:FactoryAdapter",
+    "ralph": "factory_runtime.agents.ralph_agent:RalphAgent",
+    "ralph-agent": "factory_runtime.agents.ralph_agent:RalphAgent",
+    "resolve-issue": "factory_runtime.agents.factory_adapter:FactoryAdapter",
 }
 
 
