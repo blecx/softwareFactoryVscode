@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,18 @@ def git(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
         ["git", *args],
         cwd=cwd,
         check=True,
+        text=True,
+        capture_output=True,
+    )
+
+
+def run_python_script(
+    script: Path, *args: str, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(script), *args],
+        cwd=cwd,
+        check=False,
         text=True,
         capture_output=True,
     )
@@ -107,6 +120,73 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     gitignore = (target_repo / ".gitignore").read_text(encoding="utf-8")
     assert ".tmp/softwareFactoryVscode/" in gitignore
     assert ".factory.env" in gitignore
+
+
+def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
+    source_repo = tmp_path / "source-factory"
+    target_repo = tmp_path / "throwaway-target"
+    create_source_factory_repo(source_repo)
+    init_git_repo(target_repo)
+
+    install_result = run_python_script(
+        INSTALL_SCRIPT,
+        "--target",
+        str(target_repo),
+        "--repo-url",
+        str(source_repo),
+    )
+
+    assert install_result.returncode == 0, install_result.stdout + install_result.stderr
+    assert "Installing softwareFactoryVscode" in install_result.stdout
+    assert (
+        "Bootstrapping target repository for Option B workspace usage"
+        in install_result.stdout
+    )
+    assert "Installation compliance passed" in install_result.stdout
+    assert "Non-mutating VS Code smoke prompt" in install_result.stdout
+    assert (
+        "Do not create, modify, delete, stage, commit, or rename any file."
+        in install_result.stdout
+    )
+
+    factory_dir = target_repo / ".softwareFactoryVscode"
+    assert factory_dir.is_dir()
+    assert (factory_dir / ".git").exists()
+    assert (target_repo / ".tmp" / "softwareFactoryVscode").is_dir()
+    assert (target_repo / ".factory.env").is_file()
+    assert (target_repo / ".factory.lock.json").is_file()
+    assert (target_repo / "software-factory.code-workspace").is_file()
+
+    lock_data = json.loads(
+        (target_repo / ".factory.lock.json").read_text(encoding="utf-8")
+    )
+    assert lock_data["factory"]["repo_url"] == str(source_repo)
+    assert lock_data["factory"]["install_path"] == ".softwareFactoryVscode"
+    assert lock_data["factory"]["workspace_file"] == "software-factory.code-workspace"
+    assert lock_data["factory"]["commit"]
+
+    workspace_data = json.loads(
+        (target_repo / "software-factory.code-workspace").read_text(encoding="utf-8")
+    )
+    assert workspace_data["folders"] == [
+        {"name": "Host Project (Root)", "path": "."},
+        {"name": "AI Agent Factory", "path": ".softwareFactoryVscode"},
+    ]
+
+    verify_result = run_python_script(
+        target_repo
+        / ".softwareFactoryVscode"
+        / "scripts"
+        / "verify_factory_install.py",
+        "--target",
+        str(target_repo),
+        "--no-smoke-prompt",
+    )
+
+    assert verify_result.returncode == 0, verify_result.stdout + verify_result.stderr
+    assert "Installation compliance passed" in verify_result.stdout
+    assert "Option B workspace entrypoint look correct" in verify_result.stdout
+    assert "Non-mutating VS Code smoke prompt" not in verify_result.stdout
 
 
 def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
