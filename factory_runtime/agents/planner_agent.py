@@ -20,12 +20,12 @@ if TYPE_CHECKING:
 from factory_runtime.agents.llm_client import LLMClientFactory
 
 _SYSTEM_PROMPT = """You are the FACTORY PlannerAgent.
-Your job is to read a GitHub issue, search the codebase using MCP tools to understand the 
+Your job is to read a GitHub issue, search the codebase using MCP tools to understand the
 context, and then write a precise implementation plan broken down into actionable steps.
 
 AVAILABLE TOOLS:
 You have access to mcp-search (search_files) and mcp-filesystem (read_file, list_dir).
-Use these to inspect files and find relevant code. 
+Use these to inspect files and find relevant code.
 
 OUTPUT:
 You MUST output a final JSON block bounded by ```json ... ``` that perfectly matches this schema:

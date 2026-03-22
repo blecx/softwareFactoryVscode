@@ -126,9 +126,9 @@ class WorkflowAgent(BaseAgent):
         )
         if learnings:
             self.log(f"📚 Found {len(learnings)} relevant learnings from KB", "info")
-            for l in learnings[:3]:
-                desc = l.get("error", l.get("description", "N/A"))[:80]
-                self.log(f"  • {l.get('type', 'unknown')}: {desc}", "info")
+            for x in learnings[:3]:
+                desc = x.get("error", x.get("description", "N/A"))[:80]
+                self.log(f"  • {x.get('type', 'unknown')}: {desc}", "info")
 
         try:
             phase_output: Dict = {}

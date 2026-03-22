@@ -80,6 +80,27 @@ def create_source_factory_repo(path: Path) -> None:
         WORKSPACE_TEMPLATE.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
+    (path / "setup.sh").write_text(
+        "#!/usr/bin/env bash\n"
+        "mkdir -p .venv/bin\n"
+        "touch .venv/bin/python\n"
+        "chmod +x .venv/bin/python\n"
+        "echo '✅ Mock repository environment ready: .venv'\n",
+        encoding="utf-8",
+    )
+    (path / "setup.sh").chmod(0o755)
+    (path / "requirements.dev.txt").write_text(
+        (REPO_ROOT / "requirements.dev.txt").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (path / "factory_runtime").mkdir(parents=True, exist_ok=True)
+    (path / "factory_runtime" / "agents").mkdir(parents=True, exist_ok=True)
+    (path / "factory_runtime" / "agents" / "requirements.txt").write_text(
+        (REPO_ROOT / "factory_runtime" / "agents" / "requirements.txt").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
     git("add", ".", cwd=path)
     git("commit", "-m", "Initial factory payload", cwd=path)
 
@@ -152,6 +173,8 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
     factory_dir = target_repo / ".softwareFactoryVscode"
     assert factory_dir.is_dir()
     assert (factory_dir / ".git").exists()
+    assert (factory_dir / "setup.sh").exists()
+    assert (factory_dir / ".venv" / "bin" / "python").exists()
     assert (target_repo / ".tmp" / "softwareFactoryVscode").is_dir()
     assert (target_repo / ".factory.env").is_file()
     assert (target_repo / ".factory.lock.json").is_file()

@@ -13,5 +13,5 @@ services:
     ports:
       - "127.0.0.1:${PORT_BASH:-3011}:3011"
     volumes:
-      - ${PROJECT_WORKSPACE_DIR:-.}:/target
+      - ${TARGET_WORKSPACE_PATH:-.}:/target
       - ${FACTORY_DIR:-.}:/factory

@@ -218,7 +218,7 @@ class MCPBootloader:
                         service,
                         "python",
                         "-c",
-                        f"import sqlite3, sys; import os; sys.exit(0) if not os.path.exists('{path}') or sqlite3.connect('{path}').execute('PRAGMA integrity_check').fetchone()[0] == 'ok' else sys.exit(1)",
+                        f"import sqlite3, sys; import os; sys.exit(0) if not os.path.exists('{path}') or sqlite3.connect('{path}').execute('PRAGMA integrity_check').fetchone()[0] == 'ok' else sys.exit(1)",  # noqa: E501
                     ]
                 )
                 subprocess.run(
@@ -269,7 +269,7 @@ class MCPBootloader:
                         service,
                         "python",
                         "-c",
-                        f"import sqlite3, sys, os; sys.exit(0) if not os.path.exists('{dest_path}') or os.path.getsize('{dest_path}') < 8192 or sqlite3.connect('{dest_path}').execute(\"SELECT COUNT(*) FROM sqlite_master WHERE type='table'\").fetchone()[0] == 0 else sys.exit(1)",
+                        f"import sqlite3, sys, os; sys.exit(0) if not os.path.exists('{dest_path}') or os.path.getsize('{dest_path}') < 8192 or sqlite3.connect('{dest_path}').execute(\"SELECT COUNT(*) FROM sqlite_master WHERE type='table'\").fetchone()[0] == 0 else sys.exit(1)",  # noqa: E501
                     ]
                 )
                 res = subprocess.run(
@@ -301,7 +301,7 @@ class MCPBootloader:
                             service,
                             "python",
                             "-c",
-                            f"import sqlite3; source=sqlite3.connect('{tmp_bak}'); dest=sqlite3.connect('{dest_path}'); source.backup(dest); source.close(); dest.close()",
+                            f"import sqlite3; source=sqlite3.connect('{tmp_bak}'); dest=sqlite3.connect('{dest_path}'); source.backup(dest); source.close(); dest.close()",  # noqa: E501
                         ]
                     )
                     subprocess.run(
@@ -346,7 +346,7 @@ class MCPBootloader:
                     "mcp-memory",
                     "python",
                     "-c",
-                    "import sqlite3; con=sqlite3.connect('/data/memory.db'); bck=sqlite3.connect('/tmp/memory.db.bak'); con.backup(bck); bck.close(); con.close()",
+                    "import sqlite3; con=sqlite3.connect('/data/memory.db'); bck=sqlite3.connect('/tmp/memory.db.bak'); con.backup(bck); bck.close(); con.close()",  # noqa: E501
                 ],
                 cwd=self.workspace_root,
                 check=True,
@@ -379,7 +379,7 @@ class MCPBootloader:
                     "mcp-agent-bus",
                     "python",
                     "-c",
-                    "import sqlite3; con=sqlite3.connect('/data/agent_bus.db'); bck=sqlite3.connect('/tmp/agent_bus.db.bak'); con.backup(bck); bck.close(); con.close()",
+                    "import sqlite3; con=sqlite3.connect('/data/agent_bus.db'); bck=sqlite3.connect('/tmp/agent_bus.db.bak'); con.backup(bck); bck.close(); con.close()",  # noqa: E501
                 ],
                 cwd=self.workspace_root,
                 check=True,

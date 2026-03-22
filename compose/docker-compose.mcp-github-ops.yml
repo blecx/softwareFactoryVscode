@@ -1,4 +1,3 @@
-
 services:
   github-ops-mcp:
     build:
@@ -16,6 +15,6 @@ services:
     ports:
       - "127.0.0.1:${PORT_GITHUB:-3018}:3018"
     volumes:
-      - ${PROJECT_WORKSPACE_DIR:-.}:/target
+      - ${TARGET_WORKSPACE_PATH:-.}:/target
       - ${FACTORY_DIR:-.}:/factory
       - ${FACTORY_DIR:-.}:/factory

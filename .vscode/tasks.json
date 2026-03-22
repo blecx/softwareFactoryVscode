@@ -246,7 +246,15 @@
       "label": "\ud83d\udc33 Docker: Build & Start",
       "type": "shell",
       "command": "docker",
-      "args": ["compose", "up", "--build"],
+      "args": [
+        "compose",
+        "-f",
+        "compose/docker-compose.factory.yml",
+        "--env-file",
+        ".factory.env",
+        "up",
+        "--build"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -275,7 +283,14 @@
       "label": "\ud83d\uded1 Docker: Stop",
       "type": "shell",
       "command": "docker",
-      "args": ["compose", "down"],
+      "args": [
+        "compose",
+        "-f",
+        "compose/docker-compose.factory.yml",
+        "--env-file",
+        ".factory.env",
+        "down"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },

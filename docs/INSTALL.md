@@ -102,7 +102,7 @@ Once installed and bootstrapped, you can start the completely isolated Factory c
 
 ```bash
 cd .softwareFactoryVscode
-docker compose -f compose/docker-compose.factory.yml up -d
+docker compose --env-file ../.factory.env -f compose/docker-compose.factory.yml up -d
 cd ..
 ```
 

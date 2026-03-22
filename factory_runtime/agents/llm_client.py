@@ -401,7 +401,7 @@ class LLMClientFactory:
 
             if LLMClientFactory._looks_like_placeholder(api_key):
                 raise ValueError(
-                    "GitHub PAT token required. Set in configs/llm.json, export GITHUB_TOKEN/GH_TOKEN, or run `gh auth login`.\n"
+                    "GitHub PAT token required. Set in configs/llm.json, export GITHUB_TOKEN/GH_TOKEN, or run `gh auth login`.\n"  # noqa: E501
                     "Get your token at: https://github.com/settings/tokens"
                 )
 
