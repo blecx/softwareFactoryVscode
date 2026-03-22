@@ -1,0 +1,65 @@
+# Copilot-native issue / PR / merge workflow
+
+This repository's canonical issue workflow is **Copilot-native**.
+
+## Canonical path
+
+Use these Copilot agents in VS Code Chat:
+
+1. `@create-issue`
+   - draft or create a template-compliant issue
+2. `@resolve-issue`
+   - implement one scoped issue into one PR
+3. `@pr-merge`
+   - validate, merge, and close the linked issue
+4. `@queue-backend` or `@queue-phase-2`
+   - continue the repeatable one-issue-at-a-time loop with a manual checkpoint between iterations
+
+## Loop rules
+
+- One issue = one PR = one merge.
+- Stop immediately on blocked PRs, CI failures, merge conflicts, or workflow errors.
+- Require explicit operator approval before continuing to the next issue.
+- Use `.tmp/`, never `/tmp`.
+
+## Required guardrails
+
+- Issues must follow `.github/ISSUE_TEMPLATE/feature_request.yml` or `.github/ISSUE_TEMPLATE/bug_report.yml`.
+- PR descriptions must follow `.github/pull_request_template.md` exactly.
+- Before opening or finalizing a PR, run the local equivalents of `.github/workflows/ci.yml`:
+
+   ```text
+   ./.venv/bin/black --check factory_runtime/ scripts/ tests/
+   ./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/
+   ./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841
+   ./.venv/bin/pytest tests/
+   ./tests/run-integration-test.sh
+   ```
+
+- Validate generated PR bodies locally with `./scripts/validate-pr-template.sh` before asking GitHub to enforce the same template in CI.
+- Keep the remote repository protections aligned with `docs/setup-github-repository.md` so required status checks and PR-before-merge rules backstop the local workflow.
+
+These are not optional style notes; they are the historical guardrails defined by `docs/architecture/ADR-001-AI-Workflow-Guardrails.md`, reinforced by `docs/architecture/ADR-005-Strong-Templating-Enforcement.md` and `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md`, plus `.copilot/skills/a2a-communication/SKILL.md`, `.github/workflows/ci.yml`, and the remote protection guidance in `docs/setup-github-repository.md`.
+
+## Legacy path status
+
+The following legacy scripts are **not** the canonical workflow and should not be used for normal issue execution:
+
+- `scripts/work-issue.py`
+- `scripts/issue-pr-merge-cleanup-loop.sh`
+
+They exist only as historical/autonomous artifacts. The supported workflow entrypoints are the Copilot agents and `.copilot/skills/*` modules.
+
+## Why
+
+The Copilot-native flow keeps issue creation, implementation, merge policy, and loop orchestration aligned with the repository's current `.github/agents/*` and `.copilot/skills/*` sources of truth.
+
+## Recommended operator sequence
+
+For a new item:
+
+1. Open Copilot Chat in the workspace.
+2. Use `@create-issue` to create the issue from the repository template.
+3. Use `@resolve-issue` with the created issue number.
+4. When the PR is ready, use `@pr-merge`.
+5. For ongoing queue work, switch to `@queue-backend` or `@queue-phase-2`.

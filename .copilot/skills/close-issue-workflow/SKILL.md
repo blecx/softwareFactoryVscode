@@ -23,10 +23,15 @@ Use this skill as the canonical implementation source for `close-issue`.
 2. Verify the outcome evidence:
    - completed: merged PR and default-branch landing,
    - not planned: documented rationale and any canonical duplicates/links.
-3. Choose the correct close template and reason.
+3. Choose the correct close template and reason using `.github/issue-closing-template.md` as the canonical completed-work structure.
 4. Prepare concrete closure data under `.tmp/` when needed.
 5. Dry-run the close template, then post the final close action.
 6. Verify the issue is closed and the closing comment is present.
+
+## Required Sources
+
+- `.github/issue-closing-template.md`
+- `.copilot/skills/ux-delegation-policy/SKILL.md`
 
 ## Required Evidence
 
@@ -42,6 +47,7 @@ Use this skill as the canonical implementation source for `close-issue`.
 - Use `.tmp/`, never `/tmp`.
 - Never stage `projectDocs/` or `configs/llm.json`.
 - For UI/UX-affecting issues, include closure evidence consistent with the canonical UX delegation policy.
+- Completed-work close comments should preserve the sections and traceability structure from `.github/issue-closing-template.md`.
 
 ## Completion Contract
 

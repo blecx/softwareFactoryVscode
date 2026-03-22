@@ -1,6 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+if [[ "${ALLOW_LEGACY_AUTONOMOUS_LOOP:-0}" != "1" ]]; then
+  cat >&2 <<'EOF'
+The legacy issue/pr/merge shell loop is deprecated in this repository.
+
+Use the Copilot-native workflow instead:
+  - @create-issue
+  - @resolve-issue
+  - @pr-merge
+  - @queue-backend or @queue-phase-2
+
+See: docs/WORK-ISSUE-WORKFLOW.md
+
+If you must invoke this historical script explicitly, set:
+  ALLOW_LEGACY_AUTONOMOUS_LOOP=1
+EOF
+  exit 1
+fi
+
 MAX_ISSUES=25
 ISSUE_OVERRIDE=""
 DRY_RUN=0

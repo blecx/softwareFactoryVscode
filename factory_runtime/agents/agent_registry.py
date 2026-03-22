@@ -1,9 +1,10 @@
 """Agent registry for issue-resolution runners."""
 
 from importlib import import_module
-from typing import Type
+from typing import TYPE_CHECKING, Type
 
-from factory_runtime.agents.factory_adapter import FactoryAdapter
+if TYPE_CHECKING:
+    from factory_runtime.agents.factory_adapter import FactoryAdapter
 
 AGENT_ALIASES = {
     "autonomous": "factory_runtime.agents.factory_adapter:FactoryAdapter",
@@ -14,7 +15,7 @@ AGENT_ALIASES = {
 }
 
 
-def _load_agent_class(spec: str) -> Type[FactoryAdapter]:
+def _load_agent_class(spec: str) -> Type["FactoryAdapter"]:
     if ":" not in spec:
         raise ValueError(
             f"Invalid agent spec '{spec}'. Expected format 'module.path:ClassName'."
@@ -27,6 +28,8 @@ def _load_agent_class(spec: str) -> Type[FactoryAdapter]:
         raise ValueError(
             f"Agent class '{class_name}' not found in module '{module_name}'."
         )
+    from factory_runtime.agents.factory_adapter import FactoryAdapter
+
     if not issubclass(cls, FactoryAdapter):
         raise ValueError(f"Agent class '{class_name}' must inherit FactoryAdapter.")
     return cls
@@ -44,7 +47,7 @@ def create_issue_agent(
     agent_name_or_spec: str,
     issue_number: int,
     dry_run: bool,
-) -> FactoryAdapter:
+) -> "FactoryAdapter":
     spec = resolve_agent_spec(agent_name_or_spec)
     cls = _load_agent_class(spec)
     return cls(issue_number=issue_number, dry_run=dry_run)

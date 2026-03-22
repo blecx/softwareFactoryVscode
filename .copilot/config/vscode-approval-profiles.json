@@ -148,8 +148,8 @@
       "ralph-agent": true,
       "factory-operator": true,
       "workflow": true,
-      "continue-backend": true,
-      "continue-phase-2": true,
+      "queue-backend": true,
+      "queue-phase-2": true,
       "tutorial": true
     },
     "chat.tools.terminal.autoApprove": {
