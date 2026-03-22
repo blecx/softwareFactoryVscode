@@ -63,7 +63,7 @@ Response format for file edits:
     {"filepath": "relative/path/to/file.py", "content": "full file content here"},
     ...
   ],
-  "validation_commands": ["pytest tests/unit/", "python -m flake8 apps/api/"]
+  "validation_commands": ["pytest", "python -m flake8 ."]
 }
 ```
 
@@ -74,7 +74,7 @@ Response format for planning:
   "goal": "one-sentence description",
   "files": ["list", "of", "file", "paths"],
   "acceptance_criteria": ["criterion 1", "criterion 2"],
-  "validation_commands": ["pytest tests/unit/"],
+  "validation_commands": ["pytest"],
   "estimated_minutes": 30
 }
 ```
