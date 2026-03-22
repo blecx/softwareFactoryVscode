@@ -23,6 +23,11 @@ from typing import Any, Optional
 
 import httpx
 
+DEFAULT_MCP_PROTOCOL_VERSION = "2025-03-26"
+MCP_SESSION_ID_HEADER = "mcp-session-id"
+MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version"
+MCP_ACCEPT_HEADER = "application/json, text/event-stream"
+
 
 class ToolNotFoundError(KeyError):
     """Raised when a requested tool is not registered on any connected server."""
@@ -47,6 +52,17 @@ class ToolInfo:
     input_schema: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class ServerSession:
+    """Per-server MCP session metadata."""
+
+    server_name: str
+    server_url: str
+    endpoint_url: str
+    session_id: str | None = None
+    initialized: bool = False
+
+
 class MCPMultiClient:
     """Connects to N FastMCP servers, merges their tool manifests, and routes calls.
 
@@ -64,6 +80,8 @@ class MCPMultiClient:
         self,
         servers: list[dict[str, str]],
         timeout: float = 10.0,
+        protocol_version: str = DEFAULT_MCP_PROTOCOL_VERSION,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         """
         Args:
@@ -72,7 +90,10 @@ class MCPMultiClient:
         """
         self._servers = servers
         self._timeout = timeout
+        self._protocol_version = protocol_version
+        self._transport = transport
         self._tools: dict[str, ToolInfo] = {}
+        self._sessions: dict[str, ServerSession] = {}
         self._http: Optional[httpx.AsyncClient] = None
         self._req_id = 0
 
@@ -93,13 +114,15 @@ class MCPMultiClient:
 
     async def connect(self) -> None:
         """Open HTTP sessions to all servers and fetch tool manifests."""
-        self._http = httpx.AsyncClient(timeout=self._timeout)
+        self._http = httpx.AsyncClient(timeout=self._timeout, transport=self._transport)
         self._tools = {}
+        self._sessions = {}
 
         for server in self._servers:
             name = server["name"]
             url = server["url"].rstrip("/")
-            tools = await self._fetch_tools(url, name)
+            session = await self._initialize_server(name, url)
+            tools = await self._fetch_tools(session)
             for tool in tools:
                 if tool.name in self._tools:
                     existing = self._tools[tool.name]
@@ -115,6 +138,7 @@ class MCPMultiClient:
         if self._http is not None:
             await self._http.aclose()
             self._http = None
+        self._sessions = {}
 
     # ------------------------------------------------------------------
     # Tool manifest
@@ -153,8 +177,11 @@ class MCPMultiClient:
             MCPCallError: The server returned an error or HTTP failure.
         """
         tool = self.get_tool(name)  # raises ToolNotFoundError if missing
+        session = self._sessions.get(tool.server_url)
+        if session is None or not session.initialized:
+            session = await self._initialize_server(tool.server_name, tool.server_url)
         return await self._rpc_call(
-            tool.server_url,
+            session,
             "tools/call",
             {
                 "name": name,
@@ -170,48 +197,152 @@ class MCPMultiClient:
         self._req_id += 1
         return self._req_id
 
-    async def _rpc_call(
-        self, base_url: str, method: str, params: dict[str, Any]
-    ) -> Any:
-        """Send a JSON-RPC 2.0 request to the MCP endpoint and return the result."""
+    def _normalize_endpoint_url(self, base_url: str) -> str:
+        """Return the MCP endpoint URL for one server base URL."""
+        normalized = base_url.rstrip("/")
+        if normalized.endswith("/mcp"):
+            return normalized
+        return f"{normalized}/mcp"
+
+    def _build_headers(
+        self,
+        *,
+        session_id: str | None = None,
+        include_accept: bool = True,
+    ) -> dict[str, str]:
+        """Build required Streamable HTTP headers."""
+        headers = {
+            "Content-Type": "application/json",
+            MCP_PROTOCOL_VERSION_HEADER: self._protocol_version,
+        }
+        if include_accept:
+            headers["Accept"] = MCP_ACCEPT_HEADER
+        if session_id:
+            headers[MCP_SESSION_ID_HEADER] = session_id
+        return headers
+
+    async def _initialize_server(
+        self, server_name: str, base_url: str
+    ) -> ServerSession:
+        """Perform the MCP initialize handshake for one server."""
+        existing = self._sessions.get(base_url)
+        if existing is not None and existing.initialized:
+            return existing
+
+        session = ServerSession(
+            server_name=server_name,
+            server_url=base_url,
+            endpoint_url=self._normalize_endpoint_url(base_url),
+        )
+
+        result, response = await self._rpc_request(
+            session.endpoint_url,
+            payload={
+                "jsonrpc": "2.0",
+                "id": self._next_id(),
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": self._protocol_version,
+                    "capabilities": {},
+                    "clientInfo": {
+                        "name": "software-factory-mcp-client",
+                        "version": "1.0",
+                    },
+                },
+            },
+            headers=self._build_headers(),
+        )
+        _ = result
+        session.session_id = response.headers.get(MCP_SESSION_ID_HEADER)
+
+        await self._rpc_notify(
+            session.endpoint_url,
+            payload={
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {},
+            },
+            headers=self._build_headers(session_id=session.session_id),
+        )
+
+        session.initialized = True
+        self._sessions[base_url] = session
+        return session
+
+    async def _rpc_notify(
+        self,
+        endpoint_url: str,
+        *,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+    ) -> None:
+        """Send a JSON-RPC notification to the MCP endpoint."""
         assert (
             self._http is not None
         ), "Call connect() or use async context manager first"
 
-        payload = {
-            "jsonrpc": "2.0",
-            "id": self._next_id(),
-            "method": method,
-            "params": params,
-        }
         try:
-            resp = await self._http.post(
-                f"{base_url}/mcp",
-                json=payload,
-                headers={"Content-Type": "application/json"},
-            )
+            resp = await self._http.post(endpoint_url, json=payload, headers=headers)
             resp.raise_for_status()
         except httpx.HTTPError as exc:
             raise MCPCallError(
-                f"HTTP error calling {base_url}/mcp ({method}): {exc}"
+                f"HTTP error calling {endpoint_url} ({payload.get('method')}): {exc}"
+            ) from exc
+
+    async def _rpc_call(
+        self, session: ServerSession, method: str, params: dict[str, Any]
+    ) -> Any:
+        """Send a JSON-RPC 2.0 request to the MCP endpoint and return the result."""
+        result, _ = await self._rpc_request(
+            session.endpoint_url,
+            payload={
+                "jsonrpc": "2.0",
+                "id": self._next_id(),
+                "method": method,
+                "params": params,
+            },
+            headers=self._build_headers(session_id=session.session_id),
+        )
+        return result
+
+    async def _rpc_request(
+        self,
+        endpoint_url: str,
+        *,
+        payload: dict[str, Any],
+        headers: dict[str, str],
+    ) -> tuple[Any, httpx.Response]:
+        """Send a JSON-RPC 2.0 request to the MCP endpoint and return result+response."""
+        assert (
+            self._http is not None
+        ), "Call connect() or use async context manager first"
+
+        try:
+            resp = await self._http.post(endpoint_url, json=payload, headers=headers)
+            resp.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise MCPCallError(
+                f"HTTP error calling {endpoint_url} ({payload.get('method')}): {exc}"
             ) from exc
 
         try:
             data = resp.json()
         except (json.JSONDecodeError, ValueError) as exc:
-            raise MCPCallError(f"Invalid JSON response from {base_url}: {exc}") from exc
+            raise MCPCallError(
+                f"Invalid JSON response from {endpoint_url}: {exc}"
+            ) from exc
 
         if "error" in data:
             err = data["error"]
             raise MCPCallError(
-                f"MCP error from {base_url} tool call: [{err.get('code')}] {err.get('message')}"
+                f"MCP error from {endpoint_url} tool call: [{err.get('code')}] {err.get('message')}"
             )
 
-        return data.get("result")
+        return data.get("result"), resp
 
-    async def _fetch_tools(self, base_url: str, server_name: str) -> list[ToolInfo]:
+    async def _fetch_tools(self, session: ServerSession) -> list[ToolInfo]:
         """Fetch tool manifest from one server via tools/list RPC."""
-        result = await self._rpc_call(base_url, "tools/list", {})
+        result = await self._rpc_call(session, "tools/list", {})
         tools_raw = result.get("tools", []) if isinstance(result, dict) else []
 
         tools = []
@@ -220,8 +351,8 @@ class MCPMultiClient:
                 ToolInfo(
                     name=t.get("name", ""),
                     description=t.get("description", ""),
-                    server_name=server_name,
-                    server_url=base_url,
+                    server_name=session.server_name,
+                    server_url=session.server_url,
                     input_schema=t.get("inputSchema", {}),
                 )
             )
