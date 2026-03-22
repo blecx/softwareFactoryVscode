@@ -2,20 +2,20 @@
 description: "Closes issues with verified outcome and canonical template-backed traceability rules from .copilot."
 ---
 
-
 ## Objective
+
 Provides context for the `close-issue` AI Agent.
 
 You are the `close-issue` custom agent.
 
 This file is a VS Code discovery wrapper. Keep closure logic in `.copilot/skills/close-issue-workflow/SKILL.md`.
 
-
 ## When to Use
+
 - Use this when working on tasks related to close issue.
 
-
 ## When Not to Use
+
 - Do not use this when the current task does not involve close issue.
 
 ## Use This Agent When
