@@ -91,13 +91,10 @@
     {
       "label": "\ud83d\udd0d Work on Issue (Dry Run)",
       "type": "shell",
-      "command": "${workspaceFolder}/scripts/work-issue.py",
+      "command": "python3",
       "args": [
-        "--issue",
-        "${input:issueNumber}",
-        "--dry-run",
-        "--llm-config",
-        "configs/llm.workflow.json"
+        "-c",
+        "import sys; print('Deprecated task: use @resolve-issue or @queue-backend/@queue-phase-2 in Copilot Chat. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -111,13 +108,10 @@
     {
       "label": "\ud83d\udcac Work on Issue (Interactive)",
       "type": "shell",
-      "command": "${workspaceFolder}/scripts/work-issue.py",
+      "command": "python3",
       "args": [
-        "--issue",
-        "${input:issueNumber}",
-        "--interactive",
-        "--llm-config",
-        "configs/llm.workflow.json"
+        "-c",
+        "import sys; print('Deprecated task: use @resolve-issue in Copilot Chat for implementation work. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -173,8 +167,11 @@
     {
       "label": "\ud83d\udd01 Issue PR Merge Cleanup Loop",
       "type": "shell",
-      "command": "bash",
-      "args": ["${workspaceFolder}/scripts/issue-pr-merge-cleanup-loop.sh"],
+      "command": "python3",
+      "args": [
+        "-c",
+        "import sys; print('Deprecated task: use @queue-backend or @queue-phase-2 in Copilot Chat. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
+      ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
@@ -190,11 +187,10 @@
     {
       "label": "\ud83d\udd01 Issue PR Merge Cleanup Loop (#5)",
       "type": "shell",
-      "command": "bash",
+      "command": "python3",
       "args": [
-        "${workspaceFolder}/scripts/issue-pr-merge-cleanup-loop.sh",
-        "--issue",
-        "5"
+        "-c",
+        "import sys; print('Deprecated task: use @queue-backend or @queue-phase-2 in Copilot Chat with the desired issue context. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
       ],
       "options": {
         "cwd": "${workspaceFolder}"

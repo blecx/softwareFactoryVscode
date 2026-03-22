@@ -17,15 +17,21 @@ Provides context and instructions for the `resolve-issue-workflow` skill module.
 ## Instructions
 1. Select issue (backend-first, lowest number) and confirm scope.
 2. Write compact plan: goal, scope, AC, files, validation commands.
-3. Apply UX delegation policy from `.copilot/skills/ux-delegation-policy/SKILL.md` and capture required consultation outcome.
-4. Implement minimal code changes in a dedicated branch.
-5. Run required validations for touched areas explicitly using the active venv environment (NEVER global python):
-   - Backend: `./.venv/bin/python -m black apps/api/`, `./.venv/bin/python -m flake8 apps/api/`, `./.venv/bin/python -m pytest tests/`
-   - Frontend: `cd ../factory-client/client && npm run lint`, `npm run build`, tests if configured.
-6. Commit with `Fixes #<issue>` and push.
-7. Create PR via GitHub CLI using the generated `.tmp` markdown file:
+3. Reject or reformat work that does not follow `.github/ISSUE_TEMPLATE/feature_request.yml` or `.github/ISSUE_TEMPLATE/bug_report.yml`.
+4. Apply UX delegation policy from `.copilot/skills/ux-delegation-policy/SKILL.md` and capture required consultation outcome.
+5. Read `.github/workflows/ci.yml` and treat its checks as the minimum local precheck contract for this slice.
+6. Implement minimal code changes in a dedicated branch.
+7. Run required validations explicitly using the repo venv (NEVER global python), including the local equivalents of `.github/workflows/ci.yml` before opening a PR:
+   - `./.venv/bin/black --check factory_runtime/ scripts/ tests/`
+   - `./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/`
+   - `./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841`
+   - `./.venv/bin/pytest tests/`
+   - `./tests/run-integration-test.sh`
+8. Commit with `Fixes #<issue>` and push.
+9. Create PR via GitHub CLI using the generated `.tmp` markdown file and `.github/pull_request_template.md` structure:
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`
-8. Address CI failures by root cause and re-validate.
+10. Run `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md` before creating or updating the PR.
+11. Address CI failures by root cause and re-validate.
 
 ## Required Planning Shape
 - Goal
@@ -52,6 +58,8 @@ Prefer tool-driven discovery over pasting large context into chat.
 - Avoid unrelated refactors.
 - Keep diffs reviewable and DDD-compliant.
 - Follow `.copilot/skills/ux-delegation-policy/SKILL.md` as the canonical delegation rule source.
+- Treat `.github/pull_request_template.md` as mandatory output structure for PR bodies.
+- Do not ask GitHub Actions to discover preventable failures locally first; run the local CI-equivalent prechecks before PR creation.
 
 ## Completion Contract
 Return a concise result that states:
