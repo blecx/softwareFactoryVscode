@@ -4,7 +4,7 @@ from pathlib import Path
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 
-from .test_runner_service import TestRunnerService, TestRunnerServiceError
+from .devops_test_runner_service import TestRunnerService, TestRunnerServiceError
 
 
 def _load_service() -> TestRunnerService:
