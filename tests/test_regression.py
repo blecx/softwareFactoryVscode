@@ -1,9 +1,12 @@
+import asyncio
 import importlib.util
 import json
 import sys
 from pathlib import Path
 
+import httpx
 import pytest
+import yaml
 
 from factory_runtime.agents.agent_registry import resolve_agent_spec
 from factory_runtime.agents.complexity_scorer import ComplexityScorer
@@ -294,6 +297,128 @@ def test_setup_repo_doc_matches_current_ci_checks():
     assert "Python Code Quality (Lint & Format)" in setup_doc
     assert "Architectural Boundary Tests" in setup_doc
     assert "PR Template Conformance" in setup_doc
+
+
+def test_bash_gateway_default_policy_matches_profile_schema():
+    repo_root = Path(__file__).parent.parent
+    policy_path = repo_root / "configs" / "bash_gateway_policy.default.yml"
+
+    from factory_runtime.apps.mcp.bash_gateway.policy import BashGatewayPolicy
+
+    data = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
+    policy = BashGatewayPolicy.from_dict(data)
+
+    assert set(policy.profiles) == {"safe-readonly", "repo-maintenance"}
+    assert "scripts/validate-pr-template.sh" in policy.profiles["safe-readonly"].scripts
+    assert "setup.sh" in policy.profiles["repo-maintenance"].scripts
+
+
+def test_mcp_multi_client_performs_streamable_http_handshake():
+    from factory_runtime.agents.mcp_client import MCPMultiClient
+
+    session_id = "session-123"
+    state = {
+        "initialized": False,
+        "notified": False,
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url == httpx.URL("http://test-server/mcp")
+        assert request.headers["accept"] == "application/json, text/event-stream"
+        assert request.headers["mcp-protocol-version"] == "2025-03-26"
+        payload = json.loads(request.content.decode("utf-8"))
+        method = payload.get("method")
+
+        if method == "initialize":
+            state["initialized"] = True
+            return httpx.Response(
+                200,
+                headers={"mcp-session-id": session_id},
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "result": {
+                        "protocolVersion": "2025-03-26",
+                        "capabilities": {},
+                        "serverInfo": {"name": "mock", "version": "1.0"},
+                    },
+                },
+            )
+
+        if request.headers.get("mcp-session-id") != session_id:
+            return httpx.Response(
+                400,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": "server-error",
+                    "error": {
+                        "code": -32600,
+                        "message": "Bad Request: Missing session ID",
+                    },
+                },
+            )
+
+        if method == "notifications/initialized":
+            state["notified"] = True
+            return httpx.Response(202, text="")
+
+        if not state["initialized"] or not state["notified"]:
+            return httpx.Response(
+                400,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload.get("id", "server-error"),
+                    "error": {"code": -32600, "message": "Handshake incomplete"},
+                },
+            )
+
+        if method == "tools/list":
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "result": {
+                        "tools": [
+                            {
+                                "name": "ping_tool",
+                                "description": "Ping",
+                                "inputSchema": {"type": "object"},
+                            }
+                        ]
+                    },
+                },
+            )
+
+        if method == "tools/call":
+            return httpx.Response(
+                200,
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "result": {"ok": True, "echo": payload["params"]},
+                },
+            )
+
+        return httpx.Response(404, text="unexpected")
+
+    async def run_test() -> None:
+        transport = httpx.MockTransport(handler)
+        async with MCPMultiClient(
+            [{"name": "mock", "url": "http://test-server"}],
+            transport=transport,
+        ) as client:
+            tools = client.list_tools()
+            assert [tool.name for tool in tools] == ["ping_tool"]
+
+            result = await client.call_tool("ping_tool", {"value": "pong"})
+            assert result == {
+                "ok": True,
+                "echo": {"name": "ping_tool", "arguments": {"value": "pong"}},
+            }
+
+    asyncio.run(run_test())
+    assert state == {"initialized": True, "notified": True}
 
 
 def _load_next_pr_module():

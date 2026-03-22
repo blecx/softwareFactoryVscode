@@ -62,6 +62,8 @@ def init_git_repo(path: Path) -> None:
 def create_source_factory_repo(path: Path) -> None:
     init_git_repo(path)
     (path / "scripts").mkdir(parents=True, exist_ok=True)
+    (path / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (path / "configs").mkdir(parents=True, exist_ok=True)
     (path / ".gitignore").write_text(
         ROOT_GITIGNORE.read_text(encoding="utf-8"),
         encoding="utf-8",
@@ -76,6 +78,18 @@ def create_source_factory_repo(path: Path) -> None:
     )
     (path / "scripts" / "verify_factory_install.py").write_text(
         VERIFY_SCRIPT.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (path / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (path / "configs" / "bash_gateway_policy.default.yml").write_text(
+        (REPO_ROOT / "configs" / "bash_gateway_policy.default.yml").read_text(
+            encoding="utf-8"
+        ),
         encoding="utf-8",
     )
     (path / "workspace.code-workspace.template").write_text(
@@ -181,6 +195,19 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
     assert (target_repo / ".factory.env").is_file()
     assert (target_repo / ".factory.lock.json").is_file()
     assert (target_repo / "software-factory.code-workspace").is_file()
+    assert (
+        target_repo
+        / ".softwareFactoryVscode"
+        / "configs"
+        / "bash_gateway_policy.default.yml"
+    ).is_file()
+    assert (
+        target_repo
+        / ".softwareFactoryVscode"
+        / ".copilot"
+        / "config"
+        / "vscode-agent-settings.json"
+    ).is_file()
 
     lock_data = json.loads(
         (target_repo / ".factory.lock.json").read_text(encoding="utf-8")
@@ -370,6 +397,90 @@ def test_verify_factory_install_fails_when_workspace_file_missing(
     assert exit_code == 1
 
 
+def test_verify_factory_install_fails_when_bash_gateway_policy_is_invalid(
+    tmp_path: Path,
+) -> None:
+    target_repo = tmp_path / "target-project"
+    target_repo.mkdir(parents=True, exist_ok=True)
+    factory_dir = target_repo / ".softwareFactoryVscode"
+    (factory_dir / ".git").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "scripts").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
+    for script_name in (
+        "install_factory.py",
+        "bootstrap_host.py",
+        "verify_factory_install.py",
+    ):
+        (factory_dir / "scripts" / script_name).write_text("# stub\n", encoding="utf-8")
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        json.dumps(
+            {
+                "workspace": {
+                    "mcp": {
+                        "servers": {"bashGateway": {"url": "http://127.0.0.1:3011/mcp"}}
+                    }
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (factory_dir / "configs" / "bash_gateway_policy.default.yml").write_text(
+        "policy:\n  allow:\n    - '^ls'\n",
+        encoding="utf-8",
+    )
+    (target_repo / ".factory.env").write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (target_repo / ".gitignore").write_text(
+        "# Factory Isolation\n.tmp/softwareFactoryVscode/\n.factory.env\n",
+        encoding="utf-8",
+    )
+    (target_repo / ".factory.lock.json").write_text(
+        json.dumps(
+            {
+                "version": "main",
+                "installed_at": "2026-03-21T00:00:00Z",
+                "updated_at": "2026-03-21T00:00:00Z",
+                "factory": {
+                    "repo_url": "https://example.invalid/factory.git",
+                    "install_path": ".softwareFactoryVscode",
+                    "workspace_file": "software-factory.code-workspace",
+                    "commit": "deadbeef",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {"name": "AI Agent Factory", "path": ".softwareFactoryVscode"},
+                ]
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    exit_code = verify_factory_install.main(["--target", str(target_repo)])
+
+    assert exit_code == 1
+
+
 def test_verify_factory_runtime_passes_with_mocked_services(
     tmp_path: Path,
     monkeypatch,
@@ -401,6 +512,13 @@ def test_verify_factory_runtime_passes_with_mocked_services(
             }
         )
         + "\n",
+        encoding="utf-8",
+    )
+    (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "configs" / "bash_gateway_policy.default.yml").write_text(
+        (REPO_ROOT / "configs" / "bash_gateway_policy.default.yml").read_text(
+            encoding="utf-8"
+        ),
         encoding="utf-8",
     )
     (target_repo / ".factory.env").write_text(
@@ -496,6 +614,27 @@ def test_verify_factory_runtime_fails_when_required_service_missing(
         "verify_factory_install.py",
     ):
         (factory_dir / "scripts" / script_name).write_text("# stub\n", encoding="utf-8")
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        json.dumps(
+            {
+                "workspace": {
+                    "mcp": {
+                        "servers": {"bashGateway": {"url": "http://127.0.0.1:3011/mcp"}}
+                    }
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "configs" / "bash_gateway_policy.default.yml").write_text(
+        (REPO_ROOT / "configs" / "bash_gateway_policy.default.yml").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
     (target_repo / ".factory.env").write_text(
         "\n".join(
             [
