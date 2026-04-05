@@ -808,3 +808,12 @@ def test_runtime_dockerfiles_copy_from_factory_runtime_tree() -> None:
     for dockerfile in dockerfiles:
         text = dockerfile.read_text(encoding="utf-8")
         assert "factory_runtime/" in text
+
+
+def test_devops_docker_compose_image_uses_known_working_docker_cli_base() -> None:
+    dockerfile = REPO_ROOT / "docker" / "mcp-devops-docker-compose" / "Dockerfile"
+
+    text = dockerfile.read_text(encoding="utf-8")
+
+    assert "FROM docker:27.4.1-cli" in text
+    assert "FROM docker:27-cli" not in text
