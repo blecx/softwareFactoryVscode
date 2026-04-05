@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     REPO_FUNDAMENTALS_REPO_ROOT=/target
 
 WORKDIR /factory
-COPY apps/__init__.py apps/__init__.py
-COPY apps/mcp/__init__.py apps/mcp/__init__.py
-COPY apps/mcp/repo_fundamentals/ apps/mcp/repo_fundamentals/
+COPY factory_runtime/apps/__init__.py apps/__init__.py
+COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
+COPY factory_runtime/apps/mcp/repo_fundamentals/ apps/mcp/repo_fundamentals/
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ripgrep && \

@@ -1,10 +1,9 @@
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 WORKDIR /app
-COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir fastapi uvicorn pydantic
 
-COPY apps/mock_llm_gateway /app/apps/mock_llm_gateway
+COPY factory_runtime/apps/mock_llm_gateway /app/apps/mock_llm_gateway
 
 EXPOSE 9090
 

@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     GITHUB_OPS_MCP_REPO_ROOT=/target
 
 WORKDIR /factory
-COPY apps/__init__.py apps/__init__.py
-COPY apps/mcp/__init__.py apps/mcp/__init__.py
-COPY apps/mcp/github_ops/ apps/mcp/github_ops/
+COPY factory_runtime/apps/__init__.py apps/__init__.py
+COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
+COPY factory_runtime/apps/mcp/github_ops/ apps/mcp/github_ops/
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
