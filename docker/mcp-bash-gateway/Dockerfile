@@ -11,9 +11,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /factory
-COPY apps/__init__.py apps/__init__.py
-COPY apps/mcp/__init__.py apps/mcp/__init__.py
-COPY apps/mcp/bash_gateway/ apps/mcp/bash_gateway/
+COPY factory_runtime/apps/__init__.py apps/__init__.py
+COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
+COPY factory_runtime/apps/mcp/bash_gateway/ apps/mcp/bash_gateway/
 
 RUN pip install --no-cache-dir \
     mcp==1.12.4 \

@@ -38,7 +38,14 @@ def build_compose_command(
     env_file: Path,
     action: Sequence[str],
 ) -> list[str]:
-    command = ["docker", "compose", "--env-file", str(env_file)]
+    command = [
+        "docker",
+        "compose",
+        "--project-directory",
+        str(repo_root),
+        "--env-file",
+        str(env_file),
+    ]
     for compose_file in COMPOSE_FILES:
         command.extend(["-f", str((repo_root / compose_file).resolve())])
     command.extend(action)
