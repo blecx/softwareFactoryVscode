@@ -13,9 +13,9 @@ RUN pip install --no-cache-dir \
     mcp==1.12.4 \
     uvicorn[standard]==0.27.0
 
-COPY apps/__init__.py apps/__init__.py
-COPY apps/mcp/__init__.py apps/mcp/__init__.py
-COPY apps/mcp/memory/ apps/mcp/memory/
+COPY factory_runtime/apps/__init__.py apps/__init__.py
+COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
+COPY factory_runtime/apps/mcp/memory/ apps/mcp/memory/
 
 VOLUME ["/data"]
 

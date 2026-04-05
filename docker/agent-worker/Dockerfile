@@ -10,13 +10,13 @@ RUN apt-get update \
 WORKDIR /factory
 
 # Install full requirements (includes agents package deps)
-COPY requirements.txt .
+COPY factory_runtime/agents/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source
-COPY agents/ agents/
-COPY apps/__init__.py apps/__init__.py
-COPY apps/mcp/ apps/mcp/
+COPY factory_runtime/agents/ agents/
+COPY factory_runtime/apps/__init__.py apps/__init__.py
+COPY factory_runtime/apps/mcp/ apps/mcp/
 
 # Workspace is mounted at runtime via volume
 # CMD runs the orchestrator queue loop

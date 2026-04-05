@@ -10,9 +10,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /factory
-COPY apps/__init__.py apps/__init__.py
-COPY apps/mcp/__init__.py apps/mcp/__init__.py
-COPY apps/mcp/repo_fundamentals/ apps/mcp/repo_fundamentals/
+COPY factory_runtime/apps/__init__.py apps/__init__.py
+COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
+COPY factory_runtime/apps/mcp/repo_fundamentals/ apps/mcp/repo_fundamentals/
 
 RUN pip install --no-cache-dir \
     mcp==1.12.4 \

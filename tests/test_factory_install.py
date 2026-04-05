@@ -6,6 +6,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 INSTALL_SCRIPT = REPO_ROOT / "scripts" / "install_factory.py"
 BOOTSTRAP_SCRIPT = REPO_ROOT / "scripts" / "bootstrap_host.py"
@@ -716,7 +718,14 @@ def test_factory_stack_builds_full_compose_command(tmp_path: Path) -> None:
 
     command = factory_stack.build_compose_command(repo_root, env_file, ["up", "-d"])
 
-    assert command[:4] == ["docker", "compose", "--env-file", str(env_file)]
+    assert command[:6] == [
+        "docker",
+        "compose",
+        "--project-directory",
+        str(repo_root),
+        "--env-file",
+        str(env_file),
+    ]
     for compose_file in factory_stack.COMPOSE_FILES:
         assert str((repo_root / compose_file).resolve()) in command
     assert command[-2:] == ["up", "-d"]
@@ -758,3 +767,44 @@ def test_validate_throwaway_install_uses_canonical_stack_helper(
         ("stop", repo_root, env_file, True),
         ("start", repo_root, env_file, factory_stack.DEFAULT_WAIT_TIMEOUT),
     ]
+
+
+def test_runtime_compose_files_build_from_repo_root() -> None:
+    compose_files = [
+        REPO_ROOT / "compose" / "docker-compose.factory.yml",
+        REPO_ROOT / "compose" / "docker-compose.context7.yml",
+        REPO_ROOT / "compose" / "docker-compose.mcp-bash-gateway.yml",
+        REPO_ROOT / "compose" / "docker-compose.repo-fundamentals-mcp.yml",
+        REPO_ROOT / "compose" / "docker-compose.mcp-devops.yml",
+        REPO_ROOT / "compose" / "docker-compose.mcp-offline-docs.yml",
+        REPO_ROOT / "compose" / "docker-compose.mcp-github-ops.yml",
+    ]
+
+    for compose_file in compose_files:
+        data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+        for service in data.get("services", {}).values():
+            build = service.get("build")
+            if isinstance(build, dict):
+                assert build.get("context") == "."
+
+
+def test_runtime_dockerfiles_copy_from_factory_runtime_tree() -> None:
+    dockerfiles = [
+        REPO_ROOT / "docker" / "mcp-memory" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-agent-bus" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-bash-gateway" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-devops-docker-compose" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-devops-test-runner" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-github-ops" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-offline-docs" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-git" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-search" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-filesystem" / "Dockerfile",
+        REPO_ROOT / "docker" / "approval-gate" / "Dockerfile",
+        REPO_ROOT / "docker" / "agent-worker" / "Dockerfile",
+        REPO_ROOT / "docker" / "mock-llm-gateway" / "Dockerfile",
+    ]
+
+    for dockerfile in dockerfiles:
+        text = dockerfile.read_text(encoding="utf-8")
+        assert "factory_runtime/" in text

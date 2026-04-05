@@ -6,9 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DOCKER_COMPOSE_MCP_REPO_ROOT=/target
 
 WORKDIR /factory
-COPY apps/__init__.py apps/__init__.py
-COPY apps/mcp/__init__.py apps/mcp/__init__.py
-COPY apps/mcp/devops/ apps/mcp/devops/
+COPY factory_runtime/apps/__init__.py apps/__init__.py
+COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
+COPY factory_runtime/apps/mcp/devops/ apps/mcp/devops/
 
 RUN apk add --no-cache python3 py3-pip && \
     pip install --no-cache-dir --break-system-packages \

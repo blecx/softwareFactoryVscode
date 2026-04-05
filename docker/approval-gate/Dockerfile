@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir \
     pydantic==2.5.3 \
     websockets==12.0
 
-COPY apps/__init__.py apps/__init__.py
-COPY apps/approval_gate/ apps/approval_gate/
+COPY factory_runtime/apps/__init__.py apps/__init__.py
+COPY factory_runtime/apps/approval_gate/ apps/approval_gate/
 
 EXPOSE 8001
 
