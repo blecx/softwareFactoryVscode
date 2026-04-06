@@ -10,6 +10,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import factory_workspace
+
 FACTORY_DIRNAME = ".softwareFactoryVscode"
 TMP_SUBPATH = Path(".tmp") / "softwareFactoryVscode"
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
@@ -112,23 +118,26 @@ def ensure_tmp_dir(target_dir: Path) -> Path:
     return tmp_dir
 
 
-def ensure_factory_env(target_dir: Path) -> tuple[Path, bool]:
-    factory_env_path = target_dir / ".factory.env"
-    if factory_env_path.exists():
-        return factory_env_path, False
-
-    project_id = target_dir.name
-    content = "\n".join(
-        [
-            f"TARGET_WORKSPACE_PATH={target_dir}",
-            f"PROJECT_WORKSPACE_ID={project_id}",
-            f"COMPOSE_PROJECT_NAME=factory_{project_id}",
-            "CONTEXT7_API_KEY=",
-            "",
-        ]
+def sync_factory_runtime_contract(
+    target_dir: Path,
+    *,
+    workspace_file: str,
+) -> tuple[factory_workspace.WorkspaceRuntimeConfig, bool]:
+    factory_dir = ensure_factory_present(target_dir)
+    env_path = target_dir / ".factory.env"
+    existed_before = env_path.exists()
+    config = factory_workspace.build_runtime_config(
+        target_dir,
+        factory_dir=factory_dir,
+        workspace_file=workspace_file,
     )
-    factory_env_path.write_text(content, encoding="utf-8")
-    return factory_env_path, True
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+        write_env=not existed_before,
+    )
+    return config, not existed_before
 
 
 def ensure_gitignore_entries(target_dir: Path) -> tuple[Path, bool]:
@@ -159,19 +168,21 @@ def resolve_workspace_path(target_dir: Path, workspace_file: str) -> Path:
     return target_dir / candidate
 
 
-def render_workspace_file() -> str:
+def render_workspace_file(config: factory_workspace.WorkspaceRuntimeConfig) -> str:
     template = load_json(WORKSPACE_TEMPLATE_PATH)
+    template["settings"] = config.workspace_settings
     return json.dumps(template, indent=2, ensure_ascii=False) + "\n"
 
 
 def ensure_workspace_file(
     target_dir: Path,
     workspace_file: str,
+    config: factory_workspace.WorkspaceRuntimeConfig,
     *,
     force: bool = False,
 ) -> tuple[Path, str]:
     workspace_path = resolve_workspace_path(target_dir, workspace_file)
-    desired = render_workspace_file()
+    desired = render_workspace_file(config)
     existed_before = workspace_path.exists()
 
     if existed_before:
@@ -227,7 +238,11 @@ def bootstrap_target(
 ) -> dict[str, Any]:
     ensure_factory_present(target_dir)
     tmp_dir = ensure_tmp_dir(target_dir)
-    factory_env_path, factory_env_created = ensure_factory_env(target_dir)
+    runtime_config, factory_env_created = sync_factory_runtime_contract(
+        target_dir,
+        workspace_file=workspace_file,
+    )
+    factory_env_path = target_dir / ".factory.env"
     gitignore_result = None
     if not skip_gitignore:
         gitignore_result = ensure_gitignore_entries(target_dir)
@@ -237,6 +252,7 @@ def bootstrap_target(
         workspace_result = ensure_workspace_file(
             target_dir,
             workspace_file,
+            runtime_config,
             force=force_workspace,
         )
 
@@ -255,6 +271,8 @@ def bootstrap_target(
         "gitignore_result": gitignore_result,
         "workspace_result": workspace_result,
         "lock_path": lock_path,
+        "runtime_manifest_path": runtime_config.runtime_manifest_path,
+        "runtime_config": runtime_config,
     }
 
 
@@ -288,8 +306,11 @@ def main(argv: list[str] | None = None) -> int:
     if result["factory_env_created"]:
         print("➡️ Created canonical .factory.env environment contract...")
     else:
-        print("➡️ Preserved existing .factory.env environment contract...")
+        print("➡️ Refreshed canonical .factory.env environment contract...")
     print(f"   [{result['factory_env_path']}] ready.")
+
+    print("➡️ Generated runtime metadata and registered this workspace install...")
+    print(f"   [{result['runtime_manifest_path']}] ready.")
 
     if result["gitignore_result"]:
         gitignore_path, gitignore_updated = result["gitignore_result"]
