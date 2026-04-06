@@ -135,7 +135,7 @@ def sync_factory_runtime_contract(
         config,
         runtime_state="installed",
         active=False,
-        write_env=not existed_before,
+        write_env=True,
     )
     return config, not existed_before
 

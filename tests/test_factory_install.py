@@ -329,7 +329,9 @@ def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
     )
 
     assert workspace_path.read_text(encoding="utf-8") == custom_workspace
-    assert (target_repo / ".factory.env").read_text(encoding="utf-8") == custom_env
+    updated_env = (target_repo / ".factory.env").read_text(encoding="utf-8")
+    assert "CONTEXT7_API_KEY=abc123" in updated_env
+    assert "PORT_BASH=" in updated_env
 
 
 def test_bootstrap_force_workspace_overwrites_existing_workspace(
