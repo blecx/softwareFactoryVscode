@@ -89,10 +89,36 @@ Open `.factory.env` and populate any required API keys to activate the backend L
 TARGET_WORKSPACE_PATH=/path/to/your/project
 PROJECT_WORKSPACE_ID=my-project
 COMPOSE_PROJECT_NAME=factory_my-project
+FACTORY_INSTANCE_ID=factory-abc123def456
+FACTORY_PORT_INDEX=0
+FACTORY_DIR=/path/to/your/project/.softwareFactoryVscode
+
+PORT_CONTEXT7=3010
+PORT_BASH=3011
+PORT_FS=3012
+PORT_GIT=3013
+PORT_SEARCH=3014
+PORT_TEST=3015
+PORT_COMPOSE=3016
+PORT_DOCS=3017
+PORT_GITHUB=3018
+MEMORY_MCP_PORT=3030
+AGENT_BUS_PORT=3031
+APPROVAL_GATE_PORT=8001
+PORT_TUI=9090
 
 # Required for AI/MCP connectivity
 CONTEXT7_API_KEY=your_context7_key_here
 ```
+
+The bootstrap step also generates `.tmp/softwareFactoryVscode/runtime-manifest.json`.
+That manifest is the effective runtime contract for the installed workspace and includes:
+
+- the workspace instance identity
+- the compose project name
+- the generated host port map
+- the effective MCP URLs used by the generated workspace settings
+- runtime health endpoints used by verification
 
 ---
 
@@ -115,6 +141,24 @@ The helper preserves the supported runtime contract:
 - compose files come from `.softwareFactoryVscode/compose/`
 - environment comes from the host-facing `.factory.env`
 - startup remains deterministic via `up -d --build --wait --wait-timeout ...`
+
+The runtime helper now understands workspace-aware lifecycle commands as well:
+
+```bash
+python3 .softwareFactoryVscode/scripts/factory_stack.py list
+python3 .softwareFactoryVscode/scripts/factory_stack.py status
+python3 .softwareFactoryVscode/scripts/factory_stack.py activate
+python3 .softwareFactoryVscode/scripts/factory_stack.py deactivate
+```
+
+These commands distinguish:
+
+- **installed** — the workspace has a valid hidden-tree factory install
+- **running** — the workspace currently owns Docker runtime resources
+- **active** — the workspace is currently selected in the host registry for operator workflows
+
+Important: workspaces do **not** start Docker services automatically when they are installed.
+Only an explicit `start` command should create running containers.
 
 After starting the stack, you can run runtime compliance verification:
 
@@ -170,6 +214,8 @@ python3 .softwareFactoryVscode/scripts/verify_factory_install.py --target .
 The verifier checks the hidden-tree installation contract, host runtime files, `.gitignore`, lock metadata, and the Option B workspace entrypoint.
 
 Runtime compliance is a second phase you can run after starting services. It checks the core compose services for the factory runtime and, optionally, the localhost MCP endpoints used by VS Code.
+
+When a workspace is assigned a non-default port block, runtime verification follows the generated effective endpoints from the runtime manifest and generated workspace settings instead of assuming only the historical default localhost ports.
 
 To prove the installation works and the target mounts are successfully connected to your host project:
 

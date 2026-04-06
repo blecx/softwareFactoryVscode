@@ -5,8 +5,15 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 from typing import Sequence
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import factory_workspace
 
 DEFAULT_WAIT_TIMEOUT = 90
 COMPOSE_FILES = [
@@ -61,6 +68,80 @@ def run_compose_command(repo_root: Path, command: Sequence[str]) -> None:
     )
 
 
+def collect_running_services(compose_project_name: str) -> dict[str, str]:
+    result = subprocess.run(
+        [
+            "docker",
+            "ps",
+            "--filter",
+            f"label=com.docker.compose.project={compose_project_name}",
+            "--format",
+            '{{.Label "com.docker.compose.service"}}|{{.Status}}',
+        ],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    services: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        if not line.strip() or "|" not in line:
+            continue
+        service, status = line.split("|", 1)
+        services[service.strip()] = status.strip()
+    return services
+
+
+def resolve_target_dir_from_env(repo_root: Path, env_file: Path) -> Path:
+    env_values = factory_workspace.parse_env_file(env_file)
+    target_value = env_values.get("TARGET_WORKSPACE_PATH", "").strip()
+    if target_value:
+        return Path(target_value).expanduser().resolve()
+    return repo_root.parent.resolve()
+
+
+def sync_workspace_runtime(
+    repo_root: Path,
+    *,
+    env_file: Path,
+    persist: bool = True,
+) -> factory_workspace.WorkspaceRuntimeConfig:
+    target_dir = resolve_target_dir_from_env(repo_root, env_file)
+    config = factory_workspace.build_runtime_config(
+        target_dir,
+        factory_dir=repo_root,
+    )
+    registry = factory_workspace.load_registry()
+    existing_record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
+    runtime_state = "installed"
+    if isinstance(existing_record, dict):
+        runtime_state = str(existing_record.get("runtime_state", "installed"))
+    if persist:
+        factory_workspace.sync_runtime_artifacts(
+            config,
+            runtime_state=runtime_state,
+            active=None,
+        )
+    return config
+
+
+def ensure_ports_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> None:
+    try:
+        running_services = collect_running_services(config.compose_project_name)
+    except subprocess.CalledProcessError:
+        running_services = {}
+    if running_services:
+        return
+    if not factory_workspace.ports_available(config.ports):
+        used_ports = [
+            f"{key}={value}"
+            for key, value in sorted(config.ports.items())
+            if not factory_workspace.can_bind_port(value)
+        ]
+        raise RuntimeError(
+            "Workspace runtime ports are not available: " + ", ".join(used_ports)
+        )
+
+
 def start_stack(
     repo_root: Path,
     *,
@@ -70,6 +151,8 @@ def start_stack(
     wait_timeout: int = DEFAULT_WAIT_TIMEOUT,
 ) -> Path:
     resolved_env_file = resolve_env_file(repo_root, env_file)
+    config = sync_workspace_runtime(repo_root, env_file=resolved_env_file)
+    ensure_ports_ready(config)
     action = ["up", "-d"]
     if build:
         action.append("--build")
@@ -80,6 +163,7 @@ def start_stack(
         repo_root,
         build_compose_command(repo_root, resolved_env_file, action),
     )
+    factory_workspace.update_runtime_state(config.factory_instance_id, "running")
     return resolved_env_file
 
 
@@ -90,6 +174,7 @@ def stop_stack(
     remove_volumes: bool = False,
 ) -> Path:
     resolved_env_file = resolve_env_file(repo_root, env_file)
+    config = sync_workspace_runtime(repo_root, env_file=resolved_env_file)
     action = ["down", "--remove-orphans"]
     if remove_volumes:
         action.append("-v")
@@ -98,7 +183,77 @@ def stop_stack(
         repo_root,
         build_compose_command(repo_root, resolved_env_file, action),
     )
+    factory_workspace.update_runtime_state(config.factory_instance_id, "stopped")
     return resolved_env_file
+
+
+def list_workspaces() -> int:
+    registry = factory_workspace.load_registry()
+    active_workspace = registry.get("active_workspace", "")
+    for instance_id, record in sorted(registry.get("workspaces", {}).items()):
+        marker = "*" if instance_id == active_workspace else " "
+        print(
+            f"{marker} {record.get('project_workspace_id', '')} "
+            f"[{instance_id}] state={record.get('runtime_state', 'unknown')} "
+            f"ports={record.get('port_index', '?')} path={record.get('target_workspace_path', '')}"
+        )
+    return 0
+
+
+def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    config = sync_workspace_runtime(
+        repo_root, env_file=resolved_env_file, persist=False
+    )
+    registry = factory_workspace.load_registry()
+    record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
+    active = registry.get("active_workspace", "") == config.factory_instance_id
+    print(f"workspace_id={config.project_workspace_id}")
+    print(f"instance_id={config.factory_instance_id}")
+    print(f"target={config.target_dir}")
+    print(f"compose_project={config.compose_project_name}")
+    print(f"runtime_state={record.get('runtime_state', 'installed')}")
+    print(f"active={str(active).lower()}")
+    print(f"port_index={config.port_index}")
+    for name, url in sorted(config.mcp_server_urls.items()):
+        print(f"mcp.{name}={url}")
+    return 0
+
+
+def activate_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    config = sync_workspace_runtime(
+        repo_root, env_file=resolved_env_file, persist=False
+    )
+    registry = factory_workspace.load_registry()
+    existing_record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
+    runtime_state = (
+        str(existing_record.get("runtime_state", "installed"))
+        if isinstance(existing_record, dict)
+        else "installed"
+    )
+    factory_workspace.upsert_workspace_record(
+        factory_workspace.build_runtime_manifest(config),
+        runtime_state=runtime_state,
+        active=None,
+    )
+    factory_workspace.set_active_workspace(config.factory_instance_id)
+    print(
+        f"Activated workspace `{config.project_workspace_id}` [{config.factory_instance_id}]"
+    )
+    return 0
+
+
+def deactivate_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    config = sync_workspace_runtime(
+        repo_root, env_file=resolved_env_file, persist=False
+    )
+    factory_workspace.clear_active_workspace(config.factory_instance_id)
+    print(
+        f"Deactivated workspace `{config.project_workspace_id}` [{config.factory_instance_id}]"
+    )
+    return 0
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,8 +262,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "command",
-        choices=["start", "stop"],
-        help="Whether to start or stop the full factory runtime stack.",
+        choices=["start", "stop", "list", "status", "activate", "deactivate"],
+        help="Workspace runtime lifecycle command.",
     )
     parser.add_argument(
         "--repo-root",
@@ -157,12 +312,20 @@ def main() -> int:
             wait=not args.no_wait,
             wait_timeout=args.wait_timeout,
         )
-    else:
+    elif args.command == "stop":
         stop_stack(
             repo_root,
             env_file=env_file,
             remove_volumes=args.remove_volumes,
         )
+    elif args.command == "list":
+        return list_workspaces()
+    elif args.command == "status":
+        return status_workspace(repo_root, env_file=env_file)
+    elif args.command == "activate":
+        return activate_workspace(repo_root, env_file=env_file)
+    else:
+        return deactivate_workspace(repo_root, env_file=env_file)
 
     return 0
 
