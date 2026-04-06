@@ -1,0 +1,19 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-04-06T09:00:24.837530",
+  "completed_issues": [],
+  "patterns": {
+    "avg_time_multiplier": 1.0,
+    "common_blockers": [],
+    "success_factors": [],
+    "risk_factors": []
+  },
+  "recommendations": {
+    "last_selected": {
+      "issue_number": 23,
+      "selected_at": "2026-04-06T09:00:24.837499",
+      "reason": "Next in Unknown, all blockers resolved (verified via GitHub)",
+      "github_state": "OPEN"
+    }
+  }
+}

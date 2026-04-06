@@ -40,11 +40,11 @@ PORT_LAYOUT: dict[str, int] = {
 MCP_SERVER_PORT_KEYS: dict[str, str] = {
     "context7": "PORT_CONTEXT7",
     "bashGateway": "PORT_BASH",
-    "git": "PORT_FS",
-    "search": "PORT_GIT",
-    "filesystem": "PORT_SEARCH",
-    "dockerCompose": "PORT_TEST",
-    "testRunner": "PORT_COMPOSE",
+    "git": "PORT_GIT",
+    "search": "PORT_SEARCH",
+    "filesystem": "PORT_FS",
+    "dockerCompose": "PORT_COMPOSE",
+    "testRunner": "PORT_TEST",
     "offlineDocs": "PORT_DOCS",
     "githubOps": "PORT_GITHUB",
 }

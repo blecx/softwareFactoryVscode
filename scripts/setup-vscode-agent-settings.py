@@ -4,13 +4,17 @@
 import argparse
 import copy
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
-CONFIG_PATH = (
-    Path(__file__).parent.parent / ".copilot/config/vscode-agent-settings.json"
-)
-WORKSPACE_SETTINGS_PATH = Path(__file__).parent.parent / ".vscode/settings.json"
+sys.path.insert(0, str(Path(__file__).parent.resolve()))
+import factory_workspace  # noqa: E402
+
+SCRIPT_DIR = Path(__file__).parent.resolve()
+REPO_ROOT = SCRIPT_DIR.parent
+CONFIG_PATH = REPO_ROOT / ".copilot/config/vscode-agent-settings.json"
+WORKSPACE_SETTINGS_PATH = REPO_ROOT / ".vscode/settings.json"
 
 MANAGED_PREFIXES = (
     "chat.",
@@ -126,7 +130,23 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    expected = load_json(CONFIG_PATH).get("workspace", {})
+    env_path = REPO_ROOT / ".factory.env"
+    if not env_path.exists() and (REPO_ROOT.parent / ".factory.env").exists():
+        env_path = REPO_ROOT.parent / ".factory.env"
+
+    env_values = factory_workspace.parse_env_file(env_path)
+    ports = {}
+    for key in factory_workspace.PORT_LAYOUT:
+        val = env_values.get(key)
+        if val:
+            try:
+                ports[key] = int(val)
+            except ValueError:
+                pass
+        if key not in ports:
+            ports[key] = factory_workspace.PORT_LAYOUT[key]
+
+    expected = factory_workspace.build_effective_workspace_settings(REPO_ROOT, ports)
     existing = load_json(WORKSPACE_SETTINGS_PATH)
 
     if args.check:
