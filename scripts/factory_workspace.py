@@ -466,6 +466,14 @@ def build_runtime_config(
 
 def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
     health_urls = build_health_urls(config.ports)
+    # Determine factory version
+    version_file = config.factory_dir / "VERSION"
+    factory_version = (
+        version_file.read_text(encoding="utf-8").strip()
+        if version_file.exists()
+        else "unknown"
+    )
+
     return {
         "version": REGISTRY_VERSION,
         "generated_at": utc_now_iso(),
@@ -478,6 +486,7 @@ def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
         "compose_project_name": config.compose_project_name,
         "port_index": config.port_index,
         "ports": config.ports,
+        "factory_version": factory_version,
         "mcp_servers": {
             name: {
                 "url": url,
@@ -553,8 +562,14 @@ def upsert_workspace_record(
         "compose_project_name": manifest.get("compose_project_name", ""),
         "port_index": manifest.get("port_index", 0),
         "ports": manifest.get("ports", {}),
+        "factory_version": manifest.get("factory_version", "unknown"),
         "runtime_state": runtime_state,
         "installed_at": installed_at,
+        "last_activated_at": (
+            existing.get("last_activated_at")
+            if existing.get("last_activated_at")
+            else (utc_now_iso() if active else None)
+        ),
         "updated_at": utc_now_iso(),
     }
     registry["workspaces"][instance_id] = record
@@ -574,6 +589,9 @@ def set_active_workspace(
 ) -> Path:
     registry = load_registry(registry_path)
     registry["active_workspace"] = instance_id or ""
+    if instance_id and instance_id in registry.get("workspaces", {}):
+        registry["workspaces"][instance_id]["last_activated_at"] = utc_now_iso()
+        registry["workspaces"][instance_id]["updated_at"] = utc_now_iso()
     return save_registry(registry, registry_path)
 
 
@@ -602,3 +620,76 @@ def update_runtime_state(
     record["updated_at"] = utc_now_iso()
     registry["workspaces"][instance_id] = record
     return save_registry(registry, registry_path)
+
+
+def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
+    registry = load_registry(registry_path)
+    workspaces = registry.get("workspaces", {})
+    stale_ids = []
+    for iid, record in workspaces.items():
+        if not isinstance(record, dict):
+            stale_ids.append(iid)
+            continue
+        try:
+            target_dir = Path(record.get("target_workspace_path", ""))
+            if not target_dir.exists() or not target_dir.is_dir():
+                stale_ids.append(iid)
+                continue
+            manifest_path = target_dir / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME
+            if not manifest_path.exists():
+                stale_ids.append(iid)
+                continue
+        except Exception:
+            stale_ids.append(iid)
+
+    for iid in stale_ids:
+        del registry["workspaces"][iid]
+        if registry.get("active_workspace") == iid:
+            registry["active_workspace"] = ""
+
+    if stale_ids:
+        save_registry(registry, registry_path)
+
+    return {"stale_removed": stale_ids, "remaining": len(registry["workspaces"])}
+
+
+def refresh_registry_entry(
+    target_dir: Path, *, registry_path: Path | None = None
+) -> None:
+    manifest_path = target_dir / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME
+    if manifest_path.exists():
+        manifest = load_json(manifest_path)
+        if "factory_instance_id" in manifest:
+            upsert_workspace_record(manifest, registry_path=registry_path)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Factory Workspace Registry CLI")
+    subparsers = parser.add_subparsers(dest="command", help="Command to run")
+
+    parser_list = subparsers.add_parser("list", help="List workspaces")
+    parser_reconcile = subparsers.add_parser(
+        "reconcile", help="Clean up stale registry records"
+    )
+    parser_refresh = subparsers.add_parser(
+        "refresh", help="Refresh a workspace in the registry"
+    )
+    parser_refresh.add_argument(
+        "target_dir", type=Path, help="Path to workspace target dir"
+    )
+
+    args = parser.parse_args()
+
+    if args.command == "list":
+        reg = load_registry()
+        print(json.dumps(reg, indent=2))
+    elif args.command == "reconcile":
+        res = reconcile_registry()
+        print(json.dumps(res, indent=2))
+    elif args.command == "refresh":
+        refresh_registry_entry(args.target_dir)
+        print(f"Refreshed {args.target_dir}")
+    else:
+        parser.print_help()
