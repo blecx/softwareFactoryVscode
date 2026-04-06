@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
 
@@ -18,6 +19,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import bootstrap_host
+import factory_workspace
 
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
 DEFAULT_RUNTIME_TIMEOUT = 2.0
@@ -34,23 +36,28 @@ REQUIRED_WORKSPACE_FOLDERS = [
 ]
 RUNTIME_SERVICES = {
     "mock-llm-gateway": {
-        "health_url": "http://127.0.0.1:9090/admin/mocks",
+        "port_key": "PORT_TUI",
+        "health_path": "/admin/mocks",
         "require_healthy_status": True,
     },
     "mcp-memory": {
-        "health_url": "http://127.0.0.1:3030/health",
+        "port_key": "MEMORY_MCP_PORT",
+        "health_path": "/health",
         "require_healthy_status": True,
     },
     "mcp-agent-bus": {
-        "health_url": "http://127.0.0.1:3031/health",
+        "port_key": "AGENT_BUS_PORT",
+        "health_path": "/health",
         "require_healthy_status": True,
     },
     "approval-gate": {
-        "health_url": "http://127.0.0.1:8001/health",
+        "port_key": "APPROVAL_GATE_PORT",
+        "health_path": "/health",
         "require_healthy_status": True,
     },
     "agent-worker": {
-        "health_url": None,
+        "port_key": "",
+        "health_path": "",
         "require_healthy_status": False,
     },
 }
@@ -108,14 +115,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def parse_env_file(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        values[key] = value
-    return values
+    return factory_workspace.parse_env_file(path)
+
+
+def load_runtime_manifest(target_dir: Path) -> dict[str, Any]:
+    manifest_path = (
+        target_dir
+        / factory_workspace.TMP_SUBPATH
+        / factory_workspace.RUNTIME_MANIFEST_FILENAME
+    )
+    return factory_workspace.load_json(manifest_path)
 
 
 def render_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
@@ -142,11 +151,12 @@ def render_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
     )
 
 
-def render_runtime_smoke_prompt(target_dir: Path) -> str:
+def render_runtime_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
     return "\n".join(
         [
             "Please perform a read-only runtime smoke test for this Software Factory installation.",
             f"Target repository: `{target_dir}`",
+            f"Workspace file: `{workspace_file}`",
             "",
             "Rules:",
             "1. Do not modify files, environment variables, docker configuration, or git state.",
@@ -155,8 +165,10 @@ def render_runtime_smoke_prompt(target_dir: Path) -> str:
             "",
             "Please verify and report PASS/FAIL with evidence for:",
             "- The core compose services are running and healthy where health checks exist.",
-            "- The health endpoints on ports 3030, 3031, and 8001 respond.",
-            "- If MCP endpoints are part of this runtime, confirm whether localhost ports 3010-3018 appear reachable.",
+            "- The generated runtime manifest and effective workspace settings agree on the active endpoint map.",
+            "- The effective health endpoints respond for this workspace's assigned ports.",
+            "- If MCP endpoints are part of this runtime, confirm whether the "
+            "generated workspace MCP URLs appear reachable.",
             "",
             "Do not make any edits; only inspect and summarize.",
         ]
@@ -217,16 +229,24 @@ def collect_running_services(compose_project_name: str) -> dict[str, str]:
     return services
 
 
-def load_vscode_mcp_server_urls(target_dir: Path) -> dict[str, str]:
-    config_path = (
-        target_dir
-        / bootstrap_host.FACTORY_DIRNAME
-        / ".copilot"
-        / "config"
-        / "vscode-agent-settings.json"
+def load_vscode_mcp_server_urls(
+    target_dir: Path, workspace_file: str
+) -> dict[str, str]:
+    workspace_path = target_dir / workspace_file
+    config_data = (
+        bootstrap_host.load_json(workspace_path) if workspace_path.exists() else {}
     )
-    config_data = bootstrap_host.load_json(config_path)
-    servers = config_data.get("workspace", {}).get("mcp", {}).get("servers", {})
+    servers = config_data.get("settings", {}).get("mcp", {}).get("servers", {})
+    if not isinstance(servers, dict) or not servers:
+        config_path = (
+            target_dir
+            / bootstrap_host.FACTORY_DIRNAME
+            / ".copilot"
+            / "config"
+            / "vscode-agent-settings.json"
+        )
+        config_data = bootstrap_host.load_json(config_path)
+        servers = config_data.get("workspace", {}).get("mcp", {}).get("servers", {})
     urls: dict[str, str] = {}
     if not isinstance(servers, dict):
         return urls
@@ -323,6 +343,7 @@ def check_factory_env(target_dir: Path, violations: list[str]) -> None:
         return
 
     values = parse_env_file(env_path)
+    runtime_manifest = load_runtime_manifest(target_dir)
     expected_workspace = str(target_dir)
     if values.get("TARGET_WORKSPACE_PATH") != expected_workspace:
         violations.append(
@@ -344,6 +365,21 @@ def check_factory_env(target_dir: Path, violations: list[str]) -> None:
 
     if "CONTEXT7_API_KEY" not in values:
         violations.append("CONTEXT7_API_KEY entry is missing in .factory.env")
+
+    instance_id = values.get("FACTORY_INSTANCE_ID", "")
+    if runtime_manifest:
+        if instance_id and runtime_manifest.get("factory_instance_id") != instance_id:
+            violations.append(
+                "FACTORY_INSTANCE_ID in .factory.env does not match the generated runtime manifest."
+            )
+
+        expected_factory_dir = str(target_dir / bootstrap_host.FACTORY_DIRNAME)
+        actual_factory_dir = values.get("FACTORY_DIR", "")
+        if actual_factory_dir and actual_factory_dir != expected_factory_dir:
+            violations.append(
+                "FACTORY_DIR does not match the installed hidden-tree factory path "
+                f"(expected `{expected_factory_dir}`, found `{actual_factory_dir}`)."
+            )
 
 
 def check_lock_file(
@@ -468,6 +504,7 @@ def verify_installation(
 def verify_runtime(
     target_dir: Path,
     *,
+    workspace_file: str,
     timeout: float,
     check_vscode_mcp: bool,
 ) -> list[str]:
@@ -485,9 +522,31 @@ def verify_runtime(
         ]
 
     env_values = parse_env_file(env_path)
-    compose_project_name = env_values.get("COMPOSE_PROJECT_NAME", "")
+    runtime_manifest = load_runtime_manifest(target_dir)
+    compose_project_name = str(
+        runtime_manifest.get("compose_project_name")
+        or env_values.get("COMPOSE_PROJECT_NAME", "")
+    )
     if not compose_project_name:
         return ["COMPOSE_PROJECT_NAME is missing or empty in .factory.env"]
+
+    ports = factory_workspace.build_port_values(0)
+    manifest_ports = runtime_manifest.get("ports", {})
+    if isinstance(manifest_ports, dict):
+        for key, value in manifest_ports.items():
+            if key in ports:
+                try:
+                    ports[key] = int(value)
+                except (TypeError, ValueError):
+                    continue
+    for key in ports:
+        raw_value = env_values.get(key, "").strip()
+        if not raw_value:
+            continue
+        try:
+            ports[key] = int(raw_value)
+        except ValueError:
+            continue
 
     try:
         running_services = collect_running_services(compose_project_name)
@@ -521,8 +580,10 @@ def verify_runtime(
                 f"Runtime service `{service_name}` is not reported as running (docker status: `{status}`)."
             )
 
-        health_url = metadata["health_url"]
-        if health_url:
+        port_key = metadata["port_key"]
+        health_path = metadata["health_path"]
+        if port_key and health_path:
+            health_url = f"http://127.0.0.1:{ports[port_key]}{health_path}"
             error = probe_http_url(
                 health_url,
                 timeout=timeout,
@@ -532,11 +593,11 @@ def verify_runtime(
                 violations.append(error)
 
     if check_vscode_mcp:
-        server_urls = load_vscode_mcp_server_urls(target_dir)
+        server_urls = load_vscode_mcp_server_urls(target_dir, workspace_file)
         if not server_urls:
             violations.append(
                 "Could not load VS Code MCP server URLs from "
-                "`.softwareFactoryVscode/.copilot/config/vscode-agent-settings.json`."
+                "the generated workspace file or canonical VS Code MCP config."
             )
         for server_name, url in server_urls.items():
             if not url.startswith("http://127.0.0.1") and not url.startswith(
@@ -584,6 +645,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\n🔁 Verifying runtime compliance...")
         runtime_violations = verify_runtime(
             target_dir,
+            workspace_file=args.workspace_file,
             timeout=args.runtime_timeout,
             check_vscode_mcp=args.check_vscode_mcp,
         )
@@ -604,7 +666,7 @@ def main(argv: list[str] | None = None) -> int:
         print(render_smoke_prompt(target_dir, args.workspace_file))
         if args.runtime:
             print("\n🧪 Non-mutating runtime smoke prompt:\n")
-            print(render_runtime_smoke_prompt(target_dir))
+            print(render_runtime_smoke_prompt(target_dir, args.workspace_file))
     return 0
 
 
