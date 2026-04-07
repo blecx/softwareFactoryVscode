@@ -18,7 +18,7 @@ import os
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from fastapi.responses import JSONResponse
 
 from .bus_client import BusClient
@@ -46,9 +46,10 @@ async def health() -> dict[str, str]:
 
 
 @app.get("/pending", response_model=list[PendingRun])
-async def get_pending() -> list[dict[str, Any]]:
+async def get_pending(request: Request) -> list[dict[str, Any]]:
+    project_id = request.headers.get("X-Workspace-ID", "default")
     """Return all runs currently awaiting human approval."""
-    runs = await _bus.list_pending()
+    runs = await _bus.list_pending(project_id=project_id)
     return [
         {
             "run_id": r["run_id"],
@@ -66,10 +67,11 @@ async def get_pending() -> list[dict[str, Any]]:
 
 
 @app.get("/plan/{run_id}", response_model=PlanCard)
-async def get_plan(run_id: str) -> dict[str, Any]:
+async def get_plan(run_id: str, request: Request) -> dict[str, Any]:
+    project_id = request.headers.get("X-Workspace-ID", "default")
     """Return the full plan card for a run awaiting approval."""
     try:
-        packet = await _bus.read_context_packet(run_id)
+        packet = await _bus.read_context_packet(run_id, project_id=project_id)
     except Exception as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
@@ -97,7 +99,8 @@ async def get_plan(run_id: str) -> dict[str, Any]:
 
 
 @app.post("/approve/{run_id}")
-async def approve(run_id: str, body: ApprovalRequest) -> dict[str, Any]:
+async def approve(run_id: str, body: ApprovalRequest, request: Request) -> dict[str, Any]:
+    project_id = request.headers.get("X-Workspace-ID", "default")
     """Approve or reject a plan.
 
     - ``approved=true``  → transitions run to 'approved' so CoderAgent continues
@@ -105,10 +108,10 @@ async def approve(run_id: str, body: ApprovalRequest) -> dict[str, Any]:
     """
     try:
         if body.approved:
-            await _bus.approve_run(run_id=run_id, feedback=body.feedback)
+            await _bus.approve_run(run_id=run_id, feedback=body.feedback, project_id=project_id)
             return {"ok": True, "run_id": run_id, "decision": "approved"}
         else:
-            await _bus.reject_run(run_id=run_id, feedback=body.feedback)
+            await _bus.reject_run(run_id=run_id, feedback=body.feedback, project_id=project_id)
             return {"ok": True, "run_id": run_id, "decision": "rejected"}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -121,6 +124,7 @@ async def approve(run_id: str, body: ApprovalRequest) -> dict[str, Any]:
 
 @app.websocket("/ws/approvals")
 async def ws_approvals(websocket: WebSocket) -> None:
+    project_id = websocket.query_params.get("project_id", "default")
     """Push new pending plans to connected clients.
 
     Polls mcp-agent-bus every 5 seconds and pushes any runs that are
@@ -131,7 +135,7 @@ async def ws_approvals(websocket: WebSocket) -> None:
     seen: set[str] = set()
     try:
         while True:
-            runs = await _bus.list_pending()
+            runs = await _bus.list_pending(project_id=project_id)
             new_runs = [r for r in runs if r["run_id"] not in seen]
             if new_runs:
                 for r in new_runs:

@@ -19,7 +19,7 @@ import os
 from typing import Any, Optional
 
 import uvicorn
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 
 from .store import MemoryStore
 
@@ -29,9 +29,27 @@ _store = MemoryStore(db_path=_db_path)
 mcp = FastMCP("mcp-memory", json_response=True)
 
 
+def extract_project_id(ctx: Context) -> str:
+    """Extract the workspace tenant ID from the HTTP request context.
+    
+    In Phase D, all VS Code side clients will pass an X-Workspace-ID header.
+    Fallback to 'default' if not present or during testing.
+    """
+    if ctx.request_context and hasattr(ctx.request_context, "request"):
+        return ctx.request_context.request.headers.get("X-Workspace-ID", "default")
+    return "default"
+
+
 # ---------------------------------------------------------------------------
 # Lessons (long-term memory)
 # ---------------------------------------------------------------------------
+
+@mcp.tool()
+def memory_purge_workspace(ctx: Context) -> dict[str, Any]:
+    """Admin tool: purge all memory records for the caller's workspace identity."""
+    project_id = extract_project_id(ctx)
+    counts = _store.purge_workspace(project_id)
+    return {"ok": True, "counts": counts}
 
 
 @mcp.tool()
@@ -40,67 +58,37 @@ def memory_store_lesson(
     outcome: str,
     summary: str,
     learnings: list[str],
+    ctx: Context,
     repo: str = "",
 ) -> dict[str, Any]:
-    """Store a lesson learned from a completed issue run.
-
-    Args:
-        issue_number: GitHub issue number that was resolved.
-        outcome: One of 'success', 'failure', or 'partial'.
-        summary: One-paragraph human-readable summary of what happened.
-        learnings: List of concrete take-aways to apply to future similar issues.
-        repo: GitHub repo slug (owner/repo). Optional.
-
-    Returns:
-        {"ok": True, "lesson_id": <int>}
-    """
+    """Store a lesson learned from a completed issue run."""
     lesson_id = _store.store_lesson(
         issue_number=issue_number,
         outcome=outcome,
         summary=summary,
         learnings=learnings,
         repo=repo,
+        project_id=extract_project_id(ctx),
     )
     return {"ok": True, "lesson_id": lesson_id}
 
 
 @mcp.tool()
-def memory_get_lessons(issue_number: int) -> dict[str, Any]:
-    """Return all stored lessons for a specific issue number.
-
-    Returns:
-        {"lessons": [{"id", "issue_number", "outcome", "summary", "learnings", "ts"}, ...]}
-    """
-    return {"lessons": _store.get_lessons(issue_number)}
+def memory_get_lessons(issue_number: int, ctx: Context) -> dict[str, Any]:
+    """Return all stored lessons for a specific issue number."""
+    return {"lessons": _store.get_lessons(issue_number, extract_project_id(ctx))}
 
 
 @mcp.tool()
-def memory_search_similar(query: str, limit: int = 5) -> dict[str, Any]:
-    """Search past lessons by keyword similarity.
-
-    Finds lessons whose summary or learnings contain all words in the query.
-    Used by RouterAgent to adjust complexity scores based on past outcomes.
-
-    Args:
-        query: Free-text search (e.g. issue title or key domain terms).
-        limit: Maximum number of results to return (default 5).
-
-    Returns:
-        {"results": [{"issue_number", "outcome", "summary", "learnings", "ts"}, ...]}
-    """
-    return {"results": _store.search_similar(query=query, limit=limit)}
+def memory_search_similar(query: str, ctx: Context, limit: int = 5) -> dict[str, Any]:
+    """Search past lessons by keyword similarity."""
+    return {"results": _store.search_similar(query=query, limit=limit, project_id=extract_project_id(ctx))}
 
 
 @mcp.tool()
-def memory_get_recent(limit: int = 10) -> dict[str, Any]:
-    """Return the N most recent lessons across all issues.
-
-    Useful for short-term context: 'what did the agent just do?'
-
-    Returns:
-        {"lessons": [...]}
-    """
-    return {"lessons": _store.get_recent_lessons(limit=limit)}
+def memory_get_recent(ctx: Context, limit: int = 10) -> dict[str, Any]:
+    """Return the N most recent lessons across all issues."""
+    return {"lessons": _store.get_recent_lessons(limit=limit, project_id=extract_project_id(ctx))}
 
 
 # ---------------------------------------------------------------------------
@@ -112,19 +100,11 @@ def memory_get_recent(limit: int = 10) -> dict[str, Any]:
 def memory_upsert_entity(
     name: str,
     kind: str,
+    ctx: Context,
     metadata: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
-    """Add or update a knowledge graph entity node.
-
-    Args:
-        name: Unique identifier (e.g. 'apps/api/services/template_service.py').
-        kind: Node type: 'file' | 'domain' | 'service' | 'issue' | 'agent'.
-        metadata: Optional JSON dict with extra properties.
-
-    Returns:
-        {"ok": True}
-    """
-    _store.upsert_entity(name=name, kind=kind, metadata=metadata)
+    """Add or update a knowledge graph entity node."""
+    _store.upsert_entity(name=name, kind=kind, metadata=metadata, project_id=extract_project_id(ctx))
     return {"ok": True}
 
 
@@ -133,19 +113,11 @@ def memory_add_relationship(
     from_entity: str,
     relation: str,
     to_entity: str,
+    ctx: Context,
 ) -> dict[str, Any]:
-    """Add a directed edge between two knowledge graph entities.
-
-    Args:
-        from_entity: Source entity name.
-        relation: Edge type: 'belongs_to' | 'changed_by' | 'depends_on' | 'tested_by'.
-        to_entity: Target entity name.
-
-    Returns:
-        {"ok": True}
-    """
+    """Add a directed edge between two knowledge graph entities."""
     _store.add_relationship(
-        from_entity=from_entity, relation=relation, to_entity=to_entity
+        from_entity=from_entity, relation=relation, to_entity=to_entity, project_id=extract_project_id(ctx)
     )
     return {"ok": True}
 
@@ -153,18 +125,11 @@ def memory_add_relationship(
 @mcp.tool()
 def memory_get_related(
     entity: str,
+    ctx: Context,
     relation: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Query outgoing edges from a knowledge graph entity.
-
-    Args:
-        entity: Source entity name to query.
-        relation: Optional filter (e.g. 'depends_on'). If omitted, returns all edges.
-
-    Returns:
-        {"relationships": [{"from_entity", "relation", "to_entity", "ts"}, ...]}
-    """
-    return {"relationships": _store.get_related(entity=entity, relation=relation)}
+    """Query outgoing edges from a knowledge graph entity."""
+    return {"relationships": _store.get_related(entity=entity, relation=relation, project_id=extract_project_id(ctx))}
 
 
 # ---------------------------------------------------------------------------
