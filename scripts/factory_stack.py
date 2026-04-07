@@ -142,6 +142,13 @@ def ensure_ports_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> None
         )
 
 
+def ensure_data_dirs_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> None:
+    data_dir_str = config.env_values.get("FACTORY_DATA_DIR")
+    if data_dir_str:
+        base_dir = Path(data_dir_str).expanduser()
+        (base_dir / "memory" / config.factory_instance_id).mkdir(parents=True, exist_ok=True)
+        (base_dir / "bus" / config.factory_instance_id).mkdir(parents=True, exist_ok=True)
+
 def start_stack(
     repo_root: Path,
     *,
@@ -152,6 +159,7 @@ def start_stack(
 ) -> Path:
     resolved_env_file = resolve_env_file(repo_root, env_file)
     config = sync_workspace_runtime(repo_root, env_file=resolved_env_file)
+    ensure_data_dirs_ready(config)
     ensure_ports_ready(config)
     action = ["up", "-d"]
     if build:
@@ -187,7 +195,62 @@ def stop_stack(
     return resolved_env_file
 
 
+def cleanup_workspace(
+    repo_root: Path,
+    *,
+    env_file: Path | None = None,
+) -> int:
+    import shutil
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    try:
+        config = sync_workspace_runtime(repo_root, env_file=resolved_env_file, persist=False)
+        instance_id = config.factory_instance_id
+        action = ["down", "-v", "--remove-orphans"]
+        run_compose_command(
+            repo_root,
+            build_compose_command(repo_root, resolved_env_file, action),
+        )
+        print(f"🧹 Removed Docker stack and volumes for {instance_id}")
+    except Exception as e:
+        print(f"⚠️ Could not completely remove docker stack (it may not exist): {e}")
+
+    registry = factory_workspace.load_registry()
+    if "workspaces" in registry:
+        # Also clean up any that map to this directory
+        keys_to_delete = []
+        for key, record in registry["workspaces"].items():
+            if isinstance(record, dict) and record.get("target_workspace_path") == str(repo_root):
+                keys_to_delete.append(key)
+        for key in keys_to_delete:
+            del registry["workspaces"][key]
+            if registry.get("active_workspace") == key:
+                registry["active_workspace"] = ""
+            print(f"🧹 Removed registry record {key}")
+        factory_workspace.save_registry(registry)
+
+    if resolved_env_file.exists():
+        resolved_env_file.unlink()
+        print(f"🧹 Deleted {resolved_env_file}")
+
+    manifest_path = repo_root / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+    if manifest_path.exists():
+        manifest_path.unlink()
+        print(f"🧹 Deleted {manifest_path}")
+
+    # Remove the data directories fully
+    data_dir = repo_root / ".softwareFactoryVscode" / "data"
+    if data_dir.exists() and data_dir.is_dir():
+        shutil.rmtree(data_dir, ignore_errors=True)
+        print(f"🧹 Erased local data volumes in {data_dir}")
+
+    return 0
+
+
 def list_workspaces() -> int:
+    res = factory_workspace.reconcile_registry()
+    if res.get("stale_removed"):
+        for stale_id in res["stale_removed"]:
+            print(f"🧹 Removed stale registry record for: {stale_id}")
     registry = factory_workspace.load_registry()
     active_workspace = registry.get("active_workspace", "")
     for instance_id, record in sorted(registry.get("workspaces", {}).items()):
@@ -262,7 +325,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "command",
-        choices=["start", "stop", "list", "status", "activate", "deactivate"],
+        choices=["start", "stop", "list", "status", "activate", "deactivate", "cleanup"],
         help="Workspace runtime lifecycle command.",
     )
     parser.add_argument(
@@ -317,6 +380,11 @@ def main() -> int:
             repo_root,
             env_file=env_file,
             remove_volumes=args.remove_volumes,
+        )
+    elif args.command == "cleanup":
+        return cleanup_workspace(
+            repo_root,
+            env_file=env_file,
         )
     elif args.command == "list":
         return list_workspaces()

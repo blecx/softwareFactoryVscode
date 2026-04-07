@@ -149,6 +149,7 @@ python3 .softwareFactoryVscode/scripts/factory_stack.py list
 python3 .softwareFactoryVscode/scripts/factory_stack.py status
 python3 .softwareFactoryVscode/scripts/factory_stack.py activate
 python3 .softwareFactoryVscode/scripts/factory_stack.py deactivate
+python3 .softwareFactoryVscode/scripts/factory_stack.py cleanup
 ```
 
 These commands distinguish:
