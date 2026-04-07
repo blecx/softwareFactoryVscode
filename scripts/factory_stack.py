@@ -204,6 +204,7 @@ def cleanup_workspace(
     resolved_env_file = resolve_env_file(repo_root, env_file)
     try:
         config = sync_workspace_runtime(repo_root, env_file=resolved_env_file, persist=False)
+        target_path_str = str(config.target_dir.absolute())
         instance_id = config.factory_instance_id
         action = ["down", "-v", "--remove-orphans"]
         run_compose_command(
@@ -213,13 +214,14 @@ def cleanup_workspace(
         print(f"🧹 Removed Docker stack and volumes for {instance_id}")
     except Exception as e:
         print(f"⚠️ Could not completely remove docker stack (it may not exist): {e}")
+        target_path_str = str(repo_root.parent.absolute())
 
     registry = factory_workspace.load_registry()
     if "workspaces" in registry:
         # Also clean up any that map to this directory
         keys_to_delete = []
         for key, record in registry["workspaces"].items():
-            if isinstance(record, dict) and record.get("target_workspace_path") == str(repo_root):
+            if isinstance(record, dict) and Path(record.get("target_workspace_path", "")).absolute() == Path(target_path_str).absolute():
                 keys_to_delete.append(key)
         for key in keys_to_delete:
             del registry["workspaces"][key]
