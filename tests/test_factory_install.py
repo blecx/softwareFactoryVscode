@@ -1345,3 +1345,32 @@ def test_devops_docker_compose_image_uses_known_working_docker_cli_base() -> Non
 
     assert "FROM docker:27.4.1-cli" in text
     assert "FROM docker:27-cli" not in text
+from pathlib import Path
+import pytest
+import sys
+sys.path.insert(0, str(Path("scripts").resolve()))
+from factory_stack import cleanup_workspace, list_workspaces
+import factory_workspace
+
+def test_cleanup_workspace(tmp_path: Path):
+    target = tmp_path / "target"
+    target.mkdir()
+    factory_dir = target / ".softwareFactoryVscode"
+    factory_dir.mkdir()
+    
+    config = factory_workspace.build_runtime_config(target, factory_dir=factory_dir)
+    factory_workspace.sync_runtime_artifacts(config)
+    
+    # Assert created
+    assert (target / ".factory.env").exists()
+    assert (target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json").exists()
+    
+    # cleanup
+    cleanup_workspace(target)
+    
+    assert not (target / ".factory.env").exists()
+    assert not (target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json").exists()
+    
+    reg = factory_workspace.load_registry()
+    assert config.factory_instance_id not in reg.get("workspaces", {})
+
