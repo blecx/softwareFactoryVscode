@@ -21,7 +21,7 @@ import os
 from typing import Any, Optional
 
 import uvicorn
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP, Context
 
 from .bus import AgentBus, InvalidStatusTransitionError
 
@@ -29,6 +29,22 @@ _db_path = os.getenv("AGENT_BUS_DB_PATH", "/data/agent_bus.db")
 _bus = AgentBus(db_path=_db_path)
 
 mcp = FastMCP("mcp-agent-bus", json_response=True)
+
+
+def extract_project_id(ctx: Context) -> str:
+    """Extract the workspace tenant ID from the HTTP request headers."""
+    default_id = os.getenv("PROJECT_WORKSPACE_ID", "default")
+    if not ctx or not ctx.request_context or not getattr(ctx.request_context, "request", None):
+        return default_id
+    # Starlette/FastAPI headers are typically accessible via request.headers
+    try:
+        headers = dict(ctx.request_context.request.headers)
+        return headers.get("x-workspace-id", default_id)
+    except Exception:
+        pass
+    return default_id
+
+
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +90,7 @@ def bus_set_status(run_id: str, status: str) -> dict[str, Any]:
 
 
 @mcp.tool()
-def bus_list_pending_approval() -> dict[str, Any]:
+def bus_list_pending_approval(ctx: Context = None) -> dict[str, Any]:
     """Return all runs currently awaiting human approval.
 
     Returns:
@@ -152,7 +168,7 @@ def bus_approve_run(run_id: str, feedback: str = "") -> dict[str, Any]:
 
 
 @mcp.tool()
-def bus_read_context_packet(run_id: str) -> dict[str, Any]:
+def bus_read_context_packet(run_id: str, ctx: Context = None) -> dict[str, Any]:
     """Read the full context packet for a run in one call.
 
     This is the core FACTORY primitive. Any agent calls this once
@@ -293,6 +309,23 @@ def main() -> None:
     app = mcp.streamable_http_app()
     uvicorn.run(app, host=host, port=port)
 
+
+
+# ---------------------------------------------------------------------------
+# Tenant Management
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def bus_purge_workspace(project_id: str, ctx: Context = None) -> dict[str, Any]:
+    """Purges all data for a specific workspace tenant from the bus.
+    Requires the caller to be accessing the server with the matching x-workspace-id header as a basic security check.
+    """
+    caller_tenant = extract_project_id(ctx)
+    if caller_tenant != project_id:
+        return {"ok": False, "error": f"Tenant mismatch: Caller cannot purge project_id={project_id}"}
+        
+    counts = _bus.purge_workspace(project_id)
+    return {"ok": True, "counts": counts, "message": f"Purged runtime bus data for {project_id}"}
 
 if __name__ == "__main__":
     main()

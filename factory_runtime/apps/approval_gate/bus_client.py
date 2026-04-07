@@ -17,11 +17,12 @@ class BusClient:
     def __init__(self, base_url: str = "http://localhost:3031") -> None:
         self._base_url = base_url.rstrip("/")
 
-    async def _call(self, tool: str, args: dict[str, Any]) -> Any:
+    async def _call(self, tool: str, args: dict[str, Any], project_id: str = "default") -> Any:
         """POST a tool call to the bus MCP endpoint and return the result."""
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.post(
                 f"{self._base_url}/mcp/",
+                headers={"X-Workspace-ID": project_id},
                 json={
                     "jsonrpc": "2.0",
                     "method": "tools/call",
@@ -41,19 +42,19 @@ class BusClient:
                 return _json.loads(raw)
             return result
 
-    async def list_pending(self) -> list[dict[str, Any]]:
+    async def list_pending(self, project_id: str = "default") -> list[dict[str, Any]]:
         """Return runs awaiting approval."""
-        result = await self._call("bus_list_pending_approval", {})
+        result = await self._call("bus_list_pending_approval", {}, project_id=project_id)
         return result.get("runs", [])
 
-    async def read_context_packet(self, run_id: str) -> dict[str, Any]:
+    async def read_context_packet(self, run_id: str, project_id: str = "default") -> dict[str, Any]:
         """Return the full context packet for a run."""
-        return await self._call("bus_read_context_packet", {"run_id": run_id})
+        return await self._call("bus_read_context_packet", {"run_id": run_id}, project_id=project_id)
 
-    async def approve_run(self, run_id: str, feedback: str = "") -> None:
+    async def approve_run(self, run_id: str, feedback: str = "", project_id: str = "default") -> None:
         """Approve a plan."""
-        await self._call("bus_approve_run", {"run_id": run_id, "feedback": feedback})
+        await self._call("bus_approve_run", {"run_id": run_id, "feedback": feedback}, project_id=project_id)
 
-    async def reject_run(self, run_id: str, feedback: str = "") -> None:
+    async def reject_run(self, run_id: str, feedback: str = "", project_id: str = "default") -> None:
         """Reject a plan by transitioning to failed."""
-        await self._call("bus_set_status", {"run_id": run_id, "status": "failed"})
+        await self._call("bus_set_status", {"run_id": run_id, "status": "failed"}, project_id=project_id)
