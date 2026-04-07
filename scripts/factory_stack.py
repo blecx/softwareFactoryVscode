@@ -156,23 +156,41 @@ def start_stack(
     build: bool = True,
     wait: bool = True,
     wait_timeout: int = DEFAULT_WAIT_TIMEOUT,
+    foreground: bool = False,
 ) -> Path:
     resolved_env_file = resolve_env_file(repo_root, env_file)
     config = sync_workspace_runtime(repo_root, env_file=resolved_env_file)
     ensure_data_dirs_ready(config)
     ensure_ports_ready(config)
-    action = ["up", "-d"]
-    if build:
-        action.append("--build")
-    if wait:
-        action.extend(["--wait", "--wait-timeout", str(wait_timeout)])
+    if foreground:
+        action = ["up"]
+        if build:
+            action.append("--build")
+    else:
+        action = ["up", "-d"]
+        if build:
+            action.append("--build")
+        if wait:
+            action.extend(["--wait", "--wait-timeout", str(wait_timeout)])
 
-    run_compose_command(
-        repo_root,
-        build_compose_command(repo_root, resolved_env_file, action),
-    )
     factory_workspace.update_runtime_state(config.factory_instance_id, "running")
-    return resolved_env_file
+    if foreground:
+        try:
+            run_compose_command(
+                repo_root,
+                build_compose_command(repo_root, resolved_env_file, action),
+            )
+        except KeyboardInterrupt:
+            print("\nShutting down stack...")
+        finally:
+            factory_workspace.update_runtime_state(config.factory_instance_id, "stopped")
+            return resolved_env_file
+    else:
+        run_compose_command(
+            repo_root,
+            build_compose_command(repo_root, resolved_env_file, action),
+        )
+        return resolved_env_file
 
 
 def stop_stack(

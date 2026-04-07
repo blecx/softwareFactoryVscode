@@ -245,12 +245,16 @@
       "args": [
         "${workspaceFolder}/scripts/factory_stack.py",
         "start",
-        "--build"
+        "--build",
+			"--foreground"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "isBackground": true,
+		"runOptions": {
+			"runOn": "folderOpen"
+		},
       "problemMatcher": {
         "pattern": {
           "regexp": "^$",
