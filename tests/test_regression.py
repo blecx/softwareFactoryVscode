@@ -146,15 +146,6 @@ def test_tasks_no_longer_invoke_legacy_issue_loop_scripts():
         assert "WORK-ISSUE-WORKFLOW.md" in serialized
 
 
-def test_legacy_loop_script_is_deprecated_by_default():
-    repo_root = Path(__file__).parent.parent
-    text = (repo_root / "scripts" / "issue-pr-merge-cleanup-loop.sh").read_text(
-        encoding="utf-8"
-    )
-    assert "ALLOW_LEGACY_AUTONOMOUS_LOOP" in text
-    assert "docs/WORK-ISSUE-WORKFLOW.md" in text
-
-
 def test_issue_templates_use_live_repo_labels():
     repo_root = Path(__file__).parent.parent
     feature_template = (

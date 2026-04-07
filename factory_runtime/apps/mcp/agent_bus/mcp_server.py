@@ -53,7 +53,7 @@ def extract_project_id(ctx: Context) -> str:
 
 
 @mcp.tool()
-def bus_create_run(issue_number: int, repo: str = "") -> dict[str, Any]:
+def bus_create_run(issue_number: int, repo: str = "", ctx: Context = None) -> dict[str, Any]:
     """Create a new agent task run for a GitHub issue.
 
     Args:
@@ -63,12 +63,12 @@ def bus_create_run(issue_number: int, repo: str = "") -> dict[str, Any]:
     Returns:
         {"run_id": str}  — UUID identifying this run throughout its lifecycle.
     """
-    run_id = _bus.create_run(issue_number=issue_number, repo=repo)
+    run_id = _bus.create_run(issue_number=issue_number, repo=repo, project_id=extract_project_id(ctx))
     return {"run_id": run_id}
 
 
 @mcp.tool()
-def bus_set_status(run_id: str, status: str) -> dict[str, Any]:
+def bus_set_status(run_id: str, status: str, ctx: Context = None) -> dict[str, Any]:
     """Transition a run to a new status.
 
     Valid lifecycle: created → routing → planning → awaiting_approval →
@@ -83,7 +83,7 @@ def bus_set_status(run_id: str, status: str) -> dict[str, Any]:
         {"ok": True} on success.
     """
     try:
-        _bus.set_status(run_id=run_id, status=status)
+        _bus.set_status(run_id=run_id, status=status, project_id=extract_project_id(ctx))
     except InvalidStatusTransitionError as exc:
         raise ValueError(str(exc)) from exc
     return {"ok": True}
@@ -96,7 +96,7 @@ def bus_list_pending_approval(ctx: Context = None) -> dict[str, Any]:
     Returns:
         {"runs": [{"run_id", "issue_number", "repo", "status", "created_ts"}, ...]}
     """
-    return {"runs": _bus.list_pending_approval()}
+    return {"runs": _bus.list_pending_approval(project_id=extract_project_id(ctx))}
 
 
 # ---------------------------------------------------------------------------
@@ -112,6 +112,7 @@ def bus_write_plan(
     acceptance_criteria: list[str],
     validation_cmds: list[str],
     estimated_minutes: Optional[int] = None,
+    ctx: Context = None,
 ) -> dict[str, Any]:
     """Write (or replace) the implementation plan for a run.
 
@@ -137,12 +138,13 @@ def bus_write_plan(
         acceptance_criteria=acceptance_criteria,
         validation_cmds=validation_cmds,
         estimated_minutes=estimated_minutes,
+        project_id=extract_project_id(ctx),
     )
     return {"ok": True}
 
 
 @mcp.tool()
-def bus_approve_run(run_id: str, feedback: str = "") -> dict[str, Any]:
+def bus_approve_run(run_id: str, feedback: str = "", ctx: Context = None) -> dict[str, Any]:
     """Mark a plan as approved by a human reviewer.
 
     Transitions the run from 'awaiting_approval' → 'approved'.
@@ -156,7 +158,7 @@ def bus_approve_run(run_id: str, feedback: str = "") -> dict[str, Any]:
         {"ok": True}
     """
     try:
-        _bus.approve_run(run_id=run_id, feedback=feedback)
+        _bus.approve_run(run_id=run_id, feedback=feedback, project_id=extract_project_id(ctx))
     except InvalidStatusTransitionError as exc:
         raise ValueError(str(exc)) from exc
     return {"ok": True}
@@ -190,7 +192,7 @@ def bus_read_context_packet(run_id: str, ctx: Context = None) -> dict[str, Any]:
           "checkpoints": [{"label", "metadata", "ts"}, ...]
         }
     """
-    return _bus.read_context_packet(run_id=run_id)
+    return _bus.read_context_packet(run_id=run_id, project_id=extract_project_id(ctx))
 
 
 # ---------------------------------------------------------------------------
@@ -204,6 +206,7 @@ def bus_write_snapshot(
     filepath: str,
     content_before: Optional[str],
     content_after: Optional[str],
+    ctx: Context = None,
 ) -> dict[str, Any]:
     """Record before/after content for a file modified during a run.
 
@@ -224,6 +227,7 @@ def bus_write_snapshot(
         filepath=filepath,
         content_before=content_before,
         content_after=content_after,
+        project_id=extract_project_id(ctx),
     )
     return {"ok": True}
 
@@ -279,6 +283,7 @@ def bus_write_checkpoint(
     run_id: str,
     label: str,
     metadata: Optional[dict[str, Any]] = None,
+    ctx: Context = None,
 ) -> dict[str, Any]:
     """Record a named milestone checkpoint within a run.
 
@@ -293,7 +298,7 @@ def bus_write_checkpoint(
     Returns:
         {"ok": True}
     """
-    _bus.write_checkpoint(run_id=run_id, label=label, metadata=metadata)
+    _bus.write_checkpoint(run_id=run_id, label=label, metadata=metadata, project_id=extract_project_id(ctx))
     return {"ok": True}
 
 

@@ -166,6 +166,7 @@ class MemoryStore:
         name: str,
         kind: str,
         metadata: Optional[dict[str, Any]] = None,
+        project_id: str = "default",
     ) -> None:
         """Insert or update a knowledge graph entity node."""
         import os
@@ -194,7 +195,7 @@ class MemoryStore:
         self._conn.commit()
 
     def get_related(
-        self, entity: str, relation: Optional[str] = None
+        self, entity: str, relation: Optional[str] = None, project_id: str = "default"
     ) -> list[dict[str, Any]]:
         """Return all entities related to `entity`, optionally filtered by relation type."""
         import os
@@ -210,6 +211,20 @@ class MemoryStore:
                 (entity, project_id),
             ).fetchall()
         return [_row_to_dict(r) for r in rows]
+
+
+    def purge_workspace(self, project_id: str) -> dict[str, int]:
+        """Deletes all records associated with a specific workspace tenant."""
+        cursor = self._conn.cursor()
+        counts = {"lessons": 0, "entities": 0, "relationships": 0}
+        cursor.execute("DELETE FROM relationships WHERE project_id = ?", (project_id,))
+        counts["relationships"] = cursor.rowcount
+        cursor.execute("DELETE FROM entities WHERE project_id = ?", (project_id,))
+        counts["entities"] = cursor.rowcount
+        cursor.execute("DELETE FROM lessons WHERE project_id = ?", (project_id,))
+        counts["lessons"] = cursor.rowcount
+        self._conn.commit()
+        return counts
 
     def close(self) -> None:
         """Close the SQLite connection."""
@@ -227,21 +242,3 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
                 pass
     return d
 
-
-    def purge_workspace(self, project_id: str) -> dict[str, int]:
-        """Deletes all records associated with a specific workspace tenant."""
-        cursor = self._conn.cursor()
-        
-        counts = {"lessons": 0, "entities": 0, "relationships": 0}
-        
-        cursor.execute("DELETE FROM relationships WHERE project_id = ?", (project_id,))
-        counts["relationships"] = cursor.rowcount
-        
-        cursor.execute("DELETE FROM entities WHERE project_id = ?", (project_id,))
-        counts["entities"] = cursor.rowcount
-        
-        cursor.execute("DELETE FROM lessons WHERE project_id = ?", (project_id,))
-        counts["lessons"] = cursor.rowcount
-        
-        self._conn.commit()
-        return counts

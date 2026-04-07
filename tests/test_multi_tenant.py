@@ -30,8 +30,8 @@ def test_agent_bus_multi_tenant_isolation():
     pending_t1 = bus.list_pending_approval(project_id="tenant-1")
     
     # Write a plan requires only run_id, since run_id identifies the task uniquely
-    bus.write_plan(run1, goal="tenant 1 goal", files=[])
-    bus.write_plan(run2, goal="tenant 2 goal", files=[])
+    bus.write_plan(run1, goal="tenant 1 goal", files=[], acceptance_criteria=[], validation_cmds=[], project_id="tenant-1")
+    bus.write_plan(run2, goal="tenant 2 goal", files=[], acceptance_criteria=[], validation_cmds=[], project_id="tenant-2")
     
     # Check purge counts
     counts = bus.purge_workspace(project_id="tenant-1")

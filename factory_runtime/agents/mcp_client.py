@@ -82,6 +82,7 @@ class MCPMultiClient:
         timeout: float = 10.0,
         protocol_version: str = DEFAULT_MCP_PROTOCOL_VERSION,
         transport: httpx.AsyncBaseTransport | None = None,
+        workspace_id: str | None = None,
     ) -> None:
         """
         Args:
@@ -92,6 +93,7 @@ class MCPMultiClient:
         self._timeout = timeout
         self._protocol_version = protocol_version
         self._transport = transport
+        self._workspace_id = workspace_id
         self._tools: dict[str, ToolInfo] = {}
         self._sessions: dict[str, ServerSession] = {}
         self._http: Optional[httpx.AsyncClient] = None
@@ -219,6 +221,8 @@ class MCPMultiClient:
             headers["Accept"] = MCP_ACCEPT_HEADER
         if session_id:
             headers[MCP_SESSION_ID_HEADER] = session_id
+        if self._workspace_id:
+            headers["X-Workspace-ID"] = self._workspace_id
         return headers
 
     async def _initialize_server(

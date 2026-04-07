@@ -160,9 +160,9 @@ class AgentBus:
         ).fetchone()
         return dict(row) if row else None
 
-    def set_status(self, run_id: str, status: str) -> None:
+    def set_status(self, run_id: str, status: str, project_id: str = "default") -> None:
         """Transition run to a new status. Raises InvalidStatusTransitionError on bad transitions."""
-        run = self.get_run(run_id)
+        run = self.get_run(run_id, project_id=project_id)
         if run is None:
             raise ValueError(f"Unknown run_id: {run_id}")
         current = run["status"]
@@ -200,9 +200,10 @@ class AgentBus:
         acceptance_criteria: list[str],
         validation_cmds: list[str],
         estimated_minutes: Optional[int] = None,
+        project_id: str = "default",
     ) -> None:
         """Write (or replace) the implementation plan for a run."""
-        if self.get_run(run_id) is None:
+        if self.get_run(run_id, project_id=project_id) is None:
             raise ValueError("Run not found for project.")
         self._conn.execute(
             """
@@ -228,20 +229,20 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def approve_run(self, run_id: str, feedback: str = "") -> None:
+    def approve_run(self, run_id: str, feedback: str = "", project_id: str = "default") -> None:
         """Mark the plan as approved and update run status to 'approved'."""
         # In sqlite we can't easily JOIN an UPDATE, so let's check permission first.
-        if not self.get_run(run_id):
+        if not self.get_run(run_id, project_id=project_id):
             raise ValueError("Run not found for project.")
         self._conn.execute(
             "UPDATE plans SET approved = 1, feedback = ? WHERE run_id = ?",
             (feedback, run_id),
         )
-        self.set_status(run_id, "approved")
+        self.set_status(run_id, "approved", project_id=project_id)
 
-    def get_plan(self, run_id: str) -> Optional[dict[str, Any]]:
+    def get_plan(self, run_id: str, project_id: str = "default") -> Optional[dict[str, Any]]:
         """Return the plan for a run, with JSON fields deserialized."""
-        if self.get_run(run_id) is None:
+        if self.get_run(run_id, project_id=project_id) is None:
             return None
         row = self._conn.execute(
             "SELECT * FROM plans WHERE run_id = ?", (run_id,)
@@ -267,6 +268,7 @@ class AgentBus:
         filepath: str,
         content_before: Optional[str],
         content_after: Optional[str],
+        project_id: str = "default",
     ) -> None:
         """Record before/after content for a file modified during a run."""
         self._conn.execute(
@@ -278,9 +280,9 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def get_snapshots(self, run_id: str) -> list[dict[str, Any]]:
+    def get_snapshots(self, run_id: str, project_id: str = "default") -> list[dict[str, Any]]:
         """Return all file snapshots for a run."""
-        if self.get_run(run_id) is None:
+        if self.get_run(run_id, project_id=project_id) is None:
             return []
         rows = self._conn.execute(
             "SELECT * FROM file_snapshots WHERE run_id = ? ORDER BY ts ASC",
@@ -302,7 +304,7 @@ class AgentBus:
         passed: bool,
     ) -> None:
         """Record the result of a validation command (test/lint run)."""
-        if self.get_run(run_id) is None:
+        if self.get_run(run_id, project_id=project_id) is None:
             raise ValueError("Run not found for project.")
         self._conn.execute(
             """
@@ -313,9 +315,9 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def get_validations(self, run_id: str, limit: int = 10) -> list[dict[str, Any]]:
+    def get_validations(self, run_id: str, limit: int = 10, project_id: str = "default") -> list[dict[str, Any]]:
         """Return the most recent validation results for a run."""
-        if self.get_run(run_id) is None:
+        if self.get_run(run_id, project_id=project_id) is None:
             return []
         rows = self._conn.execute(
             """
@@ -349,9 +351,9 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def get_checkpoints(self, run_id: str) -> list[dict[str, Any]]:
+    def get_checkpoints(self, run_id: str, project_id: str = "default") -> list[dict[str, Any]]:
         """Return all checkpoints for a run in chronological order."""
-        if self.get_run(run_id) is None:
+        if self.get_run(run_id, project_id=project_id) is None:
             return []
         rows = self._conn.execute(
             "SELECT * FROM checkpoints WHERE run_id = ? ORDER BY ts ASC",
@@ -388,7 +390,7 @@ class AgentBus:
               "checkpoints": [...]
             }
         """
-        run = self.get_run(run_id)
+        run = self.get_run(run_id, project_id=project_id)
         if run is None:
             raise ValueError(f"Unknown run_id: {run_id}")
         return {
