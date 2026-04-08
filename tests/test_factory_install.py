@@ -4,6 +4,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+from http.client import RemoteDisconnected
 from pathlib import Path
 
 import yaml
@@ -658,6 +659,33 @@ def test_runtime_smoke_prompt_uses_generated_endpoint_language() -> None:
     assert "3010-3018" not in prompt
 
 
+def test_probe_http_url_allows_remote_disconnect_when_http_errors_allowed(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        verify_factory_install,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RemoteDisconnected("x")),
+    )
+
+    assert (
+        verify_factory_install.probe_http_url(
+            "http://127.0.0.1:3010/mcp",
+            timeout=1.0,
+            allow_http_error=True,
+        )
+        is None
+    )
+
+    message = verify_factory_install.probe_http_url(
+        "http://127.0.0.1:3010/mcp",
+        timeout=1.0,
+        allow_http_error=False,
+    )
+    assert message is not None
+    assert "remote disconnected" in message
+
+
 def test_verify_factory_runtime_fails_when_required_service_missing(
     tmp_path: Path,
     monkeypatch,
@@ -1253,8 +1281,8 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
     )
 
     assert exit_code == 0
-    assert "http://127.0.0.1:3230/health" in probed_urls
-    assert "http://127.0.0.1:3231/health" in probed_urls
+    assert "http://127.0.0.1:3230/mcp" in probed_urls
+    assert "http://127.0.0.1:3231/mcp" in probed_urls
     assert "http://127.0.0.1:8201/health" in probed_urls
     assert "http://127.0.0.1:3211/mcp" in probed_urls
 
@@ -1316,6 +1344,34 @@ def test_runtime_compose_files_build_from_repo_root() -> None:
                 assert build.get("context") == "."
 
 
+def test_runtime_compose_shared_services_do_not_override_internal_ports() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+
+    memory_env = services.get("mcp-memory", {}).get("environment", {})
+    bus_env = services.get("mcp-agent-bus", {}).get("environment", {})
+    approval_env = services.get("approval-gate", {}).get("environment", {})
+
+    assert "MEMORY_MCP_PORT" not in memory_env
+    assert "AGENT_BUS_PORT" not in bus_env
+    assert "APPROVAL_GATE_PORT" not in approval_env
+
+
+def test_runtime_compose_interservice_urls_use_fixed_internal_ports() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+
+    approval_env = services.get("approval-gate", {}).get("environment", {})
+    worker_env = services.get("agent-worker", {}).get("environment", {})
+
+    assert approval_env.get("AGENT_BUS_URL") == "http://mcp-agent-bus:3031"
+    assert worker_env.get("MEMORY_MCP_URL") == "http://mcp-memory:3030"
+    assert worker_env.get("AGENT_BUS_URL") == "http://mcp-agent-bus:3031"
+    assert worker_env.get("APPROVAL_GATE_URL") == "http://approval-gate:8001"
+
+
 def test_runtime_dockerfiles_copy_from_factory_runtime_tree() -> None:
     dockerfiles = [
         REPO_ROOT / "docker" / "mcp-memory" / "Dockerfile",
@@ -1338,6 +1394,26 @@ def test_runtime_dockerfiles_copy_from_factory_runtime_tree() -> None:
         assert "factory_runtime/" in text
 
 
+def test_runtime_mcp_dockerfiles_pin_fastmcp_compatible_version() -> None:
+    dockerfiles = [
+        REPO_ROOT / "docker" / "mcp-memory" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-agent-bus" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-bash-gateway" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-devops-docker-compose" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-devops-test-runner" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-github-ops" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-offline-docs" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-git" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-search" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-filesystem" / "Dockerfile",
+    ]
+
+    for dockerfile in dockerfiles:
+        text = dockerfile.read_text(encoding="utf-8")
+        assert "mcp==1.25.0" in text
+        assert "uvicorn[standard]==0.44.0" in text
+
+
 def test_devops_docker_compose_image_uses_known_working_docker_cli_base() -> None:
     dockerfile = REPO_ROOT / "docker" / "mcp-devops-docker-compose" / "Dockerfile"
 
@@ -1345,21 +1421,20 @@ def test_devops_docker_compose_image_uses_known_working_docker_cli_base() -> Non
 
     assert "FROM docker:27.4.1-cli" in text
     assert "FROM docker:27-cli" not in text
-from pathlib import Path
-import pytest
-import sys
-sys.path.insert(0, str(Path("scripts").resolve()))
-from factory_stack import cleanup_workspace, list_workspaces
-import factory_workspace
+
 
 def test_cleanup_workspace(tmp_path: Path):
+    sys.path.insert(0, str(Path("scripts").resolve()))
+    from factory_stack import cleanup_workspace
+    import factory_workspace as workspace_module
+
     target = tmp_path / "target"
     target.mkdir()
     factory_dir = target / ".softwareFactoryVscode"
     factory_dir.mkdir()
     
-    config = factory_workspace.build_runtime_config(target, factory_dir=factory_dir)
-    factory_workspace.sync_runtime_artifacts(config)
+    config = workspace_module.build_runtime_config(target, factory_dir=factory_dir)
+    workspace_module.sync_runtime_artifacts(config)
     
     # Assert created
     assert (target / ".factory.env").exists()
@@ -1371,6 +1446,6 @@ def test_cleanup_workspace(tmp_path: Path):
     assert not (target / ".factory.env").exists()
     assert not (target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json").exists()
     
-    reg = factory_workspace.load_registry()
+    reg = workspace_module.load_registry()
     assert config.factory_instance_id not in reg.get("workspaces", {})
 
