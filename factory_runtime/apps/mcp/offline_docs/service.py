@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from apps.mcp.repo_fundamentals.path_guard import RepoPathGuard
+from ..repo_fundamentals.path_guard import RepoPathGuard
 
 
 class OfflineDocsServiceError(RuntimeError):

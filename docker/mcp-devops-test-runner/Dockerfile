@@ -6,9 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TEST_RUNNER_MCP_REPO_ROOT=/target
 
 WORKDIR /factory
-COPY factory_runtime/apps/__init__.py apps/__init__.py
-COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
-COPY factory_runtime/apps/mcp/devops/ apps/mcp/devops/
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends python3 python3-pip && \
@@ -20,4 +19,4 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 
 EXPOSE 3016
 
-CMD ["python3", "-m", "apps.mcp.devops.test_runner_server"]
+CMD ["python3", "-m", "factory_runtime.apps.mcp.devops.test_runner_server"]

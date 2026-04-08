@@ -8,7 +8,7 @@ services:
       - GITHUB_OPS_MCP_PORT=3018
       - GITHUB_OPS_MCP_HOST=0.0.0.0
       - GITHUB_OPS_MCP_REPO_ROOT=/target
-      - GITHUB_OPS_MCP_AUDIT_DIR=/factory/.tmp/mcp-github-ops
+      - GITHUB_OPS_MCP_AUDIT_DIR=/factory-data/.tmp/mcp-github-ops
       - GITHUB_OPS_ALLOWED_REPOS=${GITHUB_OPS_ALLOWED_REPOS:-YOUR_ORG/YOUR_REPO}
       - GH_TOKEN=${GH_TOKEN:-}
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
@@ -16,5 +16,4 @@ services:
       - "127.0.0.1:${PORT_GITHUB:-3018}:3018"
     volumes:
       - ${TARGET_WORKSPACE_PATH:-.}:/target
-      - ${FACTORY_DIR:-.}:/factory
-      - ${FACTORY_DIR:-.}:/factory
+      - ${FACTORY_DIR:-.}:/factory-data
