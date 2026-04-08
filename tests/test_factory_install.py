@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 from http.client import RemoteDisconnected
@@ -1064,7 +1065,58 @@ def test_factory_stack_start_rolls_back_runtime_state_when_compose_fails(
 
     registry = factory_workspace.load_registry(registry_path)
     assert (
-        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "stopped"
+        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "failed"
+    )
+
+
+def test_factory_stack_status_reports_degraded_when_required_service_restarts(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config, runtime_state="running", active=False
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda compose_project_name: {
+            "mock-llm-gateway": "Up 10 seconds (healthy)",
+            "mcp-memory": "Up 10 seconds (healthy)",
+            "mcp-agent-bus": "Up 10 seconds (healthy)",
+            "approval-gate": "Up 10 seconds (healthy)",
+            "agent-worker": "Restarting (1) 3 seconds ago",
+        },
+    )
+
+    factory_stack.status_workspace(repo_root, env_file=target_repo / ".factory.env")
+    output = capsys.readouterr().out
+
+    assert "runtime_state=degraded" in output
+    registry = factory_workspace.load_registry(registry_path)
+    assert (
+        registry["workspaces"][config.factory_instance_id]["runtime_state"]
+        == "degraded"
     )
 
 
@@ -1469,6 +1521,133 @@ def test_runtime_dockerfiles_copy_from_factory_runtime_tree() -> None:
     for dockerfile in dockerfiles:
         text = dockerfile.read_text(encoding="utf-8")
         assert "factory_runtime/" in text
+
+
+def test_agent_worker_requirements_include_openai_sdk() -> None:
+    requirements = (
+        REPO_ROOT / "factory_runtime" / "agents" / "requirements.txt"
+    ).read_text(encoding="utf-8")
+    assert "openai==" in requirements
+
+
+def test_offline_docs_compose_does_not_mount_over_runtime_code_path() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.mcp-offline-docs.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    service = data.get("services", {}).get("offline-docs-mcp", {})
+    volumes = service.get("volumes", [])
+    assert all(not str(volume).endswith(":/factory") for volume in volumes)
+
+    env = service.get("environment", [])
+    joined_env = "\n".join(str(item) for item in env)
+    assert (
+        "OFFLINE_DOCS_INDEX_DB=/factory-data/.tmp/mcp-offline-docs/docs_index.db"
+        in joined_env
+    )
+
+
+def test_auxiliary_mcp_compose_files_do_not_mount_over_runtime_code_path() -> None:
+    compose_expectations = {
+        REPO_ROOT
+        / "compose"
+        / "docker-compose.mcp-bash-gateway.yml": [
+            (
+                "BASH_GATEWAY_POLICY_PATH=${BASH_GATEWAY_POLICY_PATH:-"
+                "/factory-data/configs/bash_gateway_policy.default.yml}"
+            ),
+            "BASH_GATEWAY_AUDIT_DIR=/factory-data/.tmp/agent-script-runs",
+        ],
+        REPO_ROOT
+        / "compose"
+        / "docker-compose.mcp-devops.yml": [
+            "DOCKER_COMPOSE_MCP_AUDIT_DIR=/factory-data/.tmp/mcp-docker-compose",
+            "TEST_RUNNER_MCP_AUDIT_DIR=/factory-data/.tmp/mcp-test-runner",
+        ],
+        REPO_ROOT
+        / "compose"
+        / "docker-compose.mcp-github-ops.yml": [
+            "GITHUB_OPS_MCP_AUDIT_DIR=/factory-data/.tmp/mcp-github-ops",
+        ],
+    }
+
+    for compose_file, expected_env_entries in compose_expectations.items():
+        text = compose_file.read_text(encoding="utf-8")
+        assert "${FACTORY_DIR:-.}:/factory\n" not in text
+        assert "${FACTORY_DIR:-.}:/factory-data" in text
+        for expected in expected_env_entries:
+            assert expected in text
+
+
+def test_auxiliary_mcp_dockerfiles_use_factory_runtime_package_entrypoints() -> None:
+    dockerfiles = [
+        REPO_ROOT / "docker" / "mcp-bash-gateway" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-github-ops" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-devops-docker-compose" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-devops-test-runner" / "Dockerfile",
+    ]
+
+    for dockerfile in dockerfiles:
+        text = dockerfile.read_text(encoding="utf-8")
+        assert "COPY factory_runtime/ /factory/factory_runtime/" in text
+        assert 'ENV PYTHONPATH="/factory"' in text
+        assert '"-m", "factory_runtime.apps.mcp.' in text
+
+
+def test_reconcile_registry_prunes_ephemeral_pytest_workspaces(
+    tmp_path: Path, monkeypatch
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+
+    ephemeral_target = tmp_path / "pytest-of-sw" / "pytest-1" / "target-project"
+    ephemeral_target.mkdir(parents=True, exist_ok=True)
+    (ephemeral_target / ".tmp" / "softwareFactoryVscode").mkdir(
+        parents=True, exist_ok=True
+    )
+    (
+        ephemeral_target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+    ).write_text("{}\n", encoding="utf-8")
+
+    persistent_target = Path("/tmp") / "factory-registry-persistent-target"
+    if persistent_target.exists():
+        shutil.rmtree(persistent_target)
+    persistent_target.mkdir(parents=True, exist_ok=True)
+    try:
+        (persistent_target / ".tmp" / "softwareFactoryVscode").mkdir(
+            parents=True, exist_ok=True
+        )
+        (
+            persistent_target
+            / ".tmp"
+            / "softwareFactoryVscode"
+            / "runtime-manifest.json"
+        ).write_text("{}\n", encoding="utf-8")
+
+        registry = {
+            "version": 1,
+            "active_workspace": "",
+            "workspaces": {
+                "factory-ephemeral": {
+                    "factory_instance_id": "factory-ephemeral",
+                    "target_workspace_path": str(ephemeral_target),
+                    "runtime_state": "installed",
+                },
+                "factory-persistent": {
+                    "factory_instance_id": "factory-persistent",
+                    "target_workspace_path": str(persistent_target),
+                    "runtime_state": "installed",
+                },
+            },
+        }
+        factory_workspace.write_json_atomic(registry_path, registry)
+
+        result = factory_workspace.reconcile_registry(registry_path=registry_path)
+        updated = factory_workspace.load_registry(registry_path=registry_path)
+
+        assert "factory-ephemeral" in result["stale_removed"]
+        assert "factory-ephemeral" not in updated["workspaces"]
+        assert "factory-persistent" in updated["workspaces"]
+    finally:
+        shutil.rmtree(persistent_target, ignore_errors=True)
 
 
 def test_agent_worker_entrypoint_targets_supported_factory_cli_mode() -> None:
