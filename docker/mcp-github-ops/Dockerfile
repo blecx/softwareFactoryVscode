@@ -6,9 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     GITHUB_OPS_MCP_REPO_ROOT=/target
 
 WORKDIR /factory
-COPY factory_runtime/apps/__init__.py apps/__init__.py
-COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
-COPY factory_runtime/apps/mcp/github_ops/ apps/mcp/github_ops/
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
@@ -28,4 +27,4 @@ RUN pip install --no-cache-dir \
 
 EXPOSE 3018
 
-CMD ["python", "-m", "apps.mcp.github_ops.mcp_server"]
+CMD ["python", "-m", "factory_runtime.apps.mcp.github_ops.mcp_server"]
