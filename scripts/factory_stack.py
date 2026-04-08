@@ -15,7 +15,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import factory_workspace
 
-DEFAULT_WAIT_TIMEOUT = 90
+DEFAULT_WAIT_TIMEOUT = 300
 COMPOSE_FILES = [
     "compose/docker-compose.factory.yml",
     "compose/docker-compose.context7.yml",

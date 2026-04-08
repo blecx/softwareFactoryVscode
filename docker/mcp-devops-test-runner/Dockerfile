@@ -15,8 +15,8 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir --break-system-packages \
-      mcp==1.12.4 \
-      uvicorn[standard]==0.27.0
+      mcp==1.25.0 \
+    uvicorn[standard]==0.44.0
 
 EXPOSE 3016
 
