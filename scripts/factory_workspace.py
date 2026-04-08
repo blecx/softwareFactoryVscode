@@ -456,6 +456,11 @@ def build_runtime_config(
         except ValueError:
             continue
 
+    # If persisted env port overrides are stale/conflicting, fall back to the
+    # allocated port block for the selected index so runtime start can recover.
+    if not ports_available(ports):
+        ports = build_port_values(port_index)
+
     assert_ports_do_not_conflict(
         ports,
         registry_path=registry_path,
@@ -668,9 +673,20 @@ def update_runtime_state(
     return save_registry(registry, registry_path)
 
 
+def is_ephemeral_workspace_path(target_dir: Path) -> bool:
+    """Return True for temporary pytest-generated workspace paths.
+
+    These records are useful transiently during tests but add long-term noise
+    when persisted in the operator registry.
+    """
+    target = str(target_dir)
+    return "/pytest-of-" in target or "/pytest-" in target
+
+
 def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
     registry = load_registry(registry_path)
     workspaces = registry.get("workspaces", {})
+    active_workspace = registry.get("active_workspace", "")
     stale_ids = []
     for iid, record in workspaces.items():
         if not isinstance(record, dict):
@@ -679,6 +695,9 @@ def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
         try:
             target_dir = Path(record.get("target_workspace_path", ""))
             if not target_dir.exists() or not target_dir.is_dir():
+                stale_ids.append(iid)
+                continue
+            if iid != active_workspace and is_ephemeral_workspace_path(target_dir):
                 stale_ids.append(iid)
                 continue
             manifest_path = target_dir / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME

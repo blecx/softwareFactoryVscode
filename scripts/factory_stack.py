@@ -91,6 +91,33 @@ def collect_running_services(compose_project_name: str) -> dict[str, str]:
     return services
 
 
+def infer_runtime_state_from_services(running_services: dict[str, str]) -> str:
+    """Infer effective runtime state from observed Docker service statuses."""
+    if not running_services:
+        return "stopped"
+
+    required_services = factory_workspace.RUNTIME_SERVICE_CONTRACT
+    degraded = False
+
+    for service_name, metadata in required_services.items():
+        status = str(running_services.get(service_name, "")).strip()
+        if not status:
+            degraded = True
+            continue
+
+        lowered = status.lower()
+        if "restarting" in lowered or "unhealthy" in lowered or "dead" in lowered:
+            degraded = True
+            continue
+        if "up" not in lowered:
+            degraded = True
+            continue
+        if metadata.get("require_healthy_status") and "healthy" not in lowered:
+            degraded = True
+
+    return "degraded" if degraded else "running"
+
+
 def resolve_target_dir_from_env(repo_root: Path, env_file: Path) -> Path:
     env_values = factory_workspace.parse_env_file(env_file)
     target_value = env_values.get("TARGET_WORKSPACE_PATH", "").strip()
@@ -206,11 +233,18 @@ def start_stack(
                 build_compose_command(repo_root, resolved_env_file, action),
             )
         except subprocess.CalledProcessError:
-            factory_workspace.update_runtime_state(
-                config.factory_instance_id, "stopped"
-            )
+            factory_workspace.update_runtime_state(config.factory_instance_id, "failed")
             raise
-        factory_workspace.update_runtime_state(config.factory_instance_id, "running")
+        try:
+            running_services = collect_running_services(config.compose_project_name)
+        except subprocess.CalledProcessError:
+            running_services = {}
+        inferred_state = infer_runtime_state_from_services(running_services)
+        if inferred_state == "stopped":
+            inferred_state = "running"
+        factory_workspace.update_runtime_state(
+            config.factory_instance_id, inferred_state
+        )
         return resolved_env_file
 
 
@@ -331,12 +365,25 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     )
     registry = factory_workspace.load_registry()
     record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
+    try:
+        running_services = collect_running_services(config.compose_project_name)
+    except subprocess.CalledProcessError:
+        running_services = {}
+
+    inferred_state = infer_runtime_state_from_services(running_services)
+    persisted_state = str(record.get("runtime_state", "installed"))
+    runtime_state = inferred_state if inferred_state != "stopped" else persisted_state
+    if runtime_state != persisted_state:
+        factory_workspace.update_runtime_state(
+            config.factory_instance_id, runtime_state
+        )
+
     active = registry.get("active_workspace", "") == config.factory_instance_id
     print(f"workspace_id={config.project_workspace_id}")
     print(f"instance_id={config.factory_instance_id}")
     print(f"target={config.target_dir}")
     print(f"compose_project={config.compose_project_name}")
-    print(f"runtime_state={record.get('runtime_state', 'installed')}")
+    print(f"runtime_state={runtime_state}")
     print(f"active={str(active).lower()}")
     print(f"port_index={config.port_index}")
     for name, url in sorted(config.mcp_server_urls.items()):
