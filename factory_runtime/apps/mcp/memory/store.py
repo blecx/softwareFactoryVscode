@@ -108,7 +108,9 @@ class MemoryStore:
         self._conn.commit()
         return cur.lastrowid  # type: ignore[return-value]
 
-    def get_lessons(self, issue_number: int, project_id: str = "default") -> list[dict[str, Any]]:
+    def get_lessons(
+        self, issue_number: int, project_id: str = "default"
+    ) -> list[dict[str, Any]]:
         """Return all lessons for a given issue number."""
         import os
 
@@ -118,7 +120,9 @@ class MemoryStore:
         ).fetchall()
         return [_row_to_dict(r) for r in rows]
 
-    def search_similar(self, query: str, limit: int = 5, project_id: str = "default") -> list[dict[str, Any]]:
+    def search_similar(
+        self, query: str, limit: int = 5, project_id: str = "default"
+    ) -> list[dict[str, Any]]:
         """Full-text keyword search across lesson summaries and learnings.
 
         Returns up to `limit` most-recent matching rows.
@@ -147,7 +151,9 @@ class MemoryStore:
     # Short-term context (last N runs summary)
     # ------------------------------------------------------------------
 
-    def get_recent_lessons(self, limit: int = 10, project_id: str = "default") -> list[dict[str, Any]]:
+    def get_recent_lessons(
+        self, limit: int = 10, project_id: str = "default"
+    ) -> list[dict[str, Any]]:
         """Return the most recent `limit` lessons across all issues."""
         import os
 
@@ -181,7 +187,13 @@ class MemoryStore:
         )
         self._conn.commit()
 
-    def add_relationship(self, from_entity: str, relation: str, to_entity: str, project_id: str = "default") -> None:
+    def add_relationship(
+        self,
+        from_entity: str,
+        relation: str,
+        to_entity: str,
+        project_id: str = "default",
+    ) -> None:
         """Add or ignore a relationship edge between two entities."""
         import os
 
@@ -212,7 +224,6 @@ class MemoryStore:
             ).fetchall()
         return [_row_to_dict(r) for r in rows]
 
-
     def purge_workspace(self, project_id: str) -> dict[str, int]:
         """Deletes all records associated with a specific workspace tenant."""
         cursor = self._conn.cursor()
@@ -241,4 +252,3 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
             except (json.JSONDecodeError, TypeError):
                 pass
     return d
-

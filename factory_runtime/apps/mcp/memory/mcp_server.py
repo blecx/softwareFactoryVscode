@@ -19,7 +19,7 @@ import os
 from typing import Any, Optional
 
 import uvicorn
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.fastmcp import Context, FastMCP
 
 from .store import MemoryStore
 
@@ -31,7 +31,7 @@ mcp = FastMCP("mcp-memory", json_response=True)
 
 def extract_project_id(ctx: Context) -> str:
     """Extract the workspace tenant ID from the HTTP request context.
-    
+
     In Phase D, all VS Code side clients will pass an X-Workspace-ID header.
     Fallback to 'default' if not present or during testing.
     """
@@ -43,6 +43,7 @@ def extract_project_id(ctx: Context) -> str:
 # ---------------------------------------------------------------------------
 # Lessons (long-term memory)
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 def memory_purge_workspace(ctx: Context) -> dict[str, Any]:
@@ -82,13 +83,21 @@ def memory_get_lessons(issue_number: int, ctx: Context) -> dict[str, Any]:
 @mcp.tool()
 def memory_search_similar(query: str, ctx: Context, limit: int = 5) -> dict[str, Any]:
     """Search past lessons by keyword similarity."""
-    return {"results": _store.search_similar(query=query, limit=limit, project_id=extract_project_id(ctx))}
+    return {
+        "results": _store.search_similar(
+            query=query, limit=limit, project_id=extract_project_id(ctx)
+        )
+    }
 
 
 @mcp.tool()
 def memory_get_recent(ctx: Context, limit: int = 10) -> dict[str, Any]:
     """Return the N most recent lessons across all issues."""
-    return {"lessons": _store.get_recent_lessons(limit=limit, project_id=extract_project_id(ctx))}
+    return {
+        "lessons": _store.get_recent_lessons(
+            limit=limit, project_id=extract_project_id(ctx)
+        )
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +113,9 @@ def memory_upsert_entity(
     metadata: Optional[dict[str, Any]] = None,
 ) -> dict[str, Any]:
     """Add or update a knowledge graph entity node."""
-    _store.upsert_entity(name=name, kind=kind, metadata=metadata, project_id=extract_project_id(ctx))
+    _store.upsert_entity(
+        name=name, kind=kind, metadata=metadata, project_id=extract_project_id(ctx)
+    )
     return {"ok": True}
 
 
@@ -117,7 +128,10 @@ def memory_add_relationship(
 ) -> dict[str, Any]:
     """Add a directed edge between two knowledge graph entities."""
     _store.add_relationship(
-        from_entity=from_entity, relation=relation, to_entity=to_entity, project_id=extract_project_id(ctx)
+        from_entity=from_entity,
+        relation=relation,
+        to_entity=to_entity,
+        project_id=extract_project_id(ctx),
     )
     return {"ok": True}
 
@@ -129,7 +143,11 @@ def memory_get_related(
     relation: Optional[str] = None,
 ) -> dict[str, Any]:
     """Query outgoing edges from a knowledge graph entity."""
-    return {"relationships": _store.get_related(entity=entity, relation=relation, project_id=extract_project_id(ctx))}
+    return {
+        "relationships": _store.get_related(
+            entity=entity, relation=relation, project_id=extract_project_id(ctx)
+        )
+    }
 
 
 # ---------------------------------------------------------------------------

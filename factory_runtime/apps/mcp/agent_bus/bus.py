@@ -134,7 +134,9 @@ class AgentBus:
     # Task runs
     # ------------------------------------------------------------------
 
-    def create_run(self, issue_number: int, repo: str = "", project_id: str = "default") -> str:
+    def create_run(
+        self, issue_number: int, repo: str = "", project_id: str = "default"
+    ) -> str:
         """Create a new task run and return its run_id."""
         run_id = str(uuid4())
         ts = _now()
@@ -150,7 +152,9 @@ class AgentBus:
         self._conn.commit()
         return run_id
 
-    def get_run(self, run_id: str, project_id: str = "default") -> Optional[dict[str, Any]]:
+    def get_run(
+        self, run_id: str, project_id: str = "default"
+    ) -> Optional[dict[str, Any]]:
         """Return run metadata or None if not found."""
         import os
 
@@ -178,7 +182,9 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def list_pending_approval(self, project_id: str = "default") -> list[dict[str, Any]]:
+    def list_pending_approval(
+        self, project_id: str = "default"
+    ) -> list[dict[str, Any]]:
         """Return all runs currently awaiting human approval."""
         import os
 
@@ -229,7 +235,9 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def approve_run(self, run_id: str, feedback: str = "", project_id: str = "default") -> None:
+    def approve_run(
+        self, run_id: str, feedback: str = "", project_id: str = "default"
+    ) -> None:
         """Mark the plan as approved and update run status to 'approved'."""
         # In sqlite we can't easily JOIN an UPDATE, so let's check permission first.
         if not self.get_run(run_id, project_id=project_id):
@@ -240,7 +248,9 @@ class AgentBus:
         )
         self.set_status(run_id, "approved", project_id=project_id)
 
-    def get_plan(self, run_id: str, project_id: str = "default") -> Optional[dict[str, Any]]:
+    def get_plan(
+        self, run_id: str, project_id: str = "default"
+    ) -> Optional[dict[str, Any]]:
         """Return the plan for a run, with JSON fields deserialized."""
         if self.get_run(run_id, project_id=project_id) is None:
             return None
@@ -280,7 +290,9 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def get_snapshots(self, run_id: str, project_id: str = "default") -> list[dict[str, Any]]:
+    def get_snapshots(
+        self, run_id: str, project_id: str = "default"
+    ) -> list[dict[str, Any]]:
         """Return all file snapshots for a run."""
         if self.get_run(run_id, project_id=project_id) is None:
             return []
@@ -302,6 +314,7 @@ class AgentBus:
         stderr: str,
         exit_code: int,
         passed: bool,
+        project_id: str = "default",
     ) -> None:
         """Record the result of a validation command (test/lint run)."""
         if self.get_run(run_id, project_id=project_id) is None:
@@ -315,7 +328,9 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def get_validations(self, run_id: str, limit: int = 10, project_id: str = "default") -> list[dict[str, Any]]:
+    def get_validations(
+        self, run_id: str, limit: int = 10, project_id: str = "default"
+    ) -> list[dict[str, Any]]:
         """Return the most recent validation results for a run."""
         if self.get_run(run_id, project_id=project_id) is None:
             return []
@@ -351,7 +366,9 @@ class AgentBus:
         )
         self._conn.commit()
 
-    def get_checkpoints(self, run_id: str, project_id: str = "default") -> list[dict[str, Any]]:
+    def get_checkpoints(
+        self, run_id: str, project_id: str = "default"
+    ) -> list[dict[str, Any]]:
         """Return all checkpoints for a run in chronological order."""
         if self.get_run(run_id, project_id=project_id) is None:
             return []
@@ -374,7 +391,9 @@ class AgentBus:
     # Context packet (the key FACTORY primitive)
     # ------------------------------------------------------------------
 
-    def read_context_packet(self, run_id: str) -> dict[str, Any]:
+    def read_context_packet(
+        self, run_id: str, project_id: str = "default"
+    ) -> dict[str, Any]:
         """Return all run data in one call - the core FACTORY primitive.
 
         Any agent can call this once to get the full issue context,
@@ -405,35 +424,50 @@ class AgentBus:
         """Close the SQLite connection."""
         self._conn.close()
 
-
     def purge_workspace(self, project_id: str) -> dict[str, int]:
         """Deletes all records associated with a specific workspace tenant."""
         cursor = self._conn.cursor()
-        
+
         # Find all run IDs for this tenant
-        cursor.execute("SELECT run_id FROM task_runs WHERE project_id = ?", (project_id,))
+        cursor.execute(
+            "SELECT run_id FROM task_runs WHERE project_id = ?", (project_id,)
+        )
         run_ids = [row[0] for row in cursor.fetchall()]
-        
-        counts = {"runs": 0, "plans": 0, "snapshots": 0, "validations": 0, "checkpoints": 0}
+
+        counts = {
+            "runs": 0,
+            "plans": 0,
+            "snapshots": 0,
+            "validations": 0,
+            "checkpoints": 0,
+        }
         if not run_ids:
             return counts
-            
+
         placeholders = ",".join("?" * len(run_ids))
-        
-        cursor.execute(f"DELETE FROM checkpoints WHERE run_id IN ({placeholders})", run_ids)
+
+        cursor.execute(
+            f"DELETE FROM checkpoints WHERE run_id IN ({placeholders})", run_ids
+        )
         counts["checkpoints"] = cursor.rowcount
-        
-        cursor.execute(f"DELETE FROM validation_results WHERE run_id IN ({placeholders})", run_ids)
+
+        cursor.execute(
+            f"DELETE FROM validation_results WHERE run_id IN ({placeholders})", run_ids
+        )
         counts["validations"] = cursor.rowcount
-        
-        cursor.execute(f"DELETE FROM file_snapshots WHERE run_id IN ({placeholders})", run_ids)
+
+        cursor.execute(
+            f"DELETE FROM file_snapshots WHERE run_id IN ({placeholders})", run_ids
+        )
         counts["snapshots"] = cursor.rowcount
-        
+
         cursor.execute(f"DELETE FROM plans WHERE run_id IN ({placeholders})", run_ids)
         counts["plans"] = cursor.rowcount
-        
-        cursor.execute(f"DELETE FROM task_runs WHERE run_id IN ({placeholders})", run_ids)
+
+        cursor.execute(
+            f"DELETE FROM task_runs WHERE run_id IN ({placeholders})", run_ids
+        )
         counts["runs"] = cursor.rowcount
-        
+
         self._conn.commit()
         return counts
