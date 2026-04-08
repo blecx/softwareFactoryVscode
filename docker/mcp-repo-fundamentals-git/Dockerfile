@@ -15,8 +15,8 @@ COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
 COPY factory_runtime/apps/mcp/repo_fundamentals/ apps/mcp/repo_fundamentals/
 
 RUN pip install --no-cache-dir \
-    mcp==1.12.4 \
-    uvicorn[standard]==0.27.0
+    mcp==1.25.0 \
+    uvicorn[standard]==0.44.0
 
 EXPOSE 3012
 

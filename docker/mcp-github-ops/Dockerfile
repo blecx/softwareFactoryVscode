@@ -24,7 +24,7 @@ RUN apt-get update \
 
 RUN pip install --no-cache-dir \
   mcp==1.25.0 \
-  uvicorn[standard]==0.37.0
+  uvicorn[standard]==0.44.0
 
 EXPOSE 3018
 

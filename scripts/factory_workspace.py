@@ -51,8 +51,8 @@ MCP_SERVER_PORT_KEYS: dict[str, str] = {
 
 HEALTH_ENDPOINTS: dict[str, tuple[str, str]] = {
     "mock-llm-gateway": ("PORT_TUI", "/admin/mocks"),
-    "mcp-memory": ("MEMORY_MCP_PORT", "/health"),
-    "mcp-agent-bus": ("AGENT_BUS_PORT", "/health"),
+    "mcp-memory": ("MEMORY_MCP_PORT", "/mcp"),
+    "mcp-agent-bus": ("AGENT_BUS_PORT", "/mcp"),
     "approval-gate": ("APPROVAL_GATE_PORT", "/health"),
 }
 

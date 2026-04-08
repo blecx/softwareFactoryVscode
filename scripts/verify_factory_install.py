@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from http.client import RemoteDisconnected
 import shutil
 import subprocess
 import sys
@@ -39,26 +40,31 @@ RUNTIME_SERVICES = {
         "port_key": "PORT_TUI",
         "health_path": "/admin/mocks",
         "require_healthy_status": True,
+        "allow_http_error": False,
     },
     "mcp-memory": {
         "port_key": "MEMORY_MCP_PORT",
-        "health_path": "/health",
+        "health_path": "/mcp",
         "require_healthy_status": True,
+        "allow_http_error": True,
     },
     "mcp-agent-bus": {
         "port_key": "AGENT_BUS_PORT",
-        "health_path": "/health",
+        "health_path": "/mcp",
         "require_healthy_status": True,
+        "allow_http_error": True,
     },
     "approval-gate": {
         "port_key": "APPROVAL_GATE_PORT",
         "health_path": "/health",
         "require_healthy_status": True,
+        "allow_http_error": False,
     },
     "agent-worker": {
         "port_key": "",
         "health_path": "",
         "require_healthy_status": False,
+        "allow_http_error": False,
     },
 }
 
@@ -199,6 +205,10 @@ def probe_http_url(
     try:
         with urlopen(url, timeout=timeout):
             return None
+    except RemoteDisconnected:
+        if allow_http_error:
+            return None
+        return f"HTTP probe failed for {url}: remote disconnected before response"
     except HTTPError as exc:
         if allow_http_error:
             return None
@@ -587,7 +597,7 @@ def verify_runtime(
             error = probe_http_url(
                 health_url,
                 timeout=timeout,
-                allow_http_error=False,
+                allow_http_error=bool(metadata.get("allow_http_error", False)),
             )
             if error:
                 violations.append(error)

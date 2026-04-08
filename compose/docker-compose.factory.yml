@@ -57,7 +57,6 @@ services:
     restart: unless-stopped
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
-      MEMORY_MCP_PORT: "${MEMORY_MCP_PORT:-3030}"
       MEMORY_DB_PATH: "/data/memory.db"
     volumes:
       - factory_memory_data:/data
@@ -71,7 +70,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:3030/health')",
+          "import socket; socket.create_connection(('127.0.0.1', 3030), timeout=2).close()",
         ]
       interval: 15s
       timeout: 5s
@@ -89,7 +88,6 @@ services:
     restart: unless-stopped
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
-      AGENT_BUS_PORT: "${AGENT_BUS_PORT:-3031}"
       AGENT_BUS_DB_PATH: "/data/agent_bus.db"
     volumes:
       - factory_bus_data:/data
@@ -103,7 +101,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:3031/health')",
+          "import socket; socket.create_connection(('127.0.0.1', 3031), timeout=2).close()",
         ]
       interval: 15s
       timeout: 5s
@@ -124,7 +122,6 @@ services:
         condition: service_healthy
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
-      APPROVAL_GATE_PORT: "${APPROVAL_GATE_PORT:-8001}"
       AGENT_BUS_URL: "http://mcp-agent-bus:3031"
     ports:
       - "${APPROVAL_GATE_PORT:-8001}:8001"

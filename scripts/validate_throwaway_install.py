@@ -72,6 +72,14 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Leave the throwaway runtime stack running after verification.",
     )
+    parser.add_argument(
+        "--skip-source-stack-handoff",
+        action="store_true",
+        help=(
+            "Do not stop/restart the source repository stack while validating the "
+            "throwaway runtime. Useful for isolated CI/E2E runs."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -276,7 +284,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_verify(target_repo, runtime=False)
 
         if not args.skip_runtime:
-            if source_env.exists():
+            if source_env.exists() and not args.skip_source_stack_handoff:
                 source_stack_stopped = maybe_stop_stack(source_repo, source_env)
             try:
                 maybe_stop_stack(
@@ -296,7 +304,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         target_env,
                         remove_volumes=True,
                     )
-                if source_stack_stopped:
+                if source_stack_stopped and not args.skip_source_stack_handoff:
                     start_stack(source_repo, source_env, build=False)
 
         print_summary(
