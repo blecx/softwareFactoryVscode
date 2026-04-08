@@ -1,168 +1,216 @@
-# MCP Runtime Hardening Mitigation Plan
+# MCP Runtime Mitigation Plan
 
-This plan resolves the MCP runtime instability findings with an implementation-first sequence.
-Each step includes a strict **Definition of Done (DoD)** and a concrete **test/verification method**.
+This plan replaces the earlier implementation-first checklist with a findings-driven mitigation sequence.
+The fresh throwaway install path is green, but the review found remaining robustness gaps in:
 
----
+- live runtime rebuild compatibility,
+- the `agent-worker` behavioral contract,
+- runtime state truthfulness,
+- and registry/operator hygiene.
 
-## Step 1 — Standardize MCP/runtime endpoint contract
-
-### Goal
-
-Eliminate drift between:
-
-- generated runtime manifests,
-- runtime verification probes,
-- and what MCP services actually expose in practice.
-
-### Changes
-
-1. Set shared MCP runtime reachability checks (`mcp-memory`, `mcp-agent-bus`) to use `http://127.0.0.1:<port>/mcp`.
-2. Keep `approval-gate` on `/health` and `mock-llm-gateway` on `/admin/mocks`.
-3. Update `scripts/factory_workspace.py` and `scripts/verify_factory_install.py` to use the same endpoint map.
-4. Keep `allow_http_error=True` only for MCP stream endpoints where `4xx` may still indicate a reachable server.
-
-### Definition of Done
-
-- `factory_workspace` and `verify_factory_install` use a consistent endpoint contract.
-- Tests asserting runtime probe URLs pass with `/mcp` for memory/bus.
-
-### Test this step
-
-- `pytest tests/test_factory_install.py::test_verify_runtime_uses_generated_workspace_endpoint_settings -v`
-- `pytest tests/test_factory_install.py::test_runtime_smoke_prompt_uses_generated_endpoint_language -v`
+Each step below includes a strict **Definition of Done (DoD)** and a concrete **verification method**.
 
 ---
 
-## Step 2 — Decouple dynamic host ports from container internal ports
+## Step 1 — Stabilize the live runtime rebuild path
 
-### Goal
+### Step 1 goal
 
-Prevent dynamic host port blocks from changing internal service bind ports used by compose-network traffic.
+Make the source-repo runtime rebuild reliably, not just fresh throwaway installs.
 
-### Changes
+### Step 1 findings addressed
 
-1. In `compose/docker-compose.factory.yml`, remove internal port env overrides from shared services:
-   - `MEMORY_MCP_PORT`
-   - `AGENT_BUS_PORT`
-   - `APPROVAL_GATE_PORT`
-2. Keep published host ports dynamic via `${MEMORY_MCP_PORT}:3030`, `${AGENT_BUS_PORT}:3031`, `${APPROVAL_GATE_PORT}:8001`.
-3. Preserve container-to-container URLs on fixed internal ports:
-   - `http://mcp-memory:3030`
-   - `http://mcp-agent-bus:3031`
-   - `http://approval-gate:8001`
+- repo-root `agent-worker` restart loop caused by missing import dependencies
+- repo-root `offline-docs-mcp` restart loop caused by MCP/FastMCP import mismatch
+- lack of proof that an already-used local runtime converges after rebuild
 
-### Definition of Done
+### Step 1 changes
 
-- Shared services no longer bind internal ports from workspace-specific host env values.
-- Existing inter-service URLs remain fixed and valid.
+1. Audit startup-time imports for required runtime services, especially:
+   - `agent-worker`
+   - `offline-docs-mcp`
+2. Ensure each required image installs every dependency needed at module import time.
+3. Align `offline-docs` server code with the pinned MCP package/API shape actually installed in its image.
+4. Rebuild the source-repo runtime from current HEAD and verify that required services converge healthy.
+5. Add validation coverage for the source-repo runtime rebuild path, not only throwaway targets.
 
-### Test this step
+### Step 1 Definition of Done
 
-- `pytest tests/test_factory_install.py::test_runtime_compose_shared_services_do_not_override_internal_ports -v`
-- `pytest tests/test_factory_install.py::test_runtime_compose_interservice_urls_use_fixed_internal_ports -v`
+- `scripts/factory_stack.py start --build` succeeds for the source repo runtime.
+- Required runtime services no longer restart-loop after rebuild.
+- `scripts/verify_factory_install.py --target .. --runtime --check-vscode-mcp` passes for the source-repo runtime where applicable.
+- Required service logs contain no startup import errors.
 
----
+### Step 1 verification
 
-## Step 3 — Ensure image import/runtime compatibility
-
-### Goal
-
-Remove startup crash loops caused by package/import mismatch.
-
-### Changes
-
-1. Keep all FastMCP Docker images pinned to a known-good version (`mcp==1.25.0`).
-2. Keep `docker/agent-worker/Dockerfile` importing `factory_runtime` as a package root.
-3. Add test coverage enforcing MCP version consistency across Dockerfiles.
-
-### Definition of Done
-
-- MCP Dockerfiles all reference the same supported `mcp` version.
-- Agent worker launches using `factory_runtime.agents.factory_cli` pathing.
-
-### Test this step
-
-- `pytest tests/test_factory_install.py::test_runtime_mcp_dockerfiles_pin_fastmcp_compatible_version -v`
-- `pytest tests/test_factory_install.py::test_runtime_dockerfiles_copy_from_factory_runtime_tree -v`
+- rebuild the source-repo runtime with `scripts/factory_stack.py start --build`
+- run runtime compliance verification against the source repo runtime
+- inspect `docker ps` and service logs for restart loops or import failures
 
 ---
 
-## Step 4 — Add golden Docker throwaway regression test
+## Step 2 — Define the `agent-worker` contract explicitly
 
-### Goal
+### Step 2 goal
 
-Add one end-to-end regression proving the full workflow under a non-default port block.
+Remove ambiguity about whether `agent-worker` is a real worker or a liveness placeholder.
 
-### Changes
+### Step 2 findings addressed
 
-1. Add a Docker-enabled integration test that:
-   - creates a fresh throwaway target,
-   - forces non-default port allocation (by pre-seeding registry index 0),
-   - runs `scripts/validate_throwaway_install.py --keep-target-running`,
-   - loads generated workspace settings URLs,
-   - verifies real localhost MCP reachability for those exact URLs.
-2. Mark the test as Docker-gated (`RUN_DOCKER_E2E=1`).
-3. Ensure robust cleanup with `factory_stack.py stop` in `finally`.
+- current `run-queue` mode is only a sleep loop
+- current tests validate entrypoint wiring and healthcheck text, not real work execution
 
-### Definition of Done
+### Step 2 changes
 
-- New integration test exists and is deterministic.
-- It asserts `runtime-manifest.port_index != 0` and probes generated MCP URLs.
-- It can be run on Docker-capable machines without manual patching.
+Pick one explicit contract and align code, docs, and tests with it.
 
-### Test this step
+#### Option A — Placeholder contract
 
-- `RUN_DOCKER_E2E=1 pytest tests/test_throwaway_runtime_docker.py -v -s`
+1. Document `agent-worker` as a compatibility/liveness stub only.
+2. Ensure verification and docs do not imply real queue processing.
+3. Keep health checks focused on liveness, not job execution.
 
----
+#### Option B — Real worker contract
 
-## Step 5 — Remove local debug artifacts from source tree
+1. Define the queue/job source explicitly.
+2. Implement polling and deterministic work execution.
+3. Persist observable state transitions/results.
+4. Add end-to-end test coverage proving a queued item is processed.
 
-### Goal
+### Step 2 Definition of Done
 
-Prevent accidental dependency on ad-hoc scripts/tests and keep repository clean.
+#### If Option A
 
-### Changes
+- docs describe `agent-worker` as a placeholder/liveness process only.
+- tests validate only placeholder expectations.
+- runtime verification language no longer implies active queue consumption.
 
-Delete temporary debug files added during investigation:
+#### If Option B
 
-- `debug_data_dirs.py`
-- `fix_health.py`
-- `patch_compose.py`
-- `patch_probe.py`
-- `patch_verify.py`
-- `test_dump.py`
-- `tests/test_e2e_todo_app.py` (experimental, non-canonical test path)
+- `run-queue` performs real deterministic work from a defined source.
+- at least one integration test proves a queued item is consumed and updates observable state.
+- health checks reflect meaningful readiness, not just argument-string presence.
 
-### Definition of Done
+### Step 2 verification
 
-- `git status` shows only intentional production/test changes.
-- No ad-hoc patch/debug scripts remain tracked.
-
-### Test this step
-
-- `git status --short`
+- review docs + tests for contract consistency
+- if Option B is chosen, run the worker integration test and inspect bus/state changes
 
 ---
 
-## Step 6 — Final validation pass
+## Step 3 — Make runtime state reporting truthful
 
-### Goal
+### Step 3 goal
 
-Prove the mitigation is stable at unit + contract levels, plus optional Docker E2E.
+Ensure reported runtime state reflects actual Docker/runtime health rather than command-flow intent.
 
-### Required validations
+### Step 3 findings addressed
 
-1. `pytest tests/test_factory_install.py -v`
-2. `pytest tests/test_regression.py -v`
+- `status` can report `starting` even when services are stuck restarting
+- registry/runtime state can mislead operators during partial failure
 
-### Optional (Docker-capable host)
+### Step 3 changes
 
-3. `RUN_DOCKER_E2E=1 pytest tests/test_throwaway_runtime_docker.py -v -s`
+1. Define clearer runtime states, for example:
+   - `installed`
+   - `starting`
+   - `running`
+   - `degraded`
+   - `failed`
+   - `stopped`
+2. Update lifecycle transitions to reflect observed runtime outcomes.
+3. Detect restart loops, unhealthy required services, or partial startup failures.
+4. Make `status` surface the truth from Docker/runtime inspection rather than only cached registry state.
 
-### Definition of Done
+### Step 3 Definition of Done
 
-- Required tests pass.
-- Docker-gated golden test passes when enabled.
-- No unresolved endpoint/port-contract mismatch remains in code or tests.
+- `status` distinguishes healthy from degraded/failed stacks.
+- partial startup failures do not leave misleading steady-state metadata.
+- registry state after failed startup is reproducible and accurate.
+- at least one automated test covers degraded-state reporting.
+
+### Step 3 verification
+
+- induce or simulate a partial startup failure
+- run `scripts/factory_stack.py status`
+- confirm registry state and observed Docker state agree
+
+---
+
+## Step 4 — Reduce registry noise from ephemeral workspaces
+
+### Step 4 goal
+
+Keep operator state readable and prevent repeated validation/test runs from polluting the workspace registry.
+
+### Step 4 findings addressed
+
+- `list` output accumulates many stale or throwaway records
+- registry churn increases operator noise and obscures active workspaces
+
+### Step 4 changes
+
+1. Define what counts as ephemeral/test-generated workspace state.
+2. Auto-prune ephemeral records more aggressively.
+3. Consider tagging ephemeral records in registry metadata.
+4. Reduce long-lived persistence of temporary validation/test workspaces where possible.
+5. Keep `factory_stack.py list` operator-focused and readable.
+
+### Step 4 Definition of Done
+
+- repeated validation/test runs do not leave excessive long-lived registry clutter.
+- `scripts/factory_stack.py list` remains readable after normal local test activity.
+- ephemeral records are auto-pruned or clearly labeled.
+
+### Step 4 verification
+
+- run repeated throwaway validations
+- inspect registry contents and `list` output
+- confirm cleanup behavior stays bounded and predictable
+
+---
+
+## Step 5 — Final confidence pass
+
+### Step 5 goal
+
+Prove the mitigation is robust for both clean-room installs and the live source-repo runtime.
+
+### Step 5 required validations
+
+1. Quality gate:
+   - `black --check factory_runtime/ scripts/ tests/`
+   - `isort --check-only factory_runtime/ scripts/ tests/`
+   - `flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841`
+2. Contract/unit suites:
+   - `pytest tests/test_factory_install.py -v`
+   - `pytest tests/test_regression.py -v`
+   - `pytest tests/test_multi_tenant.py -v`
+3. Docker throwaway runtime regression:
+   - `RUN_DOCKER_E2E=1 pytest tests/test_throwaway_runtime_docker.py -v -s`
+4. Source-repo runtime rebuild validation:
+   - rebuild current runtime
+   - verify runtime compliance
+   - inspect service health and logs
+
+### Step 5 Definition of Done
+
+- all required tests pass.
+- Docker throwaway E2E passes.
+- source-repo runtime rebuild is healthy.
+- no required service restart-loops remain.
+- the review can honestly conclude that the mitigation is implemented and still works under both fresh-install and live-runtime conditions.
+
+---
+
+## Recommended execution order
+
+To reduce risk and keep history clean, execute the work in this order:
+
+1. **Fix live runtime rebuild compatibility**
+2. **Define the `agent-worker` contract**
+3. **Make runtime state reporting truthful**
+4. **Reduce registry noise**
+5. **Run the full confidence pass**
+
+This order addresses the strongest contradiction to “still works” first, then resolves contract ambiguity, then improves operator truthfulness and hygiene.
