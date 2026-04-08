@@ -615,7 +615,7 @@ def test_verify_factory_runtime_passes_with_mocked_services(
         "mcp-memory": "Up 10 seconds (healthy)",
         "mcp-agent-bus": "Up 10 seconds (healthy)",
         "approval-gate": "Up 10 seconds (healthy)",
-        "agent-worker": "Up 10 seconds",
+        "agent-worker": "Up 10 seconds (healthy)",
     }
 
     monkeypatch.setattr(
@@ -816,6 +816,20 @@ def test_factory_stack_builds_full_compose_command(tmp_path: Path) -> None:
     assert command[-2:] == ["up", "-d"]
 
 
+def test_factory_stack_parse_args_accepts_foreground(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["factory_stack.py", "start", "--build", "--foreground"],
+    )
+
+    args = factory_stack.parse_args()
+
+    assert args.command == "start"
+    assert args.build is True
+    assert args.foreground is True
+
+
 def test_workspace_runtime_allocates_distinct_port_blocks_and_registry_state(
     tmp_path: Path,
     monkeypatch,
@@ -1003,6 +1017,55 @@ def test_factory_stack_start_stop_activate_preserve_workspace_distinction(
     registry = factory_workspace.load_registry(registry_path)
     assert registry["active_workspace"] == ""
     assert len(calls) == 2
+
+
+def test_factory_stack_start_rolls_back_runtime_state_when_compose_fails(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config, runtime_state="installed", active=False
+    )
+
+    def _raise_compose_error(_repo: Path, _command: list[str]) -> None:
+        raise subprocess.CalledProcessError(1, ["docker", "compose", "up"])
+
+    monkeypatch.setattr(factory_stack, "run_compose_command", _raise_compose_error)
+    monkeypatch.setattr(
+        factory_stack, "collect_running_services", lambda compose_project_name: {}
+    )
+
+    try:
+        factory_stack.start_stack(
+            repo_root, env_file=target_repo / ".factory.env", build=False, wait=False
+        )
+    except subprocess.CalledProcessError:
+        pass
+    else:
+        raise AssertionError("Expected compose failure to bubble up.")
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert (
+        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "stopped"
+    )
 
 
 def test_factory_stack_status_does_not_rewrite_custom_env(
@@ -1261,7 +1324,7 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
             "mcp-memory": "Up 10 seconds (healthy)",
             "mcp-agent-bus": "Up 10 seconds (healthy)",
             "approval-gate": "Up 10 seconds (healthy)",
-            "agent-worker": "Up 10 seconds",
+            "agent-worker": "Up 10 seconds (healthy)",
         },
     )
     monkeypatch.setattr(
@@ -1372,6 +1435,20 @@ def test_runtime_compose_interservice_urls_use_fixed_internal_ports() -> None:
     assert worker_env.get("APPROVAL_GATE_URL") == "http://approval-gate:8001"
 
 
+def test_runtime_compose_agent_worker_has_healthcheck() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    worker = data.get("services", {}).get("agent-worker", {})
+    healthcheck = worker.get("healthcheck", {})
+
+    assert isinstance(healthcheck, dict)
+    test_cmd = healthcheck.get("test", [])
+    assert isinstance(test_cmd, list)
+    joined = " ".join(str(item) for item in test_cmd)
+    assert "/proc/1/cmdline" in joined
+    assert "run-queue" in joined
+
+
 def test_runtime_dockerfiles_copy_from_factory_runtime_tree() -> None:
     dockerfiles = [
         REPO_ROOT / "docker" / "mcp-memory" / "Dockerfile",
@@ -1394,6 +1471,17 @@ def test_runtime_dockerfiles_copy_from_factory_runtime_tree() -> None:
         assert "factory_runtime/" in text
 
 
+def test_agent_worker_entrypoint_targets_supported_factory_cli_mode() -> None:
+    dockerfile = REPO_ROOT / "docker" / "agent-worker" / "Dockerfile"
+    cli_file = REPO_ROOT / "factory_runtime" / "agents" / "factory_cli.py"
+
+    docker_text = dockerfile.read_text(encoding="utf-8")
+    cli_text = cli_file.read_text(encoding="utf-8")
+
+    assert '"run-queue"' in docker_text
+    assert 'sys.argv[1] == "run-queue"' in cli_text
+
+
 def test_runtime_mcp_dockerfiles_pin_fastmcp_compatible_version() -> None:
     dockerfiles = [
         REPO_ROOT / "docker" / "mcp-memory" / "Dockerfile",
@@ -1414,6 +1502,16 @@ def test_runtime_mcp_dockerfiles_pin_fastmcp_compatible_version() -> None:
         assert "uvicorn[standard]==0.44.0" in text
 
 
+def test_verify_runtime_services_contract_is_shared() -> None:
+    assert (
+        verify_factory_install.RUNTIME_SERVICES
+        == factory_workspace.RUNTIME_SERVICE_CONTRACT
+    )
+
+    agent_worker = verify_factory_install.RUNTIME_SERVICES["agent-worker"]
+    assert agent_worker["require_healthy_status"] is True
+
+
 def test_devops_docker_compose_image_uses_known_working_docker_cli_base() -> None:
     dockerfile = REPO_ROOT / "docker" / "mcp-devops-docker-compose" / "Dockerfile"
 
@@ -1425,27 +1523,57 @@ def test_devops_docker_compose_image_uses_known_working_docker_cli_base() -> Non
 
 def test_cleanup_workspace(tmp_path: Path):
     sys.path.insert(0, str(Path("scripts").resolve()))
-    from factory_stack import cleanup_workspace
     import factory_workspace as workspace_module
+    from factory_stack import cleanup_workspace
 
     target = tmp_path / "target"
     target.mkdir()
     factory_dir = target / ".softwareFactoryVscode"
     factory_dir.mkdir()
-    
+    (factory_dir / ".copilot" / "config").mkdir(parents=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    data_root = tmp_path / "factory-data"
+    (target / ".factory.env").write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target}",
+                "PROJECT_WORKSPACE_ID=target",
+                "COMPOSE_PROJECT_NAME=factory_target",
+                f"FACTORY_DIR={factory_dir}",
+                f"FACTORY_DATA_DIR={data_root}",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
     config = workspace_module.build_runtime_config(target, factory_dir=factory_dir)
     workspace_module.sync_runtime_artifacts(config)
-    
+    (data_root / "memory" / config.factory_instance_id).mkdir(parents=True)
+    (data_root / "bus" / config.factory_instance_id).mkdir(parents=True)
+
     # Assert created
     assert (target / ".factory.env").exists()
-    assert (target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json").exists()
-    
+    assert (
+        target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+    ).exists()
+
     # cleanup
-    cleanup_workspace(target)
-    
+    cleanup_workspace(factory_dir, env_file=target / ".factory.env")
+
     assert not (target / ".factory.env").exists()
-    assert not (target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json").exists()
-    
+    assert not (
+        target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+    ).exists()
+    assert not (data_root / "memory" / config.factory_instance_id).exists()
+    assert not (data_root / "bus" / config.factory_instance_id).exists()
+
     reg = workspace_module.load_registry()
     assert config.factory_instance_id not in reg.get("workspaces", {})
-

@@ -49,11 +49,48 @@ MCP_SERVER_PORT_KEYS: dict[str, str] = {
     "githubOps": "PORT_GITHUB",
 }
 
+RUNTIME_SERVICE_CONTRACT: dict[str, dict[str, Any]] = {
+    "mock-llm-gateway": {
+        "port_key": "PORT_TUI",
+        "health_path": "/admin/mocks",
+        "require_healthy_status": True,
+        "allow_http_error": False,
+        "scope": "candidate-shared",
+    },
+    "mcp-memory": {
+        "port_key": "MEMORY_MCP_PORT",
+        "health_path": "/mcp",
+        "require_healthy_status": True,
+        "allow_http_error": True,
+        "scope": "candidate-shared",
+    },
+    "mcp-agent-bus": {
+        "port_key": "AGENT_BUS_PORT",
+        "health_path": "/mcp",
+        "require_healthy_status": True,
+        "allow_http_error": True,
+        "scope": "candidate-shared",
+    },
+    "approval-gate": {
+        "port_key": "APPROVAL_GATE_PORT",
+        "health_path": "/health",
+        "require_healthy_status": True,
+        "allow_http_error": False,
+        "scope": "candidate-shared",
+    },
+    "agent-worker": {
+        "port_key": "",
+        "health_path": "",
+        "require_healthy_status": True,
+        "allow_http_error": False,
+        "scope": "candidate-shared",
+    },
+}
+
 HEALTH_ENDPOINTS: dict[str, tuple[str, str]] = {
-    "mock-llm-gateway": ("PORT_TUI", "/admin/mocks"),
-    "mcp-memory": ("MEMORY_MCP_PORT", "/mcp"),
-    "mcp-agent-bus": ("AGENT_BUS_PORT", "/mcp"),
-    "approval-gate": ("APPROVAL_GATE_PORT", "/health"),
+    service_name: (str(metadata["port_key"]), str(metadata["health_path"]))
+    for service_name, metadata in RUNTIME_SERVICE_CONTRACT.items()
+    if metadata.get("port_key") and metadata.get("health_path")
 }
 
 WORKSPACE_SCOPED_SERVICES = {
@@ -70,9 +107,9 @@ WORKSPACE_SCOPED_SERVICES = {
 }
 
 CANDIDATE_SHARED_SERVICES = {
-    "mcp-memory",
-    "mcp-agent-bus",
-    "approval-gate",
+    service_name
+    for service_name, metadata in RUNTIME_SERVICE_CONTRACT.items()
+    if metadata.get("scope") == "candidate-shared"
 }
 
 MANAGED_ENV_KEYS = [
@@ -314,7 +351,12 @@ def find_available_port_index(
             continue
         if ports_available(ports):
             return index
-    raise RuntimeError("Unable to allocate a free workspace port block.")
+    raise RuntimeError(
+        "Unable to allocate a free workspace port block. "
+        f"Checked {max_port_index} blocks ({PORT_BLOCK_STRIDE} ports each). "
+        "Try cleaning stale registry entries with `factory_stack.py list`/`cleanup`, "
+        "or free conflicting local ports."
+    )
 
 
 def assert_ports_do_not_conflict(
@@ -425,7 +467,9 @@ def build_runtime_config(
         "PROJECT_WORKSPACE_ID": project_workspace_id,
         "COMPOSE_PROJECT_NAME": compose_project_name,
         "FACTORY_DIR": str(resolved_factory),
-        "FACTORY_DATA_DIR": str(resolved_factory / "data"),
+        "FACTORY_DATA_DIR": existing_env.get(
+            "FACTORY_DATA_DIR", str(resolved_factory / "data")
+        ),
         "FACTORY_INSTANCE_ID": factory_instance_id,
         "FACTORY_PORT_INDEX": str(port_index),
         **{key: str(value) for key, value in ports.items()},
