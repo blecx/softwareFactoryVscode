@@ -4,10 +4,10 @@
 from __future__ import annotations
 
 import argparse
-from http.client import RemoteDisconnected
 import shutil
 import subprocess
 import sys
+from http.client import RemoteDisconnected
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -35,38 +35,7 @@ REQUIRED_WORKSPACE_FOLDERS = [
     ("Host Project (Root)", "."),
     ("AI Agent Factory", bootstrap_host.FACTORY_DIRNAME),
 ]
-RUNTIME_SERVICES = {
-    "mock-llm-gateway": {
-        "port_key": "PORT_TUI",
-        "health_path": "/admin/mocks",
-        "require_healthy_status": True,
-        "allow_http_error": False,
-    },
-    "mcp-memory": {
-        "port_key": "MEMORY_MCP_PORT",
-        "health_path": "/mcp",
-        "require_healthy_status": True,
-        "allow_http_error": True,
-    },
-    "mcp-agent-bus": {
-        "port_key": "AGENT_BUS_PORT",
-        "health_path": "/mcp",
-        "require_healthy_status": True,
-        "allow_http_error": True,
-    },
-    "approval-gate": {
-        "port_key": "APPROVAL_GATE_PORT",
-        "health_path": "/health",
-        "require_healthy_status": True,
-        "allow_http_error": False,
-    },
-    "agent-worker": {
-        "port_key": "",
-        "health_path": "",
-        "require_healthy_status": False,
-        "allow_http_error": False,
-    },
-}
+RUNTIME_SERVICES = factory_workspace.RUNTIME_SERVICE_CONTRACT
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

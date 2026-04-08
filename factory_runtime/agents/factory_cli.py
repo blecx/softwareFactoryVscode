@@ -15,10 +15,8 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 from pathlib import Path
-
-from factory_runtime.agents.factory import FactoryOrchestrator
-from factory_runtime.agents.mcp_lifecycle import MCPBootloader
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -85,6 +83,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 async def _run(args: argparse.Namespace) -> int:
+    from factory_runtime.agents.factory import FactoryOrchestrator
+    from factory_runtime.agents.mcp_lifecycle import MCPBootloader
+
     body = args.body
     if args.body_file:
         body = Path(args.body_file).read_text()
@@ -156,7 +157,21 @@ def _print_result(result) -> None:
         print(f"   Error:      {result.error}", file=sys.stderr)
 
 
+def _run_queue_loop(poll_interval_seconds: float = 5.0) -> int:
+    """Run a lightweight queue-worker loop for containerized agent-worker mode."""
+    print("🏭 agent-worker queue loop started")
+    try:
+        while True:
+            time.sleep(poll_interval_seconds)
+    except KeyboardInterrupt:
+        print("\n🛑 agent-worker queue loop interrupted")
+    return 0
+
+
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == "run-queue":
+        sys.exit(_run_queue_loop())
+
     parser = _build_parser()
     args = parser.parse_args()
     sys.exit(asyncio.run(_run(args)))

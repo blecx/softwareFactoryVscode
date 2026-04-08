@@ -146,8 +146,13 @@ def ensure_data_dirs_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> 
     data_dir_str = config.env_values.get("FACTORY_DATA_DIR")
     if data_dir_str:
         base_dir = Path(data_dir_str).expanduser()
-        (base_dir / "memory" / config.factory_instance_id).mkdir(parents=True, exist_ok=True)
-        (base_dir / "bus" / config.factory_instance_id).mkdir(parents=True, exist_ok=True)
+        (base_dir / "memory" / config.factory_instance_id).mkdir(
+            parents=True, exist_ok=True
+        )
+        (base_dir / "bus" / config.factory_instance_id).mkdir(
+            parents=True, exist_ok=True
+        )
+
 
 def start_stack(
     repo_root: Path,
@@ -172,24 +177,40 @@ def start_stack(
             action.append("--build")
         if wait:
             action.extend(["--wait", "--wait-timeout", str(wait_timeout)])
-
-    factory_workspace.update_runtime_state(config.factory_instance_id, "running")
+    factory_workspace.update_runtime_state(config.factory_instance_id, "starting")
     if foreground:
+        try:
+            factory_workspace.update_runtime_state(
+                config.factory_instance_id, "running"
+            )
+            run_compose_command(
+                repo_root,
+                build_compose_command(repo_root, resolved_env_file, action),
+            )
+        except subprocess.CalledProcessError:
+            factory_workspace.update_runtime_state(
+                config.factory_instance_id, "stopped"
+            )
+            raise
+        except KeyboardInterrupt:
+            print("\nShutting down stack...")
+        finally:
+            factory_workspace.update_runtime_state(
+                config.factory_instance_id, "stopped"
+            )
+            return resolved_env_file
+    else:
         try:
             run_compose_command(
                 repo_root,
                 build_compose_command(repo_root, resolved_env_file, action),
             )
-        except KeyboardInterrupt:
-            print("\nShutting down stack...")
-        finally:
-            factory_workspace.update_runtime_state(config.factory_instance_id, "stopped")
-            return resolved_env_file
-    else:
-        run_compose_command(
-            repo_root,
-            build_compose_command(repo_root, resolved_env_file, action),
-        )
+        except subprocess.CalledProcessError:
+            factory_workspace.update_runtime_state(
+                config.factory_instance_id, "stopped"
+            )
+            raise
+        factory_workspace.update_runtime_state(config.factory_instance_id, "running")
         return resolved_env_file
 
 
@@ -219,10 +240,16 @@ def cleanup_workspace(
     env_file: Path | None = None,
 ) -> int:
     import shutil
+
     resolved_env_file = resolve_env_file(repo_root, env_file)
+    config: factory_workspace.WorkspaceRuntimeConfig | None = None
+    target_path = repo_root.parent
     try:
-        config = sync_workspace_runtime(repo_root, env_file=resolved_env_file, persist=False)
+        config = sync_workspace_runtime(
+            repo_root, env_file=resolved_env_file, persist=False
+        )
         target_path_str = str(config.target_dir.absolute())
+        target_path = config.target_dir
         instance_id = config.factory_instance_id
         action = ["down", "-v", "--remove-orphans"]
         run_compose_command(
@@ -239,7 +266,11 @@ def cleanup_workspace(
         # Also clean up any that map to this directory
         keys_to_delete = []
         for key, record in registry["workspaces"].items():
-            if isinstance(record, dict) and Path(record.get("target_workspace_path", "")).absolute() == Path(target_path_str).absolute():
+            if (
+                isinstance(record, dict)
+                and Path(record.get("target_workspace_path", "")).absolute()
+                == Path(target_path_str).absolute()
+            ):
                 keys_to_delete.append(key)
         for key in keys_to_delete:
             del registry["workspaces"][key]
@@ -252,16 +283,26 @@ def cleanup_workspace(
         resolved_env_file.unlink()
         print(f"🧹 Deleted {resolved_env_file}")
 
-    manifest_path = repo_root / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+    manifest_path = (
+        target_path / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+    )
     if manifest_path.exists():
         manifest_path.unlink()
         print(f"🧹 Deleted {manifest_path}")
 
-    # Remove the data directories fully
-    data_dir = repo_root / ".softwareFactoryVscode" / "data"
-    if data_dir.exists() and data_dir.is_dir():
-        shutil.rmtree(data_dir, ignore_errors=True)
-        print(f"🧹 Erased local data volumes in {data_dir}")
+    # Remove configured data directories for this instance.
+    try:
+        data_dir_str = str(config.env_values.get("FACTORY_DATA_DIR", "")).strip()
+        if data_dir_str:
+            data_dir = Path(data_dir_str).expanduser()
+            instance_memory_dir = data_dir / "memory" / instance_id
+            instance_bus_dir = data_dir / "bus" / instance_id
+            for instance_dir in (instance_memory_dir, instance_bus_dir):
+                if instance_dir.exists() and instance_dir.is_dir():
+                    shutil.rmtree(instance_dir, ignore_errors=True)
+                    print(f"🧹 Erased data directory {instance_dir}")
+    except Exception as e:
+        print(f"⚠️ Could not fully erase configured data directories: {e}")
 
     return 0
 
@@ -345,7 +386,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "command",
-        choices=["start", "stop", "list", "status", "activate", "deactivate", "cleanup"],
+        choices=[
+            "start",
+            "stop",
+            "list",
+            "status",
+            "activate",
+            "deactivate",
+            "cleanup",
+        ],
         help="Workspace runtime lifecycle command.",
     )
     parser.add_argument(
@@ -379,6 +428,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Also remove named volumes while stopping the stack.",
     )
+    parser.add_argument(
+        "--foreground",
+        action="store_true",
+        help="Start attached in the foreground (without -d or --wait).",
+    )
     return parser.parse_args()
 
 
@@ -394,6 +448,7 @@ def main() -> int:
             build=args.build,
             wait=not args.no_wait,
             wait_timeout=args.wait_timeout,
+            foreground=args.foreground,
         )
     elif args.command == "stop":
         stop_stack(
