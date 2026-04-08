@@ -18,7 +18,7 @@ import os
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 from .bus_client import BusClient
@@ -99,7 +99,9 @@ async def get_plan(run_id: str, request: Request) -> dict[str, Any]:
 
 
 @app.post("/approve/{run_id}")
-async def approve(run_id: str, body: ApprovalRequest, request: Request) -> dict[str, Any]:
+async def approve(
+    run_id: str, body: ApprovalRequest, request: Request
+) -> dict[str, Any]:
     project_id = request.headers.get("X-Workspace-ID", "default")
     """Approve or reject a plan.
 
@@ -108,10 +110,14 @@ async def approve(run_id: str, body: ApprovalRequest, request: Request) -> dict[
     """
     try:
         if body.approved:
-            await _bus.approve_run(run_id=run_id, feedback=body.feedback, project_id=project_id)
+            await _bus.approve_run(
+                run_id=run_id, feedback=body.feedback, project_id=project_id
+            )
             return {"ok": True, "run_id": run_id, "decision": "approved"}
         else:
-            await _bus.reject_run(run_id=run_id, feedback=body.feedback, project_id=project_id)
+            await _bus.reject_run(
+                run_id=run_id, feedback=body.feedback, project_id=project_id
+            )
             return {"ok": True, "run_id": run_id, "decision": "rejected"}
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

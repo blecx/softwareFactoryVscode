@@ -21,7 +21,7 @@ import os
 from typing import Any, Optional
 
 import uvicorn
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.fastmcp import Context, FastMCP
 
 from .bus import AgentBus, InvalidStatusTransitionError
 
@@ -34,7 +34,11 @@ mcp = FastMCP("mcp-agent-bus", json_response=True)
 def extract_project_id(ctx: Context) -> str:
     """Extract the workspace tenant ID from the HTTP request headers."""
     default_id = os.getenv("PROJECT_WORKSPACE_ID", "default")
-    if not ctx or not ctx.request_context or not getattr(ctx.request_context, "request", None):
+    if (
+        not ctx
+        or not ctx.request_context
+        or not getattr(ctx.request_context, "request", None)
+    ):
         return default_id
     # Starlette/FastAPI headers are typically accessible via request.headers
     try:
@@ -45,15 +49,15 @@ def extract_project_id(ctx: Context) -> str:
     return default_id
 
 
-
-
 # ---------------------------------------------------------------------------
 # Run lifecycle
 # ---------------------------------------------------------------------------
 
 
 @mcp.tool()
-def bus_create_run(issue_number: int, repo: str = "", ctx: Context = None) -> dict[str, Any]:
+def bus_create_run(
+    issue_number: int, repo: str = "", ctx: Context = None
+) -> dict[str, Any]:
     """Create a new agent task run for a GitHub issue.
 
     Args:
@@ -63,7 +67,9 @@ def bus_create_run(issue_number: int, repo: str = "", ctx: Context = None) -> di
     Returns:
         {"run_id": str}  — UUID identifying this run throughout its lifecycle.
     """
-    run_id = _bus.create_run(issue_number=issue_number, repo=repo, project_id=extract_project_id(ctx))
+    run_id = _bus.create_run(
+        issue_number=issue_number, repo=repo, project_id=extract_project_id(ctx)
+    )
     return {"run_id": run_id}
 
 
@@ -83,7 +89,9 @@ def bus_set_status(run_id: str, status: str, ctx: Context = None) -> dict[str, A
         {"ok": True} on success.
     """
     try:
-        _bus.set_status(run_id=run_id, status=status, project_id=extract_project_id(ctx))
+        _bus.set_status(
+            run_id=run_id, status=status, project_id=extract_project_id(ctx)
+        )
     except InvalidStatusTransitionError as exc:
         raise ValueError(str(exc)) from exc
     return {"ok": True}
@@ -144,7 +152,9 @@ def bus_write_plan(
 
 
 @mcp.tool()
-def bus_approve_run(run_id: str, feedback: str = "", ctx: Context = None) -> dict[str, Any]:
+def bus_approve_run(
+    run_id: str, feedback: str = "", ctx: Context = None
+) -> dict[str, Any]:
     """Mark a plan as approved by a human reviewer.
 
     Transitions the run from 'awaiting_approval' → 'approved'.
@@ -158,7 +168,9 @@ def bus_approve_run(run_id: str, feedback: str = "", ctx: Context = None) -> dic
         {"ok": True}
     """
     try:
-        _bus.approve_run(run_id=run_id, feedback=feedback, project_id=extract_project_id(ctx))
+        _bus.approve_run(
+            run_id=run_id, feedback=feedback, project_id=extract_project_id(ctx)
+        )
     except InvalidStatusTransitionError as exc:
         raise ValueError(str(exc)) from exc
     return {"ok": True}
@@ -298,7 +310,12 @@ def bus_write_checkpoint(
     Returns:
         {"ok": True}
     """
-    _bus.write_checkpoint(run_id=run_id, label=label, metadata=metadata, project_id=extract_project_id(ctx))
+    _bus.write_checkpoint(
+        run_id=run_id,
+        label=label,
+        metadata=metadata,
+        project_id=extract_project_id(ctx),
+    )
     return {"ok": True}
 
 
@@ -315,10 +332,10 @@ def main() -> None:
     uvicorn.run(app, host=host, port=port)
 
 
-
 # ---------------------------------------------------------------------------
 # Tenant Management
 # ---------------------------------------------------------------------------
+
 
 @mcp.tool()
 def bus_purge_workspace(project_id: str, ctx: Context = None) -> dict[str, Any]:
@@ -327,10 +344,18 @@ def bus_purge_workspace(project_id: str, ctx: Context = None) -> dict[str, Any]:
     """
     caller_tenant = extract_project_id(ctx)
     if caller_tenant != project_id:
-        return {"ok": False, "error": f"Tenant mismatch: Caller cannot purge project_id={project_id}"}
-        
+        return {
+            "ok": False,
+            "error": f"Tenant mismatch: Caller cannot purge project_id={project_id}",
+        }
+
     counts = _bus.purge_workspace(project_id)
-    return {"ok": True, "counts": counts, "message": f"Purged runtime bus data for {project_id}"}
+    return {
+        "ok": True,
+        "counts": counts,
+        "message": f"Purged runtime bus data for {project_id}",
+    }
+
 
 if __name__ == "__main__":
     main()

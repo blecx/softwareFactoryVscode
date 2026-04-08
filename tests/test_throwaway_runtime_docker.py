@@ -55,7 +55,9 @@ def _wait_until_reachable(url: str, max_wait_seconds: int = 30) -> bool:
     os.getenv("RUN_DOCKER_E2E", "0") != "1",
     reason="Set RUN_DOCKER_E2E=1 to run Docker-enabled throwaway runtime E2E tests.",
 )
-def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(tmp_path: Path) -> None:
+def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
+    tmp_path: Path,
+) -> None:
     if not _docker_ready():
         pytest.skip("Docker CLI is not available on PATH.")
 
@@ -99,7 +101,9 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(tmp_pa
         },
         "updated_at": "2026-01-01T00:00:00Z",
     }
-    registry_path.write_text(json.dumps(seeded_registry, indent=2) + "\n", encoding="utf-8")
+    registry_path.write_text(
+        json.dumps(seeded_registry, indent=2) + "\n", encoding="utf-8"
+    )
 
     env = os.environ.copy()
     env["SOFTWARE_FACTORY_REGISTRY_PATH"] = str(registry_path)
@@ -151,17 +155,20 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(tmp_pa
         for name, cfg in mcp_servers.items():
             url = cfg.get("url")
             if isinstance(url, str) and url.startswith("http://127.0.0.1"):
-                    reachable[name] = _wait_until_reachable(url)
+                reachable[name] = _wait_until_reachable(url)
 
-        assert reachable, "No localhost MCP URLs were found in generated workspace settings."
+        assert (
+            reachable
+        ), "No localhost MCP URLs were found in generated workspace settings."
         missing_baseline = [
             name
             for name in sorted(REQUIRED_BASELINE_SERVERS)
             if name not in reachable or not reachable[name]
         ]
-        assert not missing_baseline, (
-            "Required baseline MCP URLs were not reachable: "
-            + ", ".join(missing_baseline)
+        assert (
+            not missing_baseline
+        ), "Required baseline MCP URLs were not reachable: " + ", ".join(
+            missing_baseline
         )
     finally:
         env_path = target_repo / ".factory.env"
