@@ -158,7 +158,12 @@ def _print_result(result) -> None:
 
 
 def _run_queue_loop(poll_interval_seconds: float = 5.0) -> int:
-    """Run a lightweight queue-worker loop for containerized agent-worker mode."""
+    """Run a placeholder liveness loop for containerized agent-worker mode.
+
+    NOTE: This mode intentionally keeps the worker process alive for runtime
+    contract compatibility and health-checking, but it does not yet implement
+    queue consumption semantics.
+    """
     print("🏭 agent-worker queue loop started")
     try:
         while True:
