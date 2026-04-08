@@ -10,3 +10,14 @@ services:
       - CONTEXT7_API_KEY=${CONTEXT7_API_KEY:-}
     ports:
       - "127.0.0.1:${PORT_CONTEXT7:-3010}:3010"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "nc -z 127.0.0.1 3010 || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3

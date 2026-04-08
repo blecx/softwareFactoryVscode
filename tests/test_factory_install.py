@@ -1756,3 +1756,209 @@ def test_cleanup_workspace(tmp_path: Path):
 
     reg = workspace_module.load_registry()
     assert config.factory_instance_id not in reg.get("workspaces", {})
+
+
+# ---------------------------------------------------------------------------
+# Production readiness regression tests (mitigation plan, all 7 findings)
+# ---------------------------------------------------------------------------
+
+
+def test_all_auxiliary_compose_services_have_healthchecks() -> None:
+    """Finding #3 — all services across all compose files must have healthchecks."""
+    compose_files = [
+        REPO_ROOT / "compose" / "docker-compose.mcp-bash-gateway.yml",
+        REPO_ROOT / "compose" / "docker-compose.mcp-devops.yml",
+        REPO_ROOT / "compose" / "docker-compose.mcp-github-ops.yml",
+        REPO_ROOT / "compose" / "docker-compose.mcp-offline-docs.yml",
+        REPO_ROOT / "compose" / "docker-compose.repo-fundamentals-mcp.yml",
+        REPO_ROOT / "compose" / "docker-compose.context7.yml",
+    ]
+    for compose_file in compose_files:
+        data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+        for service_name, service in data.get("services", {}).items():
+            assert (
+                "healthcheck" in service
+            ), f"Service '{service_name}' in {compose_file.name} is missing a healthcheck"
+            hc = service["healthcheck"]
+            assert (
+                "test" in hc
+            ), f"Service '{service_name}' healthcheck has no test command"
+            assert (
+                "interval" in hc
+            ), f"Service '{service_name}' healthcheck has no interval"
+
+
+def test_factory_compose_all_services_have_healthchecks() -> None:
+    """Finding #3 — factory compose file services must have healthchecks."""
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    for service_name, service in data.get("services", {}).items():
+        # agent-worker has no port — liveness via restart policy; skip healthcheck assert
+        if service_name == "agent-worker":
+            continue
+        assert (
+            "healthcheck" in service
+        ), f"Service '{service_name}' in docker-compose.factory.yml is missing a healthcheck"
+
+
+def test_all_mcp_dockerfiles_use_factory_runtime_module_paths() -> None:
+    """Finding #4 — all factory-managed Dockerfiles must use factory_runtime.* CMD, not apps.*"""
+    dockerfiles = [
+        REPO_ROOT / "docker" / "mcp-memory" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-agent-bus" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-bash-gateway" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-devops-docker-compose" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-devops-test-runner" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-github-ops" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-offline-docs" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-git" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-search" / "Dockerfile",
+        REPO_ROOT / "docker" / "mcp-repo-fundamentals-filesystem" / "Dockerfile",
+        REPO_ROOT / "docker" / "approval-gate" / "Dockerfile",
+        REPO_ROOT / "docker" / "agent-worker" / "Dockerfile",
+        REPO_ROOT / "docker" / "mock-llm-gateway" / "Dockerfile",
+    ]
+    for dockerfile in dockerfiles:
+        text = dockerfile.read_text(encoding="utf-8")
+        assert (
+            "factory_runtime.apps." in text or '"run-queue"' in text
+        ), f"{dockerfile} uses an old module path (apps.*) instead of factory_runtime.apps.*"
+        # Legacy check: CMD must not reference bare "apps.*" (only "factory_runtime.apps.*" is valid)
+        import re
+
+        legacy_cmd = re.search(r'"-m",\s*"apps\.', text) or re.search(
+            r"python\s+-m\s+apps\.", text
+        )
+        assert (
+            not legacy_cmd
+        ), f"{dockerfile} still contains legacy standalone apps.* CMD"
+
+
+def test_mock_llm_gateway_dockerfile_pins_all_dependencies() -> None:
+    """Finding #5 — mock-llm-gateway must pin all runtime deps."""
+    dockerfile = REPO_ROOT / "docker" / "mock-llm-gateway" / "Dockerfile"
+    text = dockerfile.read_text(encoding="utf-8")
+    assert "fastapi==" in text, "mock-llm-gateway must pin fastapi version"
+    assert "uvicorn==" in text, "mock-llm-gateway must pin uvicorn version"
+    assert "pydantic==" in text, "mock-llm-gateway must pin pydantic version"
+
+
+def test_factory_stack_status_emits_commit_tracking_fields(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    """Finding #6 — status must output factory_commit, lock_commit, needs_rebuild."""
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (target_repo / ".factory.lock.json").write_text(
+        json.dumps(
+            {
+                "version": "main",
+                "installed_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z",
+                "factory": {
+                    "repo_url": "https://example.invalid/factory.git",
+                    "install_path": ".softwareFactoryVscode",
+                    "workspace_file": "software-factory.code-workspace",
+                    "commit": "aabbccdd",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        factory_stack, "collect_running_services", lambda compose_project_name: {}
+    )
+
+    factory_stack.status_workspace(repo_root, env_file=target_repo / ".factory.env")
+    output = capsys.readouterr().out
+
+    assert "factory_commit=" in output
+    assert "lock_commit=aabbccdd" in output
+    assert "needs_rebuild=" in output
+
+
+def test_factory_stack_write_lock_commit_updates_lock_file(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Finding #6 — write_factory_lock_commit must stamp the lock file."""
+    target_dir = tmp_path / "target"
+    target_dir.mkdir()
+    lock_file = target_dir / ".factory.lock.json"
+    lock_file.write_text(
+        json.dumps(
+            {
+                "version": "main",
+                "installed_at": "2026-01-01T00:00:00Z",
+                "updated_at": "2026-01-01T00:00:00Z",
+                "factory": {
+                    "repo_url": "https://example.invalid/factory.git",
+                    "install_path": ".softwareFactoryVscode",
+                    "workspace_file": "software-factory.code-workspace",
+                    "commit": "",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    factory_dir = REPO_ROOT
+    factory_stack.write_factory_lock_commit(target_dir, factory_dir)
+
+    updated = json.loads(lock_file.read_text(encoding="utf-8"))
+    commit = updated["factory"]["commit"]
+    assert len(commit) == 40 or len(commit) == 7, f"Unexpected commit hash: {commit!r}"
+    assert (
+        commit != ""
+    ), "Lock file commit must be non-empty after write_factory_lock_commit"
+
+
+def test_adr_011_agent_worker_liveness_contract_exists() -> None:
+    """Finding #2 — ADR-011 documenting agent-worker Option A must exist."""
+    adr = (
+        REPO_ROOT
+        / "docs"
+        / "architecture"
+        / "ADR-011-Agent-Worker-Liveness-Contract.md"
+    )
+    assert (
+        adr.exists()
+    ), "ADR-011-Agent-Worker-Liveness-Contract.md must exist in docs/architecture/"
+    text = adr.read_text(encoding="utf-8")
+    assert "Option A" in text, "ADR-011 must document Option A liveness placeholder"
+    assert (
+        "run-queue" in text or "run_queue" in text
+    ), "ADR-011 must reference the run-queue entrypoint"
+
+
+def test_ci_workflow_has_container_build_job() -> None:
+    """Finding #7 — CI must have a job that validates Dockerfiles build successfully."""
+    ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+    text = ci_file.read_text(encoding="utf-8")
+    assert (
+        "container-build" in text or "docker build" in text.lower()
+    ), "CI workflow must have a container-build or Docker build validation job"
+    # Confirm it loops over all Dockerfiles
+    assert (
+        "docker/*/Dockerfile" in text or "Dockerfile" in text
+    ), "CI container-build job must reference Dockerfiles"

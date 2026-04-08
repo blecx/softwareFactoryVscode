@@ -48,3 +48,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate PR Template Formatting
         run: chmod +x ./scripts/validate-pr-template.sh && ./scripts/validate-pr-template.sh "${{ github.workspace }}/.github/pull_request_template.md"
+
+  container-build:
+    name: "Docker Image Build Validation"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate all Dockerfiles build successfully
+        run: |
+          for dockerfile in docker/*/Dockerfile; do
+            service=$(basename $(dirname $dockerfile))
+            echo "Building $service..."
+            docker build -f "$dockerfile" . --quiet --tag "factory-ci-${service}:test"
+          done

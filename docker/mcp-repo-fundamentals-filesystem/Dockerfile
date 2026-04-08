@@ -6,9 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     REPO_FUNDAMENTALS_REPO_ROOT=/target
 
 WORKDIR /factory
-COPY factory_runtime/apps/__init__.py apps/__init__.py
-COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
-COPY factory_runtime/apps/mcp/repo_fundamentals/ apps/mcp/repo_fundamentals/
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 
 RUN pip install --no-cache-dir \
     mcp==1.25.0 \
@@ -16,4 +15,4 @@ RUN pip install --no-cache-dir \
 
 EXPOSE 3014
 
-CMD ["python", "-m", "apps.mcp.repo_fundamentals.filesystem_server"]
+CMD ["python", "-m", "factory_runtime.apps.mcp.repo_fundamentals.filesystem_server"]

@@ -13,12 +13,11 @@ RUN pip install --no-cache-dir \
     mcp==1.25.0 \
     uvicorn[standard]==0.44.0
 
-COPY factory_runtime/apps/__init__.py apps/__init__.py
-COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
-COPY factory_runtime/apps/mcp/agent_bus/ apps/mcp/agent_bus/
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 
 VOLUME ["/data"]
 
 EXPOSE 3031
 
-CMD ["python", "-m", "apps.mcp.agent_bus.mcp_server"]
+CMD ["python", "-m", "factory_runtime.apps.mcp.agent_bus.mcp_server"]
