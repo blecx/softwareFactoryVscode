@@ -6,5 +6,6 @@ __pycache__/
 .factory/
 .factory.env
 .factory.lock.json
+*.db
 *.db-shm
 *.db-wal
