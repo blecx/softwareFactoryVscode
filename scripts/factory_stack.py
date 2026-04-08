@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -126,6 +127,44 @@ def resolve_target_dir_from_env(repo_root: Path, env_file: Path) -> Path:
     return repo_root.parent.resolve()
 
 
+def read_factory_lock_commit(target_dir: Path) -> str:
+    """Return the factory commit SHA recorded in .factory.lock.json, or ''."""
+    lock_path = target_dir / ".factory.lock.json"
+    try:
+        data = json.loads(lock_path.read_text())
+        return str(data.get("factory", {}).get("commit", "")).strip()
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        return ""
+
+
+def get_factory_head_commit(factory_dir: Path) -> str:
+    """Return the current git HEAD commit of the factory directory, or ''."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(factory_dir), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        return ""
+
+
+def write_factory_lock_commit(target_dir: Path, factory_dir: Path) -> None:
+    """Stamp the factory's current HEAD commit into .factory.lock.json."""
+    commit = get_factory_head_commit(factory_dir)
+    if not commit:
+        return
+    lock_path = target_dir / ".factory.lock.json"
+    try:
+        data = json.loads(lock_path.read_text()) if lock_path.exists() else {}
+        data.setdefault("factory", {})["commit"] = commit
+        lock_path.write_text(json.dumps(data, indent=4) + "\n")
+    except (OSError, json.JSONDecodeError):
+        pass  # non-fatal — status will show needs_rebuild=true until next build
+
+
 def sync_workspace_runtime(
     repo_root: Path,
     *,
@@ -235,6 +274,8 @@ def start_stack(
         except subprocess.CalledProcessError:
             factory_workspace.update_runtime_state(config.factory_instance_id, "failed")
             raise
+        if build:
+            write_factory_lock_commit(config.target_dir, repo_root)
         try:
             running_services = collect_running_services(config.compose_project_name)
         except subprocess.CalledProcessError:
@@ -379,6 +420,11 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
         )
 
     active = registry.get("active_workspace", "") == config.factory_instance_id
+    lock_commit = read_factory_lock_commit(config.target_dir)
+    head_commit = get_factory_head_commit(config.factory_dir)
+    needs_rebuild = bool(head_commit) and (
+        not lock_commit or lock_commit != head_commit
+    )
     print(f"workspace_id={config.project_workspace_id}")
     print(f"instance_id={config.factory_instance_id}")
     print(f"target={config.target_dir}")
@@ -386,6 +432,9 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"runtime_state={runtime_state}")
     print(f"active={str(active).lower()}")
     print(f"port_index={config.port_index}")
+    print(f"factory_commit={head_commit}")
+    print(f"lock_commit={lock_commit}")
+    print(f"needs_rebuild={str(needs_rebuild).lower()}")
     for name, url in sorted(config.mcp_server_urls.items()):
         print(f"mcp.{name}={url}")
     return 0

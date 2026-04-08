@@ -10,9 +10,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /factory
-COPY factory_runtime/apps/__init__.py apps/__init__.py
-COPY factory_runtime/apps/mcp/__init__.py apps/mcp/__init__.py
-COPY factory_runtime/apps/mcp/repo_fundamentals/ apps/mcp/repo_fundamentals/
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 
 RUN pip install --no-cache-dir \
     mcp==1.25.0 \
@@ -20,4 +19,4 @@ RUN pip install --no-cache-dir \
 
 EXPOSE 3012
 
-CMD ["python", "-m", "apps.mcp.repo_fundamentals.git_server"]
+CMD ["python", "-m", "factory_runtime.apps.mcp.repo_fundamentals.git_server"]

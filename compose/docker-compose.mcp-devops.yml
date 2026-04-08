@@ -11,6 +11,17 @@ services:
       - DOCKER_COMPOSE_MCP_AUDIT_DIR=/factory-data/.tmp/mcp-docker-compose
     ports:
       - "127.0.0.1:${PORT_TEST:-3015}:3015"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; socket.create_connection(('127.0.0.1', 3015), timeout=2).close()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     volumes:
       - ${TARGET_WORKSPACE_PATH:-.}:/target
       - ${FACTORY_DIR:-.}:/factory-data
@@ -29,6 +40,17 @@ services:
       - TEST_RUNNER_PYTHON=python3
     ports:
       - "127.0.0.1:${PORT_COMPOSE:-3016}:3016"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; socket.create_connection(('127.0.0.1', 3016), timeout=2).close()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     volumes:
       - ${TARGET_WORKSPACE_PATH:-.}:/target
       - ${FACTORY_DIR:-.}:/factory-data

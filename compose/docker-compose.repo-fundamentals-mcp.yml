@@ -10,6 +10,17 @@ services:
       - REPO_FUNDAMENTALS_REPO_ROOT=/target
     ports:
       - "127.0.0.1:${PORT_FS:-3012}:3012"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; socket.create_connection(('127.0.0.1', 3012), timeout=2).close()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     volumes:
       - ${TARGET_WORKSPACE_PATH:-.}:/target
 
@@ -24,6 +35,17 @@ services:
       - REPO_FUNDAMENTALS_REPO_ROOT=/target
     ports:
       - "127.0.0.1:${PORT_GIT:-3013}:3013"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; socket.create_connection(('127.0.0.1', 3013), timeout=2).close()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     volumes:
       - ${TARGET_WORKSPACE_PATH:-.}:/target
 
@@ -38,5 +60,16 @@ services:
       - REPO_FUNDAMENTALS_REPO_ROOT=/target
     ports:
       - "127.0.0.1:${PORT_SEARCH:-3014}:3014"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; socket.create_connection(('127.0.0.1', 3014), timeout=2).close()",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     volumes:
       - ${TARGET_WORKSPACE_PATH:-.}:/target
