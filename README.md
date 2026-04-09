@@ -56,6 +56,7 @@ Once installed, check out our user guides to learn how to operate the factory ef
 - **[Copilot Harness Model](docs/COPILOT-HARNESS-MODEL.md):** Explains what `softwareFactoryVscode` is meant to be, why it lives in its own repository, and the intended namespace-first integration model.
 - **[Harness Integration Specification](docs/HARNESS-INTEGRATION-SPEC.md):** Defines artifact classes, ownership boundaries, and the target install/update contract.
 - **[Harness Namespace Migration Mitigation Plan](docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md):** Provides the phased migration plan, Definition of Done, verification steps, and review prompts for moving from hidden-tree installs to namespaced `.copilot` / `.github` integration.
+- **[Harness Namespace Implementation Backlog](docs/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md):** Breaks the migration into concrete implementation phases with likely files to change, dependency order, Definition of Done, review criteria, and anti-hallucination guardrails.
 
 ### Architecture Notes
 
