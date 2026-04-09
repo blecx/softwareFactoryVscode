@@ -151,15 +151,13 @@ def clone_factory(factory_dir: Path, *, repo_url: str, ref: str) -> None:
 def update_factory(factory_dir: Path, *, ref: str) -> str:
     ensure_clean_factory_tree(factory_dir)
     run_command(["git", "-C", str(factory_dir), "fetch", "origin", "--prune"])
-
     target_ref = ref or current_branch(factory_dir) or "main"
-    run_command(["git", "-C", str(factory_dir), "checkout", target_ref])
-
+    run_command(["git", "-C", str(factory_dir), "checkout", "-f", target_ref])
+    
     if remote_branch_exists(factory_dir, target_ref):
-        run_command(
-            ["git", "-C", str(factory_dir), "pull", "--ff-only", "origin", target_ref]
-        )
-
+        run_command(["git", "-C", str(factory_dir), "reset", "--hard", f"origin/{target_ref}"])
+    
+    run_command(["git", "-C", str(factory_dir), "clean", "-fd"])
     return target_ref
 
 
@@ -226,23 +224,18 @@ def invoke_verifier(
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     target_dir = resolve_target_dir(args.target)
+    
+    # 🧹 DESTROY EVERYTHING OF THE OLD STRUCTURE
+    import shutil
+    
+    # 1. Legacy locations
     old_factory = target_dir / ".softwareFactoryVscode"
     if old_factory.exists():
-        print(f"🗑️  Removing old installation path: {old_factory}")
-        import shutil
+        print(f"🗑️  Removing legacy installation path: {old_factory}")
         shutil.rmtree(old_factory, ignore_errors=True)
-        old_env = target_dir / ".factory.env"
-        if old_env.exists():
-            old_env.unlink()
-
-    old_factory = target_dir / ".softwareFactoryVscode"
-    if old_factory.exists():
-        print(f"🗑️  Removing old installation path: {old_factory}")
-        import shutil
-        shutil.rmtree(old_factory, ignore_errors=True)
-        old_env = target_dir / ".factory.env"
-        if old_env.exists():
-            old_env.unlink()
+    old_env = target_dir / ".factory.env"
+    if old_env.exists():
+        old_env.unlink()
 
     factory_dir = target_dir / FACTORY_DIRNAME
 
@@ -260,6 +253,18 @@ def main(argv: list[str] | None = None) -> int:
                 print("⚠️ Factory is already installed at this path.")
                 print("Re-run with --update to refresh the installation in place.")
                 return 1
+
+            print("➡️ Spinning down any running factory containers before update...")
+            try:
+                import subprocess
+                subprocess.run(
+                    [sys.executable, str(factory_dir / "scripts" / "factory_stack.py"), "stop", "--target", str(target_dir)],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            except Exception:
+                pass  # Ignore if it wasn't running or script fails
 
             print("➡️ Updating existing factory installation...")
             version_label = update_factory(factory_dir, ref=args.ref)

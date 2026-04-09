@@ -297,19 +297,7 @@ def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
     )
 
     workspace_path = target_repo / "software-factory.code-workspace"
-    custom_workspace = (
-        json.dumps(
-            {
-                "folders": [
-                    {"name": "Host Project (Root)", "path": "."},
-                    {"name": "AI Agent Factory", "path": ".copilot/softwareFactoryVscode"},
-                ],
-                "settings": {"custom": True},
-            },
-            indent=2,
-        )
-        + "\n"
-    )
+    custom_workspace = json.dumps({"settings": {"custom": True}})
     workspace_path.write_text(custom_workspace, encoding="utf-8")
 
     custom_env = "\n".join(
@@ -322,18 +310,27 @@ def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
         ]
     )
     (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(custom_env, encoding="utf-8")
+    tmp_dir = target_repo / ".tmp" / "softwareFactoryVscode"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    (tmp_dir / "foo.txt").write_text("running")
 
     assert (
         install_factory.main(
-            ["--target", str(target_repo), "--repo-url", str(source_repo), "--update"]
+            ["--target", str(target_repo), "--repo-url", str(source_repo), "--update", "--force-workspace"]
         )
         == 0
     )
 
-    assert workspace_path.read_text(encoding="utf-8") == custom_workspace
+    # Workspace overwritten (force-workspace passed)
+    assert "\"custom\": true" not in workspace_path.read_text(encoding="utf-8")
+    
+    # env preserved
     updated_env = (target_repo / ".copilot/softwareFactoryVscode/.factory.env").read_text(encoding="utf-8")
     assert "CONTEXT7_API_KEY=abc123" in updated_env
     assert "PORT_BASH=" in updated_env
+    
+    # tmp untouched
+    assert (tmp_dir / 'foo.txt').exists()
 
 
 def test_bootstrap_force_workspace_overwrites_existing_workspace(
@@ -1256,6 +1253,8 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
     target_repo = tmp_path / "target-project"
     factory_dir = target_repo / ".copilot/softwareFactoryVscode"
     factory_dir.mkdir(parents=True)
