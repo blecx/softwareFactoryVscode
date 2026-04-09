@@ -10,7 +10,7 @@ MOCK_HOST="/tmp/mock-host-$(date +%s)"
 MOCK_FACTORY="$MOCK_HOST/.copilot/softwareFactoryVscode"
 
 echo "➡️  Setting up Mock Host Project at $MOCK_HOST..."
-mkdir -p "$MOCK_HOST"
+mkdir -p "$MOCK_HOST/.copilot"
 cd "$MOCK_HOST"
 
 # Simulate a host project file
