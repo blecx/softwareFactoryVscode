@@ -165,7 +165,7 @@ class TimeEstimator:
         }
 
     def train_from_knowledge_base(
-        self, kb_path: Path = Path("agents/knowledge")
+        self, kb_path: Path = Path(__file__).parent / "knowledge"
     ) -> Dict[str, float]:
         """Train from knowledge base JSON files.
 

@@ -501,7 +501,7 @@ def get_knowledge_base_patterns() -> str:
     Returns JSON string of past successful workflows.
     """
     try:
-        kb_file = Path("agents/knowledge/workflow_patterns.json")
+        kb_file = Path(__file__).parent / "knowledge" / "workflow_patterns.json"
         if not kb_file.exists():
             return "[]"
 
@@ -523,7 +523,7 @@ def update_knowledge_base(
     Returns success message or error.
     """
     try:
-        kb_file = Path(f"agents/knowledge/{category}.json")
+        kb_file = Path(__file__).parent / "knowledge" / f"{category}.json"
         kb_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Load existing data
