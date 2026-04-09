@@ -116,9 +116,9 @@ def render_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
             "4. Treat `.factory.env` as sensitive and redact secrets if you mention it.",
             "",
             "Please verify and report PASS/FAIL with evidence for:",
-            "- The workspace shows both the host project root and `.softwareFactoryVscode`.",
-            "- `.factory.lock.json`, `.factory.env`, and the workspace file exist.",
-            "- `.softwareFactoryVscode/scripts/verify_factory_install.py` appears present.",
+            "- The workspace shows both the host project root and `.copilot/softwareFactoryVscode`.",
+            "- `.copilot/softwareFactoryVscode/lock.json`, `.factory.env`, and the workspace file exist.",
+            "- `.copilot/softwareFactoryVscode/scripts/verify_factory_install.py` appears present.",
             "- The installation looks compliant with Option B and ready for VS Code usage.",
             "",
             "Do not make any edits; only inspect and summarize.",
@@ -316,7 +316,7 @@ def check_bash_gateway_configuration(target_dir: Path, violations: list[str]) ->
 
 
 def check_factory_env(target_dir: Path, violations: list[str]) -> None:
-    env_path = target_dir / ".factory.env"
+    env_path = target_dir / bootstrap_host.FACTORY_DIRNAME / ".factory.env"
     if not env_path.exists():
         violations.append(f"Missing environment contract: {env_path}")
         return
@@ -364,36 +364,36 @@ def check_factory_env(target_dir: Path, violations: list[str]) -> None:
 def check_lock_file(
     target_dir: Path, workspace_file: str, violations: list[str]
 ) -> None:
-    lock_path = target_dir / ".factory.lock.json"
+    lock_path = target_dir / ".copilot/softwareFactoryVscode/lock.json"
     if not lock_path.exists():
         violations.append(f"Missing installation metadata lock file: {lock_path}")
         return
 
     lock_data = bootstrap_host.load_json(lock_path)
     if not lock_data.get("version"):
-        violations.append(".factory.lock.json is missing `version`")
+        violations.append(".copilot/softwareFactoryVscode/lock.json is missing `version`")
     if not lock_data.get("installed_at"):
-        violations.append(".factory.lock.json is missing `installed_at`")
+        violations.append(".copilot/softwareFactoryVscode/lock.json is missing `installed_at`")
     if not lock_data.get("updated_at"):
-        violations.append(".factory.lock.json is missing `updated_at`")
+        violations.append(".copilot/softwareFactoryVscode/lock.json is missing `updated_at`")
 
     factory_data = lock_data.get("factory")
     if not isinstance(factory_data, dict):
-        violations.append(".factory.lock.json is missing `factory` metadata")
+        violations.append(".copilot/softwareFactoryVscode/lock.json is missing `factory` metadata")
         return
 
     if factory_data.get("install_path") != bootstrap_host.FACTORY_DIRNAME:
         violations.append(
-            ".factory.lock.json `factory.install_path` does not match the hidden-tree install path"
+            ".copilot/softwareFactoryVscode/lock.json `factory.install_path` does not match the hidden-tree install path"
         )
     if factory_data.get("workspace_file") != workspace_file:
         violations.append(
-            ".factory.lock.json `factory.workspace_file` does not match the expected workspace filename"
+            ".copilot/softwareFactoryVscode/lock.json `factory.workspace_file` does not match the expected workspace filename"
         )
     if not factory_data.get("repo_url"):
-        violations.append(".factory.lock.json `factory.repo_url` is missing")
+        violations.append(".copilot/softwareFactoryVscode/lock.json `factory.repo_url` is missing")
     if not factory_data.get("commit"):
-        violations.append(".factory.lock.json `factory.commit` is missing")
+        violations.append(".copilot/softwareFactoryVscode/lock.json `factory.commit` is missing")
 
 
 def check_workspace_file(
@@ -494,7 +494,7 @@ def verify_runtime(
             "Docker CLI is not available on PATH, so runtime compliance cannot be verified."
         ]
 
-    env_path = target_dir / ".factory.env"
+    env_path = target_dir / bootstrap_host.FACTORY_DIRNAME / ".factory.env"
     if not env_path.exists():
         return [
             f"Missing environment contract required for runtime verification: {env_path}"

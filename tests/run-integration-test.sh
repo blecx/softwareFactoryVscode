@@ -7,7 +7,7 @@ echo "======================================================"
 
 # Create an isolated temporary host project
 MOCK_HOST="/tmp/mock-host-$(date +%s)"
-MOCK_FACTORY="$MOCK_HOST/.softwareFactoryVscode"
+MOCK_FACTORY="$MOCK_HOST/.copilot/softwareFactoryVscode"
 
 echo "➡️  Setting up Mock Host Project at $MOCK_HOST..."
 mkdir -p "$MOCK_HOST"

@@ -131,8 +131,6 @@ def main() -> int:
     args = parse_args()
 
     env_path = REPO_ROOT / ".factory.env"
-    if not env_path.exists() and (REPO_ROOT.parent / ".factory.env").exists():
-        env_path = REPO_ROOT.parent / ".factory.env"
 
     env_values = factory_workspace.parse_env_file(env_path)
     ports = {}

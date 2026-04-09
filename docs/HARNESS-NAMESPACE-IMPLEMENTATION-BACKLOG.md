@@ -89,9 +89,11 @@ The migration cannot be implemented safely until the current artifact set and ow
 
 ### Phase 0 open questions that must be answered, not guessed
 
-- What should the managed-path record be called and where should it live?
-- Which current root-level files are still required in the target model?
-- Which runtime facts must remain operator-visible?
+**[RESOLVED]** See `manifests/harness-artifact-inventory.md`
+
+- What should the managed-path record be called and where should it live? (`.copilot/softwareFactoryVscode/lock.json`)
+- Which current root-level files are still required in the target model? (Deep nesting is supported)
+- Which runtime facts must remain operator-visible? (`.factory.env` moved to `.copilot/softwareFactoryVscode/.factory.env`)
 
 ### Phase 0 DoD
 
@@ -141,9 +143,11 @@ Define the exact target structure for `.copilot/softwareFactoryVscode/` and `.gi
 
 ### Phase 1 open questions that must be answered, not guessed
 
-- Which GitHub-facing assets truly require root `.github` discovery versus namespaced presence?
-- Which Copilot assets can be consumed directly from a namespaced subtree without root projection?
-- Are any host-root `.copilot` files unavoidable as bridge files?
+**[RESOLVED]** See `manifests/namespace-target-map.md`
+
+- Which GitHub-facing assets truly require root `.github` discovery versus namespaced presence? (Nested under `.github/softwareFactoryVscode/` is supported natively)
+- Which Copilot assets can be consumed directly from a namespaced subtree without root projection? (All skills map nested)
+- Are any host-root `.copilot` files unavoidable as bridge files? (None needed)
 
 ### Phase 1 DoD
 
@@ -194,9 +198,11 @@ Redesign the installer contract around managed namespaces instead of the hidden-
 
 ### Phase 2 open questions that must be answered, not guessed
 
-- What is the compatibility behavior for already-installed hidden-tree repositories?
-- Should install support both models during transition, or only migrate forward?
-- Which artifacts become optional instead of mandatory?
+**[RESOLVED]**
+
+- What is the compatibility behavior for already-installed hidden-tree repositories? (**Auto-migrate everything to the new namespaces and remove old artifacts.**)
+- Should install support both models during transition, or only migrate forward? (**Force immediate forward migration and drop support for the old path entirely.**)
+- Which artifacts become optional instead of mandatory? (**None, we are just transitioning. Generating workspace and env files remains mandatory.**)
 
 ### Phase 2 DoD
 

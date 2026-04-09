@@ -4,7 +4,7 @@ This guide provides exactly how to install and bootstrap the `softwareFactoryVsc
 
 > **Architecture note:** This document describes the **current installer behavior**. The longer-term target integration model is documented in [`docs/COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md), [`docs/HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md), and [`ADR-012`](architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md). Where those documents differ from the hidden-tree installer described below, treat the difference as intentional future direction rather than current behavior.
 
-The Factory is designed to operate seamlessly via a "Hidden-Tree Isolation Model." When installed, it places itself under a `.softwareFactoryVscode/` hidden directory within your target project. It does **not** overwrite or pollute your existing `.vscode/`, `.github/`, or project files.
+The Factory is designed to operate seamlessly via a "Hidden-Tree Isolation Model." When installed, it places itself under a `.copilot/softwareFactoryVscode/` hidden directory within your target project. It does **not** overwrite or pollute your existing `.vscode/`, `.github/`, or project files.
 
 The supported operating model is **Option B**:
 
@@ -43,7 +43,7 @@ curl -sSL https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/scr
 
 The installer will:
 
-- clone the factory into `.softwareFactoryVscode/`
+- clone the factory into `.copilot/softwareFactoryVscode/`
 - bootstrap `.factory.env`, `.factory.lock.json`, and `.tmp/softwareFactoryVscode/`
 - add recommended runtime ignores to `.gitignore`
 - generate `software-factory.code-workspace`
@@ -73,7 +73,7 @@ curl -sSL https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/scr
 
 The updater will:
 
-- fetch and fast-forward the installed `.softwareFactoryVscode/` checkout when possible
+- fetch and fast-forward the installed `.copilot/softwareFactoryVscode/` checkout when possible
 - preserve host-specific files like `.factory.env`
 - preserve a custom `software-factory.code-workspace` unless `--force-workspace` is used
 - refresh `.factory.lock.json`
@@ -93,7 +93,7 @@ PROJECT_WORKSPACE_ID=my-project
 COMPOSE_PROJECT_NAME=factory_my-project
 FACTORY_INSTANCE_ID=factory-abc123def456
 FACTORY_PORT_INDEX=0
-FACTORY_DIR=/path/to/your/project/.softwareFactoryVscode
+FACTORY_DIR=/path/to/your/project/.copilot/softwareFactoryVscode
 
 PORT_CONTEXT7=3010
 PORT_BASH=3011
@@ -129,29 +129,29 @@ That manifest is the effective runtime contract for the installed workspace and 
 Once installed and bootstrapped, use the canonical runtime helper inside the hidden tree:
 
 ```bash
-python3 .softwareFactoryVscode/scripts/factory_stack.py start --build
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py start --build
 ```
 
 The matching canonical stop path is:
 
 ```bash
-python3 .softwareFactoryVscode/scripts/factory_stack.py stop
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py stop
 ```
 
 The helper preserves the supported runtime contract:
 
-- compose files come from `.softwareFactoryVscode/compose/`
+- compose files come from `.copilot/softwareFactoryVscode/compose/`
 - environment comes from the host-facing `.factory.env`
 - startup remains deterministic via `up -d --build --wait --wait-timeout ...`
 
 The runtime helper now understands workspace-aware lifecycle commands as well:
 
 ```bash
-python3 .softwareFactoryVscode/scripts/factory_stack.py list
-python3 .softwareFactoryVscode/scripts/factory_stack.py status
-python3 .softwareFactoryVscode/scripts/factory_stack.py activate
-python3 .softwareFactoryVscode/scripts/factory_stack.py deactivate
-python3 .softwareFactoryVscode/scripts/factory_stack.py cleanup
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py list
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py status
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py activate
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py deactivate
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py cleanup
 ```
 
 These commands distinguish:
@@ -166,7 +166,7 @@ Only an explicit `start` command should create running containers.
 After starting the stack, you can run runtime compliance verification:
 
 ```bash
-python3 .softwareFactoryVscode/scripts/verify_factory_install.py --target . --runtime
+python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target . --runtime
 ```
 
 Inside VS Code, you can run the matching workspace task from the installed factory folder:
@@ -176,7 +176,7 @@ Inside VS Code, you can run the matching workspace task from the installed facto
 If you also want to probe the localhost MCP endpoints configured for VS Code, use:
 
 ```bash
-python3 .softwareFactoryVscode/scripts/verify_factory_install.py --target . --runtime --check-vscode-mcp
+python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target . --runtime --check-vscode-mcp
 ```
 
 Inside VS Code, the matching workspace task is:
@@ -190,7 +190,7 @@ Open the generated `software-factory.code-workspace` file from the target reposi
 This workspace includes:
 
 - `.` as **Host Project (Root)**
-- `.softwareFactoryVscode` as **AI Agent Factory**
+- `.copilot/softwareFactoryVscode` as **AI Agent Factory**
 
 Using the generated workspace file is the supported way to access the installed agent configuration in VS Code.
 
@@ -201,7 +201,7 @@ Using the generated workspace file is the supported way to access the installed 
 The installer already runs a strict compliance check after install/update. To re-run it manually:
 
 ```bash
-python3 .softwareFactoryVscode/scripts/verify_factory_install.py --target .
+python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target .
 ```
 
 Inside VS Code, the matching workspace task is:
@@ -211,7 +211,7 @@ Inside VS Code, the matching workspace task is:
 To print the non-mutating smoke prompt again without changing the target repository:
 
 ```bash
-python3 .softwareFactoryVscode/scripts/verify_factory_install.py --target .
+python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target .
 ```
 
 The verifier checks the hidden-tree installation contract, host runtime files, `.gitignore`, lock metadata, and the Option B workspace entrypoint.
@@ -222,7 +222,7 @@ When a workspace is assigned a non-default port block, runtime verification foll
 
 To prove the installation works and the target mounts are successfully connected to your host project:
 
-1. **Verify State**: Confirm that `.factory.lock.json`, `.factory.env`, `software-factory.code-workspace`, and the folder `.softwareFactoryVscode/` exist in your root directory.
+1. **Verify State**: Confirm that `.factory.lock.json`, `.factory.env`, `software-factory.code-workspace`, and the folder `.copilot/softwareFactoryVscode/` exist in your root directory.
 2. **Verify Containers**: Run `docker ps` to ensure the `factory_my-project` MCP container stack is running smoothly.
 3. **Verify Mount**: Connect to one of the containers and confirm your project is mounted to `/target`.
 
@@ -232,7 +232,7 @@ To prove the installation works and the target mounts are successfully connected
 
    You should see your host project files listed.
 
-4. **Verify VS Code Entry Point**: Open `software-factory.code-workspace` and confirm both the host repository and `.softwareFactoryVscode` appear in the Explorer.
+4. **Verify VS Code Entry Point**: Open `software-factory.code-workspace` and confirm both the host repository and `.copilot/softwareFactoryVscode` appear in the Explorer.
 
 ### Non-Mutating Smoke Prompt
 

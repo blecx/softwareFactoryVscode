@@ -8,7 +8,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-FACTORY_DIRNAME = ".softwareFactoryVscode"
+FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
 DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
 
@@ -35,7 +35,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--update",
         action="store_true",
-        help="Update an existing installation instead of failing when .softwareFactoryVscode already exists.",
+        help="Update an existing installation instead of failing when .copilot/softwareFactoryVscode already exists.",
     )
     parser.add_argument(
         "--workspace-file",
@@ -226,6 +226,24 @@ def invoke_verifier(
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     target_dir = resolve_target_dir(args.target)
+    old_factory = target_dir / ".softwareFactoryVscode"
+    if old_factory.exists():
+        print(f"🗑️  Removing old installation path: {old_factory}")
+        import shutil
+        shutil.rmtree(old_factory, ignore_errors=True)
+        old_env = target_dir / ".factory.env"
+        if old_env.exists():
+            old_env.unlink()
+
+    old_factory = target_dir / ".softwareFactoryVscode"
+    if old_factory.exists():
+        print(f"🗑️  Removing old installation path: {old_factory}")
+        import shutil
+        shutil.rmtree(old_factory, ignore_errors=True)
+        old_env = target_dir / ".factory.env"
+        if old_env.exists():
+            old_env.unlink()
+
     factory_dir = target_dir / FACTORY_DIRNAME
 
     print("=================================================")
