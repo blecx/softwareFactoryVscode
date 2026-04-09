@@ -49,7 +49,7 @@ from factory_runtime.agents.workflow_state import CrossRepoContext  # noqa: E402
 class WorkflowAgent(BaseAgent):
     """Agent that follows the 6-phase workflow from successful issue completions."""
 
-    def __init__(self, kb_dir: Path = Path("agents/knowledge")):
+    def __init__(self, kb_dir: Path = Path(__file__).parent / "knowledge"):
         super().__init__(name="workflow_agent", version="1.0.0", kb_dir=kb_dir)
 
         self.side_effects: WorkflowSideEffectAdapter = (
