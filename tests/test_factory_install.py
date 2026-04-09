@@ -206,7 +206,7 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
     assert install_result.returncode == 0, install_result.stdout + install_result.stderr
     assert "Installing softwareFactoryVscode" in install_result.stdout
     assert (
-        "Bootstrapping target repository for Option B workspace usage"
+        "Bootstrapping target repository for namespace-first workspace usage"
         in install_result.stdout
     )
     assert "Installation compliance passed" in install_result.stdout
@@ -279,7 +279,7 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
 
     assert verify_result.returncode == 0, verify_result.stdout + verify_result.stderr
     assert "Installation compliance passed" in verify_result.stdout
-    assert "Option B workspace entrypoint look correct" in verify_result.stdout
+    assert "canonical workspace entrypoint look correct" in verify_result.stdout
     assert "Non-mutating VS Code smoke prompt" not in verify_result.stdout
 
 

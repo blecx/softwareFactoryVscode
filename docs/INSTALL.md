@@ -2,11 +2,11 @@
 
 This guide provides exactly how to install and bootstrap the `softwareFactoryVscode` capability.
 
-> **Architecture note:** This document describes the **current installer behavior**. The longer-term target integration model is documented in [`docs/COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md), [`docs/HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md), and [`ADR-012`](architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md). Where those documents differ from the hidden-tree installer described below, treat the difference as intentional future direction rather than current behavior.
+> **Architecture note:** This document describes the **current installer behavior**. The longer-term target integration model is documented in [`docs/COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md), [`docs/HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md), and [`ADR-012`](architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md). Where those documents differ from the harness namespace installer described below, treat the difference as intentional future direction rather than current behavior.
 
-The Factory is designed to operate seamlessly via a "Hidden-Tree Isolation Model." When installed, it places itself under a `.copilot/softwareFactoryVscode/` hidden directory within your target project. It does **not** overwrite or pollute your existing `.vscode/`, `.github/`, or project files.
+The Factory is designed to operate seamlessly via a "Harness Namespace Integration Model." When installed, it places itself under a `.copilot/softwareFactoryVscode/` hidden directory within your target project. It does **not** overwrite or pollute your existing `.vscode/`, `.github/`, or project files.
 
-The supported operating model is **Option B**:
+The supported operating model is **namespace-first**:
 
 1. Install the factory into the hidden tree.
 2. Let the installer/bootstrap generate a host-facing VS Code workspace file.
@@ -157,7 +157,7 @@ python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py cleanup
 
 These commands distinguish:
 
-- **installed** — the workspace has a valid hidden-tree factory install
+- **installed** — the workspace has a valid harness namespace factory install
 - **running** — the workspace currently owns Docker runtime resources
 - **active** — the workspace is currently selected in the host registry for operator workflows
 
@@ -215,7 +215,7 @@ To print the non-mutating smoke prompt again without changing the target reposit
 python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target .
 ```
 
-The verifier checks the hidden-tree installation contract, host runtime files, `.gitignore`, lock metadata, and the Option B workspace entrypoint.
+The verifier checks the harness namespace installation contract, host runtime files, `.gitignore`, lock metadata, and the canonical workspace entrypoint.
 
 Runtime compliance is a second phase you can run after starting services. It checks the core compose services for the factory runtime and, optionally, the localhost MCP endpoints used by VS Code.
 

@@ -1,7 +1,10 @@
 import os
 from pathlib import Path
 
-import uvicorn
+try:
+    import uvicorn
+except ImportError:
+    uvicorn = None
 from mcp.server.fastmcp import FastMCP
 
 from .devops_test_runner_service import TestRunnerService, TestRunnerServiceError

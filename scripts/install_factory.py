@@ -296,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
-        print("➡️ Bootstrapping target repository for Option B workspace usage...")
+        print("➡️ Bootstrapping target repository for namespace-first workspace usage...")
         invoke_bootstrap(
             target_dir=target_dir,
             factory_dir=factory_dir,

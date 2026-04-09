@@ -119,7 +119,7 @@ def render_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
             "- The workspace shows both the host project root and `.copilot/softwareFactoryVscode`.",
             "- `.copilot/softwareFactoryVscode/lock.json`, `.factory.env`, and the workspace file exist.",
             "- `.copilot/softwareFactoryVscode/scripts/verify_factory_install.py` appears present.",
-            "- The installation looks compliant with Option B and ready for VS Code usage.",
+            "- The installation looks compliant with namespace-first and ready for VS Code usage.",
             "",
             "Do not make any edits; only inspect and summarize.",
         ]
@@ -356,7 +356,7 @@ def check_factory_env(target_dir: Path, violations: list[str]) -> None:
         actual_factory_dir = values.get("FACTORY_DIR", "")
         if actual_factory_dir and actual_factory_dir != expected_factory_dir:
             violations.append(
-                "FACTORY_DIR does not match the installed hidden-tree factory path "
+                "FACTORY_DIR does not match the installed harness namespace factory path "
                 f"(expected `{expected_factory_dir}`, found `{actual_factory_dir}`)."
             )
 
@@ -384,7 +384,7 @@ def check_lock_file(
 
     if factory_data.get("install_path") != bootstrap_host.FACTORY_DIRNAME:
         violations.append(
-            ".copilot/softwareFactoryVscode/lock.json `factory.install_path` does not match the hidden-tree install path"
+            ".copilot/softwareFactoryVscode/lock.json `factory.install_path` does not match the harness namespace install path"
         )
     if factory_data.get("workspace_file") != workspace_file:
         violations.append(
@@ -454,6 +454,13 @@ def check_gitignore(
         )
 
 
+
+def check_for_legacy_mode(target_dir: Path) -> None:
+    legacy_dir = target_dir / ".softwareFactoryVscode"
+    if legacy_dir.exists() and legacy_dir.is_dir():
+        print("⚠️  WARNING: Repository is operating in transitional/legacy mode (.softwareFactoryVscode detected).")
+        print("    Please migrate to the namespace-first architecture (.copilot/softwareFactoryVscode) structure.")
+
 def verify_installation(
     target_dir: Path,
     *,
@@ -461,6 +468,8 @@ def verify_installation(
     skip_workspace_check: bool,
     skip_gitignore_check: bool,
 ) -> list[str]:
+
+    check_for_legacy_mode(target_dir)
     violations: list[str] = []
     check_factory_tree(target_dir, violations)
     check_bash_gateway_configuration(target_dir, violations)
@@ -487,6 +496,8 @@ def verify_runtime(
     timeout: float,
     check_vscode_mcp: bool,
 ) -> list[str]:
+
+    check_for_legacy_mode(target_dir)
     violations: list[str] = []
 
     if shutil.which("docker") is None:
@@ -616,7 +627,7 @@ def main(argv: list[str] | None = None) -> int:
 
     print("✅ Installation compliance passed.")
     print(
-        "The hidden-tree install, host contract, and Option B workspace entrypoint look correct."
+        "The harness namespace install, host contract, and canonical workspace entrypoint look correct."
     )
 
     runtime_violations: list[str] = []
