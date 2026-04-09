@@ -38,7 +38,7 @@ To use the Software Factory, you need the following:
 
 1. Install the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) from the VS Code Marketplace.
 2. Sign in with a GitHub account that holds an active Copilot subscription.
-3. *(Optional for Custom LLMs)* If you prefer using a custom LLM instead of the default Copilot models, configure your VS Code settings (e.g., editing `github.copilot.advanced` in `settings.json` or using a compatible proxy extension) to point Copilot towards your custom endpoint.
+3. _(Optional for Custom LLMs)_ If you prefer using a custom LLM instead of the default Copilot models, configure your VS Code settings (e.g., editing `github.copilot.advanced` in `settings.json` or using a compatible proxy extension) to point Copilot towards your custom endpoint.
 
 ### Installation
 
@@ -53,3 +53,14 @@ Once installed, check out our user guides to learn how to operate the factory ef
 - **[User Handout](docs/HANDOUT.md):** A detailed overview of concepts and workflows.
 - **[Cheat Sheet](docs/CHEAT_SHEET.md):** Quick reference for common tasks and CLI commands.
 - **[Issue Workflow](docs/WORK-ISSUE-WORKFLOW.md):** Learn how to work through issues using Copilot agents.
+- **[Copilot Harness Model](docs/COPILOT-HARNESS-MODEL.md):** Explains what `softwareFactoryVscode` is meant to be, why it lives in its own repository, and the intended namespace-first integration model.
+- **[Harness Integration Specification](docs/HARNESS-INTEGRATION-SPEC.md):** Defines artifact classes, ownership boundaries, and the target install/update contract.
+- **[Harness Namespace Migration Mitigation Plan](docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md):** Provides the phased migration plan, Definition of Done, verification steps, and review prompts for moving from hidden-tree installs to namespaced `.copilot` / `.github` integration.
+
+### Architecture Notes
+
+The repository uses Architecture Decision Records (ADRs) to document non-trivial design choices and avoid future drift.
+
+For the current long-term direction of installation and namespace strategy, start with:
+
+- **[ADR-012: Copilot-First Namespaced Harness Integration](docs/architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md)**
