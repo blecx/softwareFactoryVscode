@@ -352,9 +352,7 @@ def cleanup_workspace(
         resolved_env_file.unlink()
         print(f"🧹 Deleted {resolved_env_file}")
 
-    manifest_path = (
-        target_path / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
-    )
+    manifest_path = target_path / factory_workspace.TMP_SUBPATH / factory_workspace.RUNTIME_MANIFEST_FILENAME
     if manifest_path.exists():
         manifest_path.unlink()
         print(f"🧹 Deleted {manifest_path}")

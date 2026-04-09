@@ -44,7 +44,7 @@ curl -sSL https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/scr
 The installer will:
 
 - clone the factory into `.copilot/softwareFactoryVscode/`
-- bootstrap `.factory.env`, `.factory.lock.json`, and `.tmp/softwareFactoryVscode/`
+- bootstrap `.copilot/softwareFactoryVscode/.factory.env`, `.copilot/softwareFactoryVscode/lock.json`, and `.copilot/softwareFactoryVscode/.tmp/`
 - add recommended runtime ignores to `.gitignore`
 - generate `software-factory.code-workspace`
 - run `scripts/verify_factory_install.py` as a strict post-install compliance check
@@ -114,7 +114,7 @@ PORT_TUI=9090
 CONTEXT7_API_KEY=your_context7_key_here
 ```
 
-The bootstrap step also generates `.tmp/softwareFactoryVscode/runtime-manifest.json`.
+The bootstrap step also generates `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`.
 That manifest is the effective runtime contract for the installed workspace and includes:
 
 - the workspace instance identity
