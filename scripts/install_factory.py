@@ -105,9 +105,20 @@ def ensure_clean_factory_tree(factory_dir: Path) -> None:
         capture_output=True,
     )
     if status.stdout.strip():
-        raise RuntimeError(
-            "Existing factory installation has local changes. Commit/stash them or reinstall before updating."
-        )
+        import datetime
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        backup_branch = f"local-backup-{timestamp}"
+        print(f"⚠️  Factory installation has local changes. Backing up to branch '{backup_branch}'...")
+        run_command(["git", "-C", str(factory_dir), "checkout", "-b", backup_branch])
+        run_command(["git", "-C", str(factory_dir), "add", "-A"])
+        run_command([
+            "git", "-c", "user.name=Software Factory Updater", "-c", "user.email=updater@localhost", 
+            "-C", str(factory_dir), "commit", "-m", f"Auto-backup dirty state before update"
+        ])
+        
+        # Switch back to the branch we were on so update_factory can reset it
+        # Actually update_factory does a checkout to target_ref, so we are safe
+        print(f"✅  Dirty state saved to '{backup_branch}'. Proceeding with update...")
 
 
 def remote_branch_exists(factory_dir: Path, branch: str) -> bool:
@@ -258,7 +269,7 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 import subprocess
                 subprocess.run(
-                    [sys.executable, str(factory_dir / "scripts" / "factory_stack.py"), "stop", "--target", str(target_dir)],
+                    [sys.executable, str(factory_dir / "scripts" / "factory_stack.py"), "stop", "--repo-root", str(factory_dir)],
                     check=False,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
