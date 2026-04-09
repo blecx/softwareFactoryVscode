@@ -37,7 +37,7 @@ def _load_service() -> DockerComposeService:
     audit_dir = Path(
         os.getenv(
             "DOCKER_COMPOSE_MCP_AUDIT_DIR",
-            str(repo_root / ".tmp" / "mcp-docker-compose"),
+            str(repo_root / ".copilot/softwareFactoryVscode/.tmp" / "mcp-docker-compose"),
         )
     ).resolve()
     return DockerComposeService(

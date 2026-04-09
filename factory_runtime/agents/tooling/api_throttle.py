@@ -48,7 +48,7 @@ def _state_path() -> Path:
     if configured:
         path = Path(configured)
     else:
-        path = Path(".tmp") / "api-throttle-state.json"
+        path = Path(".copilot/softwareFactoryVscode/.tmp") / "api-throttle-state.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -58,7 +58,7 @@ def _lock_path() -> Path:
     if configured:
         path = Path(configured)
     else:
-        path = Path(".tmp") / "api-throttle.lock"
+        path = Path(".copilot/softwareFactoryVscode/.tmp") / "api-throttle.lock"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

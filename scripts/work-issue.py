@@ -338,7 +338,7 @@ async def _run_with_rate_limit_retry(
 
 def _persist_split_drafts(issue_number: int, drafts: Sequence) -> None:
     """Persist split issue drafts for traceability/debugging."""
-    output_path = Path(f".tmp/issue-{issue_number}-split-stubs.json")
+    output_path = Path(f".copilot/softwareFactoryVscode/.tmp/issue-{issue_number}-split-stubs.json")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     payload = [
         {
@@ -441,7 +441,7 @@ def _create_split_issues_via_gh(
 
 def _cleanup_split_transient_files(issue_number: int) -> None:
     """Clean transient artifacts after split operation."""
-    for path in Path(".tmp").glob(f"work-issue-{issue_number}-attempt-*.log"):
+    for path in Path(".copilot/softwareFactoryVscode/.tmp").glob(f"work-issue-{issue_number}-attempt-*.log"):
         try:
             path.unlink()
         except OSError:
@@ -756,7 +756,7 @@ def _wait_for_url(
 
 def _start_dev_stack_supervisor(project_root: Path) -> None:
     """Start dev stack supervisor in background if not already running."""
-    logs_dir = project_root / ".tmp"
+    logs_dir = project_root / ".copilot/softwareFactoryVscode/.tmp"
     logs_dir.mkdir(parents=True, exist_ok=True)
 
     pid_file = logs_dir / "dev-stack-supervisor.pid"

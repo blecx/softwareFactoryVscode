@@ -223,7 +223,7 @@ def relative_path(path: Path) -> str:
 
 
 def latest_goal_archive() -> dict[str, Any] | None:
-    archive_root = ROOT / ".tmp" / "archive"
+    archive_root = ROOT / ".copilot/softwareFactoryVscode/.tmp" / "archive"
     manifests = sorted(archive_root.glob("goals-*.json"))
     if not manifests:
         return None
@@ -239,7 +239,7 @@ def latest_goal_archive() -> dict[str, Any] | None:
 
 
 def archive_issue_artifacts(issue_number: int, issue_title: str, *, dry_run: bool) -> ArchiveSummary:
-    tmp_dir = ROOT / ".tmp"
+    tmp_dir = ROOT / ".copilot/softwareFactoryVscode/.tmp"
     archive_dir = tmp_dir / "archive" / "issues" / str(issue_number)
     slug = slugify(issue_title)
     candidates = [

@@ -16,7 +16,7 @@ def _load_service() -> GitHubOpsService:
     audit_dir = Path(
         os.getenv(
             "GITHUB_OPS_MCP_AUDIT_DIR",
-            str(repo_root / ".tmp" / "mcp-github-ops"),
+            str(repo_root / ".copilot/softwareFactoryVscode/.tmp" / "mcp-github-ops"),
         )
     ).resolve()
 

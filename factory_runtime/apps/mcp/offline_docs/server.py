@@ -12,7 +12,7 @@ def _load_service() -> OfflineDocsService:
     index_db = Path(
         os.getenv(
             "OFFLINE_DOCS_INDEX_DB",
-            str(repo_root / ".tmp" / "mcp-offline-docs" / "docs_index.db"),
+            str(repo_root / ".copilot/softwareFactoryVscode/.tmp" / "mcp-offline-docs" / "docs_index.db"),
         )
     ).resolve()
     source_env = os.getenv(
