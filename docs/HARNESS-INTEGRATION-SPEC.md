@@ -127,7 +127,7 @@ The preferred long-term direction is:
 - primary harness assets under `.copilot/softwareFactoryVscode/`
 - GitHub-facing integration assets under `.github/softwareFactoryVscode/`
 - minimal root-level bridge files only where needed
-- no dedicated root-level `.softwareFactoryVscode/` directory as the final integration model
+- no dedicated root-level `.copilot/softwareFactoryVscode/` directory as the final integration model
 
 The current hidden-tree installer remains transitional while the project migrates toward this target.
 

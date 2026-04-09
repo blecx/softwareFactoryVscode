@@ -5,7 +5,7 @@ __pycache__/
 .DS_Store
 .factory/
 .factory.env
-.factory.lock.json
+lock.json
 *.db
 *.db-shm
 *.db-wal

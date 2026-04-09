@@ -32,13 +32,7 @@ SCRIPT_REPO_ROOT = Path(__file__).resolve().parents[1]
 def resolve_env_file(repo_root: Path, env_file: Path | None = None) -> Path:
     if env_file is not None:
         return env_file.expanduser().resolve()
-
-    candidates = [repo_root / ".factory.env", repo_root.parent / ".factory.env"]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate.resolve()
-
-    return candidates[0].resolve()
+    return (repo_root / ".factory.env").resolve()
 
 
 def build_compose_command(
@@ -124,17 +118,17 @@ def resolve_target_dir_from_env(repo_root: Path, env_file: Path) -> Path:
     target_value = env_values.get("TARGET_WORKSPACE_PATH", "").strip()
     if target_value:
         return Path(target_value).expanduser().resolve()
-    return repo_root.parent.resolve()
+    return repo_root.parents[1].resolve()
 
 
 def read_factory_lock_commit(target_dir: Path) -> str:
-    """Return the factory commit SHA recorded in .factory.lock.json, or ''."""
-    lock_path = target_dir / ".factory.lock.json"
+    """Return the factory commit SHA recorded in .copilot/softwareFactoryVscode/lock.json, or ''."""
+    lock_path = target_dir / ".copilot/softwareFactoryVscode/lock.json"
     try:
         data = json.loads(lock_path.read_text())
         return str(data.get("factory", {}).get("commit", "")).strip()
-    except (FileNotFoundError, json.JSONDecodeError, KeyError):
-        return ""
+    except (Exception, json.JSONDecodeError, KeyError):
+        import traceback; traceback.print_exc(); return ""
 
 
 def get_factory_head_commit(factory_dir: Path) -> str:
@@ -148,15 +142,15 @@ def get_factory_head_commit(factory_dir: Path) -> str:
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError:
-        return ""
+        import traceback; traceback.print_exc(); return ""
 
 
 def write_factory_lock_commit(target_dir: Path, factory_dir: Path) -> None:
-    """Stamp the factory's current HEAD commit into .factory.lock.json."""
+    """Stamp the factory's current HEAD commit into .copilot/softwareFactoryVscode/lock.json."""
     commit = get_factory_head_commit(factory_dir)
     if not commit:
         return
-    lock_path = target_dir / ".factory.lock.json"
+    lock_path = target_dir / ".copilot/softwareFactoryVscode/lock.json"
     try:
         data = json.loads(lock_path.read_text()) if lock_path.exists() else {}
         data.setdefault("factory", {})["commit"] = commit
@@ -318,7 +312,7 @@ def cleanup_workspace(
 
     resolved_env_file = resolve_env_file(repo_root, env_file)
     config: factory_workspace.WorkspaceRuntimeConfig | None = None
-    target_path = repo_root.parent
+    target_path = repo_root.parents[1]
     try:
         config = sync_workspace_runtime(
             repo_root, env_file=resolved_env_file, persist=False
@@ -334,7 +328,7 @@ def cleanup_workspace(
         print(f"🧹 Removed Docker stack and volumes for {instance_id}")
     except Exception as e:
         print(f"⚠️ Could not completely remove docker stack (it may not exist): {e}")
-        target_path_str = str(repo_root.parent.absolute())
+        target_path_str = str(repo_root.parents[1].absolute())
 
     registry = factory_workspace.load_registry()
     if "workspaces" in registry:

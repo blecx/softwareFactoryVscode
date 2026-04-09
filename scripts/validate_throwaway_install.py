@@ -227,10 +227,10 @@ def run_install(
 def run_verify(target_repo: Path, *, runtime: bool) -> None:
     heading("🔎 Running compliance verification")
     command = [
-        str(target_repo / ".softwareFactoryVscode" / ".venv" / "bin" / "python"),
+        str(target_repo / ".copilot/softwareFactoryVscode" / ".venv" / "bin" / "python"),
         str(
             target_repo
-            / ".softwareFactoryVscode"
+            / ".copilot/softwareFactoryVscode"
             / "scripts"
             / "verify_factory_install.py"
         ),
@@ -262,8 +262,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     source_repo = Path(args.source_repo).expanduser().resolve()
     target_repo = Path(args.target).expanduser().resolve()
-    source_env = source_repo / ".factory.env"
-    target_env = target_repo / ".factory.env"
+    source_env = source_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    target_env = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
     source_stack_stopped = False
     runtime_checked = False
 
@@ -288,19 +288,19 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source_stack_stopped = maybe_stop_stack(source_repo, source_env)
             try:
                 maybe_stop_stack(
-                    target_repo / ".softwareFactoryVscode",
+                    target_repo / ".copilot/softwareFactoryVscode",
                     target_env,
                     remove_volumes=True,
                 )
                 start_stack(
-                    target_repo / ".softwareFactoryVscode", target_env, build=True
+                    target_repo / ".copilot/softwareFactoryVscode", target_env, build=True
                 )
                 run_verify(target_repo, runtime=True)
                 runtime_checked = True
             finally:
                 if not args.keep_target_running and target_env.exists():
                     maybe_stop_stack(
-                        target_repo / ".softwareFactoryVscode",
+                        target_repo / ".copilot/softwareFactoryVscode",
                         target_env,
                         remove_volumes=True,
                     )

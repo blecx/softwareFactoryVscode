@@ -16,14 +16,14 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import factory_workspace
 
-FACTORY_DIRNAME = ".softwareFactoryVscode"
+FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
 TMP_SUBPATH = Path(".tmp") / "softwareFactoryVscode"
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
 DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
 WORKSPACE_TEMPLATE_PATH = (
     Path(__file__).resolve().parent.parent / "workspace.code-workspace.template"
 )
-GITIGNORE_BLOCK = ["# Factory Isolation", ".tmp/softwareFactoryVscode/", ".factory.env"]
+GITIGNORE_BLOCK = ["# Factory Isolation", ".tmp/softwareFactoryVscode/", ".copilot/softwareFactoryVscode/.factory.env"]
 
 
 def utc_now_iso() -> str:
@@ -84,17 +84,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--factory-version",
         default="main",
-        help="Human-readable factory version or ref label to record in .factory.lock.json.",
+        help="Human-readable factory version or ref label to record in .copilot/softwareFactoryVscode/lock.json.",
     )
     parser.add_argument(
         "--factory-commit",
         default="",
-        help="Resolved git commit SHA to record in .factory.lock.json.",
+        help="Resolved git commit SHA to record in .copilot/softwareFactoryVscode/lock.json.",
     )
     parser.add_argument(
         "--repo-url",
         default=DEFAULT_REPO_URL,
-        help="Canonical source repository URL to record in .factory.lock.json.",
+        help="Canonical source repository URL to record in .copilot/softwareFactoryVscode/lock.json.",
     )
     return parser.parse_args(argv)
 
@@ -124,7 +124,7 @@ def sync_factory_runtime_contract(
     workspace_file: str,
 ) -> tuple[factory_workspace.WorkspaceRuntimeConfig, bool]:
     factory_dir = ensure_factory_present(target_dir)
-    env_path = target_dir / ".factory.env"
+    env_path = target_dir / FACTORY_DIRNAME / ".factory.env"
     existed_before = env_path.exists()
     config = factory_workspace.build_runtime_config(
         target_dir,
@@ -204,7 +204,7 @@ def update_lock_file(
     repo_url: str,
     workspace_file: str,
 ) -> Path:
-    lock_path = target_dir / ".factory.lock.json"
+    lock_path = target_dir / ".copilot/softwareFactoryVscode/lock.json"
     now = utc_now_iso()
     lock_data = load_json(lock_path)
     installed_at = lock_data.get("installed_at", now)
@@ -242,7 +242,7 @@ def bootstrap_target(
         target_dir,
         workspace_file=workspace_file,
     )
-    factory_env_path = target_dir / ".factory.env"
+    factory_env_path = target_dir / FACTORY_DIRNAME / ".factory.env"
     gitignore_result = None
     if not skip_gitignore:
         gitignore_result = ensure_gitignore_entries(target_dir)
@@ -332,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
     print("\n✅ Bootstrap secure and complete!")
     print(
         "Isolation rule confirmed: tool-owned .vscode/ and .github/ remain locked "
-        "inside .softwareFactoryVscode/ and are NOT polluting the root project by default."
+        "inside .copilot/softwareFactoryVscode/ and are NOT polluting the root project by default."
     )
     if result["workspace_result"]:
         workspace_path, workspace_status = result["workspace_result"]

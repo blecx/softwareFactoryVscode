@@ -6,7 +6,7 @@
     },
     {
       "name": "AI Agent Factory",
-      "path": ".softwareFactoryVscode"
+      "path": ".copilot/softwareFactoryVscode"
     }
   ],
   "settings": {}

@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-FACTORY_DIRNAME = ".softwareFactoryVscode"
+FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
 TMP_SUBPATH = Path(".tmp") / "softwareFactoryVscode"
 RUNTIME_MANIFEST_FILENAME = "runtime-manifest.json"
 REGISTRY_FILENAME = "workspace-registry.json"
@@ -394,7 +394,7 @@ def build_runtime_config(
         if factory_dir is not None
         else (resolved_target / FACTORY_DIRNAME).resolve()
     )
-    env_path = resolved_target / ".factory.env"
+    env_path = resolved_target / FACTORY_DIRNAME / ".factory.env"
     manifest_path = resolved_target / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME
     existing_env = parse_env_file(env_path)
     existing_manifest = load_json(manifest_path)
@@ -573,7 +573,9 @@ def sync_runtime_artifacts(
 ) -> dict[str, Any]:
     config.target_dir.joinpath(TMP_SUBPATH).mkdir(parents=True, exist_ok=True)
     if write_env:
-        write_env_file(config.target_dir / ".factory.env", config.env_values)
+        (config.target_dir / FACTORY_DIRNAME).mkdir(parents=True, exist_ok=True)
+    (config.target_dir / FACTORY_DIRNAME).mkdir(parents=True, exist_ok=True)
+    write_env_file(config.target_dir / FACTORY_DIRNAME / ".factory.env", config.env_values)
 
     manifest = build_runtime_manifest(config)
     write_json_atomic(config.runtime_manifest_path, manifest)

@@ -72,7 +72,7 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
                 "factory_instance_id": "factory-seed",
                 "project_workspace_id": "seed",
                 "target_workspace_path": str(tmp_path / "seed"),
-                "factory_dir": str(tmp_path / "seed" / ".softwareFactoryVscode"),
+                "factory_dir": str(tmp_path / "seed" / ".copilot/softwareFactoryVscode"),
                 "workspace_file_path": str(
                     tmp_path / "seed" / "software-factory.code-workspace"
                 ),
@@ -130,7 +130,7 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
                 str(FACTORY_STACK_SCRIPT),
                 "start",
                 "--repo-root",
-                str(target_repo / ".softwareFactoryVscode"),
+                str(target_repo / ".copilot/softwareFactoryVscode"),
                 "--env-file",
                 str(target_repo / ".factory.env"),
                 "--build",
@@ -172,14 +172,14 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
         )
     finally:
         env_path = target_repo / ".factory.env"
-        if env_path.exists() and (target_repo / ".softwareFactoryVscode").exists():
+        if env_path.exists() and (target_repo / ".copilot/softwareFactoryVscode").exists():
             subprocess.run(
                 [
                     sys.executable,
                     str(FACTORY_STACK_SCRIPT),
                     "stop",
                     "--repo-root",
-                    str(target_repo / ".softwareFactoryVscode"),
+                    str(target_repo / ".copilot/softwareFactoryVscode"),
                     "--env-file",
                     str(env_path),
                     "--remove-volumes",
