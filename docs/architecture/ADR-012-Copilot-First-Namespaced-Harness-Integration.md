@@ -57,8 +57,9 @@ We adopt a **Copilot-first namespaced harness integration model**.
 ### 5. Host-Owned Tooling Remains Host-Owned
 
 - **Rule:** Even when the factory integrates with `.copilot`, `.github`, `.vscode`, or `.gitignore`, those host namespaces remain host-owned.
-- **Rule:** Install and update workflows must not silently overwrite host customizations.
-- **Rule:** Managed overlays or projections into host-owned namespaces must follow an explicit update contract.
+- **Rule:** Update workflows must prioritize upstream integrity for managed assets but never destroy host state permanently. For `.copilot/softwareFactoryVscode/` updates, conflicts are handled by aggressively resetting to `origin/<ref>`, but only *after* taking an automated `git switch -c local-backup-*` branch backup of any dirty modifications.
+- **Rule:** Active `.tmp` resources and running Docker workloads must be gracefully spun down (`factory_stack.py stop`) before updates proceed, preventing filesystem exhaustion or volume corruption.
+- **Rule:** Overwrites to `software-factory.code-workspace` are applied atomically in-place, and `.factory.env` merges upstream schema additions while retaining user-injected secrets.
 
 ### 6. Copilot Must Preserve Host Project Task Focus
 

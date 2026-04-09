@@ -71,13 +71,14 @@ To refresh an already installed factory tree in place, run the same installer wi
 curl -sSL https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/scripts/install_factory.py | python3 - --target /path/to/your/existing-project --update
 ```
 
-The updater will:
+The updater operates robustly:
 
-- fetch and fast-forward the installed `.copilot/softwareFactoryVscode/` checkout when possible
-- preserve host-specific files like `.factory.env`
-- preserve a custom `software-factory.code-workspace` unless `--force-workspace` is used
-- refresh `.factory.lock.json`
-- re-run post-install compliance verification before declaring success
+- gracefully spins down active Docker compose containers to release handles (`factory_stack.py stop`)
+- forces upstream synchronization of `.copilot/softwareFactoryVscode/` (commits and stashes dirty files to a `local-backup-<timestamp>` branch if required)
+- merges new schema entries into `.copilot/softwareFactoryVscode/.factory.env` while keeping your local overrides (like custom ports and secrets)
+- preserves a custom `software-factory.code-workspace` unless `--force-workspace` is used
+- refreshes `.copilot/softwareFactoryVscode/lock.json`
+- re-runs post-install compliance verification before declaring success
 
 ---
 

@@ -251,22 +251,25 @@ Make updates safe, deterministic, and ownership-aware.
    - generated bridge files,
    - host-owned files,
    - conflict cases.
-3. Implement non-destructive defaults.
-4. Define rollback behavior for partial updates.
-5. Add regression coverage for update safety.
+3. Implement safe overwrite defaults without user prompting.
+   - Run graceful container spin-down (`factory_stack.py stop`) before applying updates.
+   - Automatically back up dirty factory trees (`git switch -c local-backup-<timestamp>`) before overwriting.
+   - Preserve `.factory.env` user secrets while merging managed system schema variables.
+   - Perform atomic in-place rewrites of `software-factory.code-workspace`.
+4. Add regression coverage for update safety.
 
 ### Phase 3 open questions that must be answered, not guessed
 
-- How should modified factory-managed files be handled?
-- What conflict UX is expected for operators?
-- Which generated files are always safe to regenerate?
+- How should modified factory-managed files be handled? -> **Answered**: Automated branch backup + hard origin reset.
+- What conflict UX is expected for operators? -> **Answered**: Zero UX. Conflicts are resolved automatically favoring upstream, with a `local-backup-*` git branch created to prevent data loss.
+- Which generated files are always safe to regenerate? -> **Answered**: `software-factory.code-workspace` and `.tmp` artifacts.
 
 ### Phase 3 DoD
 
 - update logic is ownership-aware,
 - host-owned files are preserved by default,
-- conflict states are explicit and testable,
-- rollback or recovery expectations are documented,
+- conflict states are explicitly backed up and overridden smoothly,
+- rollback or recovery expectations via branch backups are documented,
 - update docs match actual behavior.
 
 ### Phase 3 review criteria
