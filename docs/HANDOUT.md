@@ -2,6 +2,8 @@
 
 Welcome to the **Software Factory for VS Code**. This platform transforms your local environment into an autonomous, multi-tenant AI development factory. It securely orchestrates agents, memory, and development tools alongside your local code inside a VS Code workspace.
 
+> **Architecture note:** The current runtime implementation still uses a hidden-tree installation model in places, but the intended long-term product direction is documented in [`docs/COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md), [`docs/HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md), and [`ADR-012`](architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md).
+
 ## 🚀 Concept Overview
 
 The Factory operates using a **Hybrid Multi-Tenant MCP Architecture**.

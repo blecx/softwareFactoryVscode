@@ -2,6 +2,8 @@
 
 This guide provides exactly how to install and bootstrap the `softwareFactoryVscode` capability.
 
+> **Architecture note:** This document describes the **current installer behavior**. The longer-term target integration model is documented in [`docs/COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md), [`docs/HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md), and [`ADR-012`](architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md). Where those documents differ from the hidden-tree installer described below, treat the difference as intentional future direction rather than current behavior.
+
 The Factory is designed to operate seamlessly via a "Hidden-Tree Isolation Model." When installed, it places itself under a `.softwareFactoryVscode/` hidden directory within your target project. It does **not** overwrite or pollute your existing `.vscode/`, `.github/`, or project files.
 
 The supported operating model is **Option B**:
