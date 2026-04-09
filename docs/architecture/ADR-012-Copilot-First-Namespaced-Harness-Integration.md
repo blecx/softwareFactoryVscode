@@ -67,9 +67,6 @@ We adopt a **Copilot-first namespaced harness integration model**.
 - **Rule:** For normal implementation tasks, Copilot workflows must continue to default to the host project's product context, treating harness artifacts as tooling/instruction context unless explicitly targeted.
 - **Rule:** Workspace layout, documentation, and install/update behavior should reinforce this distinction.
 
-### 7. The Hidden-Tree Model Becomes Legacy, Not the End State
-
-- **Rule:** The current hidden-tree `.softwareFactoryVscode/` installation model is a valid implementation step but is not the preferred long-term integration shape.
 - **Rule:** Future install/update work should move toward namespaced integration under `.copilot` first and `.github` second.
 - **Rule:** Migration work must be planned explicitly and should preserve updateability from the central `softwareFactoryVscode` repository.
 
@@ -79,4 +76,4 @@ We adopt a **Copilot-first namespaced harness integration model**.
 - Future install/update changes can be evaluated against a stable namespace policy.
 - `.copilot` becomes the primary architectural anchor for AI behavior, with `.github` used where GitHub-specific integration is required.
 - Drift toward unmanaged root-level sprawl or silent host tooling takeover becomes easier to identify in review.
-- The current hidden-tree installer and documentation should be treated as transitional where they conflict with this target model.
+- The previous hidden-tree installer and documentation have been fully transitioned where they conflict with this target model.
