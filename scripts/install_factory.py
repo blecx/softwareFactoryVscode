@@ -241,6 +241,8 @@ def main(argv: list[str] | None = None) -> int:
     
     # 1. Legacy locations
     old_factory = target_dir / ".softwareFactoryVscode"
+    old_tmp_dir = target_dir / ".tmp" / "softwareFactoryVscode"
+
     if old_factory.exists():
         print(f"➡️ Spinning down any running legacy factory containers before removal...")
         try:
@@ -256,6 +258,11 @@ def main(argv: list[str] | None = None) -> int:
 
         print(f"🗑️  Removing legacy installation path: {old_factory}")
         shutil.rmtree(old_factory, ignore_errors=True)
+
+    if old_tmp_dir.exists():
+        print(f"🗑️  Removing legacy tmp path: {old_tmp_dir}")
+        shutil.rmtree(old_tmp_dir, ignore_errors=True)
+
     old_env = target_dir / ".factory.env"
     if old_env.exists():
         old_env.unlink()
