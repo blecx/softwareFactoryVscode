@@ -242,6 +242,18 @@ def main(argv: list[str] | None = None) -> int:
     # 1. Legacy locations
     old_factory = target_dir / ".softwareFactoryVscode"
     if old_factory.exists():
+        print(f"➡️ Spinning down any running legacy factory containers before removal...")
+        try:
+            import subprocess
+            subprocess.run(
+                [sys.executable, str(old_factory / "scripts" / "factory_stack.py"), "stop", "--repo-root", str(old_factory)],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except Exception as e:
+            print(f"⚠️ Could not stop running legacy containers: {e}")
+
         print(f"🗑️  Removing legacy installation path: {old_factory}")
         shutil.rmtree(old_factory, ignore_errors=True)
     old_env = target_dir / ".factory.env"
