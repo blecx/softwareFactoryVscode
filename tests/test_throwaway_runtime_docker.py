@@ -142,7 +142,7 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
         )
 
         runtime_manifest_path = (
-            target_repo / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+            target_repo / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
         )
         runtime_manifest = json.loads(runtime_manifest_path.read_text(encoding="utf-8"))
         assert runtime_manifest["port_index"] != 0

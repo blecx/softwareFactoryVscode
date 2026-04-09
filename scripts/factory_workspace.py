@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
-TMP_SUBPATH = Path(".tmp") / "softwareFactoryVscode"
+TMP_SUBPATH = Path(FACTORY_DIRNAME) / ".tmp"
 RUNTIME_MANIFEST_FILENAME = "runtime-manifest.json"
 REGISTRY_FILENAME = "workspace-registry.json"
 REGISTRY_VERSION = 1

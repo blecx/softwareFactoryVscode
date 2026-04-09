@@ -16,7 +16,7 @@ This document provides a concrete inventory of current install, update, and runt
 | **Compose Definitions**     | `.softwareFactoryVscode/compose/`                              | Canonical harness asset                         | **Migrate** to `.copilot/softwareFactoryVscode/compose/`                              |
 | **Runtime Environment**     | `.factory.env` at host root                                    | Local-only / ephemeral runtime state            | **Replace/Migrate** (evaluate if it can be namespaced or absorbed into registry)      |
 | **Lock File**               | `.softwareFactoryVscode/factory.lock.json`                     | Local-only / ephemeral runtime state            | **Replace** with managed-path record                                                  |
-| **Transient Data**          | `.tmp/softwareFactoryVscode/`                                  | Local-only / ephemeral runtime state            | **Keep** (ensure `.gitignore` coverage)                                               |
+| **Transient Data**          | `.copilot/softwareFactoryVscode/.tmp/`                         | Local-only / ephemeral runtime state            | **Keep** (ensure `.gitignore` coverage)                                               |
 | **Workspace File**          | `software-factory.code-workspace` at host root                 | Host-owned integration surface (Generated once) | **Optionalize**                                                                       |
 | **Git Ignore Block**        | `.gitignore` at host root                                      | Host-owned integration surface                  | **Keep** (update paths for target namespace)                                          |
 

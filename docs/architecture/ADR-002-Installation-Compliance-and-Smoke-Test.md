@@ -25,7 +25,7 @@ Every install or update MUST run a dedicated compliance script after bootstrap a
 The compliance script MUST verify the install contract rather than relying on informal operator inspection.
 
 - **Rule:** Verify the presence of `.softwareFactoryVscode/` as a hidden-tree git checkout.
-- **Rule:** Verify host-side artifacts such as `.factory.env`, `.factory.lock.json`, and `.tmp/softwareFactoryVscode/`.
+- **Rule:** Verify host-side artifacts such as `.copilot/softwareFactoryVscode/.factory.env`, `.copilot/softwareFactoryVscode/lock.json`, and `.copilot/softwareFactoryVscode/.tmp/`.
 - **Rule:** Verify the Option B workspace entrypoint (`software-factory.code-workspace`) unless explicitly skipped.
 - **Rule:** Verify `.gitignore` contains the required factory isolation entries unless explicitly skipped.
 

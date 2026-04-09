@@ -17,13 +17,13 @@ if str(SCRIPT_DIR) not in sys.path:
 import factory_workspace
 
 FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
-TMP_SUBPATH = Path(".tmp") / "softwareFactoryVscode"
+TMP_SUBPATH = Path(FACTORY_DIRNAME) / ".tmp"
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
 DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
 WORKSPACE_TEMPLATE_PATH = (
     Path(__file__).resolve().parent.parent / "workspace.code-workspace.template"
 )
-GITIGNORE_BLOCK = ["# Factory Isolation", ".tmp/softwareFactoryVscode/", ".copilot/softwareFactoryVscode/.factory.env"]
+GITIGNORE_BLOCK = ["# Factory Isolation", f"{FACTORY_DIRNAME}/.tmp/", f"{FACTORY_DIRNAME}/.factory.env"]
 
 
 def utc_now_iso() -> str:

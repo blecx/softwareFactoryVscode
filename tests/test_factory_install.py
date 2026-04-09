@@ -148,7 +148,7 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
 
     assert exit_code == 0
     assert (target_repo / ".copilot/softwareFactoryVscode").exists()
-    assert (target_repo / ".tmp" / "softwareFactoryVscode").exists()
+    assert (target_repo / ".copilot/softwareFactoryVscode/.tmp").exists()
 
     factory_env = (target_repo / ".copilot/softwareFactoryVscode/.factory.env").read_text(encoding="utf-8")
     assert f"TARGET_WORKSPACE_PATH={target_repo}" in factory_env
@@ -159,7 +159,7 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
 
     runtime_manifest = json.loads(
         (
-            target_repo / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+            target_repo / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
         ).read_text(encoding="utf-8")
     )
     assert runtime_manifest["compose_project_name"] == f"factory_{target_repo.name}"
@@ -185,7 +185,7 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     assert lock_data["factory"]["commit"]
 
     gitignore = (target_repo / ".gitignore").read_text(encoding="utf-8")
-    assert ".tmp/softwareFactoryVscode/" in gitignore
+    assert ".copilot/softwareFactoryVscode/.tmp/" in gitignore
     assert ".copilot/softwareFactoryVscode/.factory.env" in gitignore
 
 
@@ -221,9 +221,9 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
     assert (factory_dir / ".git").exists()
     assert (factory_dir / "setup.sh").exists()
     assert (factory_dir / ".venv" / "bin" / "python").exists()
-    assert (target_repo / ".tmp" / "softwareFactoryVscode").is_dir()
+    assert (target_repo / ".copilot/softwareFactoryVscode/.tmp").is_dir()
     assert (
-        target_repo / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+        target_repo / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
     ).is_file()
     assert (target_repo / ".copilot/softwareFactoryVscode/.factory.env").is_file()
     assert (target_repo / ".copilot/softwareFactoryVscode/lock.json").is_file()
@@ -259,7 +259,7 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
     ]
     runtime_manifest = json.loads(
         (
-            target_repo / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+            target_repo / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
         ).read_text(encoding="utf-8")
     )
     assert (
@@ -310,7 +310,7 @@ def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
         ]
     )
     (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(custom_env, encoding="utf-8")
-    tmp_dir = target_repo / ".tmp" / "softwareFactoryVscode"
+    tmp_dir = target_repo / ".copilot/softwareFactoryVscode/.tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     (tmp_dir / "foo.txt").write_text("running")
 
@@ -412,7 +412,7 @@ def test_verify_factory_install_fails_when_workspace_file_missing(
         encoding="utf-8",
     )
     (target_repo / ".gitignore").write_text(
-        "# Factory Isolation\n.tmp/softwareFactoryVscode/\n.copilot/softwareFactoryVscode/.factory.env\n",
+        "# Factory Isolation\n.copilot/softwareFactoryVscode/.tmp/\n.copilot/softwareFactoryVscode/.factory.env\n",
         encoding="utf-8",
     )
     (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
@@ -484,7 +484,7 @@ def test_verify_factory_install_fails_when_bash_gateway_policy_is_invalid(
         encoding="utf-8",
     )
     (target_repo / ".gitignore").write_text(
-        "# Factory Isolation\n.tmp/softwareFactoryVscode/\n.copilot/softwareFactoryVscode/.factory.env\n",
+        "# Factory Isolation\n.copilot/softwareFactoryVscode/.tmp/\n.copilot/softwareFactoryVscode/.factory.env\n",
         encoding="utf-8",
     )
     (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
@@ -575,7 +575,7 @@ def test_verify_factory_runtime_passes_with_mocked_services(
         encoding="utf-8",
     )
     (target_repo / ".gitignore").write_text(
-        "# Factory Isolation\n.tmp/softwareFactoryVscode/\n.copilot/softwareFactoryVscode/.factory.env\n",
+        "# Factory Isolation\n.copilot/softwareFactoryVscode/.tmp/\n.copilot/softwareFactoryVscode/.factory.env\n",
         encoding="utf-8",
     )
     (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
@@ -733,7 +733,7 @@ def test_verify_factory_runtime_fails_when_required_service_missing(
         encoding="utf-8",
     )
     (target_repo / ".gitignore").write_text(
-        "# Factory Isolation\n.tmp/softwareFactoryVscode/\n.copilot/softwareFactoryVscode/.factory.env\n",
+        "# Factory Isolation\n.copilot/softwareFactoryVscode/.tmp/\n.copilot/softwareFactoryVscode/.factory.env\n",
         encoding="utf-8",
     )
     (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
@@ -1314,7 +1314,7 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
         config, runtime_state="running", active=False
     )
     (target_repo / ".gitignore").write_text(
-        "# Factory Isolation\n.tmp/softwareFactoryVscode/\n.copilot/softwareFactoryVscode/.factory.env\n",
+        "# Factory Isolation\n.copilot/softwareFactoryVscode/.tmp/\n.copilot/softwareFactoryVscode/.factory.env\n",
         encoding="utf-8",
     )
     (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
@@ -1585,11 +1585,11 @@ def test_reconcile_registry_prunes_ephemeral_pytest_workspaces(
 
     ephemeral_target = tmp_path / "pytest-of-sw" / "pytest-1" / "target-project"
     ephemeral_target.mkdir(parents=True, exist_ok=True)
-    (ephemeral_target / ".tmp" / "softwareFactoryVscode").mkdir(
+    (ephemeral_target / ".copilot/softwareFactoryVscode/.tmp").mkdir(
         parents=True, exist_ok=True
     )
     (
-        ephemeral_target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+        ephemeral_target / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
     ).write_text("{}\n", encoding="utf-8")
 
     persistent_target = Path("/tmp") / "factory-registry-persistent-target"
@@ -1597,13 +1597,14 @@ def test_reconcile_registry_prunes_ephemeral_pytest_workspaces(
         shutil.rmtree(persistent_target)
     persistent_target.mkdir(parents=True, exist_ok=True)
     try:
-        (persistent_target / ".tmp" / "softwareFactoryVscode").mkdir(
+        (persistent_target / ".copilot/softwareFactoryVscode/.tmp").mkdir(
             parents=True, exist_ok=True
         )
         (
             persistent_target
-            / ".tmp"
+            / ".copilot"
             / "softwareFactoryVscode"
+            / ".tmp"
             / "runtime-manifest.json"
         ).write_text("{}\n", encoding="utf-8")
 
@@ -1727,7 +1728,7 @@ def test_cleanup_workspace(tmp_path: Path):
     # Assert created
     assert (target / ".copilot/softwareFactoryVscode/.factory.env").exists()
     assert (
-        target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+        target / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
     ).exists()
 
     # cleanup
@@ -1735,7 +1736,7 @@ def test_cleanup_workspace(tmp_path: Path):
 
     assert not (target / ".copilot/softwareFactoryVscode/.factory.env").exists()
     assert not (
-        target / ".tmp" / "softwareFactoryVscode" / "runtime-manifest.json"
+        target / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
     ).exists()
     assert not (data_root / "memory" / config.factory_instance_id).exists()
     assert not (data_root / "bus" / config.factory_instance_id).exists()

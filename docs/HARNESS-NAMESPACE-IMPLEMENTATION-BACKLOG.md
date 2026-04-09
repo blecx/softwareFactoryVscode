@@ -311,16 +311,16 @@ Reduce the architectural weight of transient runtime state.
 
 ### Phase 4 open questions that must be answered, not guessed
 
-- Which runtime facts must remain easy for operators to inspect?
-- Which runtime artifacts can move to local-only storage without harming operator workflows?
-- Should any runtime metadata remain in-repo for portability reasons?
+- Which runtime facts must remain easy for operators to inspect? -> **Answered**: `.factory.env` and `lock.json` are sufficient to inspect the configuration and current version of the workspace.
+- Which runtime artifacts can move to local-only storage without harming operator workflows? -> **Answered**: The `.tmp` folder used for logs and JSON manifest can move fully inside `.copilot/softwareFactoryVscode/.tmp`.
+- Should any runtime metadata remain in-repo for portability reasons? -> **Answered**: The internal registry handles cross-workspace operations, the `manifest` keeps a local trace for fast queries.
 
 ### Phase 4 DoD
 
-- runtime scratch state is clearly separated from harness projection,
-- each transient artifact has a documented future disposition,
-- unnecessary root-level runtime state is no longer part of the preferred install contract,
-- operator-relevant visibility remains available.
+- [x] runtime scratch state is clearly separated from harness projection,
+- [x] each transient artifact has a documented future disposition,
+- [x] unnecessary root-level runtime state is no longer part of the preferred install contract,
+- [x] operator-relevant visibility remains available.
 
 ### Phase 4 review criteria
 
