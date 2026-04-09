@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SUPERVISOR_PID_FILE="${DEV_STACK_PID_FILE:-$REPO_ROOT/.tmp/dev-stack-supervisor.pid}"
+SUPERVISOR_PID_FILE="${DEV_STACK_PID_FILE:-$REPO_ROOT/.copilot/softwareFactoryVscode/.tmp/dev-stack-supervisor.pid}"
 SUPERVISOR_SCRIPT="$REPO_ROOT/scripts/dev_stack_supervisor.py"
 PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
 

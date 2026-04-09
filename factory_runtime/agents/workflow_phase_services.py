@@ -248,7 +248,7 @@ class ImplementationPhaseService:
         )
 
         artifact_path = (
-            Path(".tmp") / f"copilot-pre-implementation-review-{issue_num}.md"
+            Path(".copilot/softwareFactoryVscode/.tmp") / f"copilot-pre-implementation-review-{issue_num}.md"
         )
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
         artifact_path.write_text(review_body + "\n", encoding="utf-8")
@@ -473,7 +473,7 @@ class PrMergePhaseService:
         """Create a repository-compliant PR body in .tmp and return its path."""
 
         repo_type = _detect_validation_repo_type(agent)
-        body_path = Path(".tmp") / f"pr-body-{issue_num}.md"
+        body_path = Path(".copilot/softwareFactoryVscode/.tmp") / f"pr-body-{issue_num}.md"
         body_path.parent.mkdir(parents=True, exist_ok=True)
 
         if repo_type == "client":

@@ -35,7 +35,7 @@ def generate_issue_mockup_artifacts(
     *,
     prompt: str,
     image_count: int = 1,
-    base_dir: Path | str = ".tmp/mockups",
+    base_dir: Path | str = ".copilot/softwareFactoryVscode/.tmp/mockups",
     api_key: str | None = None,
     model: str = "gpt-image-1",
     size: str = "1024x1024",
