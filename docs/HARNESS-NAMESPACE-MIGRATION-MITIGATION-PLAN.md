@@ -18,6 +18,7 @@ See also:
 - `docs/architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md`
 - `docs/HARNESS-INTEGRATION-SPEC.md`
 - `docs/COPILOT-HARNESS-MODEL.md`
+- `docs/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`
 - `docs/INSTALL.md`
 
 ---
