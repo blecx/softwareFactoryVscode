@@ -2,6 +2,12 @@
 
 Welcome to the **Software Factory for VS Code**, a local, AI-powered development environment that seamlessly integrates autonomous agents and advanced Model Context Protocol (MCP) tooling directly into your VS Code workspace.
 
+## Current Release
+
+- **Latest release:** `2.2`
+- **Release notes for GitHub:** [`.github/releases/v2.2.md`](.github/releases/v2.2.md)
+- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)
+
 ## What is this project?
 
 This project provides a pre-configured, multi-tenant capable AI agent runtime designed to automate many aspects of the software development lifecycle. By running a local mesh of dockerized MCP servers (spanning memory, GitHub operations, devops, bash gateways, and repository fundamentals), the Software Factory creates a secure and highly capable back-end for your local AI coding assistants.
