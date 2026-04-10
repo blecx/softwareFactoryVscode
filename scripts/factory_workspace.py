@@ -7,11 +7,18 @@ import hashlib
 import json
 import os
 import socket
+import sys
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import factory_release
 
 FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
 TMP_SUBPATH = Path(FACTORY_DIRNAME) / ".tmp"
@@ -546,13 +553,14 @@ def build_runtime_config(
 
 def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
     health_urls = build_health_urls(config.ports)
-    # Determine factory version
-    version_file = config.factory_dir / "VERSION"
-    factory_version = (
-        version_file.read_text(encoding="utf-8").strip()
-        if version_file.exists()
-        else "unknown"
+    release_metadata = factory_release.build_release_metadata(
+        config.factory_dir,
+        repo_url=factory_release.git_output(
+            config.factory_dir, ["remote", "get-url", "origin"]
+        ),
+        source_ref=factory_release.current_branch(config.factory_dir),
     )
+    factory_version = release_metadata["version_core"]
 
     return {
         "version": REGISTRY_VERSION,
@@ -567,6 +575,8 @@ def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
         "port_index": config.port_index,
         "ports": config.ports,
         "factory_version": factory_version,
+        "factory_display_version": release_metadata["display_version"],
+        "factory_release": release_metadata,
         "mcp_servers": {
             name: {
                 "url": url,
@@ -663,6 +673,12 @@ def upsert_workspace_record(
         "port_index": manifest.get("port_index", 0),
         "ports": manifest.get("ports", {}),
         "factory_version": manifest.get("factory_version", "unknown"),
+        "factory_display_version": manifest.get("factory_display_version", ""),
+        "factory_commit": (
+            manifest.get("factory_release", {}).get("commit_sha", "")
+            if isinstance(manifest.get("factory_release"), dict)
+            else ""
+        ),
         "runtime_state": runtime_state,
         "installed_at": installed_at,
         "last_activated_at": (

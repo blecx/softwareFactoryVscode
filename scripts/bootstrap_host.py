@@ -15,6 +15,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+import factory_release
 import factory_workspace
 
 FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
@@ -428,11 +429,19 @@ def update_lock_file(
         existing_lock=lock_data,
     )
     installed_at = lock_data.get("installed_at", now)
+    release_metadata = factory_release.build_lock_release_metadata(
+        factory_dir,
+        repo_url=resolved_repo_url,
+        source_ref=factory_release.DEFAULT_BRANCH,
+        version_core=resolved_version,
+        commit_sha=resolved_commit,
+    )
     lock_data.update(
         {
             "version": resolved_version,
             "installed_at": installed_at,
             "updated_at": now,
+            "release": release_metadata,
             "factory": {
                 "repo_url": resolved_repo_url,
                 "install_path": FACTORY_DIRNAME,
@@ -549,6 +558,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"➡️ Host VS Code workspace {verb}: [{workspace_path}]")
 
     print(f"➡️ Recorded installation metadata: [{result['lock_path']}]")
+    print(
+        "➡️ Installed update mechanism ready: "
+        f"[{target_dir / FACTORY_DIRNAME / 'scripts' / 'factory_update.py'}]"
+    )
     print("\n✅ Bootstrap secure and complete!")
     print(
         "Isolation rule confirmed: tool-owned .vscode/ and .github/ remain locked "

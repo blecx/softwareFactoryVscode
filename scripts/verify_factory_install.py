@@ -27,6 +27,8 @@ DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
 DEFAULT_RUNTIME_TIMEOUT = 2.0
 REQUIRED_FACTORY_FILES = [
     Path("scripts") / "bootstrap_host.py",
+    Path("scripts") / "factory_release.py",
+    Path("scripts") / "factory_update.py",
     Path("scripts") / "install_factory.py",
     Path("scripts") / "verify_factory_install.py",
 ]
@@ -409,6 +411,21 @@ def check_lock_file(
         violations.append(
             ".copilot/softwareFactoryVscode/lock.json `factory.commit` is missing"
         )
+
+    release_data = lock_data.get("release")
+    if isinstance(release_data, dict):
+        if not release_data.get("display_version"):
+            violations.append(
+                ".copilot/softwareFactoryVscode/lock.json `release.display_version` is missing"
+            )
+        if not release_data.get("commit_sha"):
+            violations.append(
+                ".copilot/softwareFactoryVscode/lock.json `release.commit_sha` is missing"
+            )
+        if not release_data.get("manifest_path"):
+            violations.append(
+                ".copilot/softwareFactoryVscode/lock.json `release.manifest_path` is missing"
+            )
 
 
 def check_workspace_file(

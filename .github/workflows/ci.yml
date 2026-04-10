@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.13
         uses: actions/setup-python@v5
@@ -19,6 +21,24 @@ jobs:
       - name: Install dependencies
         run: |
           bash ./setup.sh
+
+      - name: Resolve release policy comparison base
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            echo "RELEASE_POLICY_BASE=$(git merge-base HEAD origin/${{ github.base_ref }})" >> "$GITHUB_ENV"
+          elif [[ -n "${{ github.event.before }}" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
+            echo "RELEASE_POLICY_BASE=${{ github.event.before }}" >> "$GITHUB_ENV"
+          else
+            echo "RELEASE_POLICY_BASE=$(git rev-parse HEAD^)" >> "$GITHUB_ENV"
+          fi
+
+      - name: Enforce release docs when VERSION changes
+        run: ./.venv/bin/python ./scripts/verify_release_docs.py --repo-root . --base-rev "$RELEASE_POLICY_BASE" --head-rev HEAD
+
+      - name: Validate release manifest matches current commit
+        run: ./.venv/bin/python ./scripts/factory_release.py write-manifest --repo-root . --repo-url https://github.com/blecx/softwareFactoryVscode.git --check
 
       - name: Check code formatting (Black)
         run: ./.venv/bin/black --check factory_runtime/ scripts/ tests/

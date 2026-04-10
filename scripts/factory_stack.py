@@ -120,8 +120,7 @@ def collect_running_services(compose_project_name: str) -> dict[str, str]:
 
 def parse_published_ports(ports_text: str) -> list[int]:
     published_ports = {
-        int(match.group("host"))
-        for match in PORT_MAPPING_PATTERN.finditer(ports_text)
+        int(match.group("host")) for match in PORT_MAPPING_PATTERN.finditer(ports_text)
     }
     return sorted(published_ports)
 
@@ -145,9 +144,7 @@ def collect_service_inventory(compose_project_name: str) -> dict[str, dict[str, 
     for line in result.stdout.splitlines():
         if not line.strip() or "|" not in line:
             continue
-        service, status, image, ports_text = (line.split("|", 3) + ["", "", "", ""])[
-            :4
-        ]
+        service, status, image, ports_text = (line.split("|", 3) + ["", "", "", ""])[:4]
         inventory[service.strip()] = {
             "status": status.strip(),
             "image": image.strip(),
@@ -184,7 +181,10 @@ def build_expected_service_ports(
     expected_ports.update(
         {
             service_name: config.ports[port_key]
-            for service_name, (_server_name, port_key) in WORKSPACE_SERVICE_PORT_KEYS.items()
+            for service_name, (
+                _server_name,
+                port_key,
+            ) in WORKSPACE_SERVICE_PORT_KEYS.items()
         }
     )
     return expected_ports
@@ -197,7 +197,9 @@ def build_preflight_report(
     workspace_file: str = DEFAULT_WORKSPACE_FILENAME,
 ) -> dict[str, Any]:
     resolved_env_file = resolve_env_file(repo_root, env_file)
-    config = sync_workspace_runtime(repo_root, env_file=resolved_env_file, persist=False)
+    config = sync_workspace_runtime(
+        repo_root, env_file=resolved_env_file, persist=False
+    )
     runtime_manifest = factory_workspace.load_json(config.runtime_manifest_path)
     workspace_urls = load_workspace_server_urls(config.target_dir, workspace_file)
     manifest_server_urls = {
@@ -292,23 +294,27 @@ def build_preflight_report(
             running_service_count += 1
 
         metadata = factory_workspace.RUNTIME_SERVICE_CONTRACT.get(service_name)
-        requires_health = bool(
-            metadata["require_healthy_status"] if metadata else True
-        )
+        requires_health = bool(metadata["require_healthy_status"] if metadata else True)
         if "up" not in status:
             service_issues.append(
-                f"Runtime service `{service_name}` is not currently running (docker status: `{service_entry.get('status', '')}`)."
+                "Runtime service "
+                f"`{service_name}` is not currently running "
+                f"(docker status: `{service_entry.get('status', '')}`)."
             )
         elif requires_health and "healthy" not in status:
             service_issues.append(
-                f"Runtime service `{service_name}` is running without a healthy status (docker status: `{service_entry.get('status', '')}`)."
+                "Runtime service "
+                f"`{service_name}` is running without a healthy status "
+                f"(docker status: `{service_entry.get('status', '')}`)."
             )
 
         expected_port = expected_service_ports.get(service_name)
         published_ports = service_entry.get("published_ports", [])
         if expected_port is not None and expected_port not in published_ports:
             port_issues.append(
-                f"Runtime service `{service_name}` is not published on expected host port `{expected_port}` (found `{published_ports or 'none'}`)."
+                "Runtime service "
+                f"`{service_name}` is not published on expected host port "
+                f"`{expected_port}` (found `{published_ports or 'none'}`)."
             )
 
     if alignment_issues or port_issues:
@@ -719,6 +725,10 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
         )
 
     active = registry.get("active_workspace", "") == config.factory_instance_id
+    lock_path = config.target_dir / ".copilot/softwareFactoryVscode/lock.json"
+    lock_data = load_json(lock_path)
+    release_data = lock_data.get("release") if isinstance(lock_data, dict) else {}
+    release_data = release_data if isinstance(release_data, dict) else {}
     lock_commit = read_factory_lock_commit(config.target_dir)
     head_commit = get_factory_head_commit(config.factory_dir)
     needs_rebuild = bool(head_commit) and (
@@ -731,6 +741,10 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"runtime_state={runtime_state}")
     print(f"active={str(active).lower()}")
     print(f"port_index={config.port_index}")
+    print(
+        "installed_version="
+        f"{release_data.get('display_version', lock_data.get('version', 'unknown'))}"
+    )
     print(f"factory_commit={head_commit}")
     print(f"lock_commit={lock_commit}")
     print(f"needs_rebuild={str(needs_rebuild).lower()}")

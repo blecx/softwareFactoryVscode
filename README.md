@@ -4,8 +4,9 @@ Welcome to the **Software Factory for VS Code**, a local, AI-powered development
 
 ## Current Release
 
-- **Latest release:** `2.2`
-- **Release notes for GitHub:** [`.github/releases/v2.2.md`](.github/releases/v2.2.md)
+- **Latest release:** `2.3`
+- **Release notes for GitHub:** [`.github/releases/v2.3.md`](.github/releases/v2.3.md)
+- **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)
 - **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 
 ## What is this project?
@@ -51,6 +52,17 @@ To use the Software Factory, you need the following:
 To install and initialize the Software Factory in your target repository, please follow the detailed step-by-step instructions in the installation guide.
 
 ➡️ [Read the Installation Guide](docs/INSTALL.md)
+
+### Keeping an install current
+
+Every namespace-first install now includes a built-in updater surface:
+
+- `python3 .copilot/softwareFactoryVscode/scripts/factory_update.py check`
+- `python3 .copilot/softwareFactoryVscode/scripts/factory_update.py apply`
+
+The updater reads the installed `lock.json`, compares it against the structured
+release manifest published in `manifests/release-manifest.json`, and then uses
+the canonical installer/update flow to apply a safe refresh when needed.
 
 ### Usage & Documentation
 

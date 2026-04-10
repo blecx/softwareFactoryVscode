@@ -7,6 +7,7 @@ import subprocess
 import sys
 from http.client import RemoteDisconnected
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -14,6 +15,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 RELEASE_VERSION = (REPO_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 INSTALL_SCRIPT = REPO_ROOT / "scripts" / "install_factory.py"
 BOOTSTRAP_SCRIPT = REPO_ROOT / "scripts" / "bootstrap_host.py"
+FACTORY_RELEASE_SCRIPT = REPO_ROOT / "scripts" / "factory_release.py"
+FACTORY_UPDATE_SCRIPT = REPO_ROOT / "scripts" / "factory_update.py"
+VERIFY_RELEASE_DOCS_SCRIPT = REPO_ROOT / "scripts" / "verify_release_docs.py"
 VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify_factory_install.py"
 FACTORY_STACK_SCRIPT = REPO_ROOT / "scripts" / "factory_stack.py"
 FACTORY_WORKSPACE_SCRIPT = REPO_ROOT / "scripts" / "factory_workspace.py"
@@ -23,6 +27,7 @@ ROOT_GITIGNORE = REPO_ROOT / ".gitignore"
 
 def load_module(module_name: str, path: Path):
     spec = importlib.util.spec_from_file_location(module_name, path)
+    assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -32,6 +37,11 @@ def load_module(module_name: str, path: Path):
 
 install_factory = load_module("install_factory_under_test", INSTALL_SCRIPT)
 bootstrap_host = load_module("bootstrap_host_under_test", BOOTSTRAP_SCRIPT)
+factory_release = load_module("factory_release_under_test", FACTORY_RELEASE_SCRIPT)
+factory_update = load_module("factory_update_under_test", FACTORY_UPDATE_SCRIPT)
+verify_release_docs = load_module(
+    "verify_release_docs_under_test", VERIFY_RELEASE_DOCS_SCRIPT
+)
 verify_factory_install = load_module("verify_factory_install_under_test", VERIFY_SCRIPT)
 factory_stack = load_module("factory_stack_under_test", FACTORY_STACK_SCRIPT)
 factory_workspace = load_module(
@@ -62,7 +72,7 @@ def run_python_script(
 
 
 def build_full_service_inventory(
-    config: factory_workspace.WorkspaceRuntimeConfig,
+    config: Any,
     *,
     agent_worker_status: str = "Up 10 seconds (healthy)",
 ) -> dict[str, dict[str, object]]:
@@ -148,11 +158,22 @@ def init_git_repo(path: Path) -> None:
     git("config", "user.email", "test@example.com", cwd=path)
 
 
+def refresh_source_release_manifest(path: Path) -> None:
+    factory_release.write_release_manifest_file(
+        path,
+        repo_url=str(path),
+        source_ref="main",
+    )
+    git("add", str(factory_release.RELEASE_MANIFEST_RELATIVE_PATH), cwd=path)
+    git("commit", "-m", "Refresh release manifest", cwd=path)
+
+
 def create_source_factory_repo(path: Path) -> None:
     init_git_repo(path)
     (path / "scripts").mkdir(parents=True, exist_ok=True)
     (path / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
     (path / "configs").mkdir(parents=True, exist_ok=True)
+    (path / "manifests").mkdir(parents=True, exist_ok=True)
     (path / ".gitignore").write_text(
         ROOT_GITIGNORE.read_text(encoding="utf-8"),
         encoding="utf-8",
@@ -163,6 +184,14 @@ def create_source_factory_repo(path: Path) -> None:
     )
     (path / "scripts" / "bootstrap_host.py").write_text(
         BOOTSTRAP_SCRIPT.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (path / "scripts" / "factory_release.py").write_text(
+        FACTORY_RELEASE_SCRIPT.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (path / "scripts" / "factory_update.py").write_text(
+        FACTORY_UPDATE_SCRIPT.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
     (path / "scripts" / "verify_factory_install.py").write_text(
@@ -217,6 +246,29 @@ def create_source_factory_repo(path: Path) -> None:
     )
     git("add", ".", cwd=path)
     git("commit", "-m", "Initial factory payload", cwd=path)
+    refresh_source_release_manifest(path)
+
+
+def create_release_policy_repo(path: Path, *, version: str = "2.2") -> None:
+    init_git_repo(path)
+    (path / ".github" / "releases").mkdir(parents=True, exist_ok=True)
+    (path / "manifests").mkdir(parents=True, exist_ok=True)
+    (path / "VERSION").write_text(f"{version}\n", encoding="utf-8")
+    (path / "CHANGELOG.md").write_text(
+        "# Changelog\n\n" f"## [{version}] — 2026-04-10\n\n" f"Release {version}.\n",
+        encoding="utf-8",
+    )
+    (path / ".github" / "releases" / f"v{version}.md").write_text(
+        f"# Release {version}\n",
+        encoding="utf-8",
+    )
+    factory_release.write_release_manifest_file(
+        path,
+        repo_url="https://github.com/blecx/softwareFactoryVscode.git",
+        source_ref="main",
+    )
+    git("add", ".", cwd=path)
+    git("commit", "-m", f"Seed release {version}", cwd=path)
 
 
 def test_install_factory_bootstraps_target_and_generates_workspace(
@@ -274,6 +326,9 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
         )
     )
     assert lock_data["version"] == RELEASE_VERSION
+    assert lock_data["release"]["version_core"] == RELEASE_VERSION
+    assert lock_data["release"]["display_version"].startswith(f"{RELEASE_VERSION}+")
+    assert lock_data["release"]["commit_sha"] == lock_data["factory"]["commit"]
     assert lock_data["factory"]["repo_url"] == str(source_repo)
     assert lock_data["factory"]["workspace_file"] == "software-factory.code-workspace"
     assert lock_data["factory"]["commit"]
@@ -352,6 +407,7 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
             encoding="utf-8"
         )
     )
+    assert lock_data["release"]["display_version"].startswith(f"{RELEASE_VERSION}+")
     assert lock_data["factory"]["repo_url"] == str(source_repo)
     assert lock_data["factory"]["install_path"] == ".copilot/softwareFactoryVscode"
     assert lock_data["factory"]["workspace_file"] == "software-factory.code-workspace"
@@ -390,6 +446,82 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
     assert "Installation compliance passed" in verify_result.stdout
     assert "canonical workspace entrypoint look correct" in verify_result.stdout
     assert "Non-mutating VS Code smoke prompt" not in verify_result.stdout
+
+
+def test_verify_release_docs_skips_when_version_is_unchanged(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    repo = tmp_path / "release-policy-repo"
+    create_release_policy_repo(repo)
+    (repo / "README.md").write_text("docs only change\n", encoding="utf-8")
+    git("add", "README.md", cwd=repo)
+    git("commit", "-m", "Docs only", cwd=repo)
+
+    exit_code = verify_release_docs.main(
+        ["--repo-root", str(repo), "--base-rev", "HEAD^", "--head-rev", "HEAD"]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "VERSION is unchanged" in output
+
+
+def test_verify_release_docs_requires_changelog_release_notes_and_manifest(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    repo = tmp_path / "release-policy-repo"
+    create_release_policy_repo(repo)
+    (repo / "VERSION").write_text("2.3\n", encoding="utf-8")
+    git("add", "VERSION", cwd=repo)
+    git("commit", "-m", "Bump version only", cwd=repo)
+
+    exit_code = verify_release_docs.main(
+        ["--repo-root", str(repo), "--base-rev", "HEAD^", "--head-rev", "HEAD"]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 1
+    assert "CHANGELOG.md" in output
+    assert ".github/releases/v2.3.md" in output
+    assert "manifests/release-manifest.json" in output
+
+
+def test_verify_release_docs_passes_for_complete_release_bump(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    repo = tmp_path / "release-policy-repo"
+    create_release_policy_repo(repo)
+    (repo / "VERSION").write_text("2.3\n", encoding="utf-8")
+    (repo / "CHANGELOG.md").write_text(
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "No unreleased changes.\n\n"
+        "## [2.3] — 2026-04-10\n\n"
+        "Release 2.3.\n",
+        encoding="utf-8",
+    )
+    (repo / ".github" / "releases" / "v2.3.md").write_text(
+        "# Software Factory for VS Code 2.3\n\nRelease 2.3 notes.\n",
+        encoding="utf-8",
+    )
+    factory_release.write_release_manifest_file(
+        repo,
+        repo_url="https://github.com/blecx/softwareFactoryVscode.git",
+        source_ref="main",
+    )
+    git("add", ".", cwd=repo)
+    git("commit", "-m", "Prepare release 2.3", cwd=repo)
+
+    exit_code = verify_release_docs.main(
+        ["--repo-root", str(repo), "--base-rev", "HEAD^", "--head-rev", "HEAD"]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "includes changelog, release notes, and refreshed release metadata" in output
 
 
 def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
@@ -477,6 +609,7 @@ def test_update_ignores_local_backup_branch_and_resets_to_latest_source(
     )
     git("add", "NEW_UPDATE_MARKER.txt", cwd=source_repo)
     git("commit", "-m", "Advance factory source", cwd=source_repo)
+    refresh_source_release_manifest(source_repo)
     latest_source_head = git("rev-parse", "HEAD", cwd=source_repo).stdout.strip()
 
     assert (
@@ -504,6 +637,148 @@ def test_update_ignores_local_backup_branch_and_resets_to_latest_source(
     assert lock_data["factory"]["commit"] == latest_source_head
     assert (factory_dir / "NEW_UPDATE_MARKER.txt").exists()
     assert not (factory_dir / "DIRTY_NOTE.txt").exists()
+
+
+def test_factory_update_check_reports_when_source_manifest_is_newer(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    source_repo = tmp_path / "source-factory"
+    target_repo = tmp_path / "target-project"
+    create_source_factory_repo(source_repo)
+    init_git_repo(target_repo)
+
+    assert (
+        install_factory.main(
+            ["--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+
+    (source_repo / "UPDATE_PAYLOAD.txt").write_text(
+        "new manifest payload\n", encoding="utf-8"
+    )
+    git("add", "UPDATE_PAYLOAD.txt", cwd=source_repo)
+    git("commit", "-m", "Advance source repo for updater", cwd=source_repo)
+    refresh_source_release_manifest(source_repo)
+
+    exit_code = factory_update.main(
+        ["check", "--target", str(target_repo), "--repo-url", str(source_repo)]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "update_status=update-available" in output
+    assert "update_available=true" in output
+
+
+def test_factory_update_apply_refreshes_install_from_source_manifest(
+    tmp_path: Path,
+) -> None:
+    source_repo = tmp_path / "source-factory"
+    target_repo = tmp_path / "target-project"
+    create_source_factory_repo(source_repo)
+    init_git_repo(target_repo)
+
+    assert (
+        install_factory.main(
+            ["--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+
+    (source_repo / "APPLY_UPDATE_MARKER.txt").write_text(
+        "updater applied new payload\n", encoding="utf-8"
+    )
+    git("add", "APPLY_UPDATE_MARKER.txt", cwd=source_repo)
+    git("commit", "-m", "Advance source repo for updater apply", cwd=source_repo)
+    refresh_source_release_manifest(source_repo)
+    latest_source_head = git("rev-parse", "HEAD", cwd=source_repo).stdout.strip()
+
+    exit_code = factory_update.main(
+        ["apply", "--target", str(target_repo), "--repo-url", str(source_repo)]
+    )
+    lock_data = json.loads(
+        (target_repo / ".copilot/softwareFactoryVscode/lock.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert exit_code == 0
+    assert lock_data["factory"]["commit"] == latest_source_head
+    assert (
+        target_repo / ".copilot/softwareFactoryVscode" / "APPLY_UPDATE_MARKER.txt"
+    ).exists()
+
+
+def test_release_update_smoke_flow(tmp_path: Path, capsys) -> None:
+    source_repo = tmp_path / "source-factory"
+    target_repo = tmp_path / "target-project"
+    create_source_factory_repo(source_repo)
+    init_git_repo(target_repo)
+
+    assert (
+        install_factory.main(
+            ["--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+
+    initial_lock = json.loads(
+        (target_repo / ".copilot/softwareFactoryVscode/lock.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert initial_lock["release"]["display_version"].startswith(f"{RELEASE_VERSION}+")
+
+    (source_repo / "SMOKE_UPDATE_MARKER.txt").write_text(
+        "smoke update payload\n", encoding="utf-8"
+    )
+    git("add", "SMOKE_UPDATE_MARKER.txt", cwd=source_repo)
+    git("commit", "-m", "Advance source repo for smoke test", cwd=source_repo)
+    refresh_source_release_manifest(source_repo)
+
+    assert (
+        factory_update.main(
+            ["check", "--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+    check_output = capsys.readouterr().out
+    assert "update_status=update-available" in check_output
+
+    assert (
+        factory_update.main(
+            ["apply", "--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+
+    updated_lock = json.loads(
+        (target_repo / ".copilot/softwareFactoryVscode/lock.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    updated_manifest = json.loads(
+        (
+            target_repo
+            / ".copilot/softwareFactoryVscode/.tmp"
+            / "runtime-manifest.json"
+        ).read_text(encoding="utf-8")
+    )
+    latest_source_head = git("rev-parse", "HEAD", cwd=source_repo).stdout.strip()
+
+    assert updated_lock["factory"]["commit"] == latest_source_head
+    assert updated_lock["release"]["commit_sha"] == latest_source_head
+    assert updated_manifest["factory_release"]["commit_sha"] == latest_source_head
+    assert (
+        target_repo / ".copilot/softwareFactoryVscode" / "SMOKE_UPDATE_MARKER.txt"
+    ).exists()
+
+    assert (
+        verify_factory_install.main(["--target", str(target_repo), "--no-smoke-prompt"])
+        == 0
+    )
 
 
 def test_update_removes_legacy_factory_gitignore_block(tmp_path: Path) -> None:
@@ -728,6 +1003,8 @@ def test_verify_factory_install_fails_when_legacy_gitignore_entries_remain(
     (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
     (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
     for script_name in (
+        "factory_release.py",
+        "factory_update.py",
         "install_factory.py",
         "bootstrap_host.py",
         "verify_factory_install.py",
@@ -826,6 +1103,8 @@ def test_verify_factory_install_flags_partial_legacy_gitignore_entries(
     (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
     (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
     for script_name in (
+        "factory_release.py",
+        "factory_update.py",
         "install_factory.py",
         "bootstrap_host.py",
         "verify_factory_install.py",
@@ -923,6 +1202,8 @@ def test_verify_factory_install_fails_when_workspace_file_missing(
         parents=True, exist_ok=True
     )
     for script_name in (
+        "factory_release.py",
+        "factory_update.py",
         "install_factory.py",
         "bootstrap_host.py",
         "verify_factory_install.py",
@@ -980,6 +1261,8 @@ def test_verify_factory_install_fails_when_bash_gateway_policy_is_invalid(
     (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
     (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
     for script_name in (
+        "factory_release.py",
+        "factory_update.py",
         "install_factory.py",
         "bootstrap_host.py",
         "verify_factory_install.py",
@@ -1067,6 +1350,8 @@ def test_verify_factory_runtime_passes_with_mocked_services(
     (factory_dir / ".git").mkdir(parents=True, exist_ok=True)
     (factory_dir / "scripts").mkdir(parents=True, exist_ok=True)
     for script_name in (
+        "factory_release.py",
+        "factory_update.py",
         "install_factory.py",
         "bootstrap_host.py",
         "verify_factory_install.py",
@@ -1074,19 +1359,9 @@ def test_verify_factory_runtime_passes_with_mocked_services(
         (factory_dir / "scripts" / script_name).write_text("# stub\n", encoding="utf-8")
     (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
     (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
-        json.dumps(
-            {
-                "workspace": {
-                    "mcp": {
-                        "servers": {
-                            "context7": {"url": "http://127.0.0.1:3010/mcp"},
-                            "bashGateway": {"url": "http://127.0.0.1:3011/mcp"},
-                        }
-                    }
-                }
-            }
-        )
-        + "\n",
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
         encoding="utf-8",
     )
     (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
@@ -1111,6 +1386,14 @@ def test_verify_factory_runtime_passes_with_mocked_services(
     (target_repo / ".gitignore").write_text(
         "# Factory Isolation\n.copilot/softwareFactoryVscode/.tmp/\n.copilot/softwareFactoryVscode/.factory.env\n",
         encoding="utf-8",
+    )
+    runtime_config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    factory_workspace.sync_runtime_artifacts(
+        runtime_config,
+        runtime_state="running",
+        active=False,
     )
     (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
         json.dumps(
@@ -1138,7 +1421,8 @@ def test_verify_factory_runtime_passes_with_mocked_services(
                         "name": "AI Agent Factory",
                         "path": ".copilot/softwareFactoryVscode",
                     },
-                ]
+                ],
+                "settings": runtime_config.workspace_settings,
             }
         )
         + "\n",
@@ -1157,9 +1441,19 @@ def test_verify_factory_runtime_passes_with_mocked_services(
         verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
     )
     monkeypatch.setattr(
+        verify_factory_install.factory_stack.shutil,
+        "which",
+        lambda name: "/usr/bin/docker",
+    )
+    monkeypatch.setattr(
         verify_factory_install,
         "collect_running_services",
         lambda compose_name: services,
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "collect_service_inventory",
+        lambda _name: build_full_service_inventory(runtime_config),
     )
     monkeypatch.setattr(
         verify_factory_install,
@@ -1231,6 +1525,8 @@ def test_verify_factory_runtime_fails_when_required_service_missing(
     (factory_dir / ".git").mkdir(parents=True, exist_ok=True)
     (factory_dir / "scripts").mkdir(parents=True, exist_ok=True)
     for script_name in (
+        "factory_release.py",
+        "factory_update.py",
         "install_factory.py",
         "bootstrap_host.py",
         "verify_factory_install.py",
@@ -1781,9 +2077,18 @@ def test_build_runtime_config_matches_repo_fundamentals_port_contract(
         factory_dir=factory_dir,
     )
 
-    assert config.mcp_server_urls["git"] == f"http://127.0.0.1:{config.ports['PORT_FS']}/mcp"
-    assert config.mcp_server_urls["search"] == f"http://127.0.0.1:{config.ports['PORT_GIT']}/mcp"
-    assert config.mcp_server_urls["filesystem"] == f"http://127.0.0.1:{config.ports['PORT_SEARCH']}/mcp"
+    assert (
+        config.mcp_server_urls["git"]
+        == f"http://127.0.0.1:{config.ports['PORT_FS']}/mcp"
+    )
+    assert (
+        config.mcp_server_urls["search"]
+        == f"http://127.0.0.1:{config.ports['PORT_GIT']}/mcp"
+    )
+    assert (
+        config.mcp_server_urls["filesystem"]
+        == f"http://127.0.0.1:{config.ports['PORT_SEARCH']}/mcp"
+    )
 
 
 def test_factory_stack_preflight_reports_needs_ramp_up_for_installed_workspace(
@@ -1797,7 +2102,9 @@ def test_factory_stack_preflight_reports_needs_ramp_up_for_installed_workspace(
         factory_stack.factory_workspace, "ports_available", lambda ports: True
     )
     monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
-    monkeypatch.setattr(factory_stack, "get_factory_head_commit", lambda _path: "deadbeef")
+    monkeypatch.setattr(
+        factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
+    )
     monkeypatch.setattr(factory_stack, "collect_service_inventory", lambda _name: {})
 
     target_repo = tmp_path / "target-project"
@@ -1855,7 +2162,9 @@ def test_factory_stack_preflight_detects_workspace_port_drift(
         factory_stack.factory_workspace, "ports_available", lambda ports: True
     )
     monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
-    monkeypatch.setattr(factory_stack, "get_factory_head_commit", lambda _path: "deadbeef")
+    monkeypatch.setattr(
+        factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
+    )
 
     target_repo = tmp_path / "target-project"
     repo_root = target_repo / ".copilot/softwareFactoryVscode"
@@ -1907,7 +2216,10 @@ def test_factory_stack_preflight_detects_workspace_port_drift(
 
     assert report["status"] == "config-drift"
     assert report["recommended_action"] == "re-bootstrap"
-    assert any("Generated workspace MCP URL drift detected" in issue for issue in report["issues"])
+    assert any(
+        "Generated workspace MCP URL drift detected" in issue
+        for issue in report["issues"]
+    )
 
 
 def test_factory_stack_status_does_not_rewrite_custom_env(
@@ -1966,7 +2278,7 @@ def test_deactivate_workspace_does_not_clear_another_active_workspace(
 
     def prepare_workspace(
         target_repo: Path,
-    ) -> tuple[Path, factory_workspace.WorkspaceRuntimeConfig]:
+    ) -> tuple[Path, Any]:
         repo_root = target_repo / ".copilot/softwareFactoryVscode"
         repo_root.mkdir(parents=True)
         (repo_root / ".copilot" / "config").mkdir(parents=True)
@@ -2015,7 +2327,7 @@ def test_starting_one_workspace_does_not_change_another_workspace_state(
 
     def prepare_workspace(
         target_repo: Path,
-    ) -> tuple[Path, factory_workspace.WorkspaceRuntimeConfig]:
+    ) -> tuple[Path, Any]:
         repo_root = target_repo / ".copilot/softwareFactoryVscode"
         repo_root.mkdir(parents=True)
         (repo_root / ".copilot" / "config").mkdir(parents=True)
@@ -2081,6 +2393,8 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
     (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
     (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
     for script_name in (
+        "factory_release.py",
+        "factory_update.py",
         "install_factory.py",
         "bootstrap_host.py",
         "verify_factory_install.py",
@@ -2264,7 +2578,9 @@ def test_verify_runtime_short_circuits_on_preflight_issues(
         verify_factory_install,
         "probe_http_url",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("probe_http_url should not be called before preflight passes")
+            AssertionError(
+                "probe_http_url should not be called before preflight passes"
+            )
         ),
     )
 
@@ -2608,10 +2924,6 @@ def test_devops_docker_compose_image_uses_known_working_docker_cli_base() -> Non
 
 
 def test_cleanup_workspace(tmp_path: Path):
-    sys.path.insert(0, str(Path("scripts").resolve()))
-    import factory_workspace as workspace_module
-    from factory_stack import cleanup_workspace
-
     target = tmp_path / "target"
     target.mkdir(parents=True, exist_ok=True)
     factory_dir = target / ".copilot/softwareFactoryVscode"
@@ -2641,8 +2953,8 @@ def test_cleanup_workspace(tmp_path: Path):
         encoding="utf-8",
     )
 
-    config = workspace_module.build_runtime_config(target, factory_dir=factory_dir)
-    workspace_module.sync_runtime_artifacts(config)
+    config = factory_workspace.build_runtime_config(target, factory_dir=factory_dir)
+    factory_workspace.sync_runtime_artifacts(config)
     assert (data_root / "memory" / config.factory_instance_id).is_dir()
     assert (data_root / "bus" / config.factory_instance_id).is_dir()
 
@@ -2653,7 +2965,7 @@ def test_cleanup_workspace(tmp_path: Path):
     ).exists()
 
     # cleanup
-    cleanup_workspace(
+    factory_stack.cleanup_workspace(
         factory_dir, env_file=(target / ".copilot/softwareFactoryVscode/.factory.env")
     )
 
@@ -2664,7 +2976,7 @@ def test_cleanup_workspace(tmp_path: Path):
     assert not (data_root / "memory" / config.factory_instance_id).exists()
     assert not (data_root / "bus" / config.factory_instance_id).exists()
 
-    reg = workspace_module.load_registry()
+    reg = factory_workspace.load_registry()
     assert config.factory_instance_id not in reg.get("workspaces", {})
 
 

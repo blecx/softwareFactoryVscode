@@ -5,26 +5,44 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — 2026-04-10
+## [Unreleased]
 
 ### Unreleased Summary
 
-Post-`2.2` hardening work focused on making namespace-first upgrades more truthful
-under real target updates, especially when an installed factory checkout already
-has local edits or when a restored workspace needs a quick runtime truth check
-before endpoint probing.
+No unreleased changes recorded yet after `2.3`.
 
-### Newly Added
+## [2.3] — 2026-04-10
+
+### Summary for 2.3
+
+Release 2.3 is a functional enhancement release focused on making Software
+Factory upgrades first-class citizens. The repo now publishes structured release
+metadata, every install carries the release/build identity needed for update
+decisions, and installed workspaces get a built-in updater that can compare
+against the canonical source repository or GitHub-hosted release manifest.
+
+### Added in 2.3
 
 - **Runtime preflight workflow** — `scripts/factory_stack.py preflight`, matching
   VS Code task wiring, and updated install guidance now validate service
   inventory, expected host ports, runtime manifest alignment, and generated
   workspace MCP URLs before live probes run.
+- **Release bump policy enforcement** — CI now requires `CHANGELOG.md`,
+  `.github/releases/v<version>.md`, and `manifests/release-manifest.json` to be
+  updated whenever `VERSION` changes, so release-number bumps cannot ship
+  without the corresponding human and machine-readable metadata.
+- **Structured release lifecycle metadata** — installs now stamp structured
+  release/build information into `lock.json` and `runtime-manifest.json`, and
+  the repo now carries `manifests/release-manifest.json` as the machine-readable
+  source of truth for update checks.
+- **Installed updater entrypoint** — `scripts/factory_update.py` now lets any
+  installed workspace check/apply updates against the configured source repo,
+  including GitHub-hosted origins.
 - **Update regression coverage** — `tests/test_factory_install.py` now covers
   dirty installed checkouts that trigger updater-created `local-backup-*`
   branches during refresh, and verifies that release metadata is preserved.
 
-### Newly Fixed
+### Fixed in 2.3
 
 - **Namespace-first upgrade drift detection** — `scripts/verify_factory_install.py`
   now fails when legacy hidden-tree artifacts or stale legacy `.gitignore`
@@ -44,13 +62,21 @@ before endpoint probing.
   stranded on a temporary `local-backup-*` branch.
 - **Release metadata on update** — install updates now restamp `lock.json.version`
   from the checked-in `VERSION` file so upgraded installs continue to record the
-  release version (`2.2`) instead of a branch label like `main`.
+  release version (`2.3`) instead of a branch label like `main`.
 
-### Commits
+### Release Notes
 
-- `9b29275` — `Harden namespace-first install upgrade and runtime preflight`
-- `189d46f` — `Fix dirty install updates targeting backup branches`
-- `47952f7` — `Preserve release version metadata on updates`
+- Every install now ships with `scripts/factory_update.py` for consistent
+  `check` / `apply` update workflows.
+- `manifests/release-manifest.json` is now the machine-readable source of truth
+  for release comparison and GitHub-backed update checks.
+- Release-number bumps are now guarded in CI and mirrored in AI instructions so
+  changelog and GitHub release notes stay in lockstep with `VERSION`.
+- A final strict smoke rerun for `release_update_smoke_flow` and
+  `verify_release_docs` passed cleanly under `pytest -x -W error`, confirming
+  the new release/update contract is warning-clean.
+- Runtime manifests, lock metadata, CI validation, VS Code tasks, and install
+  guidance now align around the same release/update contract.
 
 ## [2.2] — 2026-04-10
 
