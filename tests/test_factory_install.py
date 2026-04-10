@@ -453,6 +453,58 @@ def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
     assert (tmp_dir / "foo.txt").exists()
 
 
+def test_update_ignores_local_backup_branch_and_resets_to_latest_source(
+    tmp_path: Path,
+) -> None:
+    source_repo = tmp_path / "source-factory"
+    target_repo = tmp_path / "target-project"
+    create_source_factory_repo(source_repo)
+    init_git_repo(target_repo)
+
+    assert (
+        install_factory.main(
+            ["--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    (factory_dir / "DIRTY_NOTE.txt").write_text("keep me in backup\n", encoding="utf-8")
+
+    (source_repo / "NEW_UPDATE_MARKER.txt").write_text(
+        "latest commit payload\n",
+        encoding="utf-8",
+    )
+    git("add", "NEW_UPDATE_MARKER.txt", cwd=source_repo)
+    git("commit", "-m", "Advance factory source", cwd=source_repo)
+    latest_source_head = git("rev-parse", "HEAD", cwd=source_repo).stdout.strip()
+
+    assert (
+        install_factory.main(
+            [
+                "--target",
+                str(target_repo),
+                "--repo-url",
+                str(source_repo),
+                "--update",
+            ]
+        )
+        == 0
+    )
+
+    target_head = git("rev-parse", "HEAD", cwd=factory_dir).stdout.strip()
+    target_branch = git("branch", "--show-current", cwd=factory_dir).stdout.strip()
+    backup_branches = git("branch", "--list", "local-backup-*", cwd=factory_dir).stdout
+    lock_data = json.loads((factory_dir / "lock.json").read_text(encoding="utf-8"))
+
+    assert target_head == latest_source_head
+    assert target_branch == "main"
+    assert "local-backup-" in backup_branches
+    assert lock_data["factory"]["commit"] == latest_source_head
+    assert (factory_dir / "NEW_UPDATE_MARKER.txt").exists()
+    assert not (factory_dir / "DIRTY_NOTE.txt").exists()
+
+
 def test_update_removes_legacy_factory_gitignore_block(tmp_path: Path) -> None:
     source_repo = tmp_path / "source-factory"
     target_repo = tmp_path / "target-project"

@@ -158,6 +158,27 @@ def current_branch(factory_dir: Path) -> str:
     return result.stdout.strip()
 
 
+def resolve_update_target_ref(
+    factory_dir: Path,
+    *,
+    ref: str,
+    current_ref: str,
+) -> str:
+    normalized_ref = ref.strip()
+    if normalized_ref:
+        return normalized_ref
+
+    normalized_current_ref = current_ref.strip()
+    if (
+        normalized_current_ref
+        and not normalized_current_ref.startswith("local-backup-")
+        and remote_branch_exists(factory_dir, normalized_current_ref)
+    ):
+        return normalized_current_ref
+
+    return "main"
+
+
 def head_commit(factory_dir: Path) -> str:
     result = run_command(
         ["git", "-C", str(factory_dir), "rev-parse", "HEAD"],
@@ -187,9 +208,14 @@ def clone_factory(factory_dir: Path, *, repo_url: str, ref: str) -> None:
 
 
 def update_factory(factory_dir: Path, *, ref: str) -> str:
+    original_branch = current_branch(factory_dir)
     ensure_clean_factory_tree(factory_dir)
     run_command(["git", "-C", str(factory_dir), "fetch", "origin", "--prune"])
-    target_ref = ref or current_branch(factory_dir) or "main"
+    target_ref = resolve_update_target_ref(
+        factory_dir,
+        ref=ref,
+        current_ref=original_branch,
+    )
     run_command(["git", "-C", str(factory_dir), "checkout", "-f", target_ref])
 
     if remote_branch_exists(factory_dir, target_ref):
