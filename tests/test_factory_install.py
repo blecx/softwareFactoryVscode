@@ -783,7 +783,7 @@ def test_verify_factory_runtime_fails_when_required_service_missing(
 def test_factory_stack_builds_full_compose_command(tmp_path: Path) -> None:
     repo_root = tmp_path / ".copilot/softwareFactoryVscode"
     repo_root.mkdir(parents=True, exist_ok=True)
-    env_file = tmp_path / ".factory.env"
+    env_file = repo_root / ".factory.env"
 
     command = factory_stack.build_compose_command(repo_root, env_file, ["up", "-d"])
 
@@ -1177,10 +1177,10 @@ def test_deactivate_workspace_does_not_clear_another_active_workspace(
     repo_b, config_b = prepare_workspace(tmp_path / "project-b")
 
     factory_stack.activate_workspace(
-        repo_a, env_file=config_a.target_dir / ".factory.env"
+        repo_a, env_file=config_a.target_dir / ".copilot/softwareFactoryVscode/.factory.env"
     )
     factory_stack.deactivate_workspace(
-        repo_b, env_file=config_b.target_dir / ".factory.env"
+        repo_b, env_file=config_b.target_dir / ".copilot/softwareFactoryVscode/.factory.env"
     )
 
     registry = factory_workspace.load_registry(registry_path)
@@ -1231,7 +1231,7 @@ def test_starting_one_workspace_does_not_change_another_workspace_state(
     )
 
     factory_stack.start_stack(
-        repo_a, env_file=config_a.target_dir / ".factory.env", build=False, wait=False
+        repo_a, env_file=config_a.target_dir / ".copilot/softwareFactoryVscode/.factory.env", build=False, wait=False
     )
 
     registry = factory_workspace.load_registry(registry_path)
@@ -1397,7 +1397,7 @@ def test_validate_throwaway_install_uses_canonical_stack_helper(
     )
     repo_root = tmp_path / ".copilot/softwareFactoryVscode"
     repo_root.mkdir(parents=True, exist_ok=True)
-    env_file = tmp_path / ".factory.env"
+    env_file = repo_root / ".factory.env"
     env_file.write_text("COMPOSE_PROJECT_NAME=factory_test\n", encoding="utf-8")
     calls: list[tuple[str, Path, Path, bool | int]] = []
 

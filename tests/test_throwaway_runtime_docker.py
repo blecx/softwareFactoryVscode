@@ -132,7 +132,7 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
                 "--repo-root",
                 str(target_repo / ".copilot/softwareFactoryVscode"),
                 "--env-file",
-                str(target_repo / ".factory.env"),
+                str(target_repo / ".copilot/softwareFactoryVscode/.factory.env"),
                 "--build",
             ],
             cwd=REPO_ROOT,
@@ -171,7 +171,7 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
             missing_baseline
         )
     finally:
-        env_path = target_repo / ".factory.env"
+        env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
         if env_path.exists() and (target_repo / ".copilot/softwareFactoryVscode").exists():
             subprocess.run(
                 [
