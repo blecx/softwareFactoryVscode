@@ -20,6 +20,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import bootstrap_host
+import factory_stack
 import factory_workspace
 
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
@@ -467,6 +468,13 @@ def check_gitignore(
             f".gitignore is missing required factory ignore entry: {entry}"
         )
 
+    legacy_entries = bootstrap_host.find_legacy_gitignore_entries(lines)
+    for entry in legacy_entries:
+        violations.append(
+            ".gitignore still contains a legacy hidden-tree Software Factory entry: "
+            f"{entry}"
+        )
+
 
 def check_for_legacy_mode(target_dir: Path) -> None:
     legacy_dir = target_dir / ".softwareFactoryVscode"
@@ -479,6 +487,22 @@ def check_for_legacy_mode(target_dir: Path) -> None:
         )
 
 
+def check_legacy_install_artifacts(target_dir: Path, violations: list[str]) -> None:
+    legacy_paths = [
+        target_dir / ".softwareFactoryVscode",
+        target_dir / ".tmp" / "softwareFactoryVscode",
+        target_dir / ".factory.env",
+        target_dir / ".factory.lock.json",
+    ]
+
+    for legacy_path in legacy_paths:
+        if legacy_path.exists():
+            violations.append(
+                "Legacy installation artifact is still present and should have been removed during upgrade: "
+                f"{legacy_path}"
+            )
+
+
 def verify_installation(
     target_dir: Path,
     *,
@@ -489,6 +513,7 @@ def verify_installation(
 
     check_for_legacy_mode(target_dir)
     violations: list[str] = []
+    check_legacy_install_artifacts(target_dir, violations)
     check_factory_tree(target_dir, violations)
     check_bash_gateway_configuration(target_dir, violations)
     check_factory_env(target_dir, violations)
@@ -530,6 +555,15 @@ def verify_runtime(
         ]
 
     env_values = parse_env_file(env_path)
+    factory_dir = target_dir / bootstrap_host.FACTORY_DIRNAME
+    preflight = factory_stack.build_preflight_report(
+        factory_dir,
+        env_file=env_path,
+        workspace_file=workspace_file,
+    )
+    if preflight["status"] != "ready":
+        return [str(issue) for issue in preflight["issues"]]
+
     runtime_manifest = load_runtime_manifest(target_dir)
     compose_project_name = str(
         runtime_manifest.get("compose_project_name")
@@ -556,18 +590,10 @@ def verify_runtime(
         except ValueError:
             continue
 
-    try:
-        running_services = collect_running_services(compose_project_name)
-    except subprocess.CalledProcessError:
-        return [
-            "Failed to query Docker runtime state. Ensure Docker is running and the current user can access it."
-        ]
-
-    if not running_services:
-        violations.append(
-            f"No running Docker containers were found for compose project `{compose_project_name}`."
-        )
-        return violations
+    running_services = {
+        service_name: str(data.get("status", ""))
+        for service_name, data in preflight["service_inventory"].items()
+    }
 
     for service_name, metadata in RUNTIME_SERVICES.items():
         status = running_services.get(service_name)
@@ -601,7 +627,9 @@ def verify_runtime(
                 violations.append(error)
 
     if check_vscode_mcp:
-        server_urls = load_vscode_mcp_server_urls(target_dir, workspace_file)
+        server_urls = preflight["workspace_urls"] or load_vscode_mcp_server_urls(
+            target_dir, workspace_file
+        )
         if not server_urls:
             violations.append(
                 "Could not load VS Code MCP server URLs from "

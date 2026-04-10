@@ -6,10 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -18,6 +20,7 @@ if str(SCRIPT_DIR) not in sys.path:
 import factory_workspace
 
 DEFAULT_WAIT_TIMEOUT = 300
+DEFAULT_WORKSPACE_FILENAME = factory_workspace.DEFAULT_WORKSPACE_FILENAME
 COMPOSE_FILES = [
     "compose/docker-compose.factory.yml",
     "compose/docker-compose.context7.yml",
@@ -28,6 +31,24 @@ COMPOSE_FILES = [
     "compose/docker-compose.mcp-github-ops.yml",
 ]
 SCRIPT_REPO_ROOT = Path(__file__).resolve().parents[1]
+PORT_MAPPING_PATTERN = re.compile(r"(?P<host>\d+)->(?P<container>\d+)/(?:tcp|udp)")
+WORKSPACE_SERVICE_PORT_KEYS: dict[str, tuple[str, str]] = {
+    "context7": ("context7", "PORT_CONTEXT7"),
+    "bash-gateway-mcp": ("bashGateway", "PORT_BASH"),
+    "git-mcp": ("git", "PORT_FS"),
+    "search-mcp": ("search", "PORT_GIT"),
+    "filesystem-mcp": ("filesystem", "PORT_SEARCH"),
+    "docker-compose-mcp": ("dockerCompose", "PORT_COMPOSE"),
+    "test-runner-mcp": ("testRunner", "PORT_TEST"),
+    "offline-docs-mcp": ("offlineDocs", "PORT_DOCS"),
+    "github-ops-mcp": ("githubOps", "PORT_GITHUB"),
+}
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def resolve_env_file(repo_root: Path, env_file: Path | None = None) -> Path:
@@ -95,6 +116,279 @@ def collect_running_services(compose_project_name: str) -> dict[str, str]:
         service, status = line.split("|", 1)
         services[service.strip()] = status.strip()
     return services
+
+
+def parse_published_ports(ports_text: str) -> list[int]:
+    published_ports = {
+        int(match.group("host"))
+        for match in PORT_MAPPING_PATTERN.finditer(ports_text)
+    }
+    return sorted(published_ports)
+
+
+def collect_service_inventory(compose_project_name: str) -> dict[str, dict[str, Any]]:
+    result = subprocess.run(
+        [
+            "docker",
+            "ps",
+            "-a",
+            "--filter",
+            f"label=com.docker.compose.project={compose_project_name}",
+            "--format",
+            '{{.Label "com.docker.compose.service"}}|{{.Status}}|{{.Image}}|{{.Ports}}',
+        ],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    inventory: dict[str, dict[str, Any]] = {}
+    for line in result.stdout.splitlines():
+        if not line.strip() or "|" not in line:
+            continue
+        service, status, image, ports_text = (line.split("|", 3) + ["", "", "", ""])[
+            :4
+        ]
+        inventory[service.strip()] = {
+            "status": status.strip(),
+            "image": image.strip(),
+            "ports_text": ports_text.strip(),
+            "published_ports": parse_published_ports(ports_text.strip()),
+        }
+    return inventory
+
+
+def load_workspace_server_urls(
+    target_dir: Path,
+    workspace_file: str,
+) -> dict[str, str]:
+    workspace_path = target_dir / workspace_file
+    config_data = load_json(workspace_path) if workspace_path.exists() else {}
+    servers = config_data.get("settings", {}).get("mcp", {}).get("servers", {})
+    urls: dict[str, str] = {}
+    if not isinstance(servers, dict):
+        return urls
+    for name, data in servers.items():
+        if isinstance(data, dict) and isinstance(data.get("url"), str):
+            urls[name] = data["url"]
+    return urls
+
+
+def build_expected_service_ports(
+    config: factory_workspace.WorkspaceRuntimeConfig,
+) -> dict[str, int]:
+    expected_ports = {
+        service_name: config.ports[metadata["port_key"]]
+        for service_name, metadata in factory_workspace.RUNTIME_SERVICE_CONTRACT.items()
+        if metadata.get("port_key")
+    }
+    expected_ports.update(
+        {
+            service_name: config.ports[port_key]
+            for service_name, (_server_name, port_key) in WORKSPACE_SERVICE_PORT_KEYS.items()
+        }
+    )
+    return expected_ports
+
+
+def build_preflight_report(
+    repo_root: Path,
+    *,
+    env_file: Path | None = None,
+    workspace_file: str = DEFAULT_WORKSPACE_FILENAME,
+) -> dict[str, Any]:
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    config = sync_workspace_runtime(repo_root, env_file=resolved_env_file, persist=False)
+    runtime_manifest = factory_workspace.load_json(config.runtime_manifest_path)
+    workspace_urls = load_workspace_server_urls(config.target_dir, workspace_file)
+    manifest_server_urls = {
+        name: str(data.get("url", ""))
+        for name, data in runtime_manifest.get("mcp_servers", {}).items()
+        if isinstance(data, dict)
+    }
+    manifest_health_urls = {
+        name: str(data.get("url", ""))
+        for name, data in runtime_manifest.get("runtime_health", {}).items()
+        if isinstance(data, dict)
+    }
+
+    expected_workspace_urls = config.mcp_server_urls
+    expected_health_urls = factory_workspace.build_health_urls(config.ports)
+    expected_service_ports = build_expected_service_ports(config)
+
+    alignment_issues: list[str] = []
+    for server_name, expected_url in sorted(expected_workspace_urls.items()):
+        workspace_url = workspace_urls.get(server_name, "")
+        if workspace_url != expected_url:
+            alignment_issues.append(
+                "Generated workspace MCP URL drift detected for "
+                f"`{server_name}` (expected `{expected_url}`, found `{workspace_url or 'missing'}`)."
+            )
+        manifest_url = manifest_server_urls.get(server_name, "")
+        if manifest_url != expected_url:
+            alignment_issues.append(
+                "Runtime manifest MCP URL drift detected for "
+                f"`{server_name}` (expected `{expected_url}`, found `{manifest_url or 'missing'}`)."
+            )
+
+    for service_name, expected_url in sorted(expected_health_urls.items()):
+        manifest_url = manifest_health_urls.get(service_name, "")
+        if manifest_url != expected_url:
+            alignment_issues.append(
+                "Runtime manifest health URL drift detected for "
+                f"`{service_name}` (expected `{expected_url}`, found `{manifest_url or 'missing'}`)."
+            )
+
+    docker_available = shutil.which("docker") is not None
+    service_inventory: dict[str, dict[str, Any]] = {}
+    if docker_available:
+        try:
+            service_inventory = collect_service_inventory(config.compose_project_name)
+        except subprocess.CalledProcessError as exc:
+            return {
+                "status": "docker-error",
+                "recommended_action": "inspect-docker",
+                "issues": [
+                    "Unable to inspect Docker runtime state for compose project "
+                    f"`{config.compose_project_name}`: {exc}`"
+                ],
+                "config": config,
+                "workspace_urls": workspace_urls,
+                "manifest_server_urls": manifest_server_urls,
+                "service_inventory": service_inventory,
+                "expected_service_ports": expected_service_ports,
+            }
+    else:
+        return {
+            "status": "docker-unavailable",
+            "recommended_action": "install-docker",
+            "issues": ["Docker CLI is not available on PATH."],
+            "config": config,
+            "workspace_urls": workspace_urls,
+            "manifest_server_urls": manifest_server_urls,
+            "service_inventory": service_inventory,
+            "expected_service_ports": expected_service_ports,
+        }
+
+    service_issues: list[str] = []
+    port_issues: list[str] = []
+    running_service_count = 0
+    all_expected_services = [
+        *factory_workspace.RUNTIME_SERVICE_CONTRACT.keys(),
+        *WORKSPACE_SERVICE_PORT_KEYS.keys(),
+    ]
+    all_expected_service_names = sorted(set(all_expected_services))
+
+    for service_name in all_expected_service_names:
+        service_entry = service_inventory.get(service_name)
+        if not service_entry:
+            service_issues.append(
+                "Expected runtime service is missing for compose project "
+                f"`{config.compose_project_name}`: `{service_name}`."
+            )
+            continue
+
+        status = str(service_entry.get("status", "")).strip().lower()
+        if "up" in status:
+            running_service_count += 1
+
+        metadata = factory_workspace.RUNTIME_SERVICE_CONTRACT.get(service_name)
+        requires_health = bool(
+            metadata["require_healthy_status"] if metadata else True
+        )
+        if "up" not in status:
+            service_issues.append(
+                f"Runtime service `{service_name}` is not currently running (docker status: `{service_entry.get('status', '')}`)."
+            )
+        elif requires_health and "healthy" not in status:
+            service_issues.append(
+                f"Runtime service `{service_name}` is running without a healthy status (docker status: `{service_entry.get('status', '')}`)."
+            )
+
+        expected_port = expected_service_ports.get(service_name)
+        published_ports = service_entry.get("published_ports", [])
+        if expected_port is not None and expected_port not in published_ports:
+            port_issues.append(
+                f"Runtime service `{service_name}` is not published on expected host port `{expected_port}` (found `{published_ports or 'none'}`)."
+            )
+
+    if alignment_issues or port_issues:
+        status = "config-drift"
+        recommended_action = "re-bootstrap"
+        issues = [*alignment_issues, *port_issues]
+    elif running_service_count == 0:
+        status = "needs-ramp-up"
+        recommended_action = "start"
+        issues = [
+            "Runtime preflight detected no running containers for compose project "
+            f"`{config.compose_project_name}`. Infrastructure needs ramp-up via `factory_stack.py start`."
+        ]
+    elif service_issues:
+        status = "degraded"
+        recommended_action = "inspect"
+        issues = service_issues
+    else:
+        status = "ready"
+        recommended_action = "none"
+        issues = []
+
+    return {
+        "status": status,
+        "recommended_action": recommended_action,
+        "issues": issues,
+        "config": config,
+        "workspace_urls": workspace_urls,
+        "manifest_server_urls": manifest_server_urls,
+        "manifest_health_urls": manifest_health_urls,
+        "expected_service_ports": expected_service_ports,
+        "service_inventory": service_inventory,
+    }
+
+
+def print_preflight_report(report: dict[str, Any]) -> None:
+    config = report["config"]
+    print(f"workspace_id={config.project_workspace_id}")
+    print(f"instance_id={config.factory_instance_id}")
+    print(f"target={config.target_dir}")
+    print(f"compose_project={config.compose_project_name}")
+    print(f"preflight_status={report['status']}")
+    print(f"recommended_action={report['recommended_action']}")
+    print(f"issue_count={len(report['issues'])}")
+
+    for service_name in sorted(report["expected_service_ports"].keys()):
+        service_entry = report["service_inventory"].get(service_name, {})
+        published_ports = service_entry.get("published_ports", [])
+        expected_port = report["expected_service_ports"][service_name]
+        published_value = ",".join(str(port) for port in published_ports) or ""
+        print(f"service.{service_name}.status={service_entry.get('status', '')}")
+        print(f"service.{service_name}.image={service_entry.get('image', '')}")
+        print(f"service.{service_name}.expected_port={expected_port}")
+        print(f"service.{service_name}.published_ports={published_value}")
+        print(
+            f"service.{service_name}.port_match={str(expected_port in published_ports).lower()}"
+        )
+
+    for server_name, url in sorted(report["workspace_urls"].items()):
+        print(f"workspace.mcp.{server_name}={url}")
+    for server_name, url in sorted(report["manifest_server_urls"].items()):
+        print(f"manifest.mcp.{server_name}={url}")
+
+    for index, issue in enumerate(report["issues"], start=1):
+        print(f"issue.{index}={issue}")
+
+
+def preflight_workspace(
+    repo_root: Path,
+    *,
+    env_file: Path | None = None,
+    workspace_file: str = DEFAULT_WORKSPACE_FILENAME,
+) -> int:
+    report = build_preflight_report(
+        repo_root,
+        env_file=env_file,
+        workspace_file=workspace_file,
+    )
+    print_preflight_report(report)
+    return 0 if report["status"] == "ready" else 1
 
 
 def infer_runtime_state_from_services(running_services: dict[str, str]) -> str:
@@ -440,6 +734,9 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"factory_commit={head_commit}")
     print(f"lock_commit={lock_commit}")
     print(f"needs_rebuild={str(needs_rebuild).lower()}")
+    preflight = build_preflight_report(repo_root, env_file=resolved_env_file)
+    print(f"preflight_status={preflight['status']}")
+    print(f"recommended_action={preflight['recommended_action']}")
     for name, url in sorted(config.mcp_server_urls.items()):
         print(f"mcp.{name}={url}")
     return 0
@@ -492,6 +789,7 @@ def parse_args() -> argparse.Namespace:
             "stop",
             "list",
             "status",
+            "preflight",
             "activate",
             "deactivate",
             "cleanup",
@@ -507,6 +805,14 @@ def parse_args() -> argparse.Namespace:
         "--env-file",
         default="",
         help="Optional explicit .factory.env path. Defaults to repo-root/.factory.env or repo-root/../.factory.env.",
+    )
+    parser.add_argument(
+        "--workspace-file",
+        default=DEFAULT_WORKSPACE_FILENAME,
+        help=(
+            "Workspace filename used to validate generated MCP endpoint alignment "
+            f"(default: {DEFAULT_WORKSPACE_FILENAME})."
+        ),
     )
     parser.add_argument(
         "--build",
@@ -566,6 +872,12 @@ def main() -> int:
         return list_workspaces()
     elif args.command == "status":
         return status_workspace(repo_root, env_file=env_file)
+    elif args.command == "preflight":
+        return preflight_workspace(
+            repo_root,
+            env_file=env_file,
+            workspace_file=args.workspace_file,
+        )
     elif args.command == "activate":
         return activate_workspace(repo_root, env_file=env_file)
     else:

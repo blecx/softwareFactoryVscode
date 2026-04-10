@@ -22,3 +22,22 @@ def test_verifier_flags_legacy_root_folder_as_transitional_mode(tmp_path: Path):
 
     assert "transitional/legacy mode" in result.stdout
     assert "Please migrate to the namespace-first architecture" in result.stdout
+
+
+def test_verifier_fails_when_legacy_root_env_artifact_exists(tmp_path: Path):
+    target_repo = tmp_path / "throwaway-target"
+    target_repo.mkdir(parents=True, exist_ok=True)
+    (target_repo / ".factory.env").write_text("CONTEXT7_API_KEY=\n", encoding="utf-8")
+
+    verifier_script = Path("scripts/verify_factory_install.py").absolute()
+
+    result = run_python_script(
+        str(verifier_script),
+        "--target",
+        str(target_repo),
+        "--no-smoke-prompt",
+    )
+
+    assert result.returncode == 1
+    assert "Legacy installation artifact is still present" in result.stdout
+    assert ".factory.env" in result.stdout

@@ -275,8 +275,6 @@ def main(argv: list[str] | None = None) -> int:
     if old_factory.exists():
         print("➡️ Spinning down any running legacy factory containers before removal...")
         try:
-            import subprocess
-
             subprocess.run(
                 [
                     sys.executable,
@@ -322,8 +320,6 @@ def main(argv: list[str] | None = None) -> int:
 
             print("➡️ Spinning down any running factory containers before update...")
             try:
-                import subprocess
-
                 subprocess.run(
                     [
                         sys.executable,
@@ -389,6 +385,10 @@ def main(argv: list[str] | None = None) -> int:
 
     print("✅ Factory installed successfully.")
     print(f"Open `{args.workspace_file}` in VS Code to use the installed agents.")
+    print(
+        "Tip: run `python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py preflight` "
+        "to see whether the workspace runtime is ready, needs ramp-up, or has config drift."
+    )
     return 0
 
 

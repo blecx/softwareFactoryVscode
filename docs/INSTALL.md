@@ -148,6 +148,7 @@ The runtime helper now understands workspace-aware lifecycle commands as well:
 ```bash
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py list
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py status
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py preflight
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py activate
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py deactivate
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py cleanup
@@ -158,6 +159,15 @@ These commands distinguish:
 - **installed** — the workspace has a valid harness namespace factory install
 - **running** — the workspace currently owns Docker runtime resources
 - **active** — the workspace is currently selected in the host registry for operator workflows
+
+The `preflight` command is the recommended first check after opening or restoring a VS Code workspace.
+It inspects the expected compose services, resolved host ports, generated runtime manifest, and
+generated workspace MCP URLs before any live endpoint probing. That lets you tell the difference between:
+
+- **ready** — services are up and the endpoint map is aligned
+- **needs-ramp-up** — the installation is fine but the runtime is not running yet
+- **config-drift** — generated workspace/runtime metadata no longer matches the effective port contract
+- **degraded** — services exist but are missing, unhealthy, or published on the wrong ports
 
 Important: workspaces do **not** start Docker services automatically when they are installed.
 Only an explicit `start` command should create running containers.
