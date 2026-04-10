@@ -50,6 +50,58 @@ python3 scripts/verify_factory_install.py --target ../my-target-project
 python3 scripts/verify_factory_install.py --target ../my-target-project --runtime --check-vscode-mcp
 ```
 
+## ⬆️ Updating an Installed Project Repo
+
+If `softwareFactoryVscode` is already installed in a project under
+`.copilot/softwareFactoryVscode/`, use the installed updater from the **target
+project root**.
+
+### Quick operator flow
+
+```bash
+# 1. Check whether the installed factory is current
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py check
+
+# 2. Apply the update if one is available
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py apply
+
+# 3. Verify the install contract after the update
+python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target .
+```
+
+### What the updater does
+
+- reads the installed release metadata from
+  `.copilot/softwareFactoryVscode/lock.json`
+- compares the install against the configured source repository
+- updates the installed factory checkout in place when needed
+- refreshes `.factory.env`, runtime metadata, and `lock.json`
+- re-runs installation compliance verification before declaring success
+
+### For a local source checkout
+
+If you want to explicitly point at a local `softwareFactoryVscode` clone:
+
+```bash
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py check \
+  --repo-url /path/to/softwareFactoryVscode
+
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py apply \
+  --repo-url /path/to/softwareFactoryVscode
+```
+
+### After the update
+
+Use these commands for a quick follow-up check:
+
+```bash
+# Confirm the install is now current
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py check
+
+# Inspect whether runtime config is ready, drifting, or needs ramp-up
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py preflight
+```
+
 ## 🚑 Troubleshooting
 
 - **Port Conflicts**: If the factory fails to boot due to port allocation, check `registry.json` locally or run `python3 scripts/factory_stack.py cleanup` to release dangling port mappings.
