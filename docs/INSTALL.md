@@ -207,6 +207,9 @@ Inside VS Code, the matching workspace task is:
 
 - `🛂 Verify: Installation Compliance`
 
+In the generated multi-root workspace, that task must resolve `--target` against the
+named **Host Project (Root)** folder, not the factory subtree path.
+
 To print the non-mutating smoke prompt again without changing the target repository:
 
 ```bash
