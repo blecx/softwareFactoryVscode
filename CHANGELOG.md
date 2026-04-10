@@ -5,6 +5,73 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.2] — 2026-04-10
+
+### Release Summary
+
+Release 2.2 is a validation-hardening release focused on making the factory more
+truthful under end-to-end install/runtime checks and stricter regression modes.
+The release closes the gap between “tests are green” and “a fresh throwaway
+install actually boots, verifies, and cleans up correctly.”
+
+- **Throwaway runtime resilience** — runtime-enabled validation now avoids host
+  paths that Docker may refuse to bind-mount and pre-creates workspace-scoped
+  data directories before containers start.
+- **Service contract correctness** — approval-gate and devops MCP services now
+  use the correct package entrypoint, host-port wiring, and healthcheck
+  interpreter.
+- **Release/version visibility** — installs now stamp a real harness release
+  version when a `VERSION` file is present instead of falling back to the branch
+  name.
+- **Strict regression hygiene** — SQLite-backed multi-tenant tests now close
+  owned connections, keeping the full suite clean even under `pytest -W error`.
+
+### New in 2.2
+
+- **`VERSION`** — canonical release marker for the harness, currently set to
+  `2.2`; consumed by runtime manifests and now by install metadata stamping.
+- **Expanded regression assertions** in `tests/test_factory_install.py` to verify
+  release-version stamping and runtime manifest version propagation during a
+  throwaway install.
+
+### Fixed in 2.2
+
+- **Throwaway runtime target relocation** — `scripts/validate_throwaway_install.py`
+  now redirects runtime-enabled throwaway targets away from system temp roots
+  such as `/tmp` when Docker file sharing may reject those mounts.
+- **Workspace data directory creation** — `scripts/factory_workspace.py` now
+  pre-creates workspace-scoped `data/memory/<instance>` and
+  `data/bus/<instance>` directories before compose startup, preventing bind-mount
+  initialization failures.
+- **Approval gate startup** — `factory_runtime/apps/approval_gate/main.py` now
+  launches Uvicorn via the `factory_runtime.apps.approval_gate.main:app` module
+  path instead of the legacy `apps.*` path.
+- **DevOps MCP runtime contract** — `compose/docker-compose.mcp-devops.yml` now
+  uses the correct host-port mapping for `docker-compose-mcp` vs.
+  `test-runner-mcp`, and both healthchecks invoke `python3` consistently.
+- **Strict warning-mode test stability** — `tests/test_multi_tenant.py` now
+  closes `AgentBus` and `MemoryStore` explicitly so the full suite remains clean
+  under `pytest -W error` without leaking SQLite connections.
+
+### Changed in 2.2
+
+- **`scripts/install_factory.py`** — install/update flows now prefer a checked-in
+  `VERSION` file for the human-readable lock metadata version when no explicit
+  ref is supplied.
+- **`tests/test_throwaway_runtime_docker.py`** — expanded relocation coverage now
+  models `/tmp` and custom `TMPDIR` scenarios explicitly.
+- **`tests/test_regression.py`** and **`tests/test_factory_install.py`** — added
+  regressions for approval-gate entrypoint wiring, devops MCP health/port
+  contracts, and release-version propagation through installed artifacts.
+
+### Validation for 2.2
+
+- Re-ran the full strict regression path for this release:
+  - `pytest -x -W error tests`
+  - quality gate (`black` / `flake8` / `isort`)
+  - `./tests/run-integration-test.sh`
+  - `scripts/validate_throwaway_install.py --target /tmp/software-factory-throwaway-regression`
+
 ## [2.1] — 2026-04-08
 
 ### Summary

@@ -166,6 +166,20 @@ def head_commit(factory_dir: Path) -> str:
     return result.stdout.strip()
 
 
+def resolve_version_label(factory_dir: Path, *, ref: str) -> str:
+    normalized_ref = ref.strip()
+    if normalized_ref and normalized_ref.upper() != "HEAD":
+        return normalized_ref
+
+    version_file = factory_dir / "VERSION"
+    if version_file.exists():
+        version = version_file.read_text(encoding="utf-8").strip()
+        if version:
+            return version
+
+    return normalized_ref or current_branch(factory_dir) or "main"
+
+
 def clone_factory(factory_dir: Path, *, repo_url: str, ref: str) -> None:
     run_command(["git", "clone", repo_url, str(factory_dir)])
     if ref:
@@ -330,7 +344,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"➡️ Cloning factory repository from {args.repo_url}...")
             clone_factory(factory_dir, repo_url=args.repo_url, ref=args.ref)
-            version_label = args.ref or current_branch(factory_dir) or "main"
+            version_label = resolve_version_label(factory_dir, ref=args.ref)
 
         commit_sha = head_commit(factory_dir)
 

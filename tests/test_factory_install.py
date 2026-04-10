@@ -11,6 +11,7 @@ from pathlib import Path
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+RELEASE_VERSION = (REPO_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 INSTALL_SCRIPT = REPO_ROOT / "scripts" / "install_factory.py"
 BOOTSTRAP_SCRIPT = REPO_ROOT / "scripts" / "bootstrap_host.py"
 VERIFY_SCRIPT = REPO_ROOT / "scripts" / "verify_factory_install.py"
@@ -122,6 +123,7 @@ def create_source_factory_repo(path: Path) -> None:
         (REPO_ROOT / "requirements.dev.txt").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
+    (path / "VERSION").write_text(RELEASE_VERSION + "\n", encoding="utf-8")
     (path / "factory_runtime").mkdir(parents=True, exist_ok=True)
     (path / "factory_runtime" / "agents").mkdir(parents=True, exist_ok=True)
     (path / "factory_runtime" / "agents" / "requirements.txt").write_text(
@@ -168,6 +170,7 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
             / "runtime-manifest.json"
         ).read_text(encoding="utf-8")
     )
+    assert runtime_manifest["factory_version"] == RELEASE_VERSION
     assert runtime_manifest["compose_project_name"] == f"factory_{target_repo.name}"
     port_context7 = runtime_manifest["ports"]["PORT_CONTEXT7"]
     port_bash = runtime_manifest["ports"]["PORT_BASH"]
@@ -187,7 +190,7 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
             encoding="utf-8"
         )
     )
-    assert lock_data["version"] == "main"
+    assert lock_data["version"] == RELEASE_VERSION
     assert lock_data["factory"]["repo_url"] == str(source_repo)
     assert lock_data["factory"]["workspace_file"] == "software-factory.code-workspace"
     assert lock_data["factory"]["commit"]
@@ -195,6 +198,17 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     gitignore = (target_repo / ".gitignore").read_text(encoding="utf-8")
     assert ".copilot/softwareFactoryVscode/.tmp/" in gitignore
     assert ".copilot/softwareFactoryVscode/.factory.env" in gitignore
+
+
+def test_resolve_version_label_prefers_release_file_for_head_ref(
+    tmp_path: Path,
+) -> None:
+    factory_dir = tmp_path / "factory"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    (factory_dir / "VERSION").write_text("2.2\n", encoding="utf-8")
+
+    assert install_factory.resolve_version_label(factory_dir, ref="HEAD") == "2.2"
+    assert install_factory.resolve_version_label(factory_dir, ref="") == "2.2"
 
 
 def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
