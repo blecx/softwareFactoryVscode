@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -55,6 +56,16 @@ def build_compose_command(
 
 
 def run_compose_command(repo_root: Path, command: Sequence[str]) -> None:
+    # Ensure system TEMP/TMPDIR variables reference existing directories
+    # to prevent Docker BuildKit from crashing inside VS Code terminals (which inject their own TMPDIR paths).
+    for env_var in ["TMPDIR", "TEMP", "TMP"]:
+        tmp_path = os.environ.get(env_var)
+        if tmp_path:
+            try:
+                Path(tmp_path).mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass  # Ignore permission/creation errors if any
+
     subprocess.run(
         list(command),
         cwd=str(repo_root),
