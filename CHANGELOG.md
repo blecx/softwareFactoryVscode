@@ -5,6 +5,53 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — 2026-04-10
+
+### Unreleased Summary
+
+Post-`2.2` hardening work focused on making namespace-first upgrades more truthful
+under real target updates, especially when an installed factory checkout already
+has local edits or when a restored workspace needs a quick runtime truth check
+before endpoint probing.
+
+### Newly Added
+
+- **Runtime preflight workflow** — `scripts/factory_stack.py preflight`, matching
+  VS Code task wiring, and updated install guidance now validate service
+  inventory, expected host ports, runtime manifest alignment, and generated
+  workspace MCP URLs before live probes run.
+- **Update regression coverage** — `tests/test_factory_install.py` now covers
+  dirty installed checkouts that trigger updater-created `local-backup-*`
+  branches during refresh, and verifies that release metadata is preserved.
+
+### Newly Fixed
+
+- **Namespace-first upgrade drift detection** — `scripts/verify_factory_install.py`
+  now fails when legacy hidden-tree artifacts or stale legacy `.gitignore`
+  entries remain after upgrade, including partial leftovers.
+- **Generated workspace refresh** — `scripts/bootstrap_host.py` now safely
+  refreshes factory-managed workspace sections in place, updates stale MCP URLs,
+  removes legacy `.gitignore` blocks, and preserves existing lock metadata when
+  bootstrap is re-run standalone.
+- **Reopen/restart port stability** — `scripts/factory_workspace.py` now
+  preserves persisted workspace port assignments across restored workspaces
+  instead of reallocating a fresh port block.
+- **Repo-fundamentals MCP URL mapping** — generated MCP URLs and preflight port
+  validation now match the actual compose host-port contract for `git-mcp`,
+  `search-mcp`, and `filesystem-mcp`.
+- **Dirty install updates** — `scripts/install_factory.py` now keeps the original
+  target branch when a dirty installed checkout is backed up, instead of getting
+  stranded on a temporary `local-backup-*` branch.
+- **Release metadata on update** — install updates now restamp `lock.json.version`
+  from the checked-in `VERSION` file so upgraded installs continue to record the
+  release version (`2.2`) instead of a branch label like `main`.
+
+### Commits
+
+- `9b29275` — `Harden namespace-first install upgrade and runtime preflight`
+- `189d46f` — `Fix dirty install updates targeting backup branches`
+- `47952f7` — `Preserve release version metadata on updates`
+
 ## [2.2] — 2026-04-10
 
 ### Release Summary
