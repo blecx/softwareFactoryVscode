@@ -654,6 +654,9 @@ def _archive_goals(stage: str, issue_number: int) -> None:
     Non-fatal: failures only emit a warning.
     """
     project_root = Path(__file__).parent.parent
+    tmp_path = project_root / ".copilot/softwareFactoryVscode/.tmp"
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    
     script_path = project_root / "scripts" / "archive-goals.sh"
 
     if not script_path.exists():

@@ -240,6 +240,7 @@ def latest_goal_archive() -> dict[str, Any] | None:
 
 def archive_issue_artifacts(issue_number: int, issue_title: str, *, dry_run: bool) -> ArchiveSummary:
     tmp_dir = ROOT / ".copilot/softwareFactoryVscode/.tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
     archive_dir = tmp_dir / "archive" / "issues" / str(issue_number)
     slug = slugify(issue_title)
     candidates = [
