@@ -469,6 +469,74 @@
       "group": "test"
     },
     {
+      "label": "🔖 Release: Refresh Manifest",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "${workspaceFolder}/scripts/factory_release.py",
+        "write-manifest",
+        "--repo-root",
+        "${workspaceFolder}",
+        "--repo-url",
+        "https://github.com/blecx/softwareFactoryVscode.git"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      },
+      "group": "build"
+    },
+    {
+      "label": "🔎 Check: Factory Updates",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/factory_update.py",
+        "check",
+        "--target",
+        "${workspaceFolder:Host Project (Root)}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      },
+      "group": "test"
+    },
+    {
+      "label": "⬆️ Update: Factory Install",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "${workspaceFolder}/scripts/factory_update.py",
+        "apply",
+        "--target",
+        "${workspaceFolder:Host Project (Root)}"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      },
+      "group": "test"
+    },
+    {
       "label": "🧭 Runtime: Preflight",
       "type": "shell",
       "command": "python3",

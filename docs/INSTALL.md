@@ -78,6 +78,22 @@ The updater operates robustly:
 - refreshes `.copilot/softwareFactoryVscode/lock.json`
 - re-runs post-install compliance verification before declaring success
 
+For day-to-day lifecycle management, every install also ships with a dedicated
+update helper:
+
+```bash
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py check
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py apply
+```
+
+The `check` command reads the installed release metadata from
+`.copilot/softwareFactoryVscode/lock.json`, fetches the latest structured
+release manifest from the configured repository source, and reports whether the
+install is current, behind, or requires a mandatory schema refresh.
+
+The `apply` command delegates to the canonical installer with `--update`, so it
+preserves the existing backup, bootstrap, and verification guarantees.
+
 ---
 
 ## Environment Setup
@@ -118,6 +134,7 @@ That manifest is the effective runtime contract for the installed workspace and 
 - the workspace instance identity
 - the compose project name
 - the generated host port map
+- the structured factory release/build metadata used for update decisions
 - the effective MCP URLs used by the generated workspace settings
 - runtime health endpoints used by verification
 

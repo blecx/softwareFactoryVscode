@@ -8,6 +8,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+import factory_release
+
 FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
 DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
@@ -416,6 +422,19 @@ def main(argv: list[str] | None = None) -> int:
         "Tip: run `python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py preflight` "
         "to see whether the workspace runtime is ready, needs ramp-up, or has config drift."
     )
+    manifest_url = factory_release.build_manifest_url(
+        args.repo_url, factory_release.DEFAULT_BRANCH
+    )
+    if manifest_url:
+        print(
+            "Tip: run `python3 .copilot/softwareFactoryVscode/scripts/factory_update.py check` "
+            "to compare the installed factory against the latest GitHub release manifest."
+        )
+    else:
+        print(
+            "Tip: run `python3 .copilot/softwareFactoryVscode/scripts/factory_update.py check` "
+            "to compare the installed factory against the configured source repository."
+        )
     return 0
 
 

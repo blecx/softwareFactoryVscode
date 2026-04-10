@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Enforce release documentation updates when VERSION changes."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+from pathlib import Path
+
+
+def run_git(
+    repo_root: Path, args: list[str], *, check: bool = True
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(repo_root), *args],
+        text=True,
+        capture_output=True,
+        check=check,
+    )
+
+
+def git_show(repo_root: Path, rev: str, relative_path: Path) -> str:
+    result = run_git(
+        repo_root,
+        ["show", f"{rev}:{relative_path.as_posix()}"],
+        check=False,
+    )
+    if result.returncode != 0:
+        return ""
+    return result.stdout
+
+
+def changed_files(repo_root: Path, base_rev: str, head_rev: str) -> set[str]:
+    result = run_git(repo_root, ["diff", "--name-only", f"{base_rev}..{head_rev}"])
+    return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Require changelog and release notes when VERSION changes."
+    )
+    parser.add_argument("--repo-root", default=".")
+    parser.add_argument("--base-rev", required=True)
+    parser.add_argument("--head-rev", default="HEAD")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    repo_root = Path(args.repo_root).expanduser().resolve()
+    version_path = Path("VERSION")
+    changelog_path = Path("CHANGELOG.md")
+    manifest_path = Path("manifests") / "release-manifest.json"
+
+    base_version = git_show(repo_root, args.base_rev, version_path).strip()
+    head_version = git_show(repo_root, args.head_rev, version_path).strip()
+
+    if not head_version:
+        print("❌ VERSION is missing in the target revision.")
+        return 1
+
+    if base_version == head_version:
+        print(
+            "ℹ️ VERSION is unchanged; changelog and release notes are not required "
+            "for this commit."
+        )
+        return 0
+
+    changed = changed_files(repo_root, args.base_rev, args.head_rev)
+    expected_release_notes = Path(".github") / "releases" / f"v{head_version}.md"
+    violations: list[str] = []
+
+    if changelog_path.as_posix() not in changed:
+        violations.append(
+            f"VERSION changed from `{base_version}` to `{head_version}`, but `{changelog_path}` was not updated."
+        )
+    else:
+        changelog_text = git_show(repo_root, args.head_rev, changelog_path)
+        if f"## [{head_version}]" not in changelog_text:
+            violations.append(
+                f"`{changelog_path}` must contain a `## [{head_version}]` section for the new release."
+            )
+
+    if expected_release_notes.as_posix() not in changed:
+        violations.append(
+            "VERSION changed, but the matching GitHub release notes file was not "
+            f"added or updated: `{expected_release_notes.as_posix()}`."
+        )
+    else:
+        release_notes_text = git_show(repo_root, args.head_rev, expected_release_notes)
+        if head_version not in release_notes_text:
+            violations.append(
+                f"`{expected_release_notes.as_posix()}` must mention release `{head_version}`."
+            )
+
+    if manifest_path.as_posix() not in changed:
+        violations.append(
+            f"VERSION changed, but `{manifest_path.as_posix()}` was not refreshed."
+        )
+    else:
+        manifest_text = git_show(repo_root, args.head_rev, manifest_path)
+        try:
+            manifest = json.loads(manifest_text)
+        except json.JSONDecodeError as exc:
+            violations.append(f"`{manifest_path.as_posix()}` is not valid JSON: {exc}")
+        else:
+            latest = manifest.get("latest", {})
+            stable = manifest.get("channels", {}).get("stable", {})
+            if latest.get("version_core") != head_version:
+                violations.append(
+                    f"`{manifest_path.as_posix()}` latest.version_core must be `{head_version}`."
+                )
+            if stable.get("version_core") != head_version:
+                violations.append(
+                    f"`{manifest_path.as_posix()}` channels.stable.version_core must be `{head_version}`."
+                )
+
+    if violations:
+        print("❌ Release bump policy violation(s) detected:")
+        for violation in violations:
+            print(f"- {violation}")
+        print(
+            "Release-number increases must update CHANGELOG.md, the matching "
+            "GitHub release notes file, and the machine-readable release manifest."
+        )
+        return 1
+
+    print(
+        f"✅ Release bump from `{base_version}` to `{head_version}` includes changelog, "
+        "release notes, and refreshed release metadata."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

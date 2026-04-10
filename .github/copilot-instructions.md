@@ -18,4 +18,10 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Mature components expect hostile environments. Do not assume folders (like `.tmp`) haven't been deleted or that environment variables won't behave unexpectedly.
 - Write defensive code that seamlessly recovers from transient state loss (e.g., `mkdir -p` before acting) rather than failing the toolchain when things aren't "perfect".
 
+## 4. Release Bump Discipline
+- Treat `VERSION` as the canonical release marker.
+- If you change `VERSION`, you must also update `CHANGELOG.md`, create or update the matching GitHub release notes file at `.github/releases/v<version>.md`, and refresh `manifests/release-manifest.json`.
+- Do **not** update changelog or release notes for ordinary commits unless the user asks for it or `VERSION` changes.
+- When preparing a release bump, ensure the changelog contains a dedicated `## [<version>]` section and the GitHub release notes explicitly mention the same version.
+
 Remember: **You solve nothing if you fix one bug by creating architectural debt or violating design guardrails.**
