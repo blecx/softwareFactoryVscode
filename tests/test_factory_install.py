@@ -500,6 +500,7 @@ def test_update_ignores_local_backup_branch_and_resets_to_latest_source(
     assert target_head == latest_source_head
     assert target_branch == "main"
     assert "local-backup-" in backup_branches
+    assert lock_data["version"] == RELEASE_VERSION
     assert lock_data["factory"]["commit"] == latest_source_head
     assert (factory_dir / "NEW_UPDATE_MARKER.txt").exists()
     assert not (factory_dir / "DIRTY_NOTE.txt").exists()
