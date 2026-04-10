@@ -362,7 +362,8 @@ def main(argv: list[str] | None = None) -> int:
                 pass  # Ignore if it wasn't running or script fails
 
             print("➡️ Updating existing factory installation...")
-            version_label = update_factory(factory_dir, ref=args.ref)
+            update_factory(factory_dir, ref=args.ref)
+            version_label = resolve_version_label(factory_dir, ref=args.ref)
         else:
             print(f"➡️ Cloning factory repository from {args.repo_url}...")
             clone_factory(factory_dir, repo_url=args.repo_url, ref=args.ref)
