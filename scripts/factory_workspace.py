@@ -575,7 +575,9 @@ def sync_runtime_artifacts(
     if write_env:
         (config.target_dir / FACTORY_DIRNAME).mkdir(parents=True, exist_ok=True)
     (config.target_dir / FACTORY_DIRNAME).mkdir(parents=True, exist_ok=True)
-    write_env_file(config.target_dir / FACTORY_DIRNAME / ".factory.env", config.env_values)
+    write_env_file(
+        config.target_dir / FACTORY_DIRNAME / ".factory.env", config.env_values
+    )
 
     manifest = build_runtime_manifest(config)
     write_json_atomic(config.runtime_manifest_path, manifest)

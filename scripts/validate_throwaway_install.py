@@ -227,7 +227,9 @@ def run_install(
 def run_verify(target_repo: Path, *, runtime: bool) -> None:
     heading("🔎 Running compliance verification")
     command = [
-        str(target_repo / ".copilot/softwareFactoryVscode" / ".venv" / "bin" / "python"),
+        str(
+            target_repo / ".copilot/softwareFactoryVscode" / ".venv" / "bin" / "python"
+        ),
         str(
             target_repo
             / ".copilot/softwareFactoryVscode"
@@ -293,7 +295,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                     remove_volumes=True,
                 )
                 start_stack(
-                    target_repo / ".copilot/softwareFactoryVscode", target_env, build=True
+                    target_repo / ".copilot/softwareFactoryVscode",
+                    target_env,
+                    build=True,
                 )
                 run_verify(target_repo, runtime=True)
                 runtime_checked = True

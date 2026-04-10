@@ -150,16 +150,22 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     assert (target_repo / ".copilot/softwareFactoryVscode").exists()
     assert (target_repo / ".copilot/softwareFactoryVscode/.tmp").exists()
 
-    factory_env = (target_repo / ".copilot/softwareFactoryVscode/.factory.env").read_text(encoding="utf-8")
+    factory_env = (
+        target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    ).read_text(encoding="utf-8")
     assert f"TARGET_WORKSPACE_PATH={target_repo}" in factory_env
-    assert f"FACTORY_DIR={target_repo / '.copilot/softwareFactoryVscode'}" in factory_env
+    assert (
+        f"FACTORY_DIR={target_repo / '.copilot/softwareFactoryVscode'}" in factory_env
+    )
     assert "FACTORY_INSTANCE_ID=factory_" not in factory_env
     assert "FACTORY_INSTANCE_ID=factory-" in factory_env
     assert "CONTEXT7_API_KEY=" in factory_env
 
     runtime_manifest = json.loads(
         (
-            target_repo / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
+            target_repo
+            / ".copilot/softwareFactoryVscode/.tmp"
+            / "runtime-manifest.json"
         ).read_text(encoding="utf-8")
     )
     assert runtime_manifest["compose_project_name"] == f"factory_{target_repo.name}"
@@ -177,7 +183,9 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     )
 
     lock_data = json.loads(
-        (target_repo / ".copilot/softwareFactoryVscode/lock.json").read_text(encoding="utf-8")
+        (target_repo / ".copilot/softwareFactoryVscode/lock.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert lock_data["version"] == "main"
     assert lock_data["factory"]["repo_url"] == str(source_repo)
@@ -243,7 +251,9 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
     ).is_file()
 
     lock_data = json.loads(
-        (target_repo / ".copilot/softwareFactoryVscode/lock.json").read_text(encoding="utf-8")
+        (target_repo / ".copilot/softwareFactoryVscode/lock.json").read_text(
+            encoding="utf-8"
+        )
     )
     assert lock_data["factory"]["repo_url"] == str(source_repo)
     assert lock_data["factory"]["install_path"] == ".copilot/softwareFactoryVscode"
@@ -259,7 +269,9 @@ def test_throwaway_target_install_regression_via_cli(tmp_path: Path) -> None:
     ]
     runtime_manifest = json.loads(
         (
-            target_repo / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
+            target_repo
+            / ".copilot/softwareFactoryVscode/.tmp"
+            / "runtime-manifest.json"
         ).read_text(encoding="utf-8")
     )
     assert (
@@ -309,28 +321,39 @@ def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
             "",
         ]
     )
-    (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(custom_env, encoding="utf-8")
+    (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(
+        custom_env, encoding="utf-8"
+    )
     tmp_dir = target_repo / ".copilot/softwareFactoryVscode/.tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     (tmp_dir / "foo.txt").write_text("running")
 
     assert (
         install_factory.main(
-            ["--target", str(target_repo), "--repo-url", str(source_repo), "--update", "--force-workspace"]
+            [
+                "--target",
+                str(target_repo),
+                "--repo-url",
+                str(source_repo),
+                "--update",
+                "--force-workspace",
+            ]
         )
         == 0
     )
 
     # Workspace overwritten (force-workspace passed)
-    assert "\"custom\": true" not in workspace_path.read_text(encoding="utf-8")
-    
+    assert '"custom": true' not in workspace_path.read_text(encoding="utf-8")
+
     # env preserved
-    updated_env = (target_repo / ".copilot/softwareFactoryVscode/.factory.env").read_text(encoding="utf-8")
+    updated_env = (
+        target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    ).read_text(encoding="utf-8")
     assert "CONTEXT7_API_KEY=abc123" in updated_env
     assert "PORT_BASH=" in updated_env
-    
+
     # tmp untouched
-    assert (tmp_dir / 'foo.txt').exists()
+    assert (tmp_dir / "foo.txt").exists()
 
 
 def test_bootstrap_force_workspace_overwrites_existing_workspace(
@@ -389,16 +412,20 @@ def test_verify_factory_install_fails_when_workspace_file_missing(
     target_repo = tmp_path / "target-project"
     target_repo.mkdir(parents=True, exist_ok=True)
     (target_repo / ".copilot/softwareFactoryVscode").mkdir(parents=True, exist_ok=True)
-    (target_repo / ".copilot/softwareFactoryVscode" / ".git").mkdir(parents=True, exist_ok=True)
-    (target_repo / ".copilot/softwareFactoryVscode" / "scripts").mkdir(parents=True, exist_ok=True)
+    (target_repo / ".copilot/softwareFactoryVscode" / ".git").mkdir(
+        parents=True, exist_ok=True
+    )
+    (target_repo / ".copilot/softwareFactoryVscode" / "scripts").mkdir(
+        parents=True, exist_ok=True
+    )
     for script_name in (
         "install_factory.py",
         "bootstrap_host.py",
         "verify_factory_install.py",
     ):
-        (target_repo / ".copilot/softwareFactoryVscode" / "scripts" / script_name).write_text(
-            "# stub\n", encoding="utf-8"
-        )
+        (
+            target_repo / ".copilot/softwareFactoryVscode" / "scripts" / script_name
+        ).write_text("# stub\n", encoding="utf-8")
     (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(
         "\n".join(
             [
@@ -509,7 +536,10 @@ def test_verify_factory_install_fails_when_bash_gateway_policy_is_invalid(
             {
                 "folders": [
                     {"name": "Host Project (Root)", "path": "."},
-                    {"name": "AI Agent Factory", "path": ".copilot/softwareFactoryVscode"},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
                 ]
             }
         )
@@ -600,7 +630,10 @@ def test_verify_factory_runtime_passes_with_mocked_services(
             {
                 "folders": [
                     {"name": "Host Project (Root)", "path": "."},
-                    {"name": "AI Agent Factory", "path": ".copilot/softwareFactoryVscode"},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
                 ]
             }
         )
@@ -758,7 +791,10 @@ def test_verify_factory_runtime_fails_when_required_service_missing(
             {
                 "folders": [
                     {"name": "Host Project (Root)", "path": "."},
-                    {"name": "AI Agent Factory", "path": ".copilot/softwareFactoryVscode"},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
                 ]
             }
         )
@@ -975,7 +1011,10 @@ def test_factory_stack_start_stop_activate_preserve_workspace_distinction(
     )
 
     factory_stack.start_stack(
-        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env", build=False, wait=False
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+        build=False,
+        wait=False,
     )
     registry = factory_workspace.load_registry(registry_path)
     assert (
@@ -983,21 +1022,27 @@ def test_factory_stack_start_stop_activate_preserve_workspace_distinction(
     )
     assert registry["active_workspace"] == ""
 
-    factory_stack.activate_workspace(repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env")
+    factory_stack.activate_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
     registry = factory_workspace.load_registry(registry_path)
     assert registry["active_workspace"] == config.factory_instance_id
     assert (
         registry["workspaces"][config.factory_instance_id]["runtime_state"] == "running"
     )
 
-    factory_stack.stop_stack(repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env")
+    factory_stack.stop_stack(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
     registry = factory_workspace.load_registry(registry_path)
     assert (
         registry["workspaces"][config.factory_instance_id]["runtime_state"] == "stopped"
     )
     assert registry["active_workspace"] == config.factory_instance_id
 
-    factory_stack.deactivate_workspace(repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env")
+    factory_stack.deactivate_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
     registry = factory_workspace.load_registry(registry_path)
     assert registry["active_workspace"] == ""
     assert len(calls) == 2
@@ -1039,7 +1084,10 @@ def test_factory_stack_start_rolls_back_runtime_state_when_compose_fails(
 
     try:
         factory_stack.start_stack(
-            repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env", build=False, wait=False
+            repo_root,
+            env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+            build=False,
+            wait=False,
         )
     except subprocess.CalledProcessError:
         pass
@@ -1092,7 +1140,9 @@ def test_factory_stack_status_reports_degraded_when_required_service_restarts(
         },
     )
 
-    factory_stack.status_workspace(repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env")
+    factory_stack.status_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
     output = capsys.readouterr().out
 
     assert "runtime_state=degraded" in output
@@ -1133,11 +1183,17 @@ def test_factory_stack_status_does_not_rewrite_custom_env(
             "",
         ]
     )
-    (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(custom_env, encoding="utf-8")
+    (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(
+        custom_env, encoding="utf-8"
+    )
 
-    factory_stack.status_workspace(repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env")
+    factory_stack.status_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
 
-    assert (target_repo / ".copilot/softwareFactoryVscode/.factory.env").read_text(encoding="utf-8") == custom_env
+    assert (target_repo / ".copilot/softwareFactoryVscode/.factory.env").read_text(
+        encoding="utf-8"
+    ) == custom_env
 
 
 def test_deactivate_workspace_does_not_clear_another_active_workspace(
@@ -1177,10 +1233,12 @@ def test_deactivate_workspace_does_not_clear_another_active_workspace(
     repo_b, config_b = prepare_workspace(tmp_path / "project-b")
 
     factory_stack.activate_workspace(
-        repo_a, env_file=config_a.target_dir / ".copilot/softwareFactoryVscode/.factory.env"
+        repo_a,
+        env_file=config_a.target_dir / ".copilot/softwareFactoryVscode/.factory.env",
     )
     factory_stack.deactivate_workspace(
-        repo_b, env_file=config_b.target_dir / ".copilot/softwareFactoryVscode/.factory.env"
+        repo_b,
+        env_file=config_b.target_dir / ".copilot/softwareFactoryVscode/.factory.env",
     )
 
     registry = factory_workspace.load_registry(registry_path)
@@ -1231,7 +1289,10 @@ def test_starting_one_workspace_does_not_change_another_workspace_state(
     )
 
     factory_stack.start_stack(
-        repo_a, env_file=config_a.target_dir / ".copilot/softwareFactoryVscode/.factory.env", build=False, wait=False
+        repo_a,
+        env_file=config_a.target_dir / ".copilot/softwareFactoryVscode/.factory.env",
+        build=False,
+        wait=False,
     )
 
     registry = factory_workspace.load_registry(registry_path)
@@ -1306,7 +1367,9 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
             "",
         ]
     )
-    (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(custom_env, encoding="utf-8")
+    (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(
+        custom_env, encoding="utf-8"
+    )
     config = factory_workspace.build_runtime_config(
         target_repo, factory_dir=factory_dir
     )
@@ -1339,7 +1402,10 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
             {
                 "folders": [
                     {"name": "Host Project (Root)", "path": "."},
-                    {"name": "AI Agent Factory", "path": ".copilot/softwareFactoryVscode"},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
                 ],
                 "settings": config.workspace_settings,
             }
@@ -1589,7 +1655,9 @@ def test_reconcile_registry_prunes_ephemeral_pytest_workspaces(
         parents=True, exist_ok=True
     )
     (
-        ephemeral_target / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
+        ephemeral_target
+        / ".copilot/softwareFactoryVscode/.tmp"
+        / "runtime-manifest.json"
     ).write_text("{}\n", encoding="utf-8")
 
     persistent_target = Path("/tmp") / "factory-registry-persistent-target"
@@ -1732,7 +1800,9 @@ def test_cleanup_workspace(tmp_path: Path):
     ).exists()
 
     # cleanup
-    cleanup_workspace(factory_dir, env_file=(target / ".copilot/softwareFactoryVscode/.factory.env"))
+    cleanup_workspace(
+        factory_dir, env_file=(target / ".copilot/softwareFactoryVscode/.factory.env")
+    )
 
     assert not (target / ".copilot/softwareFactoryVscode/.factory.env").exists()
     assert not (
@@ -1875,7 +1945,9 @@ def test_factory_stack_status_emits_commit_tracking_fields(
         factory_stack, "collect_running_services", lambda compose_project_name: {}
     )
 
-    factory_stack.status_workspace(repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env")
+    factory_stack.status_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
     output = capsys.readouterr().out
 
     assert "factory_commit=" in output

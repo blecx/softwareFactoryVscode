@@ -106,16 +106,29 @@ def ensure_clean_factory_tree(factory_dir: Path) -> None:
     )
     if status.stdout.strip():
         import datetime
+
         timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         backup_branch = f"local-backup-{timestamp}"
-        print(f"⚠️  Factory installation has local changes. Backing up to branch '{backup_branch}'...")
+        print(
+            f"⚠️  Factory installation has local changes. Backing up to branch '{backup_branch}'..."
+        )
         run_command(["git", "-C", str(factory_dir), "checkout", "-b", backup_branch])
         run_command(["git", "-C", str(factory_dir), "add", "-A"])
-        run_command([
-            "git", "-c", "user.name=Software Factory Updater", "-c", "user.email=updater@localhost", 
-            "-C", str(factory_dir), "commit", "-m", f"Auto-backup dirty state before update"
-        ])
-        
+        run_command(
+            [
+                "git",
+                "-c",
+                "user.name=Software Factory Updater",
+                "-c",
+                "user.email=updater@localhost",
+                "-C",
+                str(factory_dir),
+                "commit",
+                "-m",
+                "Auto-backup dirty state before update",
+            ]
+        )
+
         # Switch back to the branch we were on so update_factory can reset it
         # Actually update_factory does a checkout to target_ref, so we are safe
         print(f"✅  Dirty state saved to '{backup_branch}'. Proceeding with update...")
@@ -164,10 +177,12 @@ def update_factory(factory_dir: Path, *, ref: str) -> str:
     run_command(["git", "-C", str(factory_dir), "fetch", "origin", "--prune"])
     target_ref = ref or current_branch(factory_dir) or "main"
     run_command(["git", "-C", str(factory_dir), "checkout", "-f", target_ref])
-    
+
     if remote_branch_exists(factory_dir, target_ref):
-        run_command(["git", "-C", str(factory_dir), "reset", "--hard", f"origin/{target_ref}"])
-    
+        run_command(
+            ["git", "-C", str(factory_dir), "reset", "--hard", f"origin/{target_ref}"]
+        )
+
     run_command(["git", "-C", str(factory_dir), "clean", "-fd"])
     return target_ref
 
@@ -235,23 +250,30 @@ def invoke_verifier(
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     target_dir = resolve_target_dir(args.target)
-    
+
     # 🧹 DESTROY EVERYTHING OF THE OLD STRUCTURE
     import shutil
-    
+
     # 1. Legacy locations
     old_factory = target_dir / ".softwareFactoryVscode"
     old_tmp_dir = target_dir / ".tmp" / "softwareFactoryVscode"
 
     if old_factory.exists():
-        print(f"➡️ Spinning down any running legacy factory containers before removal...")
+        print("➡️ Spinning down any running legacy factory containers before removal...")
         try:
             import subprocess
+
             subprocess.run(
-                [sys.executable, str(old_factory / "scripts" / "factory_stack.py"), "stop", "--repo-root", str(old_factory)],
+                [
+                    sys.executable,
+                    str(old_factory / "scripts" / "factory_stack.py"),
+                    "stop",
+                    "--repo-root",
+                    str(old_factory),
+                ],
                 check=False,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
             )
         except Exception as e:
             print(f"⚠️ Could not stop running legacy containers: {e}")
@@ -287,11 +309,18 @@ def main(argv: list[str] | None = None) -> int:
             print("➡️ Spinning down any running factory containers before update...")
             try:
                 import subprocess
+
                 subprocess.run(
-                    [sys.executable, str(factory_dir / "scripts" / "factory_stack.py"), "stop", "--repo-root", str(factory_dir)],
+                    [
+                        sys.executable,
+                        str(factory_dir / "scripts" / "factory_stack.py"),
+                        "stop",
+                        "--repo-root",
+                        str(factory_dir),
+                    ],
                     check=False,
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
+                    stderr=subprocess.DEVNULL,
                 )
             except Exception:
                 pass  # Ignore if it wasn't running or script fails
@@ -315,7 +344,9 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
-        print("➡️ Bootstrapping target repository for namespace-first workspace usage...")
+        print(
+            "➡️ Bootstrapping target repository for namespace-first workspace usage..."
+        )
         invoke_bootstrap(
             target_dir=target_dir,
             factory_dir=factory_dir,
