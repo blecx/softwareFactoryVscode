@@ -1950,3 +1950,22 @@ def test_ci_workflow_has_container_build_job() -> None:
     assert (
         "docker/*/Dockerfile" in text or "Dockerfile" in text
     ), "CI container-build job must reference Dockerfiles"
+
+
+def test_verify_tasks_target_host_workspace_root() -> None:
+    tasks_path = REPO_ROOT / ".vscode" / "tasks.json"
+    tasks_data = json.loads(tasks_path.read_text(encoding="utf-8"))
+    tasks = {
+        task["label"]: task
+        for task in tasks_data.get("tasks", [])
+        if isinstance(task, dict) and isinstance(task.get("label"), str)
+    }
+
+    for label in (
+        "🛂 Verify: Installation Compliance",
+        "🩺 Verify: Runtime Compliance",
+        "🩺 Verify: Runtime Compliance + MCP",
+    ):
+        task = tasks[label]
+        assert task["args"][0] == "${workspaceFolder}/scripts/verify_factory_install.py"
+        assert task["args"][2] == "${workspaceFolder:Host Project (Root)}"

@@ -409,7 +409,7 @@
       "args": [
         "${workspaceFolder}/scripts/verify_factory_install.py",
         "--target",
-        "${workspaceFolder}/.."
+        "${workspaceFolder:Host Project (Root)}"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -430,7 +430,7 @@
       "args": [
         "${workspaceFolder}/scripts/verify_factory_install.py",
         "--target",
-        "${workspaceFolder}/..",
+        "${workspaceFolder:Host Project (Root)}",
         "--runtime"
       ],
       "options": {
@@ -452,7 +452,7 @@
       "args": [
         "${workspaceFolder}/scripts/verify_factory_install.py",
         "--target",
-        "${workspaceFolder}/..",
+        "${workspaceFolder:Host Project (Root)}",
         "--runtime",
         "--check-vscode-mcp"
       ],
