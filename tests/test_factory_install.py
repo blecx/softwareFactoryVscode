@@ -711,6 +711,76 @@ def test_factory_update_apply_refreshes_install_from_source_manifest(
     ).exists()
 
 
+def test_factory_update_check_uses_live_local_source_head_when_manifest_lags(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    source_repo = tmp_path / "source-factory"
+    target_repo = tmp_path / "target-project"
+    create_source_factory_repo(source_repo)
+    init_git_repo(target_repo)
+
+    assert (
+        install_factory.main(
+            ["--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+
+    initial_manifest = json.loads(
+        (source_repo / "manifests/release-manifest.json").read_text(encoding="utf-8")
+    )
+    initial_manifest_commit = initial_manifest["latest"]["commit_sha"]
+
+    (source_repo / "LOCAL_HEAD_ONLY_UPDATE.txt").write_text(
+        "live local source head\n", encoding="utf-8"
+    )
+    git("add", "LOCAL_HEAD_ONLY_UPDATE.txt", cwd=source_repo)
+    git(
+        "commit",
+        "-m",
+        "Advance source repo without refreshing manifest",
+        cwd=source_repo,
+    )
+    latest_source_head = git("rev-parse", "HEAD", cwd=source_repo).stdout.strip()
+
+    stale_manifest = json.loads(
+        (source_repo / "manifests/release-manifest.json").read_text(encoding="utf-8")
+    )
+    assert stale_manifest["latest"]["commit_sha"] == initial_manifest_commit
+    assert stale_manifest["latest"]["commit_sha"] != latest_source_head
+
+    assert (
+        factory_update.main(
+            ["check", "--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+    check_output = capsys.readouterr().out
+    assert "update_status=update-available" in check_output
+    assert "latest_commit=" + latest_source_head in check_output
+
+    assert (
+        factory_update.main(
+            ["apply", "--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+    capsys.readouterr()
+
+    assert (
+        factory_update.main(
+            ["check", "--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+    final_output = capsys.readouterr().out
+    assert "update_status=up-to-date" in final_output
+    assert "update_available=false" in final_output
+    assert "installed_commit=" + latest_source_head in final_output
+    assert "latest_commit=" + latest_source_head in final_output
+
+
 def test_release_update_smoke_flow(tmp_path: Path, capsys) -> None:
     source_repo = tmp_path / "source-factory"
     target_repo = tmp_path / "target-project"
