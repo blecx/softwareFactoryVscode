@@ -15,7 +15,7 @@ That function is **explicitly Option A**: a liveness placeholder loop. It does n
 ```python
 def _run_queue_loop(poll_interval_seconds: float = 5.0) -> int:
     """Run a placeholder liveness loop for containerized agent-worker mode.
-    
+
     Option A: Liveness placeholder — keeps the container alive for future
     queue integration without consuming real work items.
     """
