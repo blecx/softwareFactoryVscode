@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +28,14 @@ GITIGNORE_BLOCK = [
     "# Factory Isolation",
     f"{FACTORY_DIRNAME}/.tmp/",
     f"{FACTORY_DIRNAME}/.factory.env",
+]
+LEGACY_GITIGNORE_HEADER = "# Hidden-tree softwareFactoryVscode install artifacts"
+LEGACY_GITIGNORE_BLOCK = [
+    LEGACY_GITIGNORE_HEADER,
+    ".softwareFactoryVscode/",
+    ".factory.env",
+    ".factory.lock.json",
+    ".tmp/",
 ]
 
 
@@ -87,7 +96,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--factory-version",
-        default="main",
+        default="",
         help="Human-readable factory version or ref label to record in .copilot/softwareFactoryVscode/lock.json.",
     )
     parser.add_argument(
@@ -97,7 +106,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--repo-url",
-        default=DEFAULT_REPO_URL,
+        default="",
         help="Canonical source repository URL to record in .copilot/softwareFactoryVscode/lock.json.",
     )
     return parser.parse_args(argv)
@@ -161,19 +170,63 @@ def ensure_gitignore_entries(target_dir: Path) -> tuple[Path, bool]:
         gitignore_path.read_text(encoding="utf-8") if gitignore_path.exists() else ""
     )
     existing_lines = existing_text.splitlines()
-    missing_lines = [line for line in GITIGNORE_BLOCK if line not in existing_lines]
+    normalized_lines, removed_legacy = strip_legacy_gitignore_entries(existing_lines)
+    missing_lines = [line for line in GITIGNORE_BLOCK if line not in normalized_lines]
 
-    if not missing_lines:
+    if not missing_lines and not removed_legacy:
         return gitignore_path, False
 
-    updated_text = existing_text
+    updated_text = "\n".join(normalized_lines)
     if updated_text and not updated_text.endswith("\n"):
         updated_text += "\n"
-    if updated_text:
+    if updated_text and (missing_lines or removed_legacy):
         updated_text += "\n"
     updated_text += "\n".join(missing_lines) + "\n"
     gitignore_path.write_text(updated_text, encoding="utf-8")
     return gitignore_path, True
+
+
+def strip_legacy_gitignore_entries(existing_lines: list[str]) -> tuple[list[str], bool]:
+    updated_lines: list[str] = []
+    removed_legacy = False
+    skip_legacy_block = False
+
+    for line in existing_lines:
+        stripped = line.strip()
+
+        if stripped == LEGACY_GITIGNORE_HEADER:
+            removed_legacy = True
+            skip_legacy_block = True
+            continue
+
+        if skip_legacy_block and stripped in LEGACY_GITIGNORE_BLOCK[1:]:
+            removed_legacy = True
+            continue
+
+        if skip_legacy_block and stripped == "":
+            skip_legacy_block = False
+            if updated_lines and updated_lines[-1] != "":
+                updated_lines.append("")
+            continue
+
+        if skip_legacy_block:
+            skip_legacy_block = False
+
+        updated_lines.append(line)
+
+    while updated_lines and updated_lines[-1] == "":
+        updated_lines.pop()
+
+    return updated_lines, removed_legacy
+
+
+def find_legacy_gitignore_entries(existing_lines: list[str]) -> list[str]:
+    findings: list[str] = []
+    line_set = {line.strip() for line in existing_lines}
+    for entry in LEGACY_GITIGNORE_BLOCK:
+        if entry in line_set:
+            findings.append(entry)
+    return findings
 
 
 def resolve_workspace_path(target_dir: Path, workspace_file: str) -> Path:
@@ -183,10 +236,138 @@ def resolve_workspace_path(target_dir: Path, workspace_file: str) -> Path:
     return target_dir / candidate
 
 
+def deep_merge_dict(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def merge_workspace_folders(
+    existing_folders: list[dict[str, Any]],
+    desired_folders: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    desired_pairs = {
+        (entry.get("name"), entry.get("path"))
+        for entry in desired_folders
+        if isinstance(entry, dict)
+    }
+    extras = [
+        entry
+        for entry in existing_folders
+        if isinstance(entry, dict)
+        and (entry.get("name"), entry.get("path")) not in desired_pairs
+    ]
+    return [*desired_folders, *extras]
+
+
+def can_refresh_managed_workspace(current_data: dict[str, Any]) -> bool:
+    allowed_top_level_keys = {"folders", "settings"}
+    if any(key not in allowed_top_level_keys for key in current_data):
+        return False
+
+    folders = current_data.get("folders")
+    if not isinstance(folders, list):
+        return False
+
+    current_pairs = {
+        (entry.get("name"), entry.get("path"))
+        for entry in folders
+        if isinstance(entry, dict)
+    }
+    required_pairs = {
+        ("Host Project (Root)", "."),
+        ("AI Agent Factory", FACTORY_DIRNAME),
+    }
+    return required_pairs.issubset(current_pairs)
+
+
+def merge_workspace_file_content(
+    current_data: dict[str, Any], desired_data: dict[str, Any]
+) -> dict[str, Any]:
+    merged = dict(current_data)
+    merged["folders"] = merge_workspace_folders(
+        current_data.get("folders", []),
+        desired_data.get("folders", []),
+    )
+
+    current_settings = current_data.get("settings", {})
+    desired_settings = desired_data.get("settings", {})
+    if not isinstance(current_settings, dict):
+        current_settings = {}
+    if not isinstance(desired_settings, dict):
+        desired_settings = {}
+    merged["settings"] = deep_merge_dict(current_settings, desired_settings)
+    return merged
+
+
 def render_workspace_file(config: factory_workspace.WorkspaceRuntimeConfig) -> str:
     template = load_json(WORKSPACE_TEMPLATE_PATH)
     template["settings"] = config.workspace_settings
     return json.dumps(template, indent=2, ensure_ascii=False) + "\n"
+
+
+def read_factory_head_commit(factory_dir: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(factory_dir), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return ""
+    return result.stdout.strip()
+
+
+def read_factory_repo_url(factory_dir: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(factory_dir), "remote", "get-url", "origin"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return ""
+    return result.stdout.strip()
+
+
+def resolve_lock_metadata(
+    factory_dir: Path,
+    *,
+    requested_version: str,
+    requested_commit: str,
+    requested_repo_url: str,
+    existing_lock: dict[str, Any],
+) -> tuple[str, str, str]:
+    existing_factory = existing_lock.get("factory", {})
+    existing_factory = existing_factory if isinstance(existing_factory, dict) else {}
+
+    version = requested_version.strip()
+    if not version:
+        version_file = factory_dir / "VERSION"
+        if version_file.exists():
+            version = version_file.read_text(encoding="utf-8").strip()
+    if not version:
+        version = str(existing_lock.get("version", "")).strip()
+    if not version:
+        version = "main"
+
+    commit = requested_commit.strip() or read_factory_head_commit(factory_dir)
+    if not commit:
+        commit = str(existing_factory.get("commit", "")).strip()
+
+    repo_url = requested_repo_url.strip() or read_factory_repo_url(factory_dir)
+    if not repo_url:
+        repo_url = str(existing_factory.get("repo_url", "")).strip()
+    if not repo_url:
+        repo_url = DEFAULT_REPO_URL
+
+    return version, commit, repo_url
 
 
 def ensure_workspace_file(
@@ -198,12 +379,28 @@ def ensure_workspace_file(
 ) -> tuple[Path, str]:
     workspace_path = resolve_workspace_path(target_dir, workspace_file)
     desired = render_workspace_file(config)
+    desired_data = json.loads(desired)
     existed_before = workspace_path.exists()
 
     if existed_before:
         current = workspace_path.read_text(encoding="utf-8")
         if current == desired:
             return workspace_path, "unchanged"
+        if not force:
+            try:
+                current_data = json.loads(current)
+            except json.JSONDecodeError:
+                current_data = None
+
+            if isinstance(current_data, dict) and can_refresh_managed_workspace(
+                current_data
+            ):
+                merged_data = merge_workspace_file_content(current_data, desired_data)
+                merged = json.dumps(merged_data, indent=2, ensure_ascii=False) + "\n"
+                if merged != current:
+                    workspace_path.write_text(merged, encoding="utf-8")
+                    return workspace_path, "updated"
+                return workspace_path, "unchanged"
         if not force:
             return workspace_path, "skipped-conflict"
 
@@ -222,17 +419,25 @@ def update_lock_file(
     lock_path = target_dir / ".copilot/softwareFactoryVscode/lock.json"
     now = utc_now_iso()
     lock_data = load_json(lock_path)
+    factory_dir = target_dir / FACTORY_DIRNAME
+    resolved_version, resolved_commit, resolved_repo_url = resolve_lock_metadata(
+        factory_dir,
+        requested_version=factory_version,
+        requested_commit=factory_commit,
+        requested_repo_url=repo_url,
+        existing_lock=lock_data,
+    )
     installed_at = lock_data.get("installed_at", now)
     lock_data.update(
         {
-            "version": factory_version,
+            "version": resolved_version,
             "installed_at": installed_at,
             "updated_at": now,
             "factory": {
-                "repo_url": repo_url,
+                "repo_url": resolved_repo_url,
                 "install_path": FACTORY_DIRNAME,
                 "workspace_file": workspace_file,
-                "commit": factory_commit,
+                "commit": resolved_commit,
             },
         }
     )

@@ -40,9 +40,9 @@ PORT_LAYOUT: dict[str, int] = {
 MCP_SERVER_PORT_KEYS: dict[str, str] = {
     "context7": "PORT_CONTEXT7",
     "bashGateway": "PORT_BASH",
-    "git": "PORT_GIT",
-    "search": "PORT_SEARCH",
-    "filesystem": "PORT_FS",
+    "git": "PORT_FS",
+    "search": "PORT_GIT",
+    "filesystem": "PORT_SEARCH",
     "dockerCompose": "PORT_COMPOSE",
     "testRunner": "PORT_TEST",
     "offlineDocs": "PORT_DOCS",
@@ -432,6 +432,7 @@ def build_runtime_config(
         except ValueError:
             preferred_index = None
 
+    existing_record: dict[str, Any] = {}
     if preferred_index is None:
         registry = load_registry(registry_path)
         existing_record = registry.get("workspaces", {}).get(factory_instance_id, {})
@@ -439,26 +440,54 @@ def build_runtime_config(
             existing_index = existing_record.get("port_index")
             if isinstance(existing_index, int):
                 preferred_index = existing_index
+    else:
+        registry = load_registry(registry_path)
+        existing_record = registry.get("workspaces", {}).get(factory_instance_id, {})
+        if not isinstance(existing_record, dict):
+            existing_record = {}
 
-    port_index = find_available_port_index(
-        registry_path=registry_path,
-        preferred_index=preferred_index if preferred_index is not None else 0,
-        exclude_instance_id=factory_instance_id,
-    )
-    ports = build_port_values(port_index)
+    persisted_ports: dict[str, int] = {}
+    manifest_ports = existing_manifest.get("ports", {})
+    if isinstance(manifest_ports, dict):
+        for key, value in manifest_ports.items():
+            if key not in PORT_LAYOUT:
+                continue
+            try:
+                persisted_ports[key] = int(value)
+            except (TypeError, ValueError):
+                continue
+
+    raw_record_ports = existing_record.get("ports", {})
+    if isinstance(raw_record_ports, dict):
+        for key, value in raw_record_ports.items():
+            if key not in PORT_LAYOUT:
+                continue
+            try:
+                persisted_ports.setdefault(key, int(value))
+            except (TypeError, ValueError):
+                continue
 
     for key in PORT_LAYOUT:
         raw_value = existing_env.get(key, "").strip()
         if not raw_value:
             continue
         try:
-            ports[key] = int(raw_value)
+            persisted_ports[key] = int(raw_value)
         except ValueError:
             continue
 
-    # If persisted env port overrides are stale/conflicting, fall back to the
-    # allocated port block for the selected index so runtime start can recover.
-    if not ports_available(ports):
+    if persisted_ports:
+        port_index = preferred_index if preferred_index is not None else 0
+        ports = {
+            **build_port_values(port_index),
+            **persisted_ports,
+        }
+    else:
+        port_index = find_available_port_index(
+            registry_path=registry_path,
+            preferred_index=preferred_index if preferred_index is not None else 0,
+            exclude_instance_id=factory_instance_id,
+        )
         ports = build_port_values(port_index)
 
     assert_ports_do_not_conflict(

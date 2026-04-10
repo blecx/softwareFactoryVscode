@@ -61,6 +61,85 @@ def run_python_script(
     )
 
 
+def build_full_service_inventory(
+    config: factory_workspace.WorkspaceRuntimeConfig,
+    *,
+    agent_worker_status: str = "Up 10 seconds (healthy)",
+) -> dict[str, dict[str, object]]:
+    return {
+        "mock-llm-gateway": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory/mock-llm-gateway:latest",
+            "published_ports": [config.ports["PORT_TUI"]],
+        },
+        "mcp-memory": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory/mcp-memory:latest",
+            "published_ports": [config.ports["MEMORY_MCP_PORT"]],
+        },
+        "mcp-agent-bus": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory/mcp-agent-bus:latest",
+            "published_ports": [config.ports["AGENT_BUS_PORT"]],
+        },
+        "approval-gate": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory/approval-gate:latest",
+            "published_ports": [config.ports["APPROVAL_GATE_PORT"]],
+        },
+        "agent-worker": {
+            "status": agent_worker_status,
+            "image": "factory/agent-worker:latest",
+            "published_ports": [],
+        },
+        "context7": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_context7",
+            "published_ports": [config.ports["PORT_CONTEXT7"]],
+        },
+        "bash-gateway-mcp": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_bash",
+            "published_ports": [config.ports["PORT_BASH"]],
+        },
+        "git-mcp": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_git",
+            "published_ports": [config.ports["PORT_FS"]],
+        },
+        "search-mcp": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_search",
+            "published_ports": [config.ports["PORT_GIT"]],
+        },
+        "filesystem-mcp": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_fs",
+            "published_ports": [config.ports["PORT_SEARCH"]],
+        },
+        "docker-compose-mcp": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_compose",
+            "published_ports": [config.ports["PORT_COMPOSE"]],
+        },
+        "test-runner-mcp": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_test",
+            "published_ports": [config.ports["PORT_TEST"]],
+        },
+        "offline-docs-mcp": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_docs",
+            "published_ports": [config.ports["PORT_DOCS"]],
+        },
+        "github-ops-mcp": {
+            "status": "Up 10 seconds (healthy)",
+            "image": "factory_github",
+            "published_ports": [config.ports["PORT_GITHUB"]],
+        },
+    }
+
+
 def init_git_repo(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     git("init", cwd=path)
@@ -88,6 +167,10 @@ def create_source_factory_repo(path: Path) -> None:
     )
     (path / "scripts" / "verify_factory_install.py").write_text(
         VERIFY_SCRIPT.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (path / "scripts" / "factory_stack.py").write_text(
+        FACTORY_STACK_SCRIPT.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
     (path / "scripts" / "factory_workspace.py").write_text(
@@ -370,6 +453,57 @@ def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:
     assert (tmp_dir / "foo.txt").exists()
 
 
+def test_update_removes_legacy_factory_gitignore_block(tmp_path: Path) -> None:
+    source_repo = tmp_path / "source-factory"
+    target_repo = tmp_path / "target-project"
+    create_source_factory_repo(source_repo)
+    init_git_repo(target_repo)
+
+    assert (
+        install_factory.main(
+            ["--target", str(target_repo), "--repo-url", str(source_repo)]
+        )
+        == 0
+    )
+
+    (target_repo / ".gitignore").write_text(
+        "\n".join(
+            [
+                "# Hidden-tree softwareFactoryVscode install artifacts",
+                ".softwareFactoryVscode/",
+                ".factory.env",
+                ".factory.lock.json",
+                ".tmp/",
+                "# Factory Isolation",
+                ".copilot/softwareFactoryVscode/.tmp/",
+                ".copilot/softwareFactoryVscode/.factory.env",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        install_factory.main(
+            [
+                "--target",
+                str(target_repo),
+                "--repo-url",
+                str(source_repo),
+                "--update",
+            ]
+        )
+        == 0
+    )
+
+    gitignore = (target_repo / ".gitignore").read_text(encoding="utf-8")
+    assert "# Hidden-tree softwareFactoryVscode install artifacts" not in gitignore
+    assert ".softwareFactoryVscode/" not in gitignore
+    assert ".factory.lock.json" not in gitignore
+    assert ".copilot/softwareFactoryVscode/.tmp/" in gitignore
+    assert ".copilot/softwareFactoryVscode/.factory.env" in gitignore
+
+
 def test_bootstrap_force_workspace_overwrites_existing_workspace(
     tmp_path: Path,
 ) -> None:
@@ -395,6 +529,116 @@ def test_bootstrap_force_workspace_overwrites_existing_workspace(
     assert generated["folders"][1]["path"] == ".copilot/softwareFactoryVscode"
 
 
+def test_bootstrap_without_explicit_metadata_preserves_existing_lock_values(
+    tmp_path: Path,
+) -> None:
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
+        json.dumps(
+            {
+                "version": "2.2",
+                "installed_at": "2026-03-21T00:00:00Z",
+                "updated_at": "2026-03-21T00:00:00Z",
+                "factory": {
+                    "repo_url": "https://example.invalid/factory.git",
+                    "install_path": ".copilot/softwareFactoryVscode",
+                    "workspace_file": "software-factory.code-workspace",
+                    "commit": "deadbeef",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    exit_code = bootstrap_host.main(
+        [
+            "--target",
+            str(target_repo),
+        ]
+    )
+
+    lock_data = json.loads(
+        (target_repo / ".copilot/softwareFactoryVscode/lock.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert exit_code == 0
+    assert lock_data["version"] == "2.2"
+    assert lock_data["factory"]["repo_url"] == "https://example.invalid/factory.git"
+    assert lock_data["factory"]["commit"] == "deadbeef"
+
+
+def test_bootstrap_refreshes_generated_workspace_without_force(
+    tmp_path: Path,
+) -> None:
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    runtime_config = factory_workspace.build_runtime_config(
+        target_repo,
+        factory_dir=factory_dir,
+    )
+    stale_workspace = {
+        "folders": [
+            {"name": "Host Project (Root)", "path": "."},
+            {
+                "name": "AI Agent Factory",
+                "path": ".copilot/softwareFactoryVscode",
+            },
+        ],
+        "settings": {
+            "chat.agent.maxRequests": 50,
+            "workbench.colorTheme": "Ayu Dark",
+            "mcp": {
+                "servers": {
+                    "context7": {"url": "http://127.0.0.1:3510/mcp"},
+                    "bashGateway": {"url": "http://127.0.0.1:3511/mcp"},
+                }
+            },
+        },
+    }
+    workspace_path = target_repo / "software-factory.code-workspace"
+    workspace_path.write_text(
+        json.dumps(stale_workspace, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    _, status = bootstrap_host.ensure_workspace_file(
+        target_repo,
+        "software-factory.code-workspace",
+        runtime_config,
+        force=False,
+    )
+
+    refreshed = json.loads(workspace_path.read_text(encoding="utf-8"))
+    assert status == "updated"
+    assert refreshed["settings"]["workbench.colorTheme"] == "Ayu Dark"
+    assert (
+        refreshed["settings"]["mcp"]["servers"]["context7"]["url"]
+        == f"http://127.0.0.1:{runtime_config.ports['PORT_CONTEXT7']}/mcp"
+    )
+    assert (
+        refreshed["settings"]["mcp"]["servers"]["bashGateway"]["url"]
+        == f"http://127.0.0.1:{runtime_config.ports['PORT_BASH']}/mcp"
+    )
+
+
 def test_verify_factory_install_detects_compliant_install_and_smoke_prompt(
     tmp_path: Path,
     capsys,
@@ -418,6 +662,199 @@ def test_verify_factory_install_detects_compliant_install_and_smoke_prompt(
     assert "Installation compliance passed" in output
     assert "Non-mutating VS Code smoke prompt" in output
     assert "Do not create, modify, delete, stage, commit, or rename any file." in output
+
+
+def test_verify_factory_install_fails_when_legacy_gitignore_entries_remain(
+    tmp_path: Path,
+) -> None:
+    target_repo = tmp_path / "target-project"
+    target_repo.mkdir(parents=True, exist_ok=True)
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    (factory_dir / ".git").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "scripts").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
+    for script_name in (
+        "install_factory.py",
+        "bootstrap_host.py",
+        "verify_factory_install.py",
+    ):
+        (factory_dir / "scripts" / script_name).write_text("# stub\n", encoding="utf-8")
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        json.dumps(
+            {
+                "workspace": {
+                    "mcp": {
+                        "servers": {"bashGateway": {"url": "http://127.0.0.1:3011/mcp"}}
+                    }
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (factory_dir / "configs" / "bash_gateway_policy.default.yml").write_text(
+        (REPO_ROOT / "configs" / "bash_gateway_policy.default.yml").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    runtime_config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    factory_workspace.sync_runtime_artifacts(
+        runtime_config,
+        runtime_state="installed",
+        active=False,
+    )
+    (target_repo / ".gitignore").write_text(
+        "\n".join(
+            [
+                "# Hidden-tree softwareFactoryVscode install artifacts",
+                ".softwareFactoryVscode/",
+                ".factory.env",
+                ".factory.lock.json",
+                ".tmp/",
+                "# Factory Isolation",
+                ".copilot/softwareFactoryVscode/.tmp/",
+                ".copilot/softwareFactoryVscode/.factory.env",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
+        json.dumps(
+            {
+                "version": "main",
+                "installed_at": "2026-03-21T00:00:00Z",
+                "updated_at": "2026-03-21T00:00:00Z",
+                "factory": {
+                    "repo_url": "https://example.invalid/factory.git",
+                    "install_path": ".copilot/softwareFactoryVscode",
+                    "workspace_file": "software-factory.code-workspace",
+                    "commit": "deadbeef",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": runtime_config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    exit_code = verify_factory_install.main(["--target", str(target_repo)])
+
+    assert exit_code == 1
+
+
+def test_verify_factory_install_flags_partial_legacy_gitignore_entries(
+    tmp_path: Path,
+) -> None:
+    target_repo = tmp_path / "target-project"
+    target_repo.mkdir(parents=True, exist_ok=True)
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    (factory_dir / ".git").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "scripts").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
+    for script_name in (
+        "install_factory.py",
+        "bootstrap_host.py",
+        "verify_factory_install.py",
+    ):
+        (factory_dir / "scripts" / script_name).write_text("# stub\n", encoding="utf-8")
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        json.dumps(
+            {
+                "workspace": {
+                    "mcp": {
+                        "servers": {"bashGateway": {"url": "http://127.0.0.1:3011/mcp"}}
+                    }
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (factory_dir / "configs" / "bash_gateway_policy.default.yml").write_text(
+        (REPO_ROOT / "configs" / "bash_gateway_policy.default.yml").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    runtime_config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    factory_workspace.sync_runtime_artifacts(
+        runtime_config,
+        runtime_state="installed",
+        active=False,
+    )
+    (target_repo / ".gitignore").write_text(
+        "\n".join(
+            [
+                ".factory.env",
+                ".tmp/",
+                "# Factory Isolation",
+                ".copilot/softwareFactoryVscode/.tmp/",
+                ".copilot/softwareFactoryVscode/.factory.env",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
+        json.dumps(
+            {
+                "version": "main",
+                "installed_at": "2026-03-21T00:00:00Z",
+                "updated_at": "2026-03-21T00:00:00Z",
+                "factory": {
+                    "repo_url": "https://example.invalid/factory.git",
+                    "install_path": ".copilot/softwareFactoryVscode",
+                    "workspace_file": "software-factory.code-workspace",
+                    "commit": "deadbeef",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": runtime_config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    exit_code = verify_factory_install.main(["--target", str(target_repo)])
+
+    assert exit_code == 1
 
 
 def test_verify_factory_install_fails_when_workspace_file_missing(
@@ -1174,6 +1611,22 @@ def test_factory_stack_status_reports_degraded_when_required_service_restarts(
     factory_workspace.sync_runtime_artifacts(
         config, runtime_state="running", active=False
     )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     monkeypatch.setattr(
         factory_stack,
@@ -1186,6 +1639,14 @@ def test_factory_stack_status_reports_degraded_when_required_service_restarts(
             "agent-worker": "Restarting (1) 3 seconds ago",
         },
     )
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_service_inventory",
+        lambda compose_project_name: build_full_service_inventory(
+            config,
+            agent_worker_status="Restarting (1) 3 seconds ago",
+        ),
+    )
 
     factory_stack.status_workspace(
         repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
@@ -1193,11 +1654,207 @@ def test_factory_stack_status_reports_degraded_when_required_service_restarts(
     output = capsys.readouterr().out
 
     assert "runtime_state=degraded" in output
+    assert "preflight_status=degraded" in output
+    assert "recommended_action=inspect" in output
     registry = factory_workspace.load_registry(registry_path)
     assert (
         registry["workspaces"][config.factory_instance_id]["runtime_state"]
         == "degraded"
     )
+
+
+def test_build_runtime_config_preserves_persisted_ports_when_workspace_reopens(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    initial_config = factory_workspace.build_runtime_config(
+        target_repo,
+        factory_dir=factory_dir,
+    )
+    factory_workspace.sync_runtime_artifacts(
+        initial_config,
+        runtime_state="running",
+        active=False,
+    )
+
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: False)
+
+    reopened_config = factory_workspace.build_runtime_config(
+        target_repo,
+        factory_dir=factory_dir,
+    )
+
+    assert reopened_config.port_index == initial_config.port_index
+    assert reopened_config.ports == initial_config.ports
+    assert reopened_config.mcp_server_urls == initial_config.mcp_server_urls
+
+
+def test_build_runtime_config_matches_repo_fundamentals_port_contract(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo,
+        factory_dir=factory_dir,
+    )
+
+    assert config.mcp_server_urls["git"] == f"http://127.0.0.1:{config.ports['PORT_FS']}/mcp"
+    assert config.mcp_server_urls["search"] == f"http://127.0.0.1:{config.ports['PORT_GIT']}/mcp"
+    assert config.mcp_server_urls["filesystem"] == f"http://127.0.0.1:{config.ports['PORT_SEARCH']}/mcp"
+
+
+def test_factory_stack_preflight_reports_needs_ramp_up_for_installed_workspace(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(factory_stack, "get_factory_head_commit", lambda _path: "deadbeef")
+    monkeypatch.setattr(factory_stack, "collect_service_inventory", lambda _name: {})
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = factory_stack.build_preflight_report(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+
+    assert report["status"] == "needs-ramp-up"
+    assert report["recommended_action"] == "start"
+    assert "needs ramp-up" in report["issues"][0]
+
+
+def test_factory_stack_preflight_detects_workspace_port_drift(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(factory_stack, "get_factory_head_commit", lambda _path: "deadbeef")
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+    stale_workspace = dict(config.workspace_settings)
+    stale_workspace = json.loads(json.dumps(stale_workspace))
+    stale_workspace["mcp"]["servers"]["context7"]["url"] = "http://127.0.0.1:3510/mcp"
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": stale_workspace,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_service_inventory",
+        lambda _name: build_full_service_inventory(config),
+    )
+
+    report = factory_stack.build_preflight_report(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+
+    assert report["status"] == "config-drift"
+    assert report["recommended_action"] == "re-bootstrap"
+    assert any("Generated workspace MCP URL drift detected" in issue for issue in report["issues"])
 
 
 def test_factory_stack_status_does_not_rewrite_custom_env(
@@ -1467,6 +2124,21 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
         verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
     )
     monkeypatch.setattr(
+        verify_factory_install.factory_stack.shutil,
+        "which",
+        lambda name: "/usr/bin/docker",
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "collect_service_inventory",
+        lambda _name: build_full_service_inventory(config),
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "get_factory_head_commit",
+        lambda _path: "deadbeef",
+    )
+    monkeypatch.setattr(
         verify_factory_install,
         "collect_running_services",
         lambda compose_name: {
@@ -1498,6 +2170,59 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
     assert "http://127.0.0.1:3231/mcp" in probed_urls
     assert "http://127.0.0.1:8201/health" in probed_urls
     assert "http://127.0.0.1:3211/mcp" in probed_urls
+
+
+def test_verify_runtime_short_circuits_on_preflight_issues(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target_repo = tmp_path / "target-project"
+    target_repo.mkdir(parents=True, exist_ok=True)
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    (target_repo / ".copilot/softwareFactoryVscode/.factory.env").write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                f"FACTORY_DIR={factory_dir}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "needs-ramp-up",
+            "issues": ["Runtime preflight detected no running containers."],
+            "service_inventory": {},
+            "workspace_urls": {},
+        },
+    )
+    monkeypatch.setattr(
+        verify_factory_install,
+        "probe_http_url",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("probe_http_url should not be called before preflight passes")
+        ),
+    )
+
+    violations = verify_factory_install.verify_runtime(
+        target_repo,
+        workspace_file="software-factory.code-workspace",
+        timeout=1.0,
+        check_vscode_mcp=True,
+    )
+
+    assert violations == ["Runtime preflight detected no running containers."]
 
 
 def test_validate_throwaway_install_uses_canonical_stack_helper(
@@ -2116,3 +2841,9 @@ def test_verify_tasks_target_host_workspace_root() -> None:
         task = tasks[label]
         assert task["args"][0] == "${workspaceFolder}/scripts/verify_factory_install.py"
         assert task["args"][2] == "${workspaceFolder:Host Project (Root)}"
+
+    preflight_task = tasks["🧭 Runtime: Preflight"]
+    assert preflight_task["args"] == [
+        "${workspaceFolder}/scripts/factory_stack.py",
+        "preflight",
+    ]

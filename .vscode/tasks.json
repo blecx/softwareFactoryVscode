@@ -467,6 +467,23 @@
         "clear": true
       },
       "group": "test"
+    },
+    {
+      "label": "🧭 Runtime: Preflight",
+      "type": "shell",
+      "command": "python3",
+      "args": ["${workspaceFolder}/scripts/factory_stack.py", "preflight"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      },
+      "group": "test"
     }
   ],
   "inputs": [
