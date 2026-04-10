@@ -139,7 +139,10 @@ def read_factory_lock_commit(target_dir: Path) -> str:
         data = json.loads(lock_path.read_text())
         return str(data.get("factory", {}).get("commit", "")).strip()
     except (Exception, json.JSONDecodeError, KeyError):
-        import traceback; traceback.print_exc(); return ""
+        import traceback
+
+        traceback.print_exc()
+        return ""
 
 
 def get_factory_head_commit(factory_dir: Path) -> str:
@@ -153,7 +156,10 @@ def get_factory_head_commit(factory_dir: Path) -> str:
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError:
-        import traceback; traceback.print_exc(); return ""
+        import traceback
+
+        traceback.print_exc()
+        return ""
 
 
 def write_factory_lock_commit(target_dir: Path, factory_dir: Path) -> None:
@@ -363,7 +369,11 @@ def cleanup_workspace(
         resolved_env_file.unlink()
         print(f"🧹 Deleted {resolved_env_file}")
 
-    manifest_path = target_path / factory_workspace.TMP_SUBPATH / factory_workspace.RUNTIME_MANIFEST_FILENAME
+    manifest_path = (
+        target_path
+        / factory_workspace.TMP_SUBPATH
+        / factory_workspace.RUNTIME_MANIFEST_FILENAME
+    )
     if manifest_path.exists():
         manifest_path.unlink()
         print(f"🧹 Deleted {manifest_path}")

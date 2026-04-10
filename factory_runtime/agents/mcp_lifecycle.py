@@ -242,7 +242,11 @@ class MCPBootloader:
 
     def _hydrate_state(self):
         """Phase 2.2: Data Hydration from snapshot if DB is empty."""
-        snapshot_dir = self.workspace_root / ".copilot/softwareFactoryVscode/.tmp" / "factory_snapshots"
+        snapshot_dir = (
+            self.workspace_root
+            / ".copilot/softwareFactoryVscode/.tmp"
+            / "factory_snapshots"
+        )
         if not snapshot_dir.exists():
             return
 
@@ -327,7 +331,11 @@ class MCPBootloader:
 
     def _take_snapshots(self):
         """Phase 3.2: Snapshot Dump"""
-        snapshot_dir = self.workspace_root / ".copilot/softwareFactoryVscode/.tmp" / "factory_snapshots"
+        snapshot_dir = (
+            self.workspace_root
+            / ".copilot/softwareFactoryVscode/.tmp"
+            / "factory_snapshots"
+        )
         snapshot_dir.mkdir(parents=True, exist_ok=True)
 
         compose_args = self._get_compose_args()

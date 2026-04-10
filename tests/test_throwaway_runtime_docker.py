@@ -72,7 +72,9 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
                 "factory_instance_id": "factory-seed",
                 "project_workspace_id": "seed",
                 "target_workspace_path": str(tmp_path / "seed"),
-                "factory_dir": str(tmp_path / "seed" / ".copilot/softwareFactoryVscode"),
+                "factory_dir": str(
+                    tmp_path / "seed" / ".copilot/softwareFactoryVscode"
+                ),
                 "workspace_file_path": str(
                     tmp_path / "seed" / "software-factory.code-workspace"
                 ),
@@ -142,7 +144,9 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
         )
 
         runtime_manifest_path = (
-            target_repo / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
+            target_repo
+            / ".copilot/softwareFactoryVscode/.tmp"
+            / "runtime-manifest.json"
         )
         runtime_manifest = json.loads(runtime_manifest_path.read_text(encoding="utf-8"))
         assert runtime_manifest["port_index"] != 0
@@ -172,7 +176,10 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
         )
     finally:
         env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
-        if env_path.exists() and (target_repo / ".copilot/softwareFactoryVscode").exists():
+        if (
+            env_path.exists()
+            and (target_repo / ".copilot/softwareFactoryVscode").exists()
+        ):
             subprocess.run(
                 [
                     sys.executable,

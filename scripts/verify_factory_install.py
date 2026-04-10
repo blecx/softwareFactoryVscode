@@ -371,29 +371,43 @@ def check_lock_file(
 
     lock_data = bootstrap_host.load_json(lock_path)
     if not lock_data.get("version"):
-        violations.append(".copilot/softwareFactoryVscode/lock.json is missing `version`")
+        violations.append(
+            ".copilot/softwareFactoryVscode/lock.json is missing `version`"
+        )
     if not lock_data.get("installed_at"):
-        violations.append(".copilot/softwareFactoryVscode/lock.json is missing `installed_at`")
+        violations.append(
+            ".copilot/softwareFactoryVscode/lock.json is missing `installed_at`"
+        )
     if not lock_data.get("updated_at"):
-        violations.append(".copilot/softwareFactoryVscode/lock.json is missing `updated_at`")
+        violations.append(
+            ".copilot/softwareFactoryVscode/lock.json is missing `updated_at`"
+        )
 
     factory_data = lock_data.get("factory")
     if not isinstance(factory_data, dict):
-        violations.append(".copilot/softwareFactoryVscode/lock.json is missing `factory` metadata")
+        violations.append(
+            ".copilot/softwareFactoryVscode/lock.json is missing `factory` metadata"
+        )
         return
 
     if factory_data.get("install_path") != bootstrap_host.FACTORY_DIRNAME:
         violations.append(
-            ".copilot/softwareFactoryVscode/lock.json `factory.install_path` does not match the harness namespace install path"
+            ".copilot/softwareFactoryVscode/lock.json `factory.install_path` "
+            "does not match the harness namespace install path"
         )
     if factory_data.get("workspace_file") != workspace_file:
         violations.append(
-            ".copilot/softwareFactoryVscode/lock.json `factory.workspace_file` does not match the expected workspace filename"
+            ".copilot/softwareFactoryVscode/lock.json `factory.workspace_file` "
+            "does not match the expected workspace filename"
         )
     if not factory_data.get("repo_url"):
-        violations.append(".copilot/softwareFactoryVscode/lock.json `factory.repo_url` is missing")
+        violations.append(
+            ".copilot/softwareFactoryVscode/lock.json `factory.repo_url` is missing"
+        )
     if not factory_data.get("commit"):
-        violations.append(".copilot/softwareFactoryVscode/lock.json `factory.commit` is missing")
+        violations.append(
+            ".copilot/softwareFactoryVscode/lock.json `factory.commit` is missing"
+        )
 
 
 def check_workspace_file(
@@ -454,12 +468,16 @@ def check_gitignore(
         )
 
 
-
 def check_for_legacy_mode(target_dir: Path) -> None:
     legacy_dir = target_dir / ".softwareFactoryVscode"
     if legacy_dir.exists() and legacy_dir.is_dir():
-        print("⚠️  WARNING: Repository is operating in transitional/legacy mode (.softwareFactoryVscode detected).")
-        print("    Please migrate to the namespace-first architecture (.copilot/softwareFactoryVscode) structure.")
+        print(
+            "⚠️  WARNING: Repository is operating in transitional/legacy mode (.softwareFactoryVscode detected)."
+        )
+        print(
+            "    Please migrate to the namespace-first architecture (.copilot/softwareFactoryVscode) structure."
+        )
+
 
 def verify_installation(
     target_dir: Path,

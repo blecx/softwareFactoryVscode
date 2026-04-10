@@ -24,7 +24,10 @@ class BaseAgent(ABC):
     MAX_ISSUE_NUMBER = 99999
 
     def __init__(
-        self, name: str, version: str, kb_dir: Path = Path(__file__).parent / "knowledge"
+        self,
+        name: str,
+        version: str,
+        kb_dir: Path = Path(__file__).parent / "knowledge",
     ):
         if not name or not name.strip():
             raise ValueError("Agent name cannot be empty")

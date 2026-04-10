@@ -338,7 +338,9 @@ async def _run_with_rate_limit_retry(
 
 def _persist_split_drafts(issue_number: int, drafts: Sequence) -> None:
     """Persist split issue drafts for traceability/debugging."""
-    output_path = Path(f".copilot/softwareFactoryVscode/.tmp/issue-{issue_number}-split-stubs.json")
+    output_path = Path(
+        f".copilot/softwareFactoryVscode/.tmp/issue-{issue_number}-split-stubs.json"
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     payload = [
         {
@@ -441,7 +443,9 @@ def _create_split_issues_via_gh(
 
 def _cleanup_split_transient_files(issue_number: int) -> None:
     """Clean transient artifacts after split operation."""
-    for path in Path(".copilot/softwareFactoryVscode/.tmp").glob(f"work-issue-{issue_number}-attempt-*.log"):
+    for path in Path(".copilot/softwareFactoryVscode/.tmp").glob(
+        f"work-issue-{issue_number}-attempt-*.log"
+    ):
         try:
             path.unlink()
         except OSError:
@@ -656,7 +660,7 @@ def _archive_goals(stage: str, issue_number: int) -> None:
     project_root = Path(__file__).parent.parent
     tmp_path = project_root / ".copilot/softwareFactoryVscode/.tmp"
     tmp_path.mkdir(parents=True, exist_ok=True)
-    
+
     script_path = project_root / "scripts" / "archive-goals.sh"
 
     if not script_path.exists():

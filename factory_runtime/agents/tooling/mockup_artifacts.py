@@ -12,7 +12,11 @@ from typing import Iterable, Sequence
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp"}
 
 
-def get_mockup_dir(issue_number: int, *, base_dir: Path | str = ".copilot/softwareFactoryVscode/.tmp/mockups") -> Path:
+def get_mockup_dir(
+    issue_number: int,
+    *,
+    base_dir: Path | str = ".copilot/softwareFactoryVscode/.tmp/mockups",
+) -> Path:
     """Return deterministic mockup artifact directory for an issue."""
     if issue_number <= 0:
         raise ValueError("issue_number must be a positive integer")
@@ -155,7 +159,9 @@ def write_mockup_index_html(
 
 
 def write_issue_mockup_index(
-    issue_number: int, *, base_dir: Path | str = ".copilot/softwareFactoryVscode/.tmp/mockups"
+    issue_number: int,
+    *,
+    base_dir: Path | str = ".copilot/softwareFactoryVscode/.tmp/mockups",
 ) -> Path:
     """Convenience helper: compute folder, scan images, write index.html."""
     directory = get_mockup_dir(issue_number, base_dir=base_dir)

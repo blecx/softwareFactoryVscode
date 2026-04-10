@@ -23,7 +23,11 @@ DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
 WORKSPACE_TEMPLATE_PATH = (
     Path(__file__).resolve().parent.parent / "workspace.code-workspace.template"
 )
-GITIGNORE_BLOCK = ["# Factory Isolation", f"{FACTORY_DIRNAME}/.tmp/", f"{FACTORY_DIRNAME}/.factory.env"]
+GITIGNORE_BLOCK = [
+    "# Factory Isolation",
+    f"{FACTORY_DIRNAME}/.tmp/",
+    f"{FACTORY_DIRNAME}/.factory.env",
+]
 
 
 def utc_now_iso() -> str:
@@ -115,11 +119,17 @@ def ensure_factory_present(target_dir: Path) -> Path:
 def ensure_tmp_dir(target_dir: Path) -> Path:
     tmp_dir = target_dir / TMP_SUBPATH
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Required runtime data directories for MCP services ensuring Docker doesn't map them with root ownership
-    for sub in ["agent-script-runs", "mcp-docker-compose", "mcp-test-runner", "mcp-github-ops", "mcp-offline-docs"]:
+    for sub in [
+        "agent-script-runs",
+        "mcp-docker-compose",
+        "mcp-test-runner",
+        "mcp-github-ops",
+        "mcp-offline-docs",
+    ]:
         (tmp_dir / sub).mkdir(parents=True, exist_ok=True)
-    
+
     return tmp_dir
 
 
