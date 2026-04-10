@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import shutil
@@ -22,6 +23,18 @@ REQUIRED_BASELINE_SERVERS = {
     "git",
     "search",
 }
+
+
+def _load_validate_throwaway_module():
+    spec = importlib.util.spec_from_file_location(
+        "validate_throwaway_install_under_test",
+        VALIDATE_THROWAWAY_SCRIPT,
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
 
 
 def _docker_ready() -> bool:
@@ -48,6 +61,70 @@ def _wait_until_reachable(url: str, max_wait_seconds: int = 30) -> bool:
             return True
         time.sleep(1.0)
     return _url_is_reachable(url)
+
+
+def test_validate_throwaway_runtime_relocates_system_tmp_target() -> None:
+    module = _load_validate_throwaway_module()
+
+    source_repo = Path("/home/example/softwareFactoryVscode")
+    requested_target = Path("/tmp/throwaway-target")
+
+    effective_target, note = module.resolve_effective_target_repo(
+        source_repo,
+        requested_target,
+        runtime_enabled=True,
+    )
+
+    assert (
+        effective_target
+        == (
+            source_repo / ".tmp" / "throwaway-targets" / requested_target.name
+        ).resolve()
+    )
+    assert note is not None
+    assert "bind-mountable by Docker" in note
+
+
+def test_validate_throwaway_static_run_keeps_system_tmp_target() -> None:
+    module = _load_validate_throwaway_module()
+
+    source_repo = Path("/home/example/softwareFactoryVscode")
+    requested_target = Path("/tmp/throwaway-target")
+
+    effective_target, note = module.resolve_effective_target_repo(
+        source_repo,
+        requested_target,
+        runtime_enabled=False,
+    )
+
+    assert effective_target == requested_target.resolve()
+    assert note is None
+
+
+def test_validate_throwaway_runtime_relocates_explicit_tmp_even_with_custom_tmpdir(
+    monkeypatch,
+) -> None:
+    module = _load_validate_throwaway_module()
+    monkeypatch.setattr(
+        module.tempfile, "gettempdir", lambda: "/home/example/custom-tmp"
+    )
+
+    source_repo = Path("/home/example/softwareFactoryVscode")
+    requested_target = Path("/tmp/throwaway-target")
+
+    effective_target, note = module.resolve_effective_target_repo(
+        source_repo,
+        requested_target,
+        runtime_enabled=True,
+    )
+
+    assert (
+        effective_target
+        == (
+            source_repo / ".tmp" / "throwaway-targets" / requested_target.name
+        ).resolve()
+    )
+    assert note is not None
 
 
 @pytest.mark.docker

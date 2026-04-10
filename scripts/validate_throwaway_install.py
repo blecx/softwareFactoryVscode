@@ -200,6 +200,38 @@ def wipe_and_reinit_target(target_repo: Path) -> None:
     run_command(["git", "init", "-b", "main"], cwd=target_repo)
 
 
+def resolve_effective_target_repo(
+    source_repo: Path,
+    requested_target: Path,
+    *,
+    runtime_enabled: bool,
+) -> tuple[Path, str | None]:
+    resolved_target = requested_target.expanduser().resolve()
+    if not runtime_enabled:
+        return resolved_target, None
+
+    temp_roots = {
+        Path(tempfile.gettempdir()).expanduser().resolve(),
+        Path("/tmp").resolve(),
+        Path("/var/tmp").resolve(),
+    }
+    if any(
+        resolved_target == temp_root or temp_root in resolved_target.parents
+        for temp_root in temp_roots
+    ):
+        fallback_target = (
+            source_repo / ".tmp" / "throwaway-targets" / resolved_target.name
+        ).resolve()
+        note = (
+            "Requested target is under the system temporary directory, which may "
+            "not be bind-mountable by Docker on this host. "
+            f"Using repository-local throwaway target instead: {fallback_target}"
+        )
+        return fallback_target, note
+
+    return resolved_target, None
+
+
 def run_install(
     source_repo: Path,
     target_repo: Path,
@@ -263,9 +295,7 @@ def print_summary(
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     source_repo = Path(args.source_repo).expanduser().resolve()
-    target_repo = Path(args.target).expanduser().resolve()
     source_env = source_repo / ".copilot/softwareFactoryVscode/.factory.env"
-    target_env = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
     source_stack_stopped = False
     runtime_checked = False
 
@@ -274,6 +304,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"Source repo does not look like softwareFactoryVscode: {source_repo}"
         )
 
+    target_repo, target_note = resolve_effective_target_repo(
+        source_repo,
+        Path(args.target),
+        runtime_enabled=not args.skip_runtime,
+    )
+    target_env = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+
     with prepare_install_source(source_repo, args.factory_ref) as (
         install_source_repo,
         install_ref,
@@ -281,6 +318,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     ):
         heading("🧹 Preparing throwaway target")
         print(f"Using install source: {install_source_note} ({install_source_repo})")
+        print(f"Requested target: {Path(args.target).expanduser().resolve()}")
+        if target_note:
+            print(f"⚠️  {target_note}")
+        print(f"Effective target: {target_repo}")
         wipe_and_reinit_target(target_repo)
         run_install(install_source_repo, target_repo, install_ref, args.workspace_file)
         run_verify(target_repo, runtime=False)
