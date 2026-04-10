@@ -914,6 +914,39 @@ def test_workspace_runtime_allocates_distinct_port_blocks_and_registry_state(
     )
 
 
+def test_sync_runtime_artifacts_precreates_instance_data_dirs(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "throwaway-target"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+    )
+
+    data_root = factory_dir / "data"
+    assert (data_root / "memory" / config.factory_instance_id).is_dir()
+    assert (data_root / "bus" / config.factory_instance_id).is_dir()
+
+
 def test_workspace_runtime_rejects_explicit_port_conflicts(
     tmp_path: Path,
     monkeypatch,
@@ -1628,6 +1661,34 @@ def test_auxiliary_mcp_compose_files_do_not_mount_over_runtime_code_path() -> No
             assert expected in text
 
 
+def test_devops_mcp_compose_host_ports_match_workspace_port_contract() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.mcp-devops.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+
+    docker_ports = services.get("docker-compose-mcp", {}).get("ports", [])
+    test_runner_ports = services.get("test-runner-mcp", {}).get("ports", [])
+
+    assert docker_ports == [
+        f"127.0.0.1:${{PORT_COMPOSE:-{factory_workspace.PORT_LAYOUT['PORT_COMPOSE']}}}:3015"
+    ]
+    assert test_runner_ports == [
+        f"127.0.0.1:${{PORT_TEST:-{factory_workspace.PORT_LAYOUT['PORT_TEST']}}}:3016"
+    ]
+
+
+def test_devops_mcp_healthchecks_use_python3() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.mcp-devops.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+
+    for service_name in ("docker-compose-mcp", "test-runner-mcp"):
+        healthcheck = services.get(service_name, {}).get("healthcheck", {})
+        test_cmd = healthcheck.get("test", [])
+        assert isinstance(test_cmd, list)
+        assert "python3" in test_cmd
+
+
 def test_auxiliary_mcp_dockerfiles_use_factory_runtime_package_entrypoints() -> None:
     dockerfiles = [
         REPO_ROOT / "docker" / "mcp-bash-gateway" / "Dockerfile",
@@ -1790,8 +1851,8 @@ def test_cleanup_workspace(tmp_path: Path):
 
     config = workspace_module.build_runtime_config(target, factory_dir=factory_dir)
     workspace_module.sync_runtime_artifacts(config)
-    (data_root / "memory" / config.factory_instance_id).mkdir(parents=True)
-    (data_root / "bus" / config.factory_instance_id).mkdir(parents=True)
+    assert (data_root / "memory" / config.factory_instance_id).is_dir()
+    assert (data_root / "bus" / config.factory_instance_id).is_dir()
 
     # Assert created
     assert (target / ".copilot/softwareFactoryVscode/.factory.env").exists()

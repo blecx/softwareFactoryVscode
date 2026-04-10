@@ -412,6 +412,17 @@ def test_mcp_multi_client_performs_streamable_http_handshake():
     assert state == {"initialized": True, "notified": True}
 
 
+def test_approval_gate_entrypoint_uses_factory_runtime_module_path():
+    repo_root = Path(__file__).parent.parent
+    approval_gate = (
+        repo_root / "factory_runtime" / "apps" / "approval_gate" / "main.py"
+    ).read_text(encoding="utf-8")
+
+    assert "factory_runtime.apps.approval_gate.main:app" in approval_gate
+    assert "uvicorn apps.approval_gate.main:app" not in approval_gate
+    assert "python -m apps.approval_gate.main" not in approval_gate
+
+
 def _load_next_pr_module():
     repo_root = Path(__file__).parent.parent
     next_pr_path = repo_root / "scripts" / "next-pr.py"

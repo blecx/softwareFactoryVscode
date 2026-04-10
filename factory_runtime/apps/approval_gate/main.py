@@ -4,10 +4,10 @@ Runs on APPROVAL_GATE_PORT (default 8001).
 Talks to mcp-agent-bus at AGENT_BUS_URL (default http://localhost:3031).
 
 Usage:
-    uvicorn apps.approval_gate.main:app --port 8001
+    uvicorn factory_runtime.apps.approval_gate.main:app --port 8001
 
 Or directly (runs uvicorn internally):
-    python -m apps.approval_gate.main
+    python -m factory_runtime.apps.approval_gate.main
 """
 
 from __future__ import annotations
@@ -162,7 +162,12 @@ async def ws_approvals(websocket: WebSocket) -> None:
 def main() -> None:
     host = os.getenv("APPROVAL_GATE_HOST", "0.0.0.0")
     port = int(os.getenv("APPROVAL_GATE_PORT", "8001"))
-    uvicorn.run("apps.approval_gate.main:app", host=host, port=port, reload=False)
+    uvicorn.run(
+        "factory_runtime.apps.approval_gate.main:app",
+        host=host,
+        port=port,
+        reload=False,
+    )
 
 
 if __name__ == "__main__":

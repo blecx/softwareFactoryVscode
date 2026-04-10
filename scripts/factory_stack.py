@@ -220,15 +220,7 @@ def ensure_ports_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> None
 
 
 def ensure_data_dirs_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> None:
-    data_dir_str = config.env_values.get("FACTORY_DATA_DIR")
-    if data_dir_str:
-        base_dir = Path(data_dir_str).expanduser()
-        (base_dir / "memory" / config.factory_instance_id).mkdir(
-            parents=True, exist_ok=True
-        )
-        (base_dir / "bus" / config.factory_instance_id).mkdir(
-            parents=True, exist_ok=True
-        )
+    factory_workspace.ensure_factory_data_dirs(config)
 
 
 def start_stack(

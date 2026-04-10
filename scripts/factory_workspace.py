@@ -563,6 +563,21 @@ def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
     }
 
 
+def ensure_factory_data_dirs(config: WorkspaceRuntimeConfig) -> None:
+    """Ensure bind-mounted runtime data directories exist for this workspace."""
+
+    data_dir_value = str(config.env_values.get("FACTORY_DATA_DIR", "")).strip()
+    if not data_dir_value:
+        return
+
+    base_dir = Path(data_dir_value).expanduser().resolve()
+    for subdir in ("memory", "bus"):
+        (base_dir / subdir / config.factory_instance_id).mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+
 def sync_runtime_artifacts(
     config: WorkspaceRuntimeConfig,
     *,
@@ -575,6 +590,7 @@ def sync_runtime_artifacts(
     if write_env:
         (config.target_dir / FACTORY_DIRNAME).mkdir(parents=True, exist_ok=True)
     (config.target_dir / FACTORY_DIRNAME).mkdir(parents=True, exist_ok=True)
+    ensure_factory_data_dirs(config)
     write_env_file(
         config.target_dir / FACTORY_DIRNAME / ".factory.env", config.env_values
     )

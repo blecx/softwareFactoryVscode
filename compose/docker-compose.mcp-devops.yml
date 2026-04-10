@@ -10,12 +10,12 @@ services:
       - DOCKER_COMPOSE_MCP_REPO_ROOT=/target
       - DOCKER_COMPOSE_MCP_AUDIT_DIR=/factory-data/.tmp/mcp-docker-compose
     ports:
-      - "127.0.0.1:${PORT_TEST:-3015}:3015"
+      - "127.0.0.1:${PORT_COMPOSE:-3016}:3015"
     healthcheck:
       test:
         [
           "CMD",
-          "python",
+          "python3",
           "-c",
           "import socket; socket.create_connection(('127.0.0.1', 3015), timeout=2).close()",
         ]
@@ -39,12 +39,12 @@ services:
       - TEST_RUNNER_MCP_AUDIT_DIR=/factory-data/.tmp/mcp-test-runner
       - TEST_RUNNER_PYTHON=python3
     ports:
-      - "127.0.0.1:${PORT_COMPOSE:-3016}:3016"
+      - "127.0.0.1:${PORT_TEST:-3015}:3016"
     healthcheck:
       test:
         [
           "CMD",
-          "python",
+          "python3",
           "-c",
           "import socket; socket.create_connection(('127.0.0.1', 3016), timeout=2).close()",
         ]
