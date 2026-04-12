@@ -15,10 +15,12 @@ This creates "stale" registry records that falsely reserve host-level port block
 We implement an automatic implicit reconciliation framework supplemented by an explicit cleanup command.
 
 ### 1. Implicit Reconciliation on Discovery
+
 - **Rule**: Any discovery action (e.g., `factory_stack.py list`) MUST run an automatic `reconcile_registry()` check before returning state.
 - **Rule**: A registry entry is declared "stale" and evicted instantly if its Target Workspace Path no longer exists or if its generated runtime manifest is missing.
 
 ### 2. Explicit Cleanup command
+
 - **Rule**: A `cleanup` command MUST be added to `factory_stack.py` (e.g., `python3 scripts/factory_stack.py cleanup`).
 - **Rule**: `cleanup` MUST execute a deep obliteration which:
   1. Stops the local compose stack.

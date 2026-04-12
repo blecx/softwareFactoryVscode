@@ -2,7 +2,7 @@
 
 Welcome to the **Software Factory for VS Code**. This platform transforms your local environment into an autonomous, multi-tenant AI development factory. It securely orchestrates agents, memory, and development tools alongside your local code inside a VS Code workspace.
 
-> **Architecture note:** The current runtime implementation still uses a hidden-tree installation model in places, but the intended long-term product direction is documented in [`docs/COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md), [`docs/HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md), and [`ADR-012`](architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md).
+> **Architecture note:** The supported install contract is namespace-first: the harness lives under `.copilot/softwareFactoryVscode/`, the operator entrypoint is `software-factory.code-workspace`, and legacy `.softwareFactoryVscode` artifacts must be removed during upgrade instead of being tolerated.
 
 ## 🚀 Concept Overview
 
@@ -39,4 +39,4 @@ When you close your VS Code window, VS Code automatically terminates the backgro
 
 ## 🏢 Working in a Multi-Tenant Environment
 
-You can run multiple instances of the software factory simultaneously for different target projects on the exact same host machine. The factory dynamically maps unique port blocks for each workspace and writes them to a `.factory.env` file. Data in the SQLite databases is strictly partitioned by `project_id`.
+You can run multiple instances of the software factory simultaneously for different target projects on the exact same host machine. The factory dynamically maps unique port blocks for each workspace and writes them to `.copilot/softwareFactoryVscode/.factory.env`. Data in the SQLite databases is strictly partitioned by `project_id`.
