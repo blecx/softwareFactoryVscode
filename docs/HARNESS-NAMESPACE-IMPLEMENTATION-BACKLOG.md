@@ -29,11 +29,11 @@ If a phase reveals adjacent work that is useful but not required for the phase D
 
 ### Rule 3 — Keep current-vs-target behavior explicit
 
-If code still supports the hidden-tree model for compatibility, implementation and review must clearly distinguish:
+If code or docs still reference legacy hidden-tree handling, implementation and review must clearly distinguish:
 
-- current compatibility behavior,
-- transitional behavior,
-- and target namespace-first behavior.
+- the current namespace-first contract,
+- legacy cleanup and forward-migration behavior,
+- and any historical context that no longer defines active support policy.
 
 ### Rule 4 — Preserve host-owned content by default
 
@@ -193,14 +193,14 @@ Redesign the installer contract around managed namespaces instead of the hidden-
 1. Define the future install success contract in code-facing terms.
 2. Separate harness projection from optional runtime bootstrap.
 3. Introduce the managed-path record contract.
-4. Define compatibility mode for existing hidden-tree installs.
-5. Update docs to describe compatibility mode vs target mode.
+4. Define cleanup and forward-migration behavior for existing hidden-tree installs.
+5. Update docs to describe legacy migration handling versus the namespace-first contract.
 
 ### Phase 2 open questions that must be answered, not guessed
 
 **[RESOLVED]**
 
-- What is the compatibility behavior for already-installed hidden-tree repositories? (**Auto-migrate everything to the new namespaces and remove old artifacts.**)
+- What is the migration behavior for already-installed hidden-tree repositories? (**Auto-migrate everything to the new namespaces and remove old artifacts.**)
 - Should install support both models during transition, or only migrate forward? (**Force immediate forward migration and drop support for the old path entirely.**)
 - Which artifacts become optional instead of mandatory? (**None, we are just transitioning. Generating workspace and env files remains mandatory.**)
 
@@ -209,14 +209,14 @@ Redesign the installer contract around managed namespaces instead of the hidden-
 - installer success is defined by managed namespace projection and ownership clarity,
 - harness install and local runtime bootstrap are separated conceptually and operationally,
 - managed-path record behavior is defined,
-- compatibility mode for existing installs is documented,
+- legacy cleanup and forward-migration behavior for existing installs is documented,
 - install docs no longer present hidden-tree layout as the preferred end state.
 
 ### Phase 2 review criteria
 
 - Does the new install contract match the namespace-first spec?
-- Is compatibility behavior explicit?
-- Are root-level artifacts either justified, transitional, or deprecated?
+- Is legacy cleanup and forward-migration behavior explicit?
+- Are root-level artifacts either explicitly justified bridge artifacts or deprecated legacy artifacts?
 - Are unresolved migration decisions documented rather than assumed?
 
 ---
@@ -364,21 +364,21 @@ Move tests and verification from hidden-tree assumptions to namespace-first expe
 
 ### Phase 5 open questions that must be answered, not guessed
 
-- Which compatibility checks must remain for legacy installs? -> **Answered**: Only a simple folder existence check for `.softwareFactoryVscode` is needed to emit a warning. No legacy runtime checks are preserved.
-- What should verifier output say when a repo is still in transitional mode? -> **Answered**: `⚠️  WARNING: Repository is operating in transitional/legacy mode (.softwareFactoryVscode detected). Please migrate to the namespace-first architecture (.copilot/softwareFactoryVscode) structure.`
+- What legacy-artifact checks must remain for previously hidden-tree installs? -> **Answered**: Legacy hidden-tree artifacts must be detected as cleanup and verification-failure conditions. No warning-only compatibility mode remains.
+- How should verifier output report legacy hidden-tree artifacts during compliance checks? -> **Answered**: It should report legacy installation artifacts as still present and require cleanup rather than describing the repository as operating in a transitional mode.
 - What is the exact success contract for a namespace-first install? -> **Answered**: 1. Target directory contains `.copilot/softwareFactoryVscode`. 2. Host workspace file exists. 3. `.copilot/softwareFactoryVscode` contains `lock.json` and `.factory.env`. 4. The git branch and history for `.copilot/softwareFactoryVscode` match the remote harness.
 
 ### Phase 5 DoD
 
 - [x] verification rules match the namespace-first architecture,
 - [x] regression tests cover the key ownership and migration rules,
-- [x] hidden-tree assumptions are either removed or explicitly marked compatibility-only,
+- [x] hidden-tree assumptions are either removed or explicitly documented as legacy migration/history context,
 - [x] docs and tests describe the same success conditions.
 
 ### Phase 5 review criteria
 
 - Does verification enforce the target architecture instead of the old one?
-- Are transitional checks clearly labeled?
+- Do legacy-artifact checks reflect the namespace-first contract and strict cleanup/failure behavior?
 - Do tests cover ownership safety and update behavior?
 - Are unresolved verifier semantics documented?
 
@@ -409,7 +409,7 @@ Confirm the implementation backlog has been completed without hidden assumptions
 
 ### Phase 6 open questions that must be answered, not guessed
 
-- Are any compatibility behaviors still intended to remain permanently? -> **Answered**: The single warning block in the verifier script (`verify_factory_install.py`) will remain permanently, but active execution or support for `.softwareFactoryVscode` will not be preserved.
+- Do any legacy warning-only behaviors remain intentionally supported? -> **Answered**: No. No permanent compatibility behavior remains for legacy hidden-tree installs; legacy artifacts are handled through detection, cleanup, and verification failure semantics.
 - Are there any deliberate deviations from the target model that need their own ADR or follow-up? -> **Answered**: No. The target namespace model inside `.copilot/softwareFactoryVscode/` has been achieved exactly as specified in ADR-012.
 
 ### Phase 6 DoD

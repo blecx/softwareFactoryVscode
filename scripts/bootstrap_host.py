@@ -312,6 +312,8 @@ def render_workspace_file(config: factory_workspace.WorkspaceRuntimeConfig) -> s
 
 
 def read_factory_head_commit(factory_dir: Path) -> str:
+    if not (factory_dir / ".git").exists():
+        return ""
     try:
         result = subprocess.run(
             ["git", "-C", str(factory_dir), "rev-parse", "HEAD"],
@@ -325,6 +327,8 @@ def read_factory_head_commit(factory_dir: Path) -> str:
 
 
 def read_factory_repo_url(factory_dir: Path) -> str:
+    if not (factory_dir / ".git").exists():
+        return ""
     try:
         result = subprocess.run(
             ["git", "-C", str(factory_dir), "remote", "get-url", "origin"],

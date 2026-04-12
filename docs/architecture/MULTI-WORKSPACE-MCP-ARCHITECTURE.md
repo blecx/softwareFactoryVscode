@@ -20,7 +20,7 @@ This works well for one active workspace, but it breaks down when an operator ne
 - switch active workspaces safely and predictably,
 - or evolve selected MCP services into true multi-tenant shared services.
 
-We need an architecture that preserves the repository’s hidden-tree isolation model while adding first-class support for:
+We need an architecture that preserves the repository’s namespaced harness isolation model while adding first-class support for:
 
 1. multiple installed workspaces,
 2. multiple concurrently running workspace stacks through generated host port maps,
@@ -39,7 +39,7 @@ We need an architecture that preserves the repository’s hidden-tree isolation 
 ## Non-Goals
 
 - Rewriting every MCP server into a shared multi-tenant service in one step.
-- Replacing the hidden-tree installation model.
+- Replacing the namespace-first installation model.
 - Removing the current single-workspace runtime flow before a compatible migration path exists.
 - Introducing central cloud control planes or external orchestration dependencies.
 
@@ -121,8 +121,8 @@ Each installed workspace owns a runtime envelope.
 
 ### Workspace-scoped envelope
 
-- hidden-tree install under `.softwareFactoryVscode/`,
-- host contract in `.factory.env`,
+- namespaced install under `.copilot/softwareFactoryVscode/`,
+- host contract in `.copilot/softwareFactoryVscode/.factory.env`,
 - compose project name,
 - generated host port block,
 - generated workspace MCP settings,
@@ -215,7 +215,7 @@ The architecture should distinguish three states:
 
 ### Installed workspace
 
-A repository contains a valid hidden-tree factory install.
+A repository contains a valid namespace-first factory install.
 
 ### Running workspace
 
@@ -253,7 +253,7 @@ Any shared MCP service must satisfy the following before being treated as produc
 
 ### Phase 1: Workspace-Scoped Port Generation
 
-- add per-workspace port variables to `.factory.env`,
+- add per-workspace port variables to `.copilot/softwareFactoryVscode/.factory.env`,
 - generate effective MCP URLs into workspace settings,
 - make verification consume generated URLs and health ports.
 

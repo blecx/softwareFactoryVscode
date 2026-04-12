@@ -120,7 +120,7 @@ def render_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
             "",
             "Please verify and report PASS/FAIL with evidence for:",
             "- The workspace shows both the host project root and `.copilot/softwareFactoryVscode`.",
-            "- `.copilot/softwareFactoryVscode/lock.json`, `.factory.env`, and the workspace file exist.",
+            "- `.copilot/softwareFactoryVscode/lock.json`, `.copilot/softwareFactoryVscode/.factory.env`, and the workspace file exist.",
             "- `.copilot/softwareFactoryVscode/scripts/verify_factory_install.py` appears present.",
             "- The installation looks compliant with namespace-first and ready for VS Code usage.",
             "",

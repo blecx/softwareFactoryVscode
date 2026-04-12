@@ -3050,6 +3050,31 @@ def test_cleanup_workspace(tmp_path: Path):
     assert config.factory_instance_id not in reg.get("workspaces", {})
 
 
+def test_cleanup_workspace_still_cleans_contract_when_runtime_sync_fails(
+    tmp_path: Path, monkeypatch
+):
+    target = tmp_path / "target"
+    target.mkdir(parents=True, exist_ok=True)
+    factory_dir = target / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    env_path = factory_dir / ".factory.env"
+    env_path.write_text("CONTEXT7_API_KEY=\n", encoding="utf-8")
+    manifest_path = target / ".copilot/softwareFactoryVscode/.tmp/runtime-manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text("{}\n", encoding="utf-8")
+
+    def _raise_sync_failure(*_args, **_kwargs):
+        raise RuntimeError("simulated runtime sync failure")
+
+    monkeypatch.setattr(factory_stack, "sync_workspace_runtime", _raise_sync_failure)
+
+    exit_code = factory_stack.cleanup_workspace(factory_dir, env_file=env_path)
+
+    assert exit_code == 0
+    assert not env_path.exists()
+    assert not manifest_path.exists()
+
+
 # ---------------------------------------------------------------------------
 # Production readiness regression tests (mitigation plan, all 7 findings)
 # ---------------------------------------------------------------------------

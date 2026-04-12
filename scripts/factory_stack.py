@@ -672,15 +672,16 @@ def cleanup_workspace(
 
     # Remove configured data directories for this instance.
     try:
-        data_dir_str = str(config.env_values.get("FACTORY_DATA_DIR", "")).strip()
-        if data_dir_str:
-            data_dir = Path(data_dir_str).expanduser()
-            instance_memory_dir = data_dir / "memory" / instance_id
-            instance_bus_dir = data_dir / "bus" / instance_id
-            for instance_dir in (instance_memory_dir, instance_bus_dir):
-                if instance_dir.exists() and instance_dir.is_dir():
-                    shutil.rmtree(instance_dir, ignore_errors=True)
-                    print(f"🧹 Erased data directory {instance_dir}")
+        if config is not None:
+            data_dir_str = str(config.env_values.get("FACTORY_DATA_DIR", "")).strip()
+            if data_dir_str:
+                data_dir = Path(data_dir_str).expanduser()
+                instance_memory_dir = data_dir / "memory" / instance_id
+                instance_bus_dir = data_dir / "bus" / instance_id
+                for instance_dir in (instance_memory_dir, instance_bus_dir):
+                    if instance_dir.exists() and instance_dir.is_dir():
+                        shutil.rmtree(instance_dir, ignore_errors=True)
+                        print(f"🧹 Erased data directory {instance_dir}")
     except Exception as e:
         print(f"⚠️ Could not fully erase configured data directories: {e}")
 
@@ -818,7 +819,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--env-file",
         default="",
-        help="Optional explicit .factory.env path. Defaults to repo-root/.factory.env or repo-root/../.factory.env.",
+        help=(
+            "Optional explicit .factory.env path. Defaults to repo-root/.factory.env "
+            "(for the canonical namespaced install, repo-root is `.copilot/softwareFactoryVscode`)."
+        ),
     )
     parser.add_argument(
         "--workspace-file",

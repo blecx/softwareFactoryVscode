@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Install-time compliance proves that the hidden-tree layout, host-side files, and Option B workspace entrypoint are correct. It does not prove that the runtime stack is actually running or that the local endpoints required by the workflow are reachable.
+Install-time compliance proves that the namespace-first layout, host-side files, and Option B workspace entrypoint are correct. It does not prove that the runtime stack is actually running or that the local endpoints required by the workflow are reachable.
 
 Once an operator starts the factory services, we need a second, explicit compliance phase that checks runtime health without mutating the target repository.
 
