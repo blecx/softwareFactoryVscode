@@ -4,8 +4,8 @@ Welcome to the **Software Factory for VS Code**, a local, AI-powered development
 
 ## Current Release
 
-- **Latest release:** `2.3`
-- **Release notes for GitHub:** [`.github/releases/v2.3.md`](.github/releases/v2.3.md)
+- **Latest release:** `2.4`
+- **Release notes for GitHub:** [`.github/releases/v2.4.md`](.github/releases/v2.4.md)
 - **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)
 - **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 

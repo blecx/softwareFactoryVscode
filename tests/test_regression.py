@@ -435,6 +435,17 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
     assert "## Execution Guardrails for This Rework" in plan_doc
     assert "## Mitigation Map and Current Resolution Status" in plan_doc
     assert "## Proposed ADR to Production Promotion Path" in plan_doc
+    assert "## Practical delivery split while shared-service promotion remains blocked" in plan_doc
+    assert "| Scope | Status | Priority now | Why it matters |" in plan_doc
+    assert "Blocked for now" in plan_doc
+    assert "## Practical execution plan for a working system" in plan_doc
+    assert "### Priority 0: New repo onboarding, install, and update safety" in plan_doc
+    assert (
+        "### Priority 1: Lifecycle truth, activation behavior, and per-workspace verification"
+        in plan_doc
+    )
+    assert "### Priority 2: Docs, regression coverage, and day-two operator confidence" in plan_doc
+    assert "### Deferred phase: Shared multi-tenant promotion remains blocked" in plan_doc
     assert "## Program-level definition of done" in plan_doc
     assert "## Mandatory quality gates for this rework" in plan_doc
     assert "## Transition, update, and upgrade safety rules" in plan_doc
@@ -443,6 +454,7 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
     assert "MUST preserve the current runtime feature surface" in plan_doc
     assert "MUST NOT remove existing runtime features as a shortcut" in plan_doc
     assert "Resolved by this rework" in plan_doc
+    assert "Do the practical per-workspace priorities first." in plan_doc
     assert (
         "Shared multi-tenant promotion of `mcp-memory`, `mcp-agent-bus`, and `approval-gate`"
         in plan_doc

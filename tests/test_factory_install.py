@@ -514,7 +514,14 @@ def test_verify_release_docs_passes_for_complete_release_bump(
         encoding="utf-8",
     )
     (repo / ".github" / "releases" / "v2.3.md").write_text(
-        "# Software Factory for VS Code 2.3\n\nRelease 2.3 notes.\n",
+        "# Software Factory for VS Code 2.3\n\n"
+        "Release 2.3 notes.\n\n"
+        "## Delivery status snapshot\n\n"
+        "| Scope | Status | Why it matters |\n"
+        "| --- | --- | --- |\n"
+        "| Per-workspace runtime baseline | Fulfilled for this release | Stable baseline ships now. |\n"
+        "| Shared multi-tenant promotion | Open | Safe optimization work stays gated. |\n"
+        "| Whole implementation roadmap | Open | The release does not overclaim final completion. |\n",
         encoding="utf-8",
     )
     factory_release.write_release_manifest_file(
@@ -532,6 +539,43 @@ def test_verify_release_docs_passes_for_complete_release_bump(
 
     assert exit_code == 0
     assert "includes changelog, release notes, and refreshed release metadata" in output
+
+
+def test_verify_release_docs_requires_delivery_status_snapshot(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    repo = tmp_path / "release-policy-repo"
+    create_release_policy_repo(repo)
+    (repo / "VERSION").write_text("2.3\n", encoding="utf-8")
+    (repo / "CHANGELOG.md").write_text(
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "No unreleased changes.\n\n"
+        "## [2.3] — 2026-04-10\n\n"
+        "Release 2.3.\n",
+        encoding="utf-8",
+    )
+    (repo / ".github" / "releases" / "v2.3.md").write_text(
+        "# Software Factory for VS Code 2.3\n\nRelease 2.3 notes only.\n",
+        encoding="utf-8",
+    )
+    factory_release.write_release_manifest_file(
+        repo,
+        repo_url="https://github.com/blecx/softwareFactoryVscode.git",
+        source_ref="main",
+    )
+    git("add", ".", cwd=repo)
+    git("commit", "-m", "Prepare incomplete release 2.3", cwd=repo)
+
+    exit_code = verify_release_docs.main(
+        ["--repo-root", str(repo), "--base-rev", "HEAD^", "--head-rev", "HEAD"]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 1
+    assert "Delivery status snapshot" in output
+    assert "| Scope | Status | Why it matters |" in output
 
 
 def test_update_preserves_custom_workspace_and_env(tmp_path: Path) -> None:

@@ -85,6 +85,120 @@ For this codebase, a proposed ADR does not jump directly to production behavior.
 4. The ADR must then move from `Proposed` to `Accepted` through explicit document review and update.
 5. Only after that acceptance step may the behavior be treated as production rollout criteria or as a production-ready shared-service capability.
 
+## Practical delivery split while shared-service promotion remains blocked
+
+The current execution goal is a practical working per-workspace system for real
+repositories. Shared multi-tenant promotion remains blocked as a later
+optimization and rollout step; it is not the current prerequisite for making
+new installs, updates, lifecycle commands, and verification trustworthy.
+
+| Scope | Status | Priority now | Why it matters |
+| --- | --- | --- | --- |
+| Practical per-workspace system for real repos | In scope now | P0 | New repositories must install, update, start, activate, verify, and recover cleanly on the isolated per-workspace path. |
+| Shared multi-tenant promotion (`mcp-memory`, `mcp-agent-bus`, and `approval-gate`) | Blocked for now | Deferred / last major promotion step | This is mainly a later efficiency and shared-control-plane optimization, and it remains gated by `ADR-008`, end-to-end tenant identity, partitioned storage and audit paths, cross-tenant proof, and operator-visible diagnostics. |
+| Whole roadmap | Still open | After the practical baseline | The roadmap remains broader than the current isolated-path milestone because it still includes lifecycle polish, operator-facing docs and verification, and any later approved shared-service promotion. |
+
+### Execution rules for the blocked shared-service phase
+
+- Do the practical per-workspace priorities first.
+- Do not schedule shared multi-tenant promotion ahead of the practical baseline
+   unless a non-breaking prerequisite bug fix is required to keep the current
+   per-workspace runtime correct.
+- Treat shared-service promotion as blocked until the practical execution plan
+   below is substantially complete and `ADR-008` has moved to `Accepted`.
+
+## Practical execution plan for a working system
+
+The following priorities turn “make it work for real repos” into explicit
+sequencing for the next implementation stretch.
+
+### Priority 0: New repo onboarding, install, and update safety
+
+- improve install flows so a fresh target repo gets the correct namespaced
+   install, runtime metadata, generated workspace settings, and repo-local `.tmp`
+   guardrails on first run;
+- improve update and upgrade flows so existing installs preserve
+   `runtime_state`, `active_workspace`, `.factory.env`, lock metadata, and
+   generated runtime artifacts;
+- harden registry refresh and recovery paths used during install, update, and
+   bootstrap;
+- keep throwaway validation and source-checkout companion flows aligned with the
+   same contract.
+
+#### Priority 0 definition of done
+
+- a brand-new repo can install the factory and reach a verified per-workspace
+   runtime without manual repair;
+- update-in-place and bootstrap refresh behave idempotently and preserve
+   operator-visible state;
+- registry rebuild and reconciliation can recover from missing or stale host
+   metadata without guessing wrong ownership.
+
+#### Priority 0 validation
+
+- focused `tests/test_factory_install.py` cases for install, update, bootstrap,
+   and registry behavior;
+- throwaway validation covering fresh install and update-in-place;
+- repo-local `.tmp` guardrail regressions.
+
+### Priority 1: Lifecycle truth, activation behavior, and per-workspace verification
+
+- harden lifecycle commands (`list`, `status`, `start`, `stop`, `activate`,
+   `deactivate`, `cleanup`) so they report `installed`, `running`, and `active`
+   truthfully;
+- make workspace activation regenerate current endpoint maps and managed
+   settings deterministically;
+- strengthen per-workspace verification and preflight diagnostics around
+   effective ports, generated MCP URLs, and runtime reachability;
+- keep operator-facing documentation aligned with the actual lifecycle surface.
+
+#### Priority 1 definition of done
+
+- operators can start, stop, activate, inspect, and verify one workspace
+   without corrupting another workspace's state;
+- activation refresh is deterministic and survives restarts;
+- verification failures point to the actual effective endpoint mismatch rather
+   than generic localhost assumptions.
+
+#### Priority 1 validation
+
+- targeted lifecycle and activation tests in `tests/test_factory_install.py`;
+- `tests/test_regression.py` coverage for generated settings and doc contracts;
+- runtime verification runs against non-default port assignments when relevant.
+
+### Priority 2: Docs, regression coverage, and day-two operator confidence
+
+- expand docs and regression coverage around install, update, lifecycle,
+   verification, and new-repo onboarding;
+- keep runtime guidance, handouts, and release-status communication aligned with
+   the current supported baseline;
+- make recovery, cleanup, and operator troubleshooting flows explicit enough for
+   repeatable day-two use.
+
+#### Priority 2 definition of done
+
+- the practical per-workspace path is described clearly enough that a new repo
+   owner can onboard and recover without reverse-engineering chat history;
+- the regression suite protects the key install, update, lifecycle, and
+   verification contracts from silent drift.
+
+#### Priority 2 validation
+
+- `tests/test_regression.py` plus the shell integration regression;
+- focused documentation regressions for plan, release-note, and onboarding
+   contracts;
+- fresh-install and update-in-place reruns when lifecycle or verification docs
+   change.
+
+### Deferred phase: Shared multi-tenant promotion remains blocked
+
+- do not treat shared multi-tenant promotion as the current delivery target;
+- revisit it only after Priorities 0 through 2 are stable enough for real repo
+   onboarding and per-workspace operations;
+- require accepted ADR status, explicit tenant identity end to end, partitioned
+   storage and audit paths, cross-tenant regression coverage, and operator
+   diagnostics before unblocking it.
+
 ## Current Baseline
 
 - The host-scoped workspace registry, per-workspace port allocation, generated runtime manifest, and generated workspace MCP URLs already exist in the codebase.
@@ -186,6 +300,11 @@ For this codebase, a proposed ADR does not jump directly to production behavior.
 
 ## Workstream 4: Hybrid Tenancy Classification
 
+**Execution status:** blocked for the current delivery cycle. Revisit only
+after the practical per-workspace execution plan above is complete enough to
+support real repo onboarding, install and update safety, lifecycle truth, and
+per-workspace verification.
+
 ### Workstream 4 Deliverables
 
 - service classification matrix,
@@ -258,13 +377,18 @@ For this codebase, a proposed ADR does not jump directly to production behavior.
 - tenant-aware approval gate,
 - isolation tests and operator diagnostics.
 
+Phase D remains blocked until the practical per-workspace execution priorities
+are substantially complete and `ADR-008` has moved to `Accepted`.
+
 ## Recommended Order of Implementation
 
 1. workspace identity and registry,
 2. port allocation and generated settings,
 3. verification and lifecycle commands,
 4. throwaway/runtime workflow integration,
-5. multi-tenant shared-service promotion.
+5. multi-tenant shared-service promotion (blocked until the practical
+   per-workspace priorities above are substantially complete and `ADR-008` is
+   accepted).
 
 ## Immediate Stabilization Rework Order
 

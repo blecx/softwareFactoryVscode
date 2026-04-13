@@ -27,5 +27,6 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - If you change `VERSION`, you must also update `CHANGELOG.md`, create or update the matching GitHub release notes file at `.github/releases/v<version>.md`, and refresh `manifests/release-manifest.json`.
 - Do **not** update changelog or release notes for ordinary commits unless the user asks for it or `VERSION` changes.
 - When preparing a release bump, ensure the changelog contains a dedicated `## [<version>]` section and the GitHub release notes explicitly mention the same version.
+- GitHub release notes should include a `## Delivery status snapshot` table summarizing what the release fulfills, what remains open, and why that boundary matters.
 
 Remember: **You solve nothing if you fix one bug by creating architectural debt or violating design guardrails.**
