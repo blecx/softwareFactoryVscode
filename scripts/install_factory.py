@@ -93,6 +93,18 @@ def resolve_target_dir(target: str) -> Path:
     return Path(target).expanduser().resolve()
 
 
+def remove_legacy_file(path: Path, *, label: str) -> None:
+    if not path.exists():
+        return
+    print(f"🗑️  Removing legacy {label}: {path}")
+    if path.is_dir() and not path.is_symlink():
+        import shutil
+
+        shutil.rmtree(path, ignore_errors=True)
+        return
+    path.unlink(missing_ok=True)
+
+
 def validate_target_repo(target_dir: Path) -> None:
     try:
         run_command(
@@ -329,9 +341,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"🗑️  Removing legacy tmp path: {old_tmp_dir}")
         shutil.rmtree(old_tmp_dir, ignore_errors=True)
 
-    old_env = target_dir / ".factory.env"
-    if old_env.exists():
-        old_env.unlink()
+    remove_legacy_file(target_dir / ".factory.env", label="environment contract")
+    remove_legacy_file(target_dir / ".factory.lock.json", label="lock metadata")
 
     factory_dir = target_dir / FACTORY_DIRNAME
 

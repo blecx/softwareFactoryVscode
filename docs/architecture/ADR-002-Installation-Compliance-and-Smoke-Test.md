@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-`softwareFactoryVscode` is installed into other repositories as a hidden-tree subsystem. A clone + bootstrap sequence alone is not enough to prove that the host repository is actually ready for VS Code usage. We need a strict, machine-executable compliance step that confirms the install contract is satisfied immediately after installation or update.
+`softwareFactoryVscode` is installed into other repositories as a namespaced harness under `.copilot/softwareFactoryVscode/`. A clone + bootstrap sequence alone is not enough to prove that the host repository is actually ready for VS Code usage. We need a strict, machine-executable compliance step that confirms the install contract is satisfied immediately after installation or update.
 
 We also need a human-friendly smoke-test prompt that can be used in VS Code to demonstrate that the installed workspace is visible and inspectable by the agent without mutating the target repository.
 
@@ -24,7 +24,7 @@ Every install or update MUST run a dedicated compliance script after bootstrap a
 
 The compliance script MUST verify the install contract rather than relying on informal operator inspection.
 
-- **Rule:** Verify the presence of `.softwareFactoryVscode/` as a hidden-tree git checkout.
+- **Rule:** Verify the presence of `.copilot/softwareFactoryVscode/` as a namespaced git checkout.
 - **Rule:** Verify host-side artifacts such as `.copilot/softwareFactoryVscode/.factory.env`, `.copilot/softwareFactoryVscode/lock.json`, and `.copilot/softwareFactoryVscode/.tmp/`.
 - **Rule:** Verify the Option B workspace entrypoint (`software-factory.code-workspace`) unless explicitly skipped.
 - **Rule:** Verify `.gitignore` contains the required factory isolation entries unless explicitly skipped.

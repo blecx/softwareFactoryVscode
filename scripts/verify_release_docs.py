@@ -9,6 +9,11 @@ import subprocess
 from pathlib import Path
 
 
+RELEASE_STATUS_HEADING = "## Delivery status snapshot"
+RELEASE_STATUS_TABLE_HEADER = "| Scope | Status | Why it matters |"
+RELEASE_STATUS_TABLE_DIVIDER = "| --- | --- | --- |"
+
+
 def run_git(
     repo_root: Path, args: list[str], *, check: bool = True
 ) -> subprocess.CompletedProcess[str]:
@@ -34,6 +39,15 @@ def git_show(repo_root: Path, rev: str, relative_path: Path) -> str:
 def changed_files(repo_root: Path, base_rev: str, head_rev: str) -> set[str]:
     result = run_git(repo_root, ["diff", "--name-only", f"{base_rev}..{head_rev}"])
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+
+
+def has_release_status_snapshot(release_notes_text: str) -> bool:
+    required_markers = (
+        RELEASE_STATUS_HEADING,
+        RELEASE_STATUS_TABLE_HEADER,
+        RELEASE_STATUS_TABLE_DIVIDER,
+    )
+    return all(marker in release_notes_text for marker in required_markers)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -92,6 +106,12 @@ def main(argv: list[str] | None = None) -> int:
         if head_version not in release_notes_text:
             violations.append(
                 f"`{expected_release_notes.as_posix()}` must mention release `{head_version}`."
+            )
+        if not has_release_status_snapshot(release_notes_text):
+            violations.append(
+                f"`{expected_release_notes.as_posix()}` must contain a `{RELEASE_STATUS_HEADING}` section "
+                f"with a `{RELEASE_STATUS_TABLE_HEADER}` table so the release's fulfilled scope and open work "
+                "stay explicit."
             )
 
     if manifest_path.as_posix() not in changed:

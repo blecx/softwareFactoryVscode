@@ -29,15 +29,23 @@ _store = MemoryStore(db_path=_db_path)
 mcp = FastMCP("mcp-memory", json_response=True)
 
 
+def default_project_id() -> str:
+    return os.getenv("PROJECT_WORKSPACE_ID", "default")
+
+
 def extract_project_id(ctx: Context) -> str:
     """Extract the workspace tenant ID from the HTTP request context.
 
     In Phase D, all VS Code side clients will pass an X-Workspace-ID header.
     Fallback to 'default' if not present or during testing.
     """
+    fallback_project_id = default_project_id()
     if ctx.request_context and hasattr(ctx.request_context, "request"):
-        return ctx.request_context.request.headers.get("X-Workspace-ID", "default")
-    return "default"
+        return ctx.request_context.request.headers.get(
+            "X-Workspace-ID",
+            fallback_project_id,
+        )
+    return fallback_project_id
 
 
 # ---------------------------------------------------------------------------

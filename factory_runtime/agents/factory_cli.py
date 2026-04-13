@@ -101,7 +101,10 @@ async def _run(args: argparse.Namespace) -> int:
     await bootloader.initialize()
 
     try:
-        orq = FactoryOrchestrator(workspace_root=workspace_root)
+        orq = FactoryOrchestrator(
+            server_urls=bootloader.server_urls,
+            workspace_root=workspace_root,
+        )
         result = await orq.run_issue(
             issue_number=args.issue,
             repo=args.repo,

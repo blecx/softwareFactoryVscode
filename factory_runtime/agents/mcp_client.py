@@ -158,6 +158,25 @@ class MCPMultiClient:
             )
         return self._tools[name]
 
+    def get_all_tool_definitions(self) -> list[dict[str, Any]]:
+        """Return all tools formatted for OpenAI-compatible tool calling."""
+        definitions: list[dict[str, Any]] = []
+        for tool in self.list_tools():
+            parameters = tool.input_schema
+            if not isinstance(parameters, dict) or not parameters:
+                parameters = {"type": "object", "properties": {}}
+            definitions.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": parameters,
+                    },
+                }
+            )
+        return definitions
+
     # ------------------------------------------------------------------
     # Tool execution
     # ------------------------------------------------------------------

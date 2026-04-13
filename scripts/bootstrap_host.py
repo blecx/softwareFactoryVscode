@@ -127,20 +127,7 @@ def ensure_factory_present(target_dir: Path) -> Path:
 
 
 def ensure_tmp_dir(target_dir: Path) -> Path:
-    tmp_dir = target_dir / TMP_SUBPATH
-    tmp_dir.mkdir(parents=True, exist_ok=True)
-
-    # Required runtime data directories for MCP services ensuring Docker doesn't map them with root ownership
-    for sub in [
-        "agent-script-runs",
-        "mcp-docker-compose",
-        "mcp-test-runner",
-        "mcp-github-ops",
-        "mcp-offline-docs",
-    ]:
-        (tmp_dir / sub).mkdir(parents=True, exist_ok=True)
-
-    return tmp_dir
+    return factory_workspace.ensure_runtime_tmp_dirs(target_dir)
 
 
 def sync_factory_runtime_contract(
@@ -156,10 +143,15 @@ def sync_factory_runtime_contract(
         factory_dir=factory_dir,
         workspace_file=workspace_file,
     )
+    registry = factory_workspace.load_registry()
+    existing_record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
+    runtime_state = "installed"
+    if isinstance(existing_record, dict):
+        runtime_state = str(existing_record.get("runtime_state", "installed"))
     factory_workspace.sync_runtime_artifacts(
         config,
-        runtime_state="installed",
-        active=False,
+        runtime_state=runtime_state,
+        active=None,
         write_env=True,
     )
     return config, not existed_before
@@ -312,6 +304,8 @@ def render_workspace_file(config: factory_workspace.WorkspaceRuntimeConfig) -> s
 
 
 def read_factory_head_commit(factory_dir: Path) -> str:
+    if not (factory_dir / ".git").exists():
+        return ""
     try:
         result = subprocess.run(
             ["git", "-C", str(factory_dir), "rev-parse", "HEAD"],
@@ -325,6 +319,8 @@ def read_factory_head_commit(factory_dir: Path) -> str:
 
 
 def read_factory_repo_url(factory_dir: Path) -> str:
+    if not (factory_dir / ".git").exists():
+        return ""
     try:
         result = subprocess.run(
             ["git", "-C", str(factory_dir), "remote", "get-url", "origin"],

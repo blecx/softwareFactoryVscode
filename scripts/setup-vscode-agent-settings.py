@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configure explicit VS Code agent settings from canonical .copilot config."""
+"""Configure explicit VS Code agent settings for the source checkout."""
 
 import argparse
 import copy
@@ -110,6 +110,20 @@ def write_json(path: Path, data: Dict[str, Any]) -> None:
         handle.write("\n")
 
 
+def build_source_workspace_settings(repo_root: Path) -> Dict[str, Any]:
+    """Return source-checkout workspace settings without runtime-specific MCP URLs.
+
+    The canonical `.copilot/config/vscode-agent-settings.json` file is also used as
+    the template for installed workspaces, where MCP server URLs are generated from
+    the active workspace runtime contract. The source checkout should not pin a
+    second static MCP URL contract into `.vscode/settings.json`.
+    """
+
+    settings = copy.deepcopy(factory_workspace.load_canonical_workspace_settings(repo_root))
+    settings.pop("mcp", None)
+    return settings
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Configure or verify explicit VS Code agent settings."
@@ -130,21 +144,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
-    env_path = REPO_ROOT / ".factory.env"
-
-    env_values = factory_workspace.parse_env_file(env_path)
-    ports = {}
-    for key in factory_workspace.PORT_LAYOUT:
-        val = env_values.get(key)
-        if val:
-            try:
-                ports[key] = int(val)
-            except ValueError:
-                pass
-        if key not in ports:
-            ports[key] = factory_workspace.PORT_LAYOUT[key]
-
-    expected = factory_workspace.build_effective_workspace_settings(REPO_ROOT, ports)
+    expected = build_source_workspace_settings(REPO_ROOT)
     existing = load_json(WORKSPACE_SETTINGS_PATH)
 
     if args.check:
@@ -179,7 +179,10 @@ def main() -> int:
         print(f"🧹 Removed stale managed keys: {', '.join(removed_keys)}")
 
     write_json(WORKSPACE_SETTINGS_PATH, updated)
-    print("✅ Workspace agent settings projected from .copilot config")
+    print(
+        "✅ Workspace agent settings projected from .copilot config "
+        "without source-checkout MCP URL pinning"
+    )
     return 0
 
 

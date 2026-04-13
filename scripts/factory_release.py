@@ -332,8 +332,11 @@ def fetch_release_manifest(
     timeout: float = 5.0,
 ) -> dict[str, Any]:
     if repo_url and Path(repo_url).expanduser().exists():
-        return load_json(
-            Path(repo_url).expanduser().resolve() / RELEASE_MANIFEST_RELATIVE_PATH
+        local_repo_root = Path(repo_url).expanduser().resolve()
+        return build_release_manifest(
+            local_repo_root,
+            repo_url=repo_url,
+            source_ref=source_ref,
         )
 
     manifest_url = build_manifest_url(repo_url, DEFAULT_BRANCH)

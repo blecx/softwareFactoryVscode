@@ -257,6 +257,7 @@ def bus_write_validation(
     stderr: str,
     exit_code: int,
     passed: bool,
+    ctx: Context = None,
 ) -> dict[str, Any]:
     """Record the result of a validation command (test/lint run).
 
@@ -281,6 +282,7 @@ def bus_write_validation(
         stderr=stderr,
         exit_code=exit_code,
         passed=passed,
+        project_id=extract_project_id(ctx),
     )
     return {"ok": True}
 
@@ -357,9 +359,6 @@ def bus_purge_workspace(project_id: str, ctx: Context = None) -> dict[str, Any]:
     }
 
 
-if __name__ == "__main__":
-    main()
-
 # ---------------------------------------------------------------------------
 # Dynamic Key Injection
 # ---------------------------------------------------------------------------
@@ -381,3 +380,7 @@ def bus_set_live_key(api_key: str) -> dict[str, Any]:
     with open(override_path, "w") as f:
         json.dump({"api_key": api_key}, f)
     return {"ok": True, "message": "Live key updated dynamically."}
+
+
+if __name__ == "__main__":
+    main()

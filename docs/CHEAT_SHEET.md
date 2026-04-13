@@ -1,56 +1,102 @@
 # ⚡ Software Factory Cheat Sheet
 
-A quick reference guide for operating the Software Factory VS Code environment.
+A quick operator reference for the current namespace-first runtime model.
 
-## 📋 VS Code Integrated Tasks
+## 📋 VS Code tasks you will actually use
 
-Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), type `Run Task`, and select:
+Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
 
-| Task Name                      | Description                                                               |
-| ------------------------------ | ------------------------------------------------------------------------- |
-| `Docker: Build & Start`        | (Runs automatically on startup) Boots the MCP services in the background. |
-| `Docker: Stop`                 | Force-stops the running factory containers.                               |
-| `📦 Select Next PR`            | Picks the next available pull request from the queue to review.           |
-| `🔀 Merge PR`                  | Merges the selected/currently active PR.                                  |
-| `✅ Validate: Factory Quality` | Runs `black`, `flake8`, and `isort` on the codebase.                      |
+- `🧭 Runtime: Preflight` — inspect runtime readiness, config drift, and effective endpoint alignment before probing live services
+- `🐳 Docker: Build & Start` — build and start the runtime explicitly
+- `🛑 Docker: Stop` — stop the current workspace runtime
+- `🛂 Verify: Installation Compliance` — validate the namespace-first install contract
+- `🩺 Verify: Runtime Compliance` — validate runtime health against generated endpoints
+- `🩺 Verify: Runtime Compliance + MCP` — runtime validation plus VS Code MCP endpoint checks
+- `✅ Validate: Factory Quality` — run repository lint/format checks
 
-## 💻 CLI Commands: Factory Stack (`scripts/factory_stack.py`)
+## 💻 Lifecycle commands
 
-If you prefer the terminal, the `factory_stack.py` orchestrator handles all heavy lifting.
+From the source checkout, use `scripts/factory_stack.py`.
+From an installed target repository, use `.copilot/softwareFactoryVscode/scripts/factory_stack.py`.
 
 ```bash
-# Start the stack manually (builds images & attaches to the terminal)
-python3 scripts/factory_stack.py start --build --foreground
+# Inspect whether the workspace is ready, needs ramp-up, is drifting, or degraded
+python3 scripts/factory_stack.py preflight
 
-# Stop the stack
+# Start the runtime explicitly
+python3 scripts/factory_stack.py start --build
+
+# Stop the runtime without removing workspace runtime data
 python3 scripts/factory_stack.py stop
 
-# Remove stack, volumes, and networks (Fresh start)
+# Stop and remove runtime volumes for the current workspace
 python3 scripts/factory_stack.py stop --remove-volumes
 
-# List all active/registered workspaces on your host
+# Show registered workspaces and active selection
 python3 scripts/factory_stack.py list
 
-# Clean up stale registry data for the current workspace
+# Show current workspace state, effective URLs, and rebuild hinting
+python3 scripts/factory_stack.py status
+
+# Refresh generated runtime artifacts and mark the workspace active
+python3 scripts/factory_stack.py activate
+
+# Clear only active selection for the current workspace
+python3 scripts/factory_stack.py deactivate
+
+# Remove runtime state for the current workspace (destructive)
 python3 scripts/factory_stack.py cleanup
 ```
 
-## 🧪 Testing & Validation
+### What `activate` means now
 
-Verify that your installation is compliant and the stack is isolated.
+`activate` is not just a registry toggle.
+
+It refreshes generated runtime artifacts from the canonical installed-workspace contract and then records that workspace as the active one for the current VS Code / Copilot CLI workflow in the host registry. It does **not** start Docker containers by itself.
+
+### What `cleanup` means now
+
+`cleanup` is deeper than a status refresh.
+
+It removes runtime ownership for the current workspace, including registry ownership, generated runtime artifacts, and workspace-scoped runtime data, while leaving the installed `.copilot/softwareFactoryVscode/` baseline in place.
+
+## 🧪 Validation
 
 ```bash
-# Run the local python test suite (Memory, AgentBus, Runtime Tests)
+# Run the local test suite
 python3 -m pytest tests/ -v
 
-# Validate Factory Installation structure on a target project
+# Validate a target install contract
 python3 scripts/verify_factory_install.py --target ../my-target-project
 
-# Verify Runtime Compliance (Checks if the docker mesh and MCP endpoints are healthy)
+# Validate runtime health and generated MCP endpoints
 python3 scripts/verify_factory_install.py --target ../my-target-project --runtime --check-vscode-mcp
 ```
 
+## ⬆️ Updating an installed target workspace
+
+From the **target repository root**:
+
+```bash
+# Check whether the installed factory is current
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py check
+
+# Apply the update if needed
+python3 .copilot/softwareFactoryVscode/scripts/factory_update.py apply
+
+# Re-verify the install contract
+python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target .
+```
+
+The updater refreshes:
+
+- `.copilot/softwareFactoryVscode/.factory.env`
+- `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`
+- `.copilot/softwareFactoryVscode/lock.json`
+- the generated `software-factory.code-workspace` file when it is still managed-safe to refresh
+
 ## 🚑 Troubleshooting
 
-- **Port Conflicts**: If the factory fails to boot due to port allocation, check `registry.json` locally or run `python3 scripts/factory_stack.py cleanup` to release dangling port mappings.
-- **Data Bleeding**: Your data is safe. The backing `AgentBus` and `MemoryStore` enforce `X-Workspace-ID` matching for all FastMCP queries. If an Agent gets a 400 error, the client is missing the context header.
+- **Port conflicts or stale state**: run `python3 scripts/factory_stack.py list` first to reconcile obvious stale registry entries, then use `preflight` to see whether the issue is `needs-ramp-up`, `config-drift`, or `degraded`.
+- **Config drift**: rerun bootstrap/update or use `activate` to refresh generated runtime artifacts for the selected workspace.
+- **Tenant-aware services**: `mcp-memory`, `mcp-agent-bus`, and `approval-gate` carry tenant-aware groundwork, but they are still candidate shared services rather than a generally promoted shared control plane.

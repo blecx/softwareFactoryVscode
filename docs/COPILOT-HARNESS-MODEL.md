@@ -145,9 +145,14 @@ The goal is:
 
 ## Current state vs target state
 
-Today, parts of the implementation still follow the older hidden-tree model using `.softwareFactoryVscode/` and related runtime metadata in the host repository root.
+The active install/update contract has now moved to the namespace-first model:
 
-That is the **current implementation**, but not the preferred long-term architecture.
+- `.copilot/softwareFactoryVscode/` is the canonical installed harness path,
+- `software-factory.code-workspace` is the host-facing VS Code entrypoint,
+- `.copilot/softwareFactoryVscode/.factory.env`, `.copilot/softwareFactoryVscode/lock.json`, and `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json` are the managed runtime artifacts,
+- and legacy root-level artifacts like `.softwareFactoryVscode/`, `.tmp/softwareFactoryVscode/`, `.factory.env`, and `.factory.lock.json` are treated as migration leftovers that must be removed during upgrade.
+
+The older hidden-tree root model remains relevant only as migration history. Repositories that still contain those artifacts are considered non-compliant until cleanup removes them.
 
 The target direction is:
 

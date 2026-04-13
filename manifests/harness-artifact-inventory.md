@@ -2,23 +2,81 @@
 
 _Targeted for Phase 0 of the Harness Namespace Implementation Backlog._
 
-This document provides a concrete inventory of current install, update, and runtime artifacts generated or managed by the Software Factory harness. It classifies ownership and defines the future disposition of each artifact, acting as the baseline for the namespace migration.
+This document provides a concrete inventory of the active install, update, and runtime artifacts generated or managed by the Software Factory harness. It classifies ownership and records the current supported disposition of each artifact after the namespace-first cutover.
 
 ## Artifact Inventory
 
-| Artifact                    | Current Location                                               | Ownership Class                                 | Future Disposition                                                                    |
-| :-------------------------- | :------------------------------------------------------------- | :---------------------------------------------- | :------------------------------------------------------------------------------------ |
-| **Hidden Harness Root**     | `.softwareFactoryVscode/`                                      | Canonical harness asset (Transitional root)     | **Migrate** to `.copilot/softwareFactoryVscode/` and `.github/softwareFactoryVscode/` |
-| **Copilot Skills**          | `.softwareFactoryVscode/.copilot/skills/`                      | Canonical harness asset                         | **Migrate** to `.copilot/softwareFactoryVscode/skills/`                               |
-| **GitHub Agents**           | `.softwareFactoryVscode/.github/agents/`                       | Canonical harness asset                         | **Migrate** to `.github/softwareFactoryVscode/agents/`                                |
-| **GitHub Templates**        | `.softwareFactoryVscode/.github/pull_request_template.md` etc. | Canonical harness asset                         | **Optionalize** or Migrate to `.github/`                                              |
-| **Factory Runtime/Scripts** | `.softwareFactoryVscode/factory_runtime/`, `scripts/`          | Canonical harness asset                         | **Migrate** to `.copilot/softwareFactoryVscode/`                                      |
-| **Compose Definitions**     | `.softwareFactoryVscode/compose/`                              | Canonical harness asset                         | **Migrate** to `.copilot/softwareFactoryVscode/compose/`                              |
-| **Runtime Environment**     | `.factory.env` at host root                                    | Local-only / ephemeral runtime state            | **Replace/Migrate** (evaluate if it can be namespaced or absorbed into registry)      |
-| **Lock File**               | `.softwareFactoryVscode/factory.lock.json`                     | Local-only / ephemeral runtime state            | **Replace** with managed-path record                                                  |
-| **Transient Data**          | `.copilot/softwareFactoryVscode/.tmp/`                         | Local-only / ephemeral runtime state            | **Keep** (ensure `.gitignore` coverage)                                               |
-| **Workspace File**          | `software-factory.code-workspace` at host root                 | Host-owned integration surface (Generated once) | **Optionalize**                                                                       |
-| **Git Ignore Block**        | `.gitignore` at host root                                      | Host-owned integration surface                  | **Keep** (update paths for target namespace)                                          |
+### Harness Namespace Root
+
+Current location: `.copilot/softwareFactoryVscode/`  
+Ownership class: canonical harness asset / managed namespace  
+Supported disposition: keep as the canonical installed harness path
+
+### Copilot Skills
+
+Current location: `.copilot/softwareFactoryVscode/.copilot/skills/`  
+Ownership class: canonical harness asset  
+Supported disposition: keep namespaced under the harness root
+
+### GitHub Agents
+
+Current location: `.copilot/softwareFactoryVscode/.github/agents/`  
+Ownership class: canonical harness asset  
+Supported disposition: keep inside the harness unless projected intentionally
+
+### GitHub Templates
+
+Current location: `.copilot/softwareFactoryVscode/.github/pull_request_template.md` and related files  
+Ownership class: canonical harness asset  
+Supported disposition: keep inside the harness unless a documented projection requires otherwise
+
+### Factory Runtime/Scripts
+
+Current location: `.copilot/softwareFactoryVscode/factory_runtime/`, `scripts/`  
+Ownership class: canonical harness asset  
+Supported disposition: keep namespaced under `.copilot/softwareFactoryVscode/`
+
+### Compose Definitions
+
+Current location: `.copilot/softwareFactoryVscode/compose/`  
+Ownership class: canonical harness asset  
+Supported disposition: keep namespaced under `.copilot/softwareFactoryVscode/`
+
+### Runtime Environment
+
+Current location: `.copilot/softwareFactoryVscode/.factory.env`  
+Ownership class: local-only / ephemeral runtime state  
+Supported disposition: keep namespaced and ignore via `.gitignore`
+
+### Lock File
+
+Current location: `.copilot/softwareFactoryVscode/lock.json`  
+Ownership class: managed install metadata  
+Supported disposition: keep as the canonical managed-path/install record
+
+### Transient Data
+
+Current location: `.copilot/softwareFactoryVscode/.tmp/`  
+Ownership class: local-only / ephemeral runtime state  
+Supported disposition: keep namespaced and ignore via `.gitignore`
+
+### Workspace File
+
+Current location: `software-factory.code-workspace` at host root  
+Ownership class: host-owned integration surface (generated once)  
+Supported disposition: keep as the canonical operator entrypoint
+
+### Git Ignore Block
+
+Current location: `.gitignore` at host root  
+Ownership class: host-owned integration surface  
+Supported disposition: keep with the namespace-first `# Factory Isolation` block
+
+### Legacy Root Artifacts
+
+Current locations: `.softwareFactoryVscode/`, `.tmp/softwareFactoryVscode/`, root `.factory.env`, root `.factory.lock.json`  
+Ownership class: deprecated migration leftovers  
+Supported disposition: delete on install/update and fail verification if still present
 
 ## Ownership Classes
 
@@ -36,7 +94,7 @@ None. All Phase 0 open questions have been explicitly answered.
    **Answer:** It replaces `factory.lock.json` and moves into `.copilot/softwareFactoryVscode/lock.json`.
 
 2. **Which current root-level files are still required in the target model?**
-   **Answer:** Deep nesting is supported. GitHub agents will be nested directly under `.github/softwareFactoryVscode/agents/` without needing root-level bridge files in `.github/agents/`.
+   **Answer:** The generated `software-factory.code-workspace` file remains the canonical operator entrypoint. Legacy root install artifacts do not remain required.
 
 3. **Which runtime facts must remain operator-visible?**
-   **Answer:** `.factory.env` does not need to remain visible at the host root. It will be hidden within the namespace at `.copilot/softwareFactoryVscode/.factory.env`.
+   **Answer:** `.factory.env` remains namespaced within `.copilot/softwareFactoryVscode/.factory.env`, while runtime health and endpoint facts are surfaced through the generated workspace, verifier output, and runtime manifest.

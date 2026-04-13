@@ -30,6 +30,7 @@ def _load_validate_throwaway_module():
         "validate_throwaway_install_under_test",
         VALIDATE_THROWAWAY_SCRIPT,
     )
+    assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -85,7 +86,7 @@ def test_validate_throwaway_runtime_relocates_system_tmp_target() -> None:
     assert "bind-mountable by Docker" in note
 
 
-def test_validate_throwaway_static_run_keeps_system_tmp_target() -> None:
+def test_validate_throwaway_static_run_defaults_to_repo_local_tmp_target() -> None:
     module = _load_validate_throwaway_module()
 
     source_repo = Path("/home/example/softwareFactoryVscode")
@@ -95,6 +96,45 @@ def test_validate_throwaway_static_run_keeps_system_tmp_target() -> None:
         source_repo,
         requested_target,
         runtime_enabled=False,
+    )
+
+    assert (
+        effective_target
+        == (
+            source_repo / ".tmp" / "throwaway-targets" / requested_target.name
+        ).resolve()
+    )
+    assert note is not None
+    assert "gitignored .tmp/ guardrail" in note
+
+
+def test_validate_throwaway_preserves_repo_local_tmp_targets() -> None:
+    module = _load_validate_throwaway_module()
+
+    source_repo = Path("/home/example/softwareFactoryVscode")
+    requested_target = source_repo / ".tmp" / "sandbox" / "throwaway-target"
+
+    effective_target, note = module.resolve_effective_target_repo(
+        source_repo,
+        requested_target,
+        runtime_enabled=True,
+    )
+
+    assert effective_target == requested_target.resolve()
+    assert note is None
+
+
+def test_validate_throwaway_allows_explicit_external_targets() -> None:
+    module = _load_validate_throwaway_module()
+
+    source_repo = Path("/home/example/softwareFactoryVscode")
+    requested_target = Path("/home/example/other-workspace/throwaway-target")
+
+    effective_target, note = module.resolve_effective_target_repo(
+        source_repo,
+        requested_target,
+        runtime_enabled=False,
+        allow_external_target=True,
     )
 
     assert effective_target == requested_target.resolve()
@@ -196,6 +236,7 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
                 str(target_repo),
                 "--skip-runtime",
                 "--skip-source-stack-handoff",
+                "--allow-external-target",
             ],
             cwd=REPO_ROOT,
             env=env,

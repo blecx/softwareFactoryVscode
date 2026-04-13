@@ -4,8 +4,8 @@ Welcome to the **Software Factory for VS Code**, a local, AI-powered development
 
 ## Current Release
 
-- **Latest release:** `2.3`
-- **Release notes for GitHub:** [`.github/releases/v2.3.md`](.github/releases/v2.3.md)
+- **Latest release:** `2.4`
+- **Release notes for GitHub:** [`.github/releases/v2.4.md`](.github/releases/v2.4.md)
 - **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)
 - **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 
@@ -20,7 +20,7 @@ It transforms a standard repository into an intelligent "Factory" where you can 
 The Software Factory is deeply integrated into VS Code to provide a frictionless developer experience:
 
 - **VS Code Tasks:** Built-in tasks (like `🐳 Docker: Build & Start`, `💼 Select Next PR`, or `🚀 Start: Full Stack (Dev)`) power the complete workflow directly from the Command Palette or Terminal menu.
-- **Background Lifecycle Management:** The necessary Docker containers are designed to launch automatically when you open the workspace and shut down gracefully when you close the editor, keeping resource usage to a minimum.
+- **Runtime Lifecycle Management:** Use the provided runtime tasks to start and stop the companion Software Factory stack when needed. The source checkout no longer pins a separate static MCP URL contract into `.vscode/settings.json`.
 - **Native MCP Client:** It exposes standard Model Context Protocol servers to your VS Code AI extensions (like GitHub Copilot), enriching the AI's context with specific repository knowledge, execution capabilities, and isolated memory stores.
 - **Interactive Chat Agents:** Work seamlessly via the Copilot Chat interface using specialized agents (e.g., `@queue-backend` or `@queue-phase-2`) to process issues and navigate the codebase.
 

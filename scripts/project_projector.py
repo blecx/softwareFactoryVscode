@@ -4,9 +4,9 @@ import os
 
 def main():
     print("=================================================")
-    print("🛂 Project Projector (Hidden Tree Isolation)")
+    print("🛂 Project Projector (Namespace-First Isolation)")
     print("=================================================")
-    print("This script enforces the hidden-tree isolation model.")
+    print("This script enforces the namespace-first isolation model.")
     print("By default, NO files from .copilot/softwareFactoryVscode/.vscode")
     print("or .copilot/softwareFactoryVscode/.github are projected into the")
     print("host repository to avoid global state pollution.")

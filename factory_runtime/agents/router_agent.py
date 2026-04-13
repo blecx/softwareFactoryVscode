@@ -76,6 +76,7 @@ class RouterAgent:
         issue_title: str,
         issue_body: str,
         repo: str = "",
+        changed_files: Optional[list[str]] = None,
     ) -> RoutingDecision:
         """Analyse an issue and return a RoutingDecision.
 
@@ -92,12 +93,19 @@ class RouterAgent:
             issue_title:  Issue title (used for memory search query).
             issue_body:   Full issue body markdown.
             repo:         GitHub repo slug (owner/repo).
+            changed_files: Optional explicit file hints from the caller.
 
         Returns:
             RoutingDecision with run_id and all routing metadata.
         """
         # Step 1: extract file hints from body
-        hinted_files = _FILE_PATH_RE.findall(issue_body)
+        hinted_files = list(dict.fromkeys(_FILE_PATH_RE.findall(issue_body)))
+        if changed_files:
+            hinted_files.extend(
+                path
+                for path in changed_files
+                if path and path not in hinted_files
+            )
 
         # Step 2: memory lookup for similar past issues
         similar, memory_adj = await self._memory_lookup(issue_title)
