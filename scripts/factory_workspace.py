@@ -32,6 +32,13 @@ DEFAULT_WORKSPACE_FOLDERS = [
     {"name": "Host Project (Root)", "path": "."},
     {"name": "AI Agent Factory", "path": FACTORY_DIRNAME},
 ]
+MANAGED_TMP_SUBDIRS = (
+    "agent-script-runs",
+    "mcp-docker-compose",
+    "mcp-test-runner",
+    "mcp-github-ops",
+    "mcp-offline-docs",
+)
 
 PORT_LAYOUT: dict[str, int] = {
     "PORT_CONTEXT7": 3010,
@@ -751,6 +758,16 @@ def ensure_factory_data_dirs(config: WorkspaceRuntimeConfig) -> None:
         )
 
 
+def ensure_runtime_tmp_dirs(target_dir: Path) -> Path:
+    """Ensure managed namespaced .tmp runtime directories exist."""
+
+    tmp_dir = target_dir / TMP_SUBPATH
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    for subdir in MANAGED_TMP_SUBDIRS:
+        (tmp_dir / subdir).mkdir(parents=True, exist_ok=True)
+    return tmp_dir
+
+
 def sync_runtime_artifacts(
     config: WorkspaceRuntimeConfig,
     *,
@@ -759,7 +776,7 @@ def sync_runtime_artifacts(
     active: bool | None = None,
     write_env: bool = True,
 ) -> dict[str, Any]:
-    config.target_dir.joinpath(TMP_SUBPATH).mkdir(parents=True, exist_ok=True)
+    ensure_runtime_tmp_dirs(config.target_dir)
     if write_env:
         (config.target_dir / FACTORY_DIRNAME).mkdir(parents=True, exist_ok=True)
     (config.target_dir / FACTORY_DIRNAME).mkdir(parents=True, exist_ok=True)

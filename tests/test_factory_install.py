@@ -296,6 +296,8 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     assert exit_code == 0
     assert (target_repo / ".copilot/softwareFactoryVscode").exists()
     assert (target_repo / ".copilot/softwareFactoryVscode/.tmp").exists()
+    for subdir in factory_workspace.MANAGED_TMP_SUBDIRS:
+        assert (target_repo / ".copilot/softwareFactoryVscode/.tmp" / subdir).is_dir()
 
     factory_env = (
         target_repo / ".copilot/softwareFactoryVscode/.factory.env"
@@ -346,6 +348,10 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     gitignore = (target_repo / ".gitignore").read_text(encoding="utf-8")
     assert ".copilot/softwareFactoryVscode/.tmp/" in gitignore
     assert ".copilot/softwareFactoryVscode/.factory.env" in gitignore
+    assert not (target_repo / ".softwareFactoryVscode").exists()
+    assert not (target_repo / ".tmp" / "softwareFactoryVscode").exists()
+    assert not (target_repo / ".factory.env").exists()
+    assert not (target_repo / ".factory.lock.json").exists()
 
 
 def test_resolve_version_label_prefers_release_file_for_head_ref(
