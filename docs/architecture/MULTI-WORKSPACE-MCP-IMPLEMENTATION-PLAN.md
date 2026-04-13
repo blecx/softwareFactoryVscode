@@ -4,9 +4,24 @@
 
 Proposed
 
+This document is a sequencing plan, not the normative source of architecture truth. Normative contracts now live in `ADR-012`, `ADR-007`, `ADR-009`, `ADR-010`, and `MULTI-WORKSPACE-MCP-ARCHITECTURE.md`. When this plan lags, the codebase and those ADRs are the source of truth.
+
 ## Objective
 
-Implement a robust runtime and configuration model that allows multiple `softwareFactoryVscode` workspaces to coexist on one host, run concurrently when desired, and evolve selected MCP services into safe multi-tenant shared services.
+Continue hardening a runtime and configuration model that allows multiple `softwareFactoryVscode` workspaces to coexist on one host, run concurrently when desired, and evolve selected MCP services into safe multi-tenant shared services.
+
+## Planning Assumptions
+
+- Namespace-first install under `.copilot/softwareFactoryVscode/` is a settled architectural decision and is not revisited by this plan.
+- The installed-workspace runtime contract under `.copilot/softwareFactoryVscode/` is canonical.
+- Source checkout tooling may operate against the companion installed-workspace contract, but it must not define a second competing static MCP runtime contract.
+- Generated host-facing files such as `software-factory.code-workspace` are projections of the installed-workspace contract rather than canonical authoring sources.
+
+## Current Baseline
+
+- The host-scoped workspace registry, per-workspace port allocation, generated runtime manifest, and generated workspace MCP URLs already exist in the codebase.
+- Lifecycle commands already exist through `scripts/factory_stack.py` (`list`, `status`, `start`, `stop`, `activate`, `deactivate`, `cleanup`).
+- The remaining purpose of this plan is to sequence hardening, documentation cleanup, and future tenancy work rather than to re-decide namespace placement.
 
 ## Success Criteria
 
@@ -54,7 +69,7 @@ Implement a robust runtime and configuration model that allows multiple `softwar
 ### Workstream 2 Deliverables
 
 - canonical per-workspace port block allocator,
-- persisted port variables in `.factory.env`,
+- persisted port variables in `.copilot/softwareFactoryVscode/.factory.env`,
 - generated workspace MCP URLs,
 - generated health endpoint map.
 
@@ -65,7 +80,7 @@ Implement a robust runtime and configuration model that allows multiple `softwar
    - prefers deterministic allocation,
    - verifies host-port availability,
    - retries safely when a block is unavailable.
-3. Write effective port values into `.factory.env` during install/update or activation.
+3. Write effective port values into `.copilot/softwareFactoryVscode/.factory.env` during install/update or activation.
 4. Replace hardcoded MCP URLs in generated workspace settings with URLs derived from the effective ports.
 5. Extend runtime verification to probe those generated URLs and effective health ports.
 
@@ -86,11 +101,11 @@ Implement a robust runtime and configuration model that allows multiple `softwar
 ### Workstream 3 Detailed Steps
 
 1. Add commands such as:
-   - `workspace list`,
-   - `workspace status`,
-   - `workspace activate`,
-   - `workspace stop`,
-   - `workspace cleanup`.
+   - `factory_stack.py list`,
+   - `factory_stack.py status`,
+   - `factory_stack.py activate`,
+   - `factory_stack.py stop`,
+   - `factory_stack.py cleanup`.
 2. Make activation regenerate workspace settings and ensure the runtime endpoint map is current.
 3. Make stop/cleanup update registry state.
 4. Update throwaway validation to use the same lifecycle manager rather than ad hoc start/stop sequencing.
@@ -156,7 +171,7 @@ Implement a robust runtime and configuration model that allows multiple `softwar
 
 ### Phase B: Single-Host Multi-Workspace Support
 
-- `.factory.env` port projection,
+- `.copilot/softwareFactoryVscode/.factory.env` port projection,
 - workspace MCP URL generation,
 - verification updates,
 - active-workspace commands.

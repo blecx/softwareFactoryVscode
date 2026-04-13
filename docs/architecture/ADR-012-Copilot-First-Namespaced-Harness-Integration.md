@@ -54,14 +54,21 @@ We adopt a **Copilot-first namespaced harness integration model**.
 - **Rule:** Host-root `.copilot`, `.github`, `.vscode`, and `.gitignore` locations must not become the canonical authoring source for factory internals.
 - **Rule:** If thin bridge files or generated entrypoints are needed for tool discovery, they must remain minimal, explicit, and documented.
 
-### 5. Host-Owned Tooling Remains Host-Owned
+### 5. Installed Workspace Runtime Contract Is Canonical
+
+- **Rule:** The canonical installed-workspace runtime contract lives under `.copilot/softwareFactoryVscode/`, including `.factory.env`, `lock.json`, and `.tmp/runtime-manifest.json`.
+- **Rule:** Generated host-facing bridge files such as `software-factory.code-workspace` may surface the runtime contract, but they must not become the canonical authoring source for factory internals.
+- **Rule:** Source-checkout tooling may resolve or operate against the companion installed-workspace contract, but it MUST map to the same installed workspace identity and MUST NOT create a second committed static runtime contract in source-checkout files such as `.vscode/settings.json`.
+- **Rule:** Root-level `.factory.env`, `.factory.lock.json`, or hidden-tree `.softwareFactoryVscode/` artifacts must not be reintroduced as canonical runtime ownership surfaces.
+
+### 6. Host-Owned Tooling Remains Host-Owned
 
 - **Rule:** Even when the factory integrates with `.copilot`, `.github`, `.vscode`, or `.gitignore`, those host namespaces remain host-owned.
 - **Rule:** Update workflows must prioritize upstream integrity for managed assets but never destroy host state permanently. For `.copilot/softwareFactoryVscode/` updates, conflicts are handled by aggressively resetting to `origin/<ref>`, but only _after_ taking an automated `git switch -c local-backup-*` branch backup of any dirty modifications.
 - **Rule:** Active `.tmp` resources and running Docker workloads must be gracefully spun down (`factory_stack.py stop`) before updates proceed, preventing filesystem exhaustion or volume corruption.
 - **Rule:** Overwrites to `software-factory.code-workspace` are applied atomically in-place, and `.factory.env` merges upstream schema additions while retaining user-injected secrets.
 
-### 6. Copilot Must Preserve Host Project Task Focus
+### 7. Copilot Must Preserve Host Project Task Focus
 
 - **Rule:** The harness should use namespaces that help distinguish AI/workflow artifacts from host product source.
 - **Rule:** For normal implementation tasks, Copilot workflows must continue to default to the host project's product context, treating harness artifacts as tooling/instruction context unless explicitly targeted.
@@ -75,5 +82,6 @@ We adopt a **Copilot-first namespaced harness integration model**.
 - The project gains a clearer product identity: a reusable Copilot-first harness rather than a custom root-level add-on tree.
 - Future install/update changes can be evaluated against a stable namespace policy.
 - `.copilot` becomes the primary architectural anchor for AI behavior, with `.github` used where GitHub-specific integration is required.
+- Installed-workspace runtime ownership is explicit, and source-checkout tooling is prevented from growing a competing static runtime contract.
 - Drift toward unmanaged root-level sprawl or silent host tooling takeover becomes easier to identify in review.
 - The previous hidden-tree installer and documentation have been fully transitioned where they conflict with this target model.
