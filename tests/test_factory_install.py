@@ -8,6 +8,7 @@ import subprocess
 import sys
 from http.client import RemoteDisconnected
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import yaml
@@ -984,6 +985,46 @@ def test_bootstrap_without_explicit_metadata_preserves_existing_lock_values(
     assert lock_data["factory"]["commit"] == "deadbeef"
 
 
+def test_bootstrap_runtime_sync_preserves_active_workspace_and_runtime_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo,
+        factory_dir=factory_dir,
+    )
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=True,
+    )
+
+    bootstrap_host.sync_factory_runtime_contract(
+        target_repo,
+        workspace_file="software-factory.code-workspace",
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert registry["active_workspace"] == config.factory_instance_id
+    assert (
+        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "running"
+    )
+
+
 def test_bootstrap_refreshes_generated_workspace_without_force(
     tmp_path: Path,
 ) -> None:
@@ -1044,6 +1085,68 @@ def test_bootstrap_refreshes_generated_workspace_without_force(
         refreshed["settings"]["mcp"]["servers"]["bashGateway"]["url"]
         == f"http://127.0.0.1:{runtime_config.ports['PORT_BASH']}/mcp"
     )
+
+
+def test_factory_orchestrator_loads_workspace_id_from_companion_runtime_manifest(
+    tmp_path: Path,
+) -> None:
+    target_repo = tmp_path / "host"
+    source_repo = target_repo / "work" / "softwareFactoryVscode"
+    manifest_path = (
+        target_repo / ".copilot/softwareFactoryVscode/.tmp/runtime-manifest.json"
+    )
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps({"project_workspace_id": "host-workspace"}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    source_repo.mkdir(parents=True, exist_ok=True)
+
+    assert factory_agents._load_workspace_id(source_repo) == "host-workspace"
+
+
+def test_factory_orchestrator_store_lesson_uses_memory_tool_contract(
+    tmp_path: Path,
+) -> None:
+    orchestrator = factory_agents.FactoryOrchestrator(
+        server_urls={},
+        workspace_root=tmp_path,
+    )
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    class FakeMCP:
+        async def call_tool(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
+            calls.append((name, args))
+            return {"ok": True}
+
+    decision = SimpleNamespace(complexity_score=7, coder_model_tier="full")
+    coder_result = SimpleNamespace(
+        files_changed=["src/example.py"],
+        tests_passed=True,
+    )
+
+    asyncio.run(
+        orchestrator._store_lesson(
+            mcp=FakeMCP(),
+            issue_number=42,
+            repo="blecx/softwareFactoryVscode",
+            decision=decision,
+            coder_result=coder_result,
+            pr_url="https://example.invalid/pr/42",
+        )
+    )
+
+    assert len(calls) == 1
+    tool_name, payload = calls[0]
+    assert tool_name == "memory_store_lesson"
+    assert payload["issue_number"] == 42
+    assert payload["repo"] == "blecx/softwareFactoryVscode"
+    assert payload["outcome"] == "success"
+    assert payload["summary"].startswith("Issue #42 in blecx/softwareFactoryVscode")
+    assert isinstance(payload["learnings"], list)
+    assert any(item == "Model tier used: full" for item in payload["learnings"])
+    assert "tags" not in payload
+    assert "insight" not in payload
 
 
 def test_verify_factory_install_detects_compliant_install_and_smoke_prompt(
@@ -2107,15 +2210,17 @@ def test_activate_workspace_refreshes_generated_runtime_artifacts(
 
     workspace_path = target_repo / "software-factory.code-workspace"
     stale_workspace = json.loads(workspace_path.read_text(encoding="utf-8"))
-    stale_workspace["settings"]["mcp"]["servers"]["context7"]["url"] = (
-        "http://127.0.0.1:3510/mcp"
-    )
+    stale_workspace["settings"]["mcp"]["servers"]["context7"][
+        "url"
+    ] = "http://127.0.0.1:3510/mcp"
     workspace_path.write_text(
         json.dumps(stale_workspace, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
 
-    stale_manifest = json.loads(config.runtime_manifest_path.read_text(encoding="utf-8"))
+    stale_manifest = json.loads(
+        config.runtime_manifest_path.read_text(encoding="utf-8")
+    )
     stale_manifest["mcp_servers"]["context7"]["url"] = "http://127.0.0.1:3510/mcp"
     config.runtime_manifest_path.write_text(
         json.dumps(stale_manifest, indent=2, ensure_ascii=False) + "\n",

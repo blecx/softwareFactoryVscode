@@ -140,8 +140,6 @@ class AgentBus:
         """Create a new task run and return its run_id."""
         run_id = str(uuid4())
         ts = _now()
-        import os
-
         self._conn.execute(
             """
             INSERT INTO task_runs (run_id, project_id, issue_number, repo, status, created_ts, updated_ts)
@@ -156,8 +154,6 @@ class AgentBus:
         self, run_id: str, project_id: str = "default"
     ) -> Optional[dict[str, Any]]:
         """Return run metadata or None if not found."""
-        import os
-
         row = self._conn.execute(
             "SELECT * FROM task_runs WHERE run_id = ? AND project_id = ?",
             (run_id, project_id),
@@ -186,8 +182,6 @@ class AgentBus:
         self, project_id: str = "default"
     ) -> list[dict[str, Any]]:
         """Return all runs currently awaiting human approval."""
-        import os
-
         rows = self._conn.execute(
             "SELECT * FROM task_runs WHERE status = 'awaiting_approval' AND project_id = ? ORDER BY created_ts ASC",
             (project_id,),
@@ -281,6 +275,8 @@ class AgentBus:
         project_id: str = "default",
     ) -> None:
         """Record before/after content for a file modified during a run."""
+        if self.get_run(run_id, project_id=project_id) is None:
+            raise ValueError("Run not found for project.")
         self._conn.execute(
             """
             INSERT INTO file_snapshots (run_id, filepath, content_before, content_after, ts)
@@ -355,8 +351,11 @@ class AgentBus:
         run_id: str,
         label: str,
         metadata: Optional[dict[str, Any]] = None,
+        project_id: str = "default",
     ) -> None:
         """Record a named milestone checkpoint within a run."""
+        if self.get_run(run_id, project_id=project_id) is None:
+            raise ValueError("Run not found for project.")
         self._conn.execute(
             """
             INSERT INTO checkpoints (run_id, label, metadata, ts)
@@ -414,10 +413,14 @@ class AgentBus:
             raise ValueError(f"Unknown run_id: {run_id}")
         return {
             "run": run,
-            "plan": self.get_plan(run_id),
-            "file_snapshots": self.get_snapshots(run_id),
-            "validation_results": self.get_validations(run_id, limit=3),
-            "checkpoints": self.get_checkpoints(run_id),
+            "plan": self.get_plan(run_id, project_id=project_id),
+            "file_snapshots": self.get_snapshots(run_id, project_id=project_id),
+            "validation_results": self.get_validations(
+                run_id,
+                limit=3,
+                project_id=project_id,
+            ),
+            "checkpoints": self.get_checkpoints(run_id, project_id=project_id),
         }
 
     def close(self) -> None:

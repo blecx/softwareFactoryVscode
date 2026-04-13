@@ -29,6 +29,22 @@ app = FastAPI(title="FACTORY Approval Gate", version="1.0.0")
 _bus = BusClient(base_url=os.getenv("AGENT_BUS_URL", "http://localhost:3031"))
 
 
+def default_project_id() -> str:
+    return os.getenv("PROJECT_WORKSPACE_ID", "default")
+
+
+def request_project_id(request: Request) -> str:
+    return request.headers.get("X-Workspace-ID", default_project_id())
+
+
+def websocket_project_id(websocket: WebSocket) -> str:
+    return (
+        websocket.query_params.get("project_id")
+        or websocket.headers.get("X-Workspace-ID")
+        or default_project_id()
+    )
+
+
 # ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
@@ -47,7 +63,7 @@ async def health() -> dict[str, str]:
 
 @app.get("/pending", response_model=list[PendingRun])
 async def get_pending(request: Request) -> list[dict[str, Any]]:
-    project_id = request.headers.get("X-Workspace-ID", "default")
+    project_id = request_project_id(request)
     """Return all runs currently awaiting human approval."""
     runs = await _bus.list_pending(project_id=project_id)
     return [
@@ -68,7 +84,7 @@ async def get_pending(request: Request) -> list[dict[str, Any]]:
 
 @app.get("/plan/{run_id}", response_model=PlanCard)
 async def get_plan(run_id: str, request: Request) -> dict[str, Any]:
-    project_id = request.headers.get("X-Workspace-ID", "default")
+    project_id = request_project_id(request)
     """Return the full plan card for a run awaiting approval."""
     try:
         packet = await _bus.read_context_packet(run_id, project_id=project_id)
@@ -102,7 +118,7 @@ async def get_plan(run_id: str, request: Request) -> dict[str, Any]:
 async def approve(
     run_id: str, body: ApprovalRequest, request: Request
 ) -> dict[str, Any]:
-    project_id = request.headers.get("X-Workspace-ID", "default")
+    project_id = request_project_id(request)
     """Approve or reject a plan.
 
     - ``approved=true``  → transitions run to 'approved' so CoderAgent continues
@@ -130,7 +146,7 @@ async def approve(
 
 @app.websocket("/ws/approvals")
 async def ws_approvals(websocket: WebSocket) -> None:
-    project_id = websocket.query_params.get("project_id", "default")
+    project_id = websocket_project_id(websocket)
     """Push new pending plans to connected clients.
 
     Polls mcp-agent-bus every 5 seconds and pushes any runs that are

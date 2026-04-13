@@ -156,10 +156,15 @@ def sync_factory_runtime_contract(
         factory_dir=factory_dir,
         workspace_file=workspace_file,
     )
+    registry = factory_workspace.load_registry()
+    existing_record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
+    runtime_state = "installed"
+    if isinstance(existing_record, dict):
+        runtime_state = str(existing_record.get("runtime_state", "installed"))
     factory_workspace.sync_runtime_artifacts(
         config,
-        runtime_state="installed",
-        active=False,
+        runtime_state=runtime_state,
+        active=None,
         write_env=True,
     )
     return config, not existed_before

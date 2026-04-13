@@ -8,7 +8,7 @@ This document is a maintained architecture synthesis. It is not a replacement fo
 
 - Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, while this document explains and synthesizes them.
 - Accepted runtime contracts live in `ADR-012`, `ADR-007`, `ADR-009`, and `ADR-010`.
-- Hybrid-tenancy promotion guardrails currently live in `ADR-008`.
+- Hybrid-tenancy promotion rules are currently proposed in `ADR-008`; candidate shared services are not treated as a fully promoted shared control plane until those rules are accepted and satisfied in code and tests.
 - This document explains how those decisions fit together, maps them onto the current codebase, and keeps future-work boundaries explicit.
 
 When this document lags, the accepted ADRs and verified code are authoritative.
@@ -70,7 +70,7 @@ Source-checkout `.vscode/settings.json` must not commit a second static MCP URL 
 
 Per `ADR-008`, services that assume one repository root or direct project filesystem state remain workspace-scoped until deliberately redesigned.
 
-Candidate shared services such as `mcp-memory`, `mcp-agent-bus`, and `approval-gate` may carry tenant-aware groundwork, but they are not treated as a fully promoted shared control plane until they satisfy the explicit promotion rules in `ADR-008`.
+Candidate shared services such as `mcp-memory`, `mcp-agent-bus`, and `approval-gate` may carry tenant-aware groundwork, but they are not treated as a fully promoted shared control plane until they satisfy the proposed promotion rules in `ADR-008` and those rules are accepted into the architecture.
 
 ## Current supported architecture
 

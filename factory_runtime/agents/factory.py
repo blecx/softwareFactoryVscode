@@ -46,6 +46,7 @@ _DEFAULT_SERVERS = {
 _RUNTIME_MANIFEST_RELATIVE_PATH = Path(
     ".copilot/softwareFactoryVscode/.tmp/runtime-manifest.json"
 )
+_RUNTIME_ENV_RELATIVE_PATH = Path(".copilot/softwareFactoryVscode/.factory.env")
 _RUNTIME_MANIFEST_SERVER_MAPPING: dict[str, tuple[str, str]] = {
     "mcp-memory": ("runtime_health", "mcp-memory"),
     "mcp-agent-bus": ("runtime_health", "mcp-agent-bus"),
@@ -67,6 +68,57 @@ def _candidate_runtime_manifest_paths(workspace_root: Path) -> list[Path]:
     return candidates
 
 
+def _candidate_runtime_env_paths(workspace_root: Path) -> list[Path]:
+    resolved_root = workspace_root.resolve()
+    candidates = [(resolved_root / _RUNTIME_ENV_RELATIVE_PATH).resolve()]
+    if len(resolved_root.parents) > 1:
+        companion_env = (
+            resolved_root.parents[1] / _RUNTIME_ENV_RELATIVE_PATH
+        ).resolve()
+        if companion_env not in candidates:
+            candidates.append(companion_env)
+    return candidates
+
+
+def _parse_env_file(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
+
+
+def _load_workspace_id(workspace_root: Path) -> str | None:
+    env_workspace_id = os.environ.get("PROJECT_WORKSPACE_ID", "").strip()
+    if env_workspace_id:
+        return env_workspace_id
+
+    for manifest_path in _candidate_runtime_manifest_paths(workspace_root):
+        if not manifest_path.exists():
+            continue
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        project_workspace_id = str(manifest.get("project_workspace_id", "")).strip()
+        if project_workspace_id:
+            return project_workspace_id
+
+    for env_path in _candidate_runtime_env_paths(workspace_root):
+        values = _parse_env_file(env_path)
+        project_workspace_id = values.get("PROJECT_WORKSPACE_ID", "").strip()
+        if project_workspace_id:
+            return project_workspace_id
+
+    return None
+
+
 def _load_server_urls_from_runtime_manifest(workspace_root: Path) -> dict[str, str]:
     """Load FACTORY MCP endpoints from the generated runtime manifest when present.
 
@@ -84,7 +136,10 @@ def _load_server_urls_from_runtime_manifest(workspace_root: Path) -> dict[str, s
             continue
 
         server_urls: dict[str, str] = {}
-        for server_name, (section_name, runtime_name) in _RUNTIME_MANIFEST_SERVER_MAPPING.items():
+        for server_name, (
+            section_name,
+            runtime_name,
+        ) in _RUNTIME_MANIFEST_SERVER_MAPPING.items():
             section = manifest.get(section_name, {})
             entry = section.get(runtime_name, {}) if isinstance(section, dict) else {}
             if isinstance(entry, dict):
@@ -165,6 +220,7 @@ class FactoryOrchestrator:
         """
         self._root = workspace_root or Path.cwd()
         self._server_urls = server_urls or _load_server_urls(self._root)
+        self._workspace_id = _load_workspace_id(self._root)
         self._llm = llm_client
 
     async def run_issue(
@@ -211,7 +267,8 @@ class FactoryOrchestrator:
         changed_files: list[str],
     ) -> OrchestratorResult:
         async with MCPMultiClient(
-            [{"name": k, "url": v} for k, v in self._server_urls.items()]
+            [{"name": k, "url": v} for k, v in self._server_urls.items()],
+            workspace_id=self._workspace_id,
         ) as mcp:
             # ── 1. Route ─────────────────────────────────────────────
             router = RouterAgent(mcp)
@@ -342,13 +399,6 @@ class FactoryOrchestrator:
     ) -> None:
         """Persist a memory lesson so future similar issues route better."""
         outcome = "success" if coder_result.tests_passed else "failure"
-        tags = [
-            repo,
-            f"issue-{issue_number}",
-            f"tier-{decision.coder_model_tier}",
-            f"score-{decision.complexity_score}",
-            outcome,
-        ]
         insight = (
             f"Issue #{issue_number} in {repo}: "
             f"complexity={decision.complexity_score} ({decision.coder_model_tier}), "
@@ -356,17 +406,23 @@ class FactoryOrchestrator:
             f"files={len(coder_result.files_changed)}"
             + (f", pr={pr_url}" if pr_url else "")
         )
+        learnings = [
+            f"Model tier used: {decision.coder_model_tier}",
+            f"Complexity score: {decision.complexity_score}",
+            f"Files changed: {len(coder_result.files_changed)}",
+            f"Outcome: {outcome}",
+        ]
+        if pr_url:
+            learnings.append(f"Pull request created: {pr_url}")
         try:
             await mcp.call_tool(
                 "memory_store_lesson",
                 {
                     "issue_number": issue_number,
                     "repo": repo,
-                    "complexity_score": decision.complexity_score,
-                    "model_used": decision.coder_model_tier,
                     "outcome": outcome,
-                    "tags": tags,
-                    "insight": insight,
+                    "summary": insight,
+                    "learnings": learnings,
                 },
             )
         except Exception:  # noqa: BLE001

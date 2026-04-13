@@ -148,7 +148,9 @@ def test_tasks_no_longer_invoke_legacy_issue_loop_scripts():
 
 def test_source_checkout_does_not_commit_static_mcp_server_urls():
     repo_root = Path(__file__).parent.parent
-    settings = json.loads((repo_root / ".vscode" / "settings.json").read_text(encoding="utf-8"))
+    settings = json.loads(
+        (repo_root / ".vscode" / "settings.json").read_text(encoding="utf-8")
+    )
 
     assert "mcp" not in settings
 
@@ -325,9 +327,7 @@ def test_setup_repo_doc_matches_current_ci_checks():
 def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     repo_root = Path(__file__).parent.parent
     handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
-    cheat_sheet = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(
-        encoding="utf-8"
-    )
+    cheat_sheet = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(encoding="utf-8")
 
     assert "software-factory.code-workspace" in handout
     assert "factory_stack.py preflight" in handout
@@ -367,22 +367,79 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
         / "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md"
     ).read_text(encoding="utf-8")
 
-    assert "implementation plan is the source of truth for sequencing" in adr_013.lower()
-    assert "accepted adrs define architecture rules, terminology, and guardrails" in adr_013.lower()
+    assert (
+        "implementation plan is the source of truth for sequencing" in adr_013.lower()
+    )
+    assert (
+        "accepted adrs define architecture rules, terminology, and guardrails"
+        in adr_013.lower()
+    )
 
     assert "current VS Code workspace or Copilot CLI session" in adr_009
-    assert "MUST NOT be inferred merely from default localhost port ownership" in adr_009
+    assert (
+        "MUST NOT be inferred merely from default localhost port ownership" in adr_009
+    )
 
     assert "maintained architecture synthesis" in architecture_doc
     assert "ADR-008" in architecture_doc
     assert "Per `ADR-013`" in architecture_doc
-    assert "The authoritative architectural definition of `active` lives in `ADR-009`" in architecture_doc
+    assert (
+        "The authoritative architectural definition of `active` lives in `ADR-009`"
+        in architecture_doc
+    )
     assert "activate` refreshes generated runtime artifacts" in architecture_doc
 
-    assert "Hybrid-tenancy guardrails are captured in `ADR-008`" in plan_doc
+    assert (
+        "Hybrid-tenancy promotion rules are currently proposed in `ADR-008`" in plan_doc
+    )
     assert "maintained architecture synthesis" in plan_doc
     assert "Per `ADR-013`" in plan_doc
-    assert "the meaning of `installed`, `running`, and `active` comes from `ADR-009`" in plan_doc
+    assert (
+        "the meaning of `installed`, `running`, and `active` comes from `ADR-009`"
+        in plan_doc
+    )
+
+
+def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
+    repo_root = Path(__file__).parent.parent
+    superseded_adr = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-007-Multi-Workspace-and-Shared-Services.md"
+    ).read_text(encoding="utf-8")
+    plan_doc = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## Status" in superseded_adr
+    assert "Superseded" in superseded_adr
+    assert "MUST NOT be used as a normative architecture source" in superseded_adr
+
+    assert "## Immediate Stabilization Rework Order" in plan_doc
+    assert "## Execution Guardrails for This Rework" in plan_doc
+    assert "## Mitigation Map and Current Resolution Status" in plan_doc
+    assert "## Proposed ADR to Production Promotion Path" in plan_doc
+    assert "## Program-level definition of done" in plan_doc
+    assert "## Mandatory quality gates for this rework" in plan_doc
+    assert "## Transition, update, and upgrade safety rules" in plan_doc
+    assert "MUST follow the suggested order of attack" in plan_doc
+    assert "MUST NOT introduce new architecture decisions" in plan_doc
+    assert "MUST preserve the current runtime feature surface" in plan_doc
+    assert "MUST NOT remove existing runtime features as a shortcut" in plan_doc
+    assert "Resolved by this rework" in plan_doc
+    assert (
+        "Shared multi-tenant promotion of `mcp-memory`, `mcp-agent-bus`, and `approval-gate`"
+        in plan_doc
+    )
+    assert "Not promoted in this rework" in plan_doc
+    assert (
+        "Only after that acceptance step may the behavior be treated as production rollout criteria"
+        in plan_doc
+    )
 
 
 def test_bash_gateway_default_policy_matches_profile_schema():
@@ -505,6 +562,42 @@ def test_mcp_multi_client_performs_streamable_http_handshake():
 
     asyncio.run(run_test())
     assert state == {"initialized": True, "notified": True}
+
+
+def test_mcp_multi_client_exports_openai_tool_definitions():
+    from factory_runtime.agents.mcp_client import MCPMultiClient, ToolInfo
+
+    client = MCPMultiClient([])
+    client._tools = {
+        "ping_tool": ToolInfo(
+            name="ping_tool",
+            description="Ping",
+            server_name="mock",
+            server_url="http://test-server",
+            input_schema={
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                "required": ["value"],
+            },
+        )
+    }
+
+    definitions = client.get_all_tool_definitions()
+
+    assert definitions == [
+        {
+            "type": "function",
+            "function": {
+                "name": "ping_tool",
+                "description": "Ping",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string"}},
+                    "required": ["value"],
+                },
+            },
+        }
+    ]
 
 
 def test_approval_gate_entrypoint_uses_factory_runtime_module_path():
