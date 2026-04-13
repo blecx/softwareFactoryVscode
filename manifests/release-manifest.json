@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-04-10T22:56:10+02:00",
+  "generated_at": "2026-04-13T21:07:53+02:00",
   "source": {
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "default_branch": "main",
@@ -9,36 +9,36 @@
   },
   "latest": {
     "schema_version": 1,
-    "version_core": "2.3",
-    "normalized_version": "2.3.0",
-    "display_version": "2.3+88.gfc71d3d",
+    "version_core": "2.4",
+    "normalized_version": "2.4.0",
+    "display_version": "2.4+100.g47af329",
     "channel": "stable",
-    "build_number": 88,
-    "commit_sha": "fc71d3d2e93a3ac1b499ad908185c4b3bc311e0c",
-    "commit_short": "fc71d3d",
+    "build_number": 100,
+    "commit_sha": "47af3297f6f1c64ddaf5e3e5f38943d99f5af08c",
+    "commit_short": "47af329",
     "version_tag": "",
     "source_ref": "main",
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "manifest_path": "manifests/release-manifest.json",
     "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
-    "generated_at": "2026-04-10T22:56:10+02:00"
+    "generated_at": "2026-04-13T21:07:53+02:00"
   },
   "channels": {
     "stable": {
       "schema_version": 1,
-      "version_core": "2.3",
-      "normalized_version": "2.3.0",
-      "display_version": "2.3+88.gfc71d3d",
+      "version_core": "2.4",
+      "normalized_version": "2.4.0",
+      "display_version": "2.4+100.g47af329",
       "channel": "stable",
-      "build_number": 88,
-      "commit_sha": "fc71d3d2e93a3ac1b499ad908185c4b3bc311e0c",
-      "commit_short": "fc71d3d",
+      "build_number": 100,
+      "commit_sha": "47af3297f6f1c64ddaf5e3e5f38943d99f5af08c",
+      "commit_short": "47af329",
       "version_tag": "",
       "source_ref": "main",
       "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
       "manifest_path": "manifests/release-manifest.json",
       "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
-      "generated_at": "2026-04-10T22:56:10+02:00"
+      "generated_at": "2026-04-13T21:07:53+02:00"
     }
   },
   "update_policy": {

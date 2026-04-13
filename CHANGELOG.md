@@ -9,7 +9,80 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Unreleased Summary
 
-No unreleased changes recorded yet after `2.3`.
+No unreleased changes recorded yet after `2.4`.
+
+## [2.4] — 2026-04-13
+
+### Summary for 2.4
+
+Release 2.4 is a stabilization release for the current namespace-first,
+per-workspace runtime. The immediate hardening pass around workspace identity,
+tenant-scoped runtime behavior, bootstrap/update state preservation, and
+planner/memory contract correctness is now complete enough to ship as the new
+baseline. At the same time, the release keeps the architecture honest:
+candidate shared services are still not promoted to a production shared control
+plane, and the broader multi-tenant roadmap remains open.
+
+### Added in 2.4
+
+- **Planner-facing MCP tool definitions** — `factory_runtime/agents/mcp_client.py`
+  now exports OpenAI-compatible tool definitions so the planner can enumerate
+  tools through the shared client without relying on missing API surface.
+- **Regression coverage for the stabilization pass** — new and expanded tests now
+  cover non-default tenant context packets, cross-tenant bus write rejection,
+  workspace identity loading, lesson payload schema conformance, bootstrap state
+  preservation, and the mitigation-plan/superseded-ADR documentation contract.
+- **Repo-local throwaway testing guardrail** — `scripts/validate_throwaway_install.py`
+  now keeps default throwaway install/runtime validation inside the source
+  repository's gitignored `.tmp/throwaway-targets/` area unless an operator
+  explicitly opts into an external target.
+
+### Fixed in 2.4
+
+- **Agent-bus tenant scoping** — `factory_runtime/apps/mcp/agent_bus/bus.py` and
+  `factory_runtime/apps/mcp/agent_bus/mcp_server.py` now apply tenant scope
+  consistently to checkpoints, validations, snapshots, and context-packet
+  assembly, and they reject wrong-tenant writes explicitly.
+- **Workspace identity propagation** — `factory_runtime/agents/factory.py`,
+  `factory_runtime/apps/mcp/memory/mcp_server.py`, and
+  `factory_runtime/apps/approval_gate/main.py` now resolve and carry the same
+  effective workspace identity through the current runtime path.
+- **Bootstrap/update state preservation** — `scripts/bootstrap_host.py` now keeps
+  recorded `runtime_state` and does not silently clear `active_workspace` while
+  refreshing runtime artifacts during install/update/bootstrap.
+- **Lesson storage contract drift** — the FACTORY orchestrator now stores
+  `memory_store_lesson` records using the supported `summary` and `learnings`
+  schema instead of unsupported payload fields.
+- **Stale architecture authority drift** — the legacy duplicate multi-workspace
+  ADR is now explicitly superseded and non-normative, and the maintained
+  architecture/plan docs now distinguish what is resolved by the per-workspace
+  rework versus what remains intentionally unpromoted.
+
+### Changed in 2.4
+
+- **Practical interpretation of plan status** — the current per-workspace runtime
+  hardening pass is treated as fulfilled enough for release, while shared
+  multi-tenant runtime promotion remains open and the full roadmap exit
+  condition is still not complete.
+- **Shell integration regression guardrail** — `tests/run-integration-test.sh`
+  now stages its mock host under repo-local `.tmp/integration-test/`, cleans it
+  up on exit, and excludes `.tmp` from the copied snapshot so the integration
+  regression follows the same in-workspace testing boundary as throwaway
+  install/runtime validation.
+
+### Operational Notes for 2.4
+
+- This release marks the current **per-workspace runtime hardening** as the new
+  baseline.
+- Shared multi-tenant promotion for `mcp-memory`, `mcp-agent-bus`, and
+  `approval-gate` remains intentionally blocked until the `ADR-008` promotion
+  path is accepted and fully validated.
+- Default disposable validation now stays inside repo-local, gitignored `.tmp`
+  paths, reducing the risk of accidental breakout into unrelated directories.
+- A real repo-local throwaway flow was re-run for this release: install older
+  commit → detect update → apply update → re-verify runtime compliance.
+- Full regression coverage and the shell integration regression both passed on
+  the 2.4 state.
 
 ## [2.3] — 2026-04-10
 
