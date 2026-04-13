@@ -2,286 +2,230 @@
 
 ## Status
 
-Proposed
+Maintained synthesis
 
-## Problem Statement
+This document is a maintained architecture synthesis. It is not a replacement for the ADRs.
 
-`softwareFactoryVscode` currently assumes a mostly single-workspace localhost runtime model:
+- Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, while this document explains and synthesizes them.
+- Accepted runtime contracts live in `ADR-012`, `ADR-007`, `ADR-009`, and `ADR-010`.
+- Hybrid-tenancy promotion guardrails currently live in `ADR-008`.
+- This document explains how those decisions fit together, maps them onto the current codebase, and keeps future-work boundaries explicit.
 
-- MCP Docker services publish to well-known default host ports.
-- `.copilot/config/vscode-agent-settings.json` points to fixed localhost URLs.
-- several MCP services assume a single repository mounted at `/target`.
-- runtime verification probes default host ports directly.
+When this document lags, the accepted ADRs and verified code are authoritative.
 
-This works well for one active workspace, but it breaks down when an operator needs to:
+## Why this architecture exists
 
-- keep several projects installed on the same host,
-- run more than one project runtime simultaneously,
-- switch active workspaces safely and predictably,
-- or evolve selected MCP services into true multi-tenant shared services.
+`softwareFactoryVscode` no longer operates as a single-workspace localhost-only runtime.
 
-We need an architecture that preserves the repository’s namespaced harness isolation model while adding first-class support for:
+The repository now supports:
 
-1. multiple installed workspaces,
-2. multiple concurrently running workspace stacks through generated host port maps,
-3. VS Code MCP configuration that follows the effective runtime endpoints,
-4. and a deliberate path toward multi-tenant MCP services where that model is appropriate.
+- namespace-first installed workspaces under `.copilot/softwareFactoryVscode/`,
+- generated per-workspace host-port maps,
+- generated `software-factory.code-workspace` files,
+- generated runtime manifests used by verification and lifecycle helpers,
+- host-level workspace registry and lifecycle commands,
+- and a deliberate path toward selected shared services without weakening workspace isolation by default.
 
-## Goals
+The remaining architecture work is not “invent multi-workspace support from scratch.” It is to keep the current runtime contract coherent, harden the control plane, and prevent candidate shared services from being treated as fully promoted multi-tenant infrastructure before their guardrails are satisfied.
 
-- Allow multiple installed factory workspaces on one host without port collisions.
-- Allow multiple runtime stacks to run concurrently when their host ports differ.
-- Make workspace-local VS Code MCP settings derive from the effective runtime configuration rather than hardcoded default ports.
-- Keep single-repo MCP services isolated until they are explicitly redesigned for tenancy.
-- Add an explicit host-level concept of installed workspaces, running workspaces, and active workspaces.
-- Define a path to multi-tenant MCP services that is secure, testable, and backward compatible.
+## Core guardrails
 
-## Non-Goals
+### 1. Namespace-first runtime ownership remains canonical
 
-- Rewriting every MCP server into a shared multi-tenant service in one step.
-- Replacing the namespace-first installation model.
-- Removing the current single-workspace runtime flow before a compatible migration path exists.
-- Introducing central cloud control planes or external orchestration dependencies.
+The canonical installed-workspace runtime contract lives under `.copilot/softwareFactoryVscode/`, including:
 
-## Architectural Principles
+- `.copilot/softwareFactoryVscode/.factory.env`
+- `.copilot/softwareFactoryVscode/lock.json`
+- `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`
+- workspace-scoped data directories derived from `FACTORY_DATA_DIR`
+- the generated host-facing `software-factory.code-workspace` bridge file
 
-### 1. Workspace Identity Is Explicit
+Root-level `.factory.env`, `.factory.lock.json`, or hidden-tree `.softwareFactoryVscode/` artifacts must not be reintroduced as canonical ownership surfaces.
 
-Every installed workspace must have a durable identity. The host runtime must never infer tenancy only from the current working directory.
+### 2. One source of truth drives effective endpoints
 
-### 2. One Source of Truth for Effective Runtime Endpoints
+The same effective runtime metadata must drive:
 
-The same configuration source must drive:
+- Docker host-port publishing,
+- generated MCP URLs in `software-factory.code-workspace`,
+- runtime manifest endpoint data,
+- lifecycle status/preflight inspection,
+- and runtime verification.
 
-- Docker port publishing,
-- VS Code MCP URLs,
-- runtime verification,
-- and active-workspace inspection.
+This prevents drift between Compose, VS Code, and verifier expectations.
 
-### 3. Single-Tenant by Default, Multi-Tenant by Design
+### 3. Source checkout must not create a second runtime contract
 
-Services that mount `/target` or assume one repository root remain workspace-scoped until they are deliberately redesigned. Multi-tenancy is an opt-in capability, not an accidental side effect.
+The source checkout may operate against the companion installed workspace, but it must resolve to the same:
 
-### 4. Active Workspace Is an Operator Concept, Not a Port Assumption
+- target workspace identity,
+- compose project,
+- port block,
+- runtime manifest,
+- and generated workspace contract.
 
-A workspace becomes active because the operator starts or selects it, not because it happens to own the default localhost ports.
+Source-checkout `.vscode/settings.json` must not commit a second static MCP URL contract.
 
-### 5. Shared Services Must Prove Isolation
+### 4. Single-tenant by default, multi-tenant by deliberate promotion
 
-Any service promoted to multi-tenant/shared status must provide tenant-aware routing, storage isolation, audit separation, and deterministic verification.
+Per `ADR-008`, services that assume one repository root or direct project filesystem state remain workspace-scoped until deliberately redesigned.
 
-## Current Constraints
+Candidate shared services such as `mcp-memory`, `mcp-agent-bus`, and `approval-gate` may carry tenant-aware groundwork, but they are not treated as a fully promoted shared control plane until they satisfy the explicit promotion rules in `ADR-008`.
 
-### Fixed VS Code MCP URLs
+## Current supported architecture
 
-The canonical MCP settings file currently points to fixed `127.0.0.1` URLs. This prevents one installed workspace from automatically advertising its own port map.
+### 1. Host control plane
 
-### Workspace-Scoped MCP Servers
+The host control plane is implemented through the workspace registry and lifecycle helpers in `scripts/factory_workspace.py` and `scripts/factory_stack.py`.
 
-Several services are intentionally repository-scoped and mount exactly one target tree at `/target`, for example:
+Current supported concepts:
 
-- bash gateway,
-- repo fundamentals servers,
-- offline docs,
-- GitHub ops,
-- devops MCP servers.
+- `FACTORY_INSTANCE_ID` — unique installed-workspace runtime identity
+- `PROJECT_WORKSPACE_ID` — stable logical workspace identifier
+- host-scoped registry file — records workspace path, compose project, port block, runtime state, and timestamps
+- explicit installed / running / active state separation
 
-These should be treated as single-tenant per container instance.
+Current lifecycle commands:
 
-### Verification Assumes Default Ports
+- `factory_stack.py list`
+- `factory_stack.py status`
+- `factory_stack.py preflight`
+- `factory_stack.py start`
+- `factory_stack.py stop`
+- `factory_stack.py activate`
+- `factory_stack.py deactivate`
+- `factory_stack.py cleanup`
 
-Runtime verification probes default host ports for health and endpoint reachability. That model must be replaced with generated effective endpoints.
+### 2. Workspace runtime plane
 
-## Target Architecture
+Each installed workspace owns a runtime envelope rooted in the namespace-first install contract.
 
-### 1. Host Control Plane
+The current runtime envelope includes:
 
-A host-level control plane manages installed workspaces and runtime metadata.
+- persisted effective port variables in `.copilot/softwareFactoryVscode/.factory.env`
+- a generated runtime manifest under `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`
+- a generated `software-factory.code-workspace` file at the host project root
+- a compose project name and port index stored in both env/manifest/registry surfaces
+- workspace-scoped data directories for memory/bus persistence
 
-### Required concepts
+### 3. Effective endpoint pipeline
 
-- `FACTORY_INSTANCE_ID`: unique per installed workspace.
-- `PROJECT_WORKSPACE_ID`: stable logical workspace identifier.
-- host registry file: records installed workspaces, paths, compose project names, port blocks, status, and timestamps.
+Effective runtime endpoints are already generated and persisted.
 
-### Registry responsibilities
+Today the codebase already:
 
-- list installed workspaces,
-- list running workspaces,
-- detect stale entries,
-- reserve and release port blocks,
-- record the last selected workspace for operator convenience,
-- support active-workspace inspection without mutating projects.
+- allocates distinct workspace port blocks,
+- collision-checks the selected block before startup,
+- projects concrete MCP URLs into the generated workspace file,
+- writes the same endpoint map into the runtime manifest,
+- and validates those generated endpoints during preflight/runtime verification.
 
-A suitable initial location is a host-scoped user data path rather than a project-local file.
+This is no longer aspirational architecture; it is part of the current runtime contract.
 
-### 2. Workspace Runtime Plane
+### 4. VS Code workspace plane
 
-Each installed workspace owns a runtime envelope.
+The generated `software-factory.code-workspace` file is the supported host-facing entrypoint for installed workspaces.
 
-### Workspace-scoped envelope
+- `.copilot/config/vscode-agent-settings.json` remains the canonical schema/template source.
+- Installed workspaces project concrete URLs from the effective runtime metadata.
+- The generated workspace file is a projection of the installed-workspace contract, not the canonical authoring source.
 
-- namespaced install under `.copilot/softwareFactoryVscode/`,
-- host contract in `.copilot/softwareFactoryVscode/.factory.env`,
-- compose project name,
-- generated host port block,
-- generated workspace MCP settings,
-- workspace-local mount at `/target`.
+### 5. Service classification
 
-### Port allocation model
+The runtime currently supports two service classes.
 
-Each workspace receives a port block and uses deterministic offsets for all exposed services.
+#### Workspace-scoped services
 
-Example conceptual mapping:
+These remain one-instance-per-workspace because they depend on a repository mount or direct project filesystem state.
 
-- context7
-- bash gateway
-- repo fundamentals servers
-- devops servers
-- offline docs
-- GitHub ops
-- memory
-- agent bus
-- approval gate
-- mock gateway / TUI
-
-The important design rule is not the exact numeric range, but that the block is:
-
-- unique per running workspace,
-- generated once and persisted,
-- collision-checked before stack startup,
-- and reversible into concrete MCP URLs.
-
-### 3. VS Code Workspace Plane
-
-VS Code should consume generated effective MCP endpoints, not compile-time defaults.
-
-### Required behavior
-
-- The canonical config remains the schema/template source.
-- The installed workspace generates concrete URLs from the effective port mapping.
-- The generated workspace settings may also include tenant-specific headers where shared services require them.
-
-### Result
-
-Two VS Code windows can point to two different running workspaces on the same host, even when both use the same server names like `bashGateway`, because the URLs differ per workspace.
-
-### 4. Hybrid Tenancy Model for MCP Services
-
-The runtime should explicitly support two service classes.
-
-### Class A: Workspace-Scoped Single-Tenant Services
-
-These services remain one-container-per-workspace because they depend on a bound repository root or direct project filesystem state.
-
-Examples:
+Examples include:
 
 - bash gateway,
 - repo fundamentals services,
-- offline docs,
-- GitHub ops,
 - docker-compose MCP,
-- test runner MCP.
+- test runner MCP,
+- offline docs,
+- GitHub ops.
 
-These services scale horizontally by running one isolated instance per workspace.
+#### Candidate shared services
 
-### Class B: Shared Multi-Tenant Services
+These services may eventually be promoted to a shared control-plane role, but that promotion is not automatic.
 
-These services may evolve toward one shared service that routes requests by tenant/workspace identity.
+Current candidate shared services include:
 
-Likely candidates:
+- `mcp-memory`
+- `mcp-agent-bus`
+- `approval-gate`
+- supporting orchestration services that depend on the same control-plane lifecycle
 
-- `mcp-memory`,
-- `mcp-agent-bus`,
-- `approval-gate`.
+Current code already carries tenant-aware storage/routing groundwork in these services, but that does **not** mean they are approved as a final shared multi-tenant control plane.
 
-A shared service must require tenant identity on every request, for example through generated headers or a session-bound tenant contract.
+### 6. Active workspace semantics
 
-### Tenant contract requirements
+The authoritative architectural definition of `active` lives in `ADR-009`. This section is a synthesis of that rule and the current implementation.
 
-A multi-tenant service must isolate:
+The architecture distinguishes three states:
 
-- storage,
-- request routing,
-- logs,
-- audit trails,
-- and health/debug visibility.
+- **installed** — the namespace-first factory install exists for a target repository
+- **running** — Docker runtime resources are currently allocated for that workspace
+- **active** — the workspace currently selected by the operator-facing tool context, such as the VS Code workspace or Copilot CLI session, and recorded explicitly in the host registry
 
-A request for tenant A must never observe tenant B state.
+Important current behavior:
 
-## Active Workspace Semantics
+- more than one workspace may be running at once,
+- active is an operator/session concept rather than proof of port ownership,
+- in practice, the current implementation records that selection explicitly through `factory_stack.py activate` rather than by automatically detecting editor/window focus,
+- `activate` refreshes generated runtime artifacts from the canonical installed-workspace contract and then marks the workspace active,
+- `deactivate` clears active selection without implicitly stopping containers.
 
-The architecture should distinguish three states:
+### 7. Cleanup and reconciliation semantics
 
-### Installed workspace
+The current runtime supports both reconciliation and explicit cleanup.
 
-A repository contains a valid namespace-first factory install.
+- `list` performs registry reconciliation before reporting state.
+- `cleanup` removes runtime ownership and generated runtime artifacts for the selected workspace, while leaving the installed `.copilot/softwareFactoryVscode/` baseline in place.
+- Generated host-facing bridge files such as `software-factory.code-workspace` remain part of the installed baseline and may be refreshed later.
 
-### Running workspace
+Broader discovery-time reconciliation hardening is still governed by `ADR-010` and remains an area to keep reviewing.
 
-The workspace runtime stack currently owns host ports and has active containers.
+## What is implemented now vs. what remains future work
 
-### Active workspace
+### Implemented now
 
-The workspace is currently selected by the operator or current VS Code window for interaction.
+- namespace-first runtime ownership
+- host registry with active workspace selection
+- generated port blocks and generated workspace MCP URLs
+- generated runtime manifest and preflight drift detection
+- lifecycle commands for start/stop/status/preflight/activate/deactivate/cleanup
+- source-checkout fallback to the companion installed-workspace runtime contract
+- throwaway validation reusing the shared lifecycle helper
 
-Important: with generated port maps, more than one workspace can be running simultaneously. “Active” becomes a UX and routing concept, not a proof of exclusive runtime ownership.
+### Still future or intentionally incomplete
 
-## Robustness Requirements
+- treating candidate shared services as a generally approved multi-tenant control plane
+- strict no-ambiguity tenant enforcement across every shared-service entrypoint
+- broader registry rebuild and discovery-time hardening beyond the currently implemented reconciliation paths
+- shared-service optimization that reduces per-workspace infrastructure only after isolation proof exists
 
-- Detect port collisions before runtime startup.
-- Recover from stale registry entries after crashes or forced Docker cleanup.
-- Regenerate workspace settings idempotently.
-- Keep static install verification independent from runtime startup.
-- Make runtime verification read the effective port map, not hardcoded defaults.
-- Preserve backward compatibility for existing installs during migration.
-- Provide a clear fallback path when a requested port block cannot be allocated.
+## Review checkpoints
 
-## Security and Isolation Requirements for Multi-Tenant Services
+When reviewing future changes against this architecture, ask:
 
-Any shared MCP service must satisfy the following before being treated as production-ready:
+1. Does the change preserve `.copilot/softwareFactoryVscode/` as the canonical runtime namespace?
+2. Does it keep Compose, generated workspace settings, runtime manifest, and verification on the same effective endpoint contract?
+3. Does source-checkout tooling still resolve to the companion installed workspace rather than inventing a second runtime identity?
+4. Does it preserve installed / running / active as explicit and operator-visible concepts?
+5. If a service is being treated as shared, has it satisfied the tenant-isolation promotion rules from `ADR-008`?
 
-- explicit tenant identity per request,
-- no default tenant fallback for cross-workspace requests,
-- storage partitioning by tenant key,
-- request and audit correlation by tenant key,
-- administrative introspection that cannot leak tenant payloads by default,
-- regression tests for cross-tenant isolation,
-- and operator-visible diagnostics for active tenants and mapped workspaces.
+## Decision summary
 
-## Migration Strategy
-
-### Phase 1: Workspace-Scoped Port Generation
-
-- add per-workspace port variables to `.copilot/softwareFactoryVscode/.factory.env`,
-- generate effective MCP URLs into workspace settings,
-- make verification consume generated URLs and health ports.
-
-### Phase 2: Host Registry and Active Workspace Commands
-
-- add registry-backed list/start/stop/activate/deactivate commands,
-- integrate throwaway validation and runtime switching with the registry,
-- expose operator-readable active-workspace state.
-
-### Phase 3: Shared-Service Promotion
-
-- promote selected services to tenant-aware shared mode,
-- keep workspace-scoped services isolated,
-- add explicit tenant headers and verification rules.
-
-### Phase 4: Optional Runtime Optimization
-
-- reduce duplicate per-workspace infrastructure where shared services are proven safe,
-- keep workspace-scoped data plane services one-per-workspace.
-
-## Decision Summary
-
-The recommended architecture is a hybrid model:
+The supported architecture is now:
 
 - multiple installed workspaces,
-- multiple concurrently running stacks through generated host port blocks,
-- generated workspace-local VS Code MCP URLs,
-- workspace-scoped MCP data plane services by default,
-- and a controlled path to multi-tenant shared control plane services.
+- multiple concurrently runnable workspace stacks through generated port blocks,
+- generated workspace-local MCP URLs and runtime manifests,
+- explicit registry-backed lifecycle management,
+- workspace-scoped data-plane services by default,
+- and a controlled, reviewable path toward shared services only where isolation can be proven.
 
-This design solves the immediate multi-project problem without forcing unsafe multi-tenancy on services that are currently repository-bound.
+This keeps the runtime aligned with the accepted ADRs and the verified codebase without overstating future shared-service promotion as already complete.

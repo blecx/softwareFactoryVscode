@@ -2076,6 +2076,73 @@ def test_factory_stack_start_stop_activate_preserve_workspace_distinction(
     assert len(calls) == 2
 
 
+def test_activate_workspace_refreshes_generated_runtime_artifacts(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+    )
+
+    workspace_path = target_repo / "software-factory.code-workspace"
+    stale_workspace = json.loads(workspace_path.read_text(encoding="utf-8"))
+    stale_workspace["settings"]["mcp"]["servers"]["context7"]["url"] = (
+        "http://127.0.0.1:3510/mcp"
+    )
+    workspace_path.write_text(
+        json.dumps(stale_workspace, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    stale_manifest = json.loads(config.runtime_manifest_path.read_text(encoding="utf-8"))
+    stale_manifest["mcp_servers"]["context7"]["url"] = "http://127.0.0.1:3510/mcp"
+    config.runtime_manifest_path.write_text(
+        json.dumps(stale_manifest, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    factory_stack.activate_workspace(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+
+    refreshed_workspace = json.loads(workspace_path.read_text(encoding="utf-8"))
+    refreshed_manifest = json.loads(
+        config.runtime_manifest_path.read_text(encoding="utf-8")
+    )
+    expected_context7_url = f"http://127.0.0.1:{config.ports['PORT_CONTEXT7']}/mcp"
+
+    assert (
+        refreshed_workspace["settings"]["mcp"]["servers"]["context7"]["url"]
+        == expected_context7_url
+    )
+    assert refreshed_manifest["mcp_servers"]["context7"]["url"] == expected_context7_url
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert registry["active_workspace"] == config.factory_instance_id
+
+
 def test_factory_stack_start_rolls_back_runtime_state_when_compose_fails(
     tmp_path: Path,
     monkeypatch,

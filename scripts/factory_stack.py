@@ -793,8 +793,8 @@ def activate_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
         if isinstance(existing_record, dict)
         else "installed"
     )
-    factory_workspace.upsert_workspace_record(
-        factory_workspace.build_runtime_manifest(config),
+    factory_workspace.sync_runtime_artifacts(
+        config,
         runtime_state=runtime_state,
         active=None,
     )

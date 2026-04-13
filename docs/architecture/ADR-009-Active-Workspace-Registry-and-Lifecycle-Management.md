@@ -17,7 +17,8 @@ We will add a host-level active-workspace registry and lifecycle model.
 ### 1. Installed, running, and active are distinct states
 
 - **Rule:** The system MUST distinguish installed workspaces, running workspaces, and active workspaces.
-- **Rule:** Active workspace selection MUST be explicit and operator-visible.
+- **Rule:** An active workspace is the workspace currently selected by the operator-facing tool context — for example the current VS Code workspace or Copilot CLI session — and that selection MUST be recorded explicitly and be operator-visible.
+- **Rule:** Active workspace selection MUST NOT be inferred merely from default localhost port ownership or from whether containers happen to be running.
 
 ### 2. A host-level registry is the source of truth for runtime ownership
 
@@ -33,6 +34,7 @@ We will add a host-level active-workspace registry and lifecycle model.
 ### 4. Lifecycle commands replace ad hoc workspace switching
 
 - **Rule:** Operators and automated validation flows SHOULD use shared lifecycle commands to list, start, stop, activate, deactivate, and clean up workspaces.
+- **Rule:** `activate` records the current operator/tool-context selection for that installed workspace; it is not itself a synonym for runtime startup.
 - **Rule:** Throwaway validation and future workspace switching logic SHOULD reuse the same lifecycle machinery instead of custom stop/start sequences.
 
 ### 5. Cleanup semantics must be explicit

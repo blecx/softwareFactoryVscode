@@ -4,7 +4,9 @@
 
 Proposed
 
-This document is a sequencing plan, not the normative source of architecture truth. Normative contracts now live in `ADR-012`, `ADR-007`, `ADR-009`, `ADR-010`, and `MULTI-WORKSPACE-MCP-ARCHITECTURE.md`. When this plan lags, the codebase and those ADRs are the source of truth.
+This document is a sequencing plan, not the normative source of architecture truth. Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, architecture synthesis documents may explain but not override them, and plans remain authoritative only for sequencing and hardening work. Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-009`, and `ADR-010`. Hybrid-tenancy guardrails are captured in `ADR-008`. `MULTI-WORKSPACE-MCP-ARCHITECTURE.md` is a maintained architecture synthesis that explains how those decisions fit together and maps them onto the current codebase. When this plan or that synthesis lags, the accepted ADRs and verified code are the source of truth.
+
+For terminology and guardrails, this plan references the architecture rather than redefining it. In particular, the meaning of `installed`, `running`, and `active` comes from `ADR-009`; this plan is the source of truth for sequencing and hardening the implementation around those concepts.
 
 ## Objective
 
@@ -95,7 +97,7 @@ Continue hardening a runtime and configuration model that allows multiple `softw
 ### Workstream 3 Deliverables
 
 - operator commands to list/start/stop/activate/deactivate workspaces,
-- clear distinction between installed, running, and active states,
+- clear distinction between installed, running, and active states as defined by `ADR-009`,
 - compatibility with throwaway validation.
 
 ### Workstream 3 Detailed Steps

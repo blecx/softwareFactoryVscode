@@ -322,6 +322,69 @@ def test_setup_repo_doc_matches_current_ci_checks():
     assert "PR Template Conformance" in setup_doc
 
 
+def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
+    repo_root = Path(__file__).parent.parent
+    handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
+    cheat_sheet = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "software-factory.code-workspace" in handout
+    assert "factory_stack.py preflight" in handout
+    assert "factory_stack.py start --build" in handout
+    assert "VS Code / Copilot CLI workflow" in handout
+    assert "workspace.code-workspace" not in handout
+    assert "automatically start the background task" not in handout
+
+    assert "factory_stack.py activate" in cheat_sheet
+    assert "factory_stack.py preflight" in cheat_sheet
+    assert "refreshes generated runtime artifacts" in cheat_sheet
+    assert "VS Code / Copilot CLI workflow" in cheat_sheet
+    assert "stale registry data" not in cheat_sheet
+
+
+def test_multi_workspace_architecture_docs_capture_current_authority():
+    repo_root = Path(__file__).parent.parent
+    adr_013 = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-013-Architecture-Authority-and-Plan-Separation.md"
+    ).read_text(encoding="utf-8")
+    adr_009 = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-009-Active-Workspace-Registry-and-Lifecycle-Management.md"
+    ).read_text(encoding="utf-8")
+    architecture_doc = (
+        repo_root / "docs" / "architecture" / "MULTI-WORKSPACE-MCP-ARCHITECTURE.md"
+    ).read_text(encoding="utf-8")
+    plan_doc = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+
+    assert "implementation plan is the source of truth for sequencing" in adr_013.lower()
+    assert "accepted adrs define architecture rules, terminology, and guardrails" in adr_013.lower()
+
+    assert "current VS Code workspace or Copilot CLI session" in adr_009
+    assert "MUST NOT be inferred merely from default localhost port ownership" in adr_009
+
+    assert "maintained architecture synthesis" in architecture_doc
+    assert "ADR-008" in architecture_doc
+    assert "Per `ADR-013`" in architecture_doc
+    assert "The authoritative architectural definition of `active` lives in `ADR-009`" in architecture_doc
+    assert "activate` refreshes generated runtime artifacts" in architecture_doc
+
+    assert "Hybrid-tenancy guardrails are captured in `ADR-008`" in plan_doc
+    assert "maintained architecture synthesis" in plan_doc
+    assert "Per `ADR-013`" in plan_doc
+    assert "the meaning of `installed`, `running`, and `active` comes from `ADR-009`" in plan_doc
+
+
 def test_bash_gateway_default_policy_matches_profile_schema():
     repo_root = Path(__file__).parent.parent
     policy_path = repo_root / "configs" / "bash_gateway_policy.default.yml"
