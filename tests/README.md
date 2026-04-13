@@ -4,6 +4,8 @@
 
 This script serves as a **functional regression test** for the Software Factory. It validates the core architectural constraints of this repository when used as an isolated subsystem in a parent host project.
 
+The script now stages its mock host under the repository-local, gitignored `.tmp/integration-test/` area and cleans it up on exit, keeping the regression inside the workspace guardrail by default.
+
 ### What it tests (regression coverage)
 
 1. **Host Isolation (No Pollution):** Ensures the factory does not leak artifacts (like `.tmp` directories or `agent_metrics.json`) into the host project's root folder.

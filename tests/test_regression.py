@@ -324,6 +324,18 @@ def test_setup_repo_doc_matches_current_ci_checks():
     assert "PR Template Conformance" in setup_doc
 
 
+def test_integration_regression_script_uses_repo_local_tmp_guardrail():
+    repo_root = Path(__file__).parent.parent
+    integration_script = (repo_root / "tests" / "run-integration-test.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'MOCK_ROOT="$REPO_ROOT/.tmp/integration-test"' in integration_script
+    assert 'mktemp -d "$MOCK_ROOT/mock-host-' in integration_script
+    assert "/tmp/mock-host-" not in integration_script
+    assert "--exclude=.tmp" in integration_script
+
+
 def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     repo_root = Path(__file__).parent.parent
     handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
