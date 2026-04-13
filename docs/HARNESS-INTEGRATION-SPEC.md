@@ -189,21 +189,16 @@ To keep the architecture clear over time:
 1. docs must distinguish **current implementation** from **target architecture** when they differ,
 2. ADRs define the direction; this document defines the artifact and lifecycle contract,
 3. install/update code should use the same ownership vocabulary as these docs,
-4. regression tests should eventually assert the managed namespace model,
+4. regression tests should assert the managed namespace model,
 5. and future maintainers should not have to infer ownership from installer side effects alone.
 
-## What this means for future work
+## What this means for implementation and follow-up
 
-This specification does not itself perform the migration away from the hidden-tree installer.
+This specification defines the current artifact and lifecycle contract for the namespace-first harness model.
 
-It does define the checklist that any future mitigation or migration plan should cover:
+The mitigation and backlog documents record the migration rationale, the staged implementation sequence, and the remaining follow-up work needed to close gaps such as the fuller managed-path record and the broader ownership-aware update model.
 
-- artifact inventory,
-- managed-path manifest,
-- install flow,
-- update flow,
-- bridge-file policy,
-- host customization preservation,
-- and consistency between docs, tests, and implementation.
+See:
 
-The staged mitigation sequence for that work is documented in `docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`.
+- `docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`
+- `docs/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`

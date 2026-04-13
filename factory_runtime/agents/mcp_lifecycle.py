@@ -1,12 +1,21 @@
 import asyncio
-import json
+import importlib.util
 import logging
 import signal
-import subprocess
-import time
 from pathlib import Path
+from types import ModuleType
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+FACTORY_DIRNAME = ".copilot/softwareFactoryVscode"
+SERVER_URL_MAPPINGS: dict[str, tuple[str, str]] = {
+    "mcp-memory": ("manifest_health_urls", "mcp-memory"),
+    "mcp-agent-bus": ("manifest_health_urls", "mcp-agent-bus"),
+    "mcp-github-ops": ("manifest_server_urls", "githubOps"),
+    "mcp-search": ("manifest_server_urls", "search"),
+    "mcp-filesystem": ("manifest_server_urls", "filesystem"),
+}
 
 
 class MCPBootloader:
@@ -20,29 +29,10 @@ class MCPBootloader:
         self.kill_mcps_on_exit = kill_mcps_on_exit
         self.force_rebuild_mcps = force_rebuild_mcps
         self._teardown_handled = False
-
-        # We will populate these further in subsequent tasks
-        self.compose_files = [
-            "docker-compose.factory.yml",
-            "docker-compose.repo-fundamentals-mcp.yml",
-            "docker-compose.mcp-bash-gateway.yml",
-            "docker-compose.mcp-github-ops.yml",
-            "docker-compose.mcp-devops.yml",
-            "docker-compose.mcp-offline-docs.yml",
-        ]
-
-        self.required_ports = [
-            3011,  # bash
-            3012,
-            3013,
-            3014,  # repo-fundamentals
-            3015,
-            3016,  # devops
-            3017,  # offline-docs
-            3018,  # github-ops
-            3030,  # memory
-            3031,  # agent-bus
-        ]
+        self.server_urls: dict[str, str] = {}
+        self._factory_repo_root: Path | None = None
+        self._env_file: Path | None = None
+        self._factory_stack: ModuleType | Any | None = None
 
     def setup_signal_handlers(self):
         """Phase 3.1: Graceful SIGINT Trapping."""
@@ -66,362 +56,141 @@ class MCPBootloader:
             task.cancel()
 
     async def initialize(self):
-        """Phase 1: Pre-Flight MCP Validation (Start / Boot Time)"""
-        logger.info("Initializing MCP Bootloader...")
-        reused = self._ensure_containers()
-        self._wait_for_health_checks()
+        """Initialize the canonical workspace runtime before FACTORY runs.
 
-        if reused:
-            # Phase 2.1: SQLite Integrity Check if reused
-            self._check_sqlite_integrity()
-
-        # Phase 2.2: Data Hydration
-        self._hydrate_state()
-
-        logger.info("Pre-flight checks passed. All MCPs are go.")
-
-    def _get_compose_args(self) -> list[str]:
-        args = []
-        for f in self.compose_files:
-            p = self.workspace_root / f
-            if p.exists():
-                args.extend(["-f", str(p)])
-        return args
-
-    def _ensure_containers(self) -> bool:
-        """Starts or restarts the containers depending on the force_rebuild_mcps flag.
-        Returns True if containers were reused, False if they were rebuilt.
+        This bootloader intentionally delegates lifecycle ownership to
+        `scripts/factory_stack.py` so FACTORY issue runs follow the same generated
+        `.factory.env` and runtime-manifest contract as the installed workspace.
         """
-        compose_args = self._get_compose_args()
-        if not compose_args:
-            return False
+        logger.info("Initializing MCP Bootloader via canonical factory_stack lifecycle...")
 
-        need_rebuild = self.force_rebuild_mcps
-
-        if not need_rebuild:
-            # Quick check if they are already running
-            try:
-                cmd = ["docker", "compose"] + compose_args + ["ps", "--format", "json"]
-                result = subprocess.run(
-                    cmd,
-                    check=True,
-                    timeout=120,
-                    cwd=self.workspace_root,
-                    capture_output=True,
-                    text=True,
-                )
-
-                # If there's no output or it's empty array
-                if not result.stdout.strip() or result.stdout.strip() == "[]":
-                    need_rebuild = True
-                else:
-                    try:
-                        containers = json.loads(result.stdout)
-                        # Ensure there's a good count of containers running (rough heuristic)
-                        running = [
-                            c
-                            for c in containers
-                            if "Up" in c.get("State", "")
-                            or c.get("State", "") == "running"
-                        ]
-                        if len(running) < 5:
-                            need_rebuild = True
-                    except json.JSONDecodeError:
-                        # Docker compose ps text might be malformed on older versions
-                        need_rebuild = True
-            except Exception as e:
-                logger.warning(f"Failed to check docker status, will rebuild: {e}")
-                need_rebuild = True
-
-        if need_rebuild:
-            logger.info("Rebuilding / Restarting MCP Docker Mesh...")
-            subprocess.run(
-                ["docker", "compose"] + compose_args + ["down"],
-                cwd=self.workspace_root,
-                check=False,
-            )
-            subprocess.run(
-                ["docker", "compose"] + compose_args + ["up", "-d"],
-                cwd=self.workspace_root,
-                check=True,
-            )
-            return False
-        else:
-            logger.info("Reusing existing MCP Docker Mesh...")
-            # Still ensure they are started
-            subprocess.run(
-                ["docker", "compose"] + compose_args + ["up", "-d"],
-                cwd=self.workspace_root,
-                check=True,
-                timeout=120,
-            )
-            return True
-
-    def _wait_for_health_checks(self, timeout: int = 15):
-        """Wait for required ports to be accepting connections."""
-        import urllib.request
-        from urllib.error import HTTPError, URLError
-
-        logger.info("Running health-check handshakes to MCP ports...")
-        start_time = time.time()
-
-        pending_ports = set(self.required_ports)
-
-        while pending_ports and (time.time() - start_time) < timeout:
-            connected = []
-            for port in pending_ports:
-                try:
-                    # In docker-proxy, TCP connect might succeed even if backend is starting,
-                    # so we attempt a basic HTTP ping if applicable, or fallback to pure TCP.
-                    req = urllib.request.Request(f"http://127.0.0.1:{port}/")
-                    try:
-                        urllib.request.urlopen(req, timeout=1.0)
-                        connected.append(port)  # Got HTTP 200
-                    except HTTPError:
-                        # Any HTTP error (e.g. 404) means the server is UP!
-                        connected.append(port)
-                    except URLError:
-                        # Connection refused or timeout
-                        pass
-                except Exception:
-                    pass
-            for p in connected:
-                pending_ports.remove(p)
-
-            if pending_ports:
-                time.sleep(1.0)
-
-        if pending_ports:
-            raise RuntimeError(
-                f"Failed health-check for MCP ports: {pending_ports} after {timeout} seconds."
-            )
-
-    def _check_sqlite_integrity(self):
-        """Phase 2.1 checks DB integrity via PRAGMA if inherited container."""
-        compose_args = self._get_compose_args()
-        if not compose_args:
-            return
-
-        logger.info("Verifying inherited SQLite integrity...")
-        dbs = [
-            ("mcp-memory", "/data/memory.db"),
-            ("mcp-agent-bus", "/data/agent_bus.db"),
-        ]
-
-        for service, path in dbs:
-            try:
-                cmd = (
-                    ["docker", "compose"]
-                    + compose_args
-                    + [
-                        "exec",
-                        service,
-                        "python",
-                        "-c",
-                        f"import sqlite3, sys; import os; sys.exit(0) if not os.path.exists('{path}') or sqlite3.connect('{path}').execute('PRAGMA integrity_check').fetchone()[0] == 'ok' else sys.exit(1)",  # noqa: E501
-                    ]
-                )
-                subprocess.run(
-                    cmd,
-                    check=True,
-                    cwd=self.workspace_root,
-                    capture_output=True,
-                    timeout=120,
-                )
-            except subprocess.CalledProcessError:
-                logger.error(
-                    f"Integrity check failed for {service} at {path}. Triggering forced rebuild."
-                )
-                self.force_rebuild_mcps = True
-                self._ensure_containers()
-                # Wait for health checks again after rebuilding
-                self._wait_for_health_checks()
-                break
-            except Exception as e:
-                logger.warning(f"Error checking integrity for {service}: {e}")
-
-    def _hydrate_state(self):
-        """Phase 2.2: Data Hydration from snapshot if DB is empty."""
-        snapshot_dir = (
-            self.workspace_root
-            / ".copilot/softwareFactoryVscode/.tmp"
-            / "factory_snapshots"
+        self._factory_repo_root = self._resolve_factory_repo_root()
+        self._factory_stack = self._load_factory_stack_module(self._factory_repo_root)
+        self._env_file = self._resolve_env_file(
+            self._factory_stack,
+            self._factory_repo_root,
         )
-        if not snapshot_dir.exists():
-            return
 
-        compose_args = self._get_compose_args()
-        if not compose_args:
-            return
+        report = self._factory_stack.build_preflight_report(
+            self._factory_repo_root,
+            env_file=self._env_file,
+        )
 
-        dbs = [
-            ("mcp-memory", "/data/memory.db", snapshot_dir / "memory.db"),
-            ("mcp-agent-bus", "/data/agent_bus.db", snapshot_dir / "agent_bus.db"),
-        ]
-
-        for service, dest_path, snap_path in dbs:
-            if not snap_path.exists() or snap_path.stat().st_size == 0:
-                continue
-
-            # Check if active DB is empty (0 tables)
+        if self.force_rebuild_mcps:
+            logger.info(
+                "Forcing canonical runtime rebuild for `%s`.",
+                self._factory_repo_root,
+            )
             try:
-                cmd_check_empty = (
-                    ["docker", "compose"]
-                    + compose_args
-                    + [
-                        "exec",
-                        service,
-                        "python",
-                        "-c",
-                        f"import sqlite3, sys, os; sys.exit(0) if not os.path.exists('{dest_path}') or os.path.getsize('{dest_path}') < 8192 or sqlite3.connect('{dest_path}').execute(\"SELECT COUNT(*) FROM sqlite_master WHERE type='table'\").fetchone()[0] == 0 else sys.exit(1)",  # noqa: E501
-                    ]
+                self._factory_stack.stop_stack(
+                    self._factory_repo_root,
+                    env_file=self._env_file,
                 )
-                res = subprocess.run(
-                    cmd_check_empty,
-                    cwd=self.workspace_root,
-                    capture_output=True,
+            except Exception as exc:  # noqa: BLE001
+                logger.info(
+                    "Runtime stop before rebuild was not clean; continuing with rebuild: %s",
+                    exc,
                 )
 
-                # If exit code is 0, it is empty and we should hydrate
-                if res.returncode == 0:
-                    logger.info(f"Hydrating {service} from {snap_path}...")
+        if self.force_rebuild_mcps or report["status"] != "ready":
+            logger.info(
+                "Canonical runtime preflight status is `%s`; reconciling with factory_stack.py start.",
+                report["status"],
+            )
+            self._factory_stack.start_stack(
+                self._factory_repo_root,
+                env_file=self._env_file,
+                build=True,
+                wait=True,
+            )
+            report = self._factory_stack.build_preflight_report(
+                self._factory_repo_root,
+                env_file=self._env_file,
+            )
 
-                    tmp_bak = f"/tmp/{snap_path.name}.bak"
-                    # copy snapshot inside container
-                    subprocess.run(
-                        ["docker", "compose"]
-                        + compose_args
-                        + ["cp", str(snap_path), f"{service}:{tmp_bak}"],
-                        cwd=self.workspace_root,
-                        check=True,
-                        timeout=120,
-                    )
-                    # restore
-                    restore_cmd = (
-                        ["docker", "compose"]
-                        + compose_args
-                        + [
-                            "exec",
-                            service,
-                            "python",
-                            "-c",
-                            f"import sqlite3; source=sqlite3.connect('{tmp_bak}'); dest=sqlite3.connect('{dest_path}'); source.backup(dest); source.close(); dest.close()",  # noqa: E501
-                        ]
-                    )
-                    subprocess.run(
-                        restore_cmd, cwd=self.workspace_root, check=True, timeout=120
-                    )
-            except Exception as e:
-                logger.warning(f"Hydration failed for {service}: {e}")
+        if report["status"] != "ready":
+            raise RuntimeError(self._format_preflight_failure(report))
+
+        self.server_urls = self._extract_server_urls(report)
+        logger.info("Pre-flight checks passed. All canonical MCP services are go.")
+
+    def _resolve_factory_repo_root(self) -> Path:
+        target_factory = (self.workspace_root / FACTORY_DIRNAME).resolve()
+        if (target_factory / "scripts" / "factory_stack.py").exists():
+            return target_factory
+
+        source_factory = self.workspace_root.resolve()
+        if (source_factory / "scripts" / "factory_stack.py").exists():
+            return source_factory
+
+        raise FileNotFoundError(
+            "Unable to locate the canonical Software Factory repo from "
+            f"workspace root `{self.workspace_root}`."
+        )
+
+    def _load_factory_stack_module(self, factory_repo_root: Path) -> ModuleType:
+        stack_path = factory_repo_root / "scripts" / "factory_stack.py"
+        spec = importlib.util.spec_from_file_location(
+            f"software_factory_stack_{abs(hash(factory_repo_root))}",
+            stack_path,
+        )
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Unable to load factory_stack module from {stack_path}")
+
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _resolve_env_file(self, factory_stack: Any, factory_repo_root: Path) -> Path:
+        target_env = (self.workspace_root / FACTORY_DIRNAME / ".factory.env").resolve()
+        if target_env.exists():
+            return target_env
+        return factory_stack.resolve_env_file(factory_repo_root)
+
+    def _extract_server_urls(self, report: dict[str, Any]) -> dict[str, str]:
+        server_urls: dict[str, str] = {}
+        for server_name, (section_name, runtime_name) in SERVER_URL_MAPPINGS.items():
+            section = report.get(section_name, {})
+            url = str(section.get(runtime_name, "")).strip() if isinstance(section, dict) else ""
+            if not url:
+                raise RuntimeError(
+                    "Runtime preflight did not publish a URL for required MCP service "
+                    f"`{server_name}`."
+                )
+            server_urls[server_name] = url
+        return server_urls
+
+    def _format_preflight_failure(self, report: dict[str, Any]) -> str:
+        issues = report.get("issues")
+        if not isinstance(issues, list) or not issues:
+            issues = ["Unknown runtime preflight failure."]
+        return (
+            "FACTORY runtime failed preflight after canonical lifecycle reconciliation: "
+            + " ".join(str(issue) for issue in issues)
+        )
 
     def teardown(self):
-        """Phase 3.3: Orphan Sweeping (Teardown hooks)"""
+        """Tear down the canonical runtime when explicitly requested."""
         if getattr(self, "_teardown_handled", False):
             return
         self._teardown_handled = True
 
-        # Snapshotting will go here (Ticket 3)
-        self._take_snapshots()
-
         if self.kill_mcps_on_exit:
-            logger.info("Sweeping orphan MCP containers (--kill-mcps-on-exit is set).")
+            logger.info(
+                "Stopping canonical MCP runtime (--kill-mcps-on-exit is set)."
+            )
             self._stop_containers()
         else:
             logger.info("Skipping orphan sweep. Containers will remain running.")
 
-    def _take_snapshots(self):
-        """Phase 3.2: Snapshot Dump"""
-        snapshot_dir = (
-            self.workspace_root
-            / ".copilot/softwareFactoryVscode/.tmp"
-            / "factory_snapshots"
-        )
-        snapshot_dir.mkdir(parents=True, exist_ok=True)
-
-        compose_args = self._get_compose_args()
-        if not compose_args:
-            return
-
-        logger.info("Taking snapshots of MCP memory and agent-bus...")
-
-        # We know mcp-memory has /data/memory.db
-        try:
-            subprocess.run(
-                ["docker", "compose"]
-                + compose_args
-                + [
-                    "exec",
-                    "mcp-memory",
-                    "python",
-                    "-c",
-                    "import sqlite3; con=sqlite3.connect('/data/memory.db'); bck=sqlite3.connect('/tmp/memory.db.bak'); con.backup(bck); bck.close(); con.close()",  # noqa: E501
-                ],
-                cwd=self.workspace_root,
-                check=True,
-                capture_output=True,
-                timeout=120,
-            )
-            subprocess.run(
-                ["docker", "compose"]
-                + compose_args
-                + [
-                    "cp",
-                    "mcp-memory:/tmp/memory.db.bak",
-                    str(snapshot_dir / "memory.db"),
-                ],
-                cwd=self.workspace_root,
-                check=True,
-                capture_output=True,
-                timeout=120,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to snapshot mcp-memory: {e}")
-
-        # We know mcp-agent-bus has /data/agent_bus.db
-        try:
-            subprocess.run(
-                ["docker", "compose"]
-                + compose_args
-                + [
-                    "exec",
-                    "mcp-agent-bus",
-                    "python",
-                    "-c",
-                    "import sqlite3; con=sqlite3.connect('/data/agent_bus.db'); bck=sqlite3.connect('/tmp/agent_bus.db.bak'); con.backup(bck); bck.close(); con.close()",  # noqa: E501
-                ],
-                cwd=self.workspace_root,
-                check=True,
-                capture_output=True,
-                timeout=120,
-            )
-            subprocess.run(
-                ["docker", "compose"]
-                + compose_args
-                + [
-                    "cp",
-                    "mcp-agent-bus:/tmp/agent_bus.db.bak",
-                    str(snapshot_dir / "agent_bus.db"),
-                ],
-                cwd=self.workspace_root,
-                check=True,
-                capture_output=True,
-                timeout=120,
-            )
-        except Exception as e:
-            logger.warning(f"Failed to snapshot mcp-agent-bus: {e}")
-
     def _stop_containers(self):
-        """Teardown the Docker compose services (stop and remove)."""
-        compose_args = self._get_compose_args()
-        if compose_args:
-            try:
-                cmd = ["docker", "compose"] + compose_args + ["down"]
-                subprocess.run(
-                    cmd,
-                    check=True,
-                    cwd=self.workspace_root,
-                    capture_output=True,
-                    timeout=120,
-                )
-            except Exception as e:
-                logger.error(f"Failed to tear down containers: {e}")
+        """Teardown the canonical Docker compose services (stop and remove)."""
+        if not self._factory_stack or not self._factory_repo_root or not self._env_file:
+            return
+        try:
+            self._factory_stack.stop_stack(
+                self._factory_repo_root,
+                env_file=self._env_file,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"Failed to tear down containers: {exc}")

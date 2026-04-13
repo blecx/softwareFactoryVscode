@@ -110,3 +110,89 @@ def test_memory_store_multi_tenant_isolation():
         assert len(store.get_recent_lessons(limit=10, project_id="tenant-B")) == 1
     finally:
         store.close()
+
+
+def test_agent_bus_context_packet_preserves_non_default_project_scope():
+    """Context packets must return tenant-scoped plan, snapshot, validation, and checkpoint data."""
+    bus = AgentBus(db_path=":memory:")
+    try:
+        run_id = bus.create_run(
+            issue_number=303,
+            repo="org/tenant3",
+            project_id="tenant-3",
+        )
+        bus.write_plan(
+            run_id,
+            goal="tenant 3 goal",
+            files=["src/example.py"],
+            acceptance_criteria=["criterion"],
+            validation_cmds=["pytest tests/test_example.py"],
+            project_id="tenant-3",
+        )
+        bus.write_snapshot(
+            run_id,
+            filepath="src/example.py",
+            content_before="before",
+            content_after="after",
+            project_id="tenant-3",
+        )
+        bus.write_validation(
+            run_id,
+            command="pytest tests/test_example.py",
+            stdout="ok",
+            stderr="",
+            exit_code=0,
+            passed=True,
+            project_id="tenant-3",
+        )
+        bus.write_checkpoint(
+            run_id,
+            label="plan_generated",
+            metadata={"files_count": 1},
+            project_id="tenant-3",
+        )
+
+        packet = bus.read_context_packet(run_id, project_id="tenant-3")
+
+        assert packet["run"]["run_id"] == run_id
+        assert packet["plan"]["goal"] == "tenant 3 goal"
+        assert packet["file_snapshots"][0]["filepath"] == "src/example.py"
+        assert (
+            packet["validation_results"][0]["command"] == "pytest tests/test_example.py"
+        )
+        assert packet["checkpoints"][0]["label"] == "plan_generated"
+
+        with pytest.raises(ValueError):
+            bus.read_context_packet(run_id, project_id="tenant-4")
+    finally:
+        bus.close()
+
+
+def test_agent_bus_rejects_cross_tenant_snapshot_and_checkpoint_writes():
+    """Tenant-scoped writes must not succeed against another workspace's run."""
+    bus = AgentBus(db_path=":memory:")
+    try:
+        run_id = bus.create_run(
+            issue_number=404,
+            repo="org/tenant4",
+            project_id="tenant-4",
+        )
+
+        with pytest.raises(ValueError):
+            bus.write_snapshot(
+                run_id,
+                filepath="src/example.py",
+                content_before="before",
+                content_after="after",
+                project_id="tenant-5",
+            )
+
+        with pytest.raises(ValueError):
+            bus.write_checkpoint(
+                run_id,
+                label="coding_complete",
+                metadata={"files_changed": ["src/example.py"]},
+                project_id="tenant-5",
+            )
+    finally:
+        bus.close()

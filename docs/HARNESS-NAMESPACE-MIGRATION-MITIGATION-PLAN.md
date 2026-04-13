@@ -32,7 +32,7 @@ This mitigation is complete when all of the following are true:
 3. host-owned files are preserved by default,
 4. transient runtime state is minimized and no longer overdefines installation success,
 5. docs, tests, and installer behavior use the same vocabulary for ownership and managed paths,
-6. existing installs have a compatibility-aware migration path,
+6. existing legacy installs have a safe, documented cleanup and forward-migration path,
 7. and reviewers can verify the migration with explicit review prompts and exit criteria.
 
 ---
@@ -161,15 +161,15 @@ Redefine installation success around managed namespaces and ownership clarity ra
    - optional,
    - migrated,
    - or replaced by namespaced equivalents.
-4. Define compatibility behavior for repositories still using the hidden-tree layout.
-5. Update docs so install instructions distinguish compatibility mode from target mode.
+4. Define cleanup and forward-migration behavior for repositories still using the hidden-tree layout.
+5. Update docs so install instructions distinguish the namespace-first contract from legacy migration handling.
 
 ### Step 3 Definition of Done
 
 - the future install contract no longer depends on hidden-tree layout as the preferred steady-state model,
 - harness installation and local runtime bootstrap are defined as separate concerns,
 - all root-level install artifacts have a future disposition (keep, replace, migrate, or remove),
-- compatibility behavior for existing installs is documented.
+- legacy cleanup and forward-migration behavior for existing installs is documented.
 
 ### Step 3 verification
 
@@ -183,9 +183,9 @@ Redefine installation success around managed namespaces and ownership clarity ra
 
 "Review the proposed namespace-first install contract. Verify that installation success is defined by managed harness projection and ownership clarity, not by hidden-tree-specific runtime artifacts. List any remaining places where the old hidden-tree model is still treated as the preferred install contract."
 
-#### Review prompt — compatibility risk
+#### Review prompt — migration risk
 
-"Review the install contract for compatibility with existing hidden-tree installs. Identify any migration risk, missing fallback behavior, or place where the transition plan would strand current users."
+"Review the install contract for safe migration of existing hidden-tree installs. Identify any migration risk, missing fallback behavior, or place where the transition plan would strand current users."
 
 ---
 
@@ -320,7 +320,7 @@ Make the migration durable by ensuring review, tests, and documentation all enfo
 
 - compare the future verification contract against `docs/HARNESS-INTEGRATION-SPEC.md`,
 - confirm that every major migration risk has a matching review or regression expectation,
-- confirm that the docs accurately describe transitional vs target behavior.
+- confirm that the docs accurately describe the current namespace-first contract, legacy migration handling, and any necessary historical context.
 
 ### Step 6 review prompts
 
@@ -330,7 +330,7 @@ Make the migration durable by ensuring review, tests, and documentation all enfo
 
 #### Review prompt — doc consistency
 
-"Review the documentation set for `softwareFactoryVscode` after the namespace migration plan. Confirm that current implementation, target architecture, and transitional compatibility are described consistently. Report any contradiction, outdated hidden-tree assumption, or missing migration guidance."
+"Review the documentation set for `softwareFactoryVscode` after the namespace migration plan. Confirm that the current namespace-first contract, target architecture, and legacy migration handling are described consistently. Report any contradiction, outdated hidden-tree assumption, or missing migration guidance."
 
 ---
 
@@ -360,7 +360,7 @@ Before declaring the mitigation plan complete and ready for implementation, perf
 
 #### Final review prompt — operator readiness
 
-"Review the migration plan from the perspective of a repository operator who already has hidden-tree installs in the wild. Confirm whether the plan explains compatibility, safety, and update behavior clearly enough to proceed without surprising existing users. Report any operator-facing ambiguity or migration risk that still needs documentation before implementation starts."
+"Review the migration plan from the perspective of a repository operator who already has hidden-tree installs in the wild. Confirm whether the plan explains migration handling, safety, and update behavior clearly enough to proceed without surprising existing users. Report any operator-facing ambiguity or migration risk that still needs documentation before implementation starts."
 
 ---
 

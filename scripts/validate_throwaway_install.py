@@ -5,6 +5,10 @@ This script wipes a throwaway target repository, reinstalls the Software Factory
 hidden tree from a chosen source ref, runs static compliance verification, and
 optionally performs the runtime verification by temporarily handing the shared
 localhost MCP ports to the throwaway target.
+
+Guardrail: unless explicitly overridden, the effective throwaway target must
+stay inside the source repository's gitignored ``.tmp/`` tree so validation
+does not taint unrelated repositories or non-repository paths.
 """
 
 from __future__ import annotations
@@ -27,6 +31,7 @@ from factory_stack import start_stack as start_factory_stack
 from factory_stack import stop_stack as stop_factory_stack
 
 DEFAULT_WORKSPACE_FILE = "software-factory.code-workspace"
+DEFAULT_THROWAWAY_TARGET_ROOT = Path(".tmp") / "throwaway-targets"
 SNAPSHOT_IGNORE_NAMES = {
     ".git",
     ".venv",
@@ -45,7 +50,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--target",
         required=True,
-        help="Throwaway target repository path that will be deleted and recreated.",
+        help=(
+            "Requested throwaway target repository path. Unless "
+            "--allow-external-target is set, validation stays inside the "
+            "source repository's gitignored .tmp/ tree."
+        ),
     )
     parser.add_argument(
         "--source-repo",
@@ -78,6 +87,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help=(
             "Do not stop/restart the source repository stack while validating the "
             "throwaway runtime. Useful for isolated CI/E2E runs."
+        ),
+    )
+    parser.add_argument(
+        "--allow-external-target",
+        action="store_true",
+        help=(
+            "Explicitly allow using a throwaway target outside the source "
+            "repository's .tmp/ guardrail. Use only when external target "
+            "isolation is intentional."
         ),
     )
     return parser.parse_args(argv)
@@ -200,14 +218,64 @@ def wipe_and_reinit_target(target_repo: Path) -> None:
     run_command(["git", "init", "-b", "main"], cwd=target_repo)
 
 
+def repo_local_throwaway_root(source_repo: Path) -> Path:
+    return (source_repo / DEFAULT_THROWAWAY_TARGET_ROOT).resolve()
+
+
+def repo_local_throwaway_target(source_repo: Path, requested_target: Path) -> Path:
+    target_name = requested_target.name or "throwaway-target"
+    return (repo_local_throwaway_root(source_repo) / target_name).resolve()
+
+
+def is_within_directory(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
+
+
 def resolve_effective_target_repo(
     source_repo: Path,
     requested_target: Path,
     *,
     runtime_enabled: bool,
+    allow_external_target: bool = False,
 ) -> tuple[Path, str | None]:
+    source_repo = source_repo.expanduser().resolve()
     resolved_target = requested_target.expanduser().resolve()
+    repo_tmp_root = (source_repo / ".tmp").resolve()
+    if is_within_directory(resolved_target, repo_tmp_root):
+        return resolved_target, None
+
+    fallback_target = repo_local_throwaway_target(source_repo, resolved_target)
+
     if not runtime_enabled:
+        if allow_external_target:
+            return resolved_target, None
+        note = (
+            "Requested target is outside the source repository's gitignored .tmp/ "
+            "guardrail. Using repository-local throwaway target instead: "
+            f"{fallback_target}"
+        )
+        return fallback_target, note
+
+    if allow_external_target:
+        temp_roots = {
+            Path(tempfile.gettempdir()).expanduser().resolve(),
+            Path("/tmp").resolve(),
+            Path("/var/tmp").resolve(),
+        }
+        if any(
+            resolved_target == temp_root or temp_root in resolved_target.parents
+            for temp_root in temp_roots
+        ):
+            note = (
+                "Requested target is under the system temporary directory, which may "
+                "not be bind-mountable by Docker on this host. "
+                f"Using repository-local throwaway target instead: {fallback_target}"
+            )
+            return fallback_target, note
         return resolved_target, None
 
     temp_roots = {
@@ -219,9 +287,6 @@ def resolve_effective_target_repo(
         resolved_target == temp_root or temp_root in resolved_target.parents
         for temp_root in temp_roots
     ):
-        fallback_target = (
-            source_repo / ".tmp" / "throwaway-targets" / resolved_target.name
-        ).resolve()
         note = (
             "Requested target is under the system temporary directory, which may "
             "not be bind-mountable by Docker on this host. "
@@ -229,7 +294,12 @@ def resolve_effective_target_repo(
         )
         return fallback_target, note
 
-    return resolved_target, None
+    note = (
+        "Requested target is outside the source repository's gitignored .tmp/ "
+        "guardrail. Using repository-local throwaway target instead: "
+        f"{fallback_target}"
+    )
+    return fallback_target, note
 
 
 def run_install(
@@ -308,6 +378,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         source_repo,
         Path(args.target),
         runtime_enabled=not args.skip_runtime,
+        allow_external_target=args.allow_external_target,
     )
     target_env = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
 

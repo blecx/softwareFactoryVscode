@@ -1,42 +1,97 @@
 # 🏭 Software Factory for VS Code - User Handout
 
-Welcome to the **Software Factory for VS Code**. This platform transforms your local environment into an autonomous, multi-tenant AI development factory. It securely orchestrates agents, memory, and development tools alongside your local code inside a VS Code workspace.
+Welcome to the **Software Factory for VS Code**. The current supported model is a namespace-first installed workspace plus an explicit runtime lifecycle.
 
-> **Architecture note:** The current runtime implementation still uses a hidden-tree installation model in places, but the intended long-term product direction is documented in [`docs/COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md), [`docs/HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md), and [`ADR-012`](architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md).
+> **Architecture note:** The supported install contract is namespace-first: the harness lives under `.copilot/softwareFactoryVscode/`, the operator entrypoint is `software-factory.code-workspace`, and legacy `.softwareFactoryVscode` artifacts are migration leftovers rather than supported runtime surfaces.
 
-## 🚀 Concept Overview
+## 🚀 What you are opening
 
-The Factory operates using a **Hybrid Multi-Tenant MCP Architecture**.
-When you open a factory-enabled repository, local context is served to LLMs using the Model Context Protocol (MCP). The architecture relies on:
+The generated `software-factory.code-workspace` file is the supported VS Code entrypoint for an installed workspace.
 
-1. **Agent Bus (`mcp-agent-bus`)**: Tracks agent runs, plans, task queues, and validation results across different workspaces safely using tenant isolation (`X-Workspace-ID`).
-2. **Memory Store (`mcp-memory`)**: A long-term knowledge graph for your AI agent workspaces.
-3. **Local Docker Stack**: Provides isolated containers for git operations, DevOps tools, and filesystem sandboxes.
+That workspace exposes:
 
-## 🛠 Getting Started (The Golden Path)
+1. **Host Project (Root)** — your actual repository.
+2. **AI Agent Factory** — the installed harness under `.copilot/softwareFactoryVscode/`.
 
-### 1. Booting the Factory
+The runtime contract behind that workspace is generated from:
 
-The system is designed to be completely invisible and native to your VS Code workflow:
+- `.copilot/softwareFactoryVscode/.factory.env`
+- `.copilot/softwareFactoryVscode/lock.json`
+- `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`
 
-- Open your VS Code workspace (e.g., using the `workspace.code-workspace` file).
-- Open your VS Code workspace (e.g., using the generated `software-factory.code-workspace` file).
-- That's it!
-- _Magic_: Upon opening the folder, VS Code will automatically start the background task: `Docker: Build & Start`. It runs in the foreground of a hidden background-terminal.
+## 🛠 Golden path
 
-### 2. Instructing the Agents
+### 1. Open the generated workspace
 
-You interact with the factory via your standard VS Code Copilot Chat.
-Because the Factory exposes tools via MCP, you can instruct agents to:
+Open `software-factory.code-workspace` from the target repository root.
 
-- Read issues and create feature plans.
-- Spawn code execution runs (`queue-backend`).
-- Write structural modifications and query the knowledge graph.
+### 2. Check runtime state before assuming anything
 
-### 3. Graceful Shutdown
+Run the preflight check first:
 
-When you close your VS Code window, VS Code automatically terminates the background terminal. This sends a graceful `SIGTERM` to the python orchestrator orchestrator, cleanly stopping the Docker Compose containers so you don't leave orphaned detached resources running on your host machine.
+- VS Code task: `🧭 Runtime: Preflight`
+- CLI: `python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py preflight`
 
-## 🏢 Working in a Multi-Tenant Environment
+Preflight tells you whether the workspace is:
 
-You can run multiple instances of the software factory simultaneously for different target projects on the exact same host machine. The factory dynamically maps unique port blocks for each workspace and writes them to a `.factory.env` file. Data in the SQLite databases is strictly partitioned by `project_id`.
+- **ready** — runtime is up and endpoint metadata is aligned
+- **needs-ramp-up** — install is fine but containers are not running yet
+- **config-drift** — generated workspace/runtime metadata no longer matches the effective contract
+- **degraded** — runtime exists but services are missing, unhealthy, or on the wrong ports
+
+### 3. Start the runtime explicitly when needed
+
+Runtime startup is explicit. It is **not** triggered automatically just by opening the workspace.
+
+Use one of:
+
+- VS Code task: `🐳 Docker: Build & Start`
+- CLI: `python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py start --build`
+
+### 4. Use activate when switching operator focus
+
+`factory_stack.py activate` does two things:
+
+- refreshes generated runtime artifacts from the canonical installed-workspace contract
+- marks that workspace active for the current operator-facing context (for example the VS Code workspace or Copilot CLI session) by recording that selection in the host registry
+
+Activation does **not** start containers by itself.
+
+### 5. Verify the runtime when you need stronger proof
+
+After startup, you can run:
+
+- `python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target . --runtime`
+- `python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target . --runtime --check-vscode-mcp`
+
+## 🧠 Service model in plain English
+
+The runtime currently uses a hybrid model:
+
+- **workspace-scoped services** stay isolated per workspace because they depend on one repository root or direct project state
+- **candidate shared services** such as memory, agent bus, and approval gate carry tenant-aware groundwork, but they are **not yet** treated as a fully promoted shared multi-tenant control plane
+
+That distinction matters: multiple installed workspaces can coexist safely today without pretending every service is already globally shared.
+
+## 🏢 Working with multiple workspaces
+
+You can run multiple installed workspaces on the same host.
+
+Important concepts:
+
+- **installed** — the workspace has a valid namespace-first factory install
+- **running** — Docker resources are currently allocated for that workspace
+- **active** — the workspace is the one your current VS Code / Copilot CLI workflow is meant to act on, and that selection is recorded in the host registry
+
+Active is an explicit operator choice. It is not a synonym for “owns the default localhost ports.”
+
+Each workspace gets its own effective port block, written into `.copilot/softwareFactoryVscode/.factory.env` and projected into the generated workspace file and runtime manifest.
+
+## 🛑 Shutdown and cleanup
+
+For normal shutdown, use:
+
+- VS Code task: `🛑 Docker: Stop`
+- CLI: `python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py stop`
+
+Use `cleanup` only when you intentionally want to remove runtime state for the current workspace. Cleanup is deeper than stop: it removes runtime artifacts, registry ownership, and workspace-scoped runtime data, while leaving the installed `.copilot/softwareFactoryVscode/` baseline in place.

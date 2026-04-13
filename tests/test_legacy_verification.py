@@ -5,7 +5,7 @@ import pytest
 from tests.test_factory_install import run_python_script
 
 
-def test_verifier_flags_legacy_root_folder_as_transitional_mode(tmp_path: Path):
+def test_verifier_fails_when_legacy_root_folder_exists(tmp_path: Path):
     target_repo = tmp_path / "throwaway-target"
     target_repo.mkdir(parents=True, exist_ok=True)
     legacy_dir = target_repo / ".softwareFactoryVscode"
@@ -20,8 +20,9 @@ def test_verifier_flags_legacy_root_folder_as_transitional_mode(tmp_path: Path):
         "--no-smoke-prompt",
     )
 
-    assert "transitional/legacy mode" in result.stdout
-    assert "Please migrate to the namespace-first architecture" in result.stdout
+    assert result.returncode == 1
+    assert "Legacy installation artifact is still present" in result.stdout
+    assert str(legacy_dir) in result.stdout
 
 
 def test_verifier_fails_when_legacy_root_env_artifact_exists(tmp_path: Path):

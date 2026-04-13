@@ -146,6 +146,40 @@ def test_tasks_no_longer_invoke_legacy_issue_loop_scripts():
         assert "WORK-ISSUE-WORKFLOW.md" in serialized
 
 
+def test_source_checkout_does_not_commit_static_mcp_server_urls():
+    repo_root = Path(__file__).parent.parent
+    settings = json.loads(
+        (repo_root / ".vscode" / "settings.json").read_text(encoding="utf-8")
+    )
+
+    assert "mcp" not in settings
+
+
+def test_canonical_agent_settings_template_matches_runtime_port_contract():
+    repo_root = Path(__file__).parent.parent
+    settings = json.loads(
+        (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    servers = settings["workspace"]["mcp"]["servers"]
+
+    assert servers["dockerCompose"]["url"] == "http://127.0.0.1:3016/mcp"
+    assert servers["testRunner"]["url"] == "http://127.0.0.1:3015/mcp"
+
+
+def test_docker_build_start_task_no_longer_auto_runs_on_folder_open():
+    repo_root = Path(__file__).parent.parent
+    tasks = json.loads(
+        (repo_root / ".vscode" / "tasks.json").read_text(encoding="utf-8")
+    )
+    task_map = {task["label"]: task for task in tasks["tasks"]}
+
+    docker_start = task_map["🐳 Docker: Build & Start"]
+
+    assert docker_start.get("runOptions", {}).get("runOn") != "folderOpen"
+
+
 def test_issue_templates_use_live_repo_labels():
     repo_root = Path(__file__).parent.parent
     feature_template = (
@@ -290,6 +324,148 @@ def test_setup_repo_doc_matches_current_ci_checks():
     assert "PR Template Conformance" in setup_doc
 
 
+def test_integration_regression_script_uses_repo_local_tmp_guardrail():
+    repo_root = Path(__file__).parent.parent
+    integration_script = (repo_root / "tests" / "run-integration-test.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'MOCK_ROOT="$REPO_ROOT/.tmp/integration-test"' in integration_script
+    assert 'mktemp -d "$MOCK_ROOT/mock-host-' in integration_script
+    assert "/tmp/mock-host-" not in integration_script
+    assert "--exclude=.tmp" in integration_script
+
+
+def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
+    repo_root = Path(__file__).parent.parent
+    handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
+    cheat_sheet = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(encoding="utf-8")
+
+    assert "software-factory.code-workspace" in handout
+    assert "factory_stack.py preflight" in handout
+    assert "factory_stack.py start --build" in handout
+    assert "VS Code / Copilot CLI workflow" in handout
+    assert "workspace.code-workspace" not in handout
+    assert "automatically start the background task" not in handout
+
+    assert "factory_stack.py activate" in cheat_sheet
+    assert "factory_stack.py preflight" in cheat_sheet
+    assert "refreshes generated runtime artifacts" in cheat_sheet
+    assert "VS Code / Copilot CLI workflow" in cheat_sheet
+    assert "stale registry data" not in cheat_sheet
+
+
+def test_multi_workspace_architecture_docs_capture_current_authority():
+    repo_root = Path(__file__).parent.parent
+    adr_013 = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-013-Architecture-Authority-and-Plan-Separation.md"
+    ).read_text(encoding="utf-8")
+    adr_009 = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-009-Active-Workspace-Registry-and-Lifecycle-Management.md"
+    ).read_text(encoding="utf-8")
+    architecture_doc = (
+        repo_root / "docs" / "architecture" / "MULTI-WORKSPACE-MCP-ARCHITECTURE.md"
+    ).read_text(encoding="utf-8")
+    plan_doc = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "implementation plan is the source of truth for sequencing" in adr_013.lower()
+    )
+    assert (
+        "accepted adrs define architecture rules, terminology, and guardrails"
+        in adr_013.lower()
+    )
+
+    assert "current VS Code workspace or Copilot CLI session" in adr_009
+    assert (
+        "MUST NOT be inferred merely from default localhost port ownership" in adr_009
+    )
+
+    assert "maintained architecture synthesis" in architecture_doc
+    assert "ADR-008" in architecture_doc
+    assert "Per `ADR-013`" in architecture_doc
+    assert (
+        "The authoritative architectural definition of `active` lives in `ADR-009`"
+        in architecture_doc
+    )
+    assert "activate` refreshes generated runtime artifacts" in architecture_doc
+
+    assert (
+        "Hybrid-tenancy promotion rules are currently proposed in `ADR-008`" in plan_doc
+    )
+    assert "maintained architecture synthesis" in plan_doc
+    assert "Per `ADR-013`" in plan_doc
+    assert (
+        "the meaning of `installed`, `running`, and `active` comes from `ADR-009`"
+        in plan_doc
+    )
+
+
+def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
+    repo_root = Path(__file__).parent.parent
+    superseded_adr = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-007-Multi-Workspace-and-Shared-Services.md"
+    ).read_text(encoding="utf-8")
+    plan_doc = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## Status" in superseded_adr
+    assert "Superseded" in superseded_adr
+    assert "MUST NOT be used as a normative architecture source" in superseded_adr
+
+    assert "## Immediate Stabilization Rework Order" in plan_doc
+    assert "## Execution Guardrails for This Rework" in plan_doc
+    assert "## Mitigation Map and Current Resolution Status" in plan_doc
+    assert "## Proposed ADR to Production Promotion Path" in plan_doc
+    assert "## Practical delivery split while shared-service promotion remains blocked" in plan_doc
+    assert "| Scope | Status | Priority now | Why it matters |" in plan_doc
+    assert "Blocked for now" in plan_doc
+    assert "## Practical execution plan for a working system" in plan_doc
+    assert "### Priority 0: New repo onboarding, install, and update safety" in plan_doc
+    assert (
+        "### Priority 1: Lifecycle truth, activation behavior, and per-workspace verification"
+        in plan_doc
+    )
+    assert "### Priority 2: Docs, regression coverage, and day-two operator confidence" in plan_doc
+    assert "### Deferred phase: Shared multi-tenant promotion remains blocked" in plan_doc
+    assert "## Program-level definition of done" in plan_doc
+    assert "## Mandatory quality gates for this rework" in plan_doc
+    assert "## Transition, update, and upgrade safety rules" in plan_doc
+    assert "MUST follow the suggested order of attack" in plan_doc
+    assert "MUST NOT introduce new architecture decisions" in plan_doc
+    assert "MUST preserve the current runtime feature surface" in plan_doc
+    assert "MUST NOT remove existing runtime features as a shortcut" in plan_doc
+    assert "Resolved by this rework" in plan_doc
+    assert "Do the practical per-workspace priorities first." in plan_doc
+    assert (
+        "Shared multi-tenant promotion of `mcp-memory`, `mcp-agent-bus`, and `approval-gate`"
+        in plan_doc
+    )
+    assert "Not promoted in this rework" in plan_doc
+    assert (
+        "Only after that acceptance step may the behavior be treated as production rollout criteria"
+        in plan_doc
+    )
+
+
 def test_bash_gateway_default_policy_matches_profile_schema():
     repo_root = Path(__file__).parent.parent
     policy_path = repo_root / "configs" / "bash_gateway_policy.default.yml"
@@ -412,6 +588,42 @@ def test_mcp_multi_client_performs_streamable_http_handshake():
     assert state == {"initialized": True, "notified": True}
 
 
+def test_mcp_multi_client_exports_openai_tool_definitions():
+    from factory_runtime.agents.mcp_client import MCPMultiClient, ToolInfo
+
+    client = MCPMultiClient([])
+    client._tools = {
+        "ping_tool": ToolInfo(
+            name="ping_tool",
+            description="Ping",
+            server_name="mock",
+            server_url="http://test-server",
+            input_schema={
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+                "required": ["value"],
+            },
+        )
+    }
+
+    definitions = client.get_all_tool_definitions()
+
+    assert definitions == [
+        {
+            "type": "function",
+            "function": {
+                "name": "ping_tool",
+                "description": "Ping",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"value": {"type": "string"}},
+                    "required": ["value"],
+                },
+            },
+        }
+    ]
+
+
 def test_approval_gate_entrypoint_uses_factory_runtime_module_path():
     repo_root = Path(__file__).parent.parent
     approval_gate = (
@@ -427,6 +639,7 @@ def _load_next_pr_module():
     repo_root = Path(__file__).parent.parent
     next_pr_path = repo_root / "scripts" / "next-pr.py"
     spec = importlib.util.spec_from_file_location("next_pr_module", next_pr_path)
+    assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -438,6 +651,7 @@ def _load_next_issue_module():
     repo_root = Path(__file__).parent.parent
     next_issue_path = repo_root / "scripts" / "next-issue.py"
     spec = importlib.util.spec_from_file_location("next_issue_module", next_issue_path)
+    assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module

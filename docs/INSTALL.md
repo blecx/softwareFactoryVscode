@@ -72,6 +72,7 @@ curl -sSL https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/scr
 The updater operates robustly:
 
 - gracefully spins down active Docker compose containers to release handles (`factory_stack.py stop`)
+- removes legacy root-level migration leftovers (`.softwareFactoryVscode/`, `.tmp/softwareFactoryVscode/`, `.factory.env`, `.factory.lock.json`) instead of carrying them forward
 - forces upstream synchronization of `.copilot/softwareFactoryVscode/` (commits and stashes dirty files to a `local-backup-<timestamp>` branch if required)
 - merges new schema entries into `.copilot/softwareFactoryVscode/.factory.env` while keeping your local overrides (like custom ports and secrets)
 - preserves a custom `software-factory.code-workspace` unless `--force-workspace` is used
@@ -98,8 +99,8 @@ preserves the existing backup, bootstrap, and verification guarantees.
 
 ## Environment Setup
 
-After running the installer, a `.factory.env` file is generated in the root of your project.
-Open `.factory.env` and populate any required API keys to activate the backend LLM capability:
+After running the installer, a `.factory.env` file is generated at `.copilot/softwareFactoryVscode/.factory.env` inside your project.
+Open that file and populate any required API keys to activate the backend LLM capability:
 
 ```env
 # Example .factory.env generated variables
@@ -157,7 +158,7 @@ python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py stop
 The helper preserves the supported runtime contract:
 
 - compose files come from `.copilot/softwareFactoryVscode/compose/`
-- environment comes from the host-facing `.factory.env`
+- environment comes from `.copilot/softwareFactoryVscode/.factory.env`
 - startup remains deterministic via `up -d --build --wait --wait-timeout ...`
 
 The runtime helper now understands workspace-aware lifecycle commands as well:
@@ -175,7 +176,9 @@ These commands distinguish:
 
 - **installed** — the workspace has a valid harness namespace factory install
 - **running** — the workspace currently owns Docker runtime resources
-- **active** — the workspace is currently selected in the host registry for operator workflows
+- **active** — the workspace the current VS Code / Copilot CLI workflow is meant to act on, recorded explicitly in the host registry
+
+`activate` refreshes generated runtime artifacts from the canonical installed-workspace contract and then marks that workspace active in the host registry. It does **not** start the Docker runtime by itself.
 
 The `preflight` command is the recommended first check after opening or restoring a VS Code workspace.
 It inspects the expected compose services, resolved host ports, generated runtime manifest, and
@@ -251,7 +254,7 @@ When a workspace is assigned a non-default port block, runtime verification foll
 
 To prove the installation works and the target mounts are successfully connected to your host project:
 
-1. **Verify State**: Confirm that `.factory.lock.json`, `.factory.env`, `software-factory.code-workspace`, and the folder `.copilot/softwareFactoryVscode/` exist in your root directory.
+1. **Verify State**: Confirm that `.copilot/softwareFactoryVscode/lock.json`, `.copilot/softwareFactoryVscode/.factory.env`, `software-factory.code-workspace`, and the folder `.copilot/softwareFactoryVscode/` exist in your repository.
 2. **Verify Containers**: Run `docker ps` to ensure the `factory_my-project` MCP container stack is running smoothly.
 3. **Verify Mount**: Connect to one of the containers and confirm your project is mounted to `/target`.
 

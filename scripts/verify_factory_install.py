@@ -120,7 +120,7 @@ def render_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
             "",
             "Please verify and report PASS/FAIL with evidence for:",
             "- The workspace shows both the host project root and `.copilot/softwareFactoryVscode`.",
-            "- `.copilot/softwareFactoryVscode/lock.json`, `.factory.env`, and the workspace file exist.",
+            "- `.copilot/softwareFactoryVscode/lock.json`, `.copilot/softwareFactoryVscode/.factory.env`, and the workspace file exist.",
             "- `.copilot/softwareFactoryVscode/scripts/verify_factory_install.py` appears present.",
             "- The installation looks compliant with namespace-first and ready for VS Code usage.",
             "",
@@ -493,17 +493,6 @@ def check_gitignore(
         )
 
 
-def check_for_legacy_mode(target_dir: Path) -> None:
-    legacy_dir = target_dir / ".softwareFactoryVscode"
-    if legacy_dir.exists() and legacy_dir.is_dir():
-        print(
-            "⚠️  WARNING: Repository is operating in transitional/legacy mode (.softwareFactoryVscode detected)."
-        )
-        print(
-            "    Please migrate to the namespace-first architecture (.copilot/softwareFactoryVscode) structure."
-        )
-
-
 def check_legacy_install_artifacts(target_dir: Path, violations: list[str]) -> None:
     legacy_paths = [
         target_dir / ".softwareFactoryVscode",
@@ -527,8 +516,6 @@ def verify_installation(
     skip_workspace_check: bool,
     skip_gitignore_check: bool,
 ) -> list[str]:
-
-    check_for_legacy_mode(target_dir)
     violations: list[str] = []
     check_legacy_install_artifacts(target_dir, violations)
     check_factory_tree(target_dir, violations)
@@ -556,8 +543,6 @@ def verify_runtime(
     timeout: float,
     check_vscode_mcp: bool,
 ) -> list[str]:
-
-    check_for_legacy_mode(target_dir)
     violations: list[str] = []
 
     if shutil.which("docker") is None:
