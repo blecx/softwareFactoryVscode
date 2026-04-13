@@ -38,6 +38,8 @@ The throwaway-target regression in `tests/test_factory_install.py` validates the
 - post-install verifier success
 - non-mutating smoke prompt output contract
 
+Default throwaway install/runtime validation should stay inside the source repository's gitignored `.tmp/` tree (for example `.tmp/throwaway-targets/`) unless a test explicitly opts into an external target. This keeps disposable targets in-workspace and avoids accidentally tainting unrelated repositories or non-repository paths.
+
 ---
 
 ## Fresh Session Handoff Prompt
