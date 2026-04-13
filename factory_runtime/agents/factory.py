@@ -17,6 +17,7 @@ Implements: GitHub issue #715
 
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,9 +43,64 @@ _DEFAULT_SERVERS = {
     "mcp-filesystem": "http://localhost:3014",
 }
 
+_RUNTIME_MANIFEST_RELATIVE_PATH = Path(
+    ".copilot/softwareFactoryVscode/.tmp/runtime-manifest.json"
+)
+_RUNTIME_MANIFEST_SERVER_MAPPING: dict[str, tuple[str, str]] = {
+    "mcp-memory": ("runtime_health", "mcp-memory"),
+    "mcp-agent-bus": ("runtime_health", "mcp-agent-bus"),
+    "mcp-github-ops": ("mcp_servers", "githubOps"),
+    "mcp-search": ("mcp_servers", "search"),
+    "mcp-filesystem": ("mcp_servers", "filesystem"),
+}
 
-def _load_server_urls_from_env() -> dict[str, str]:
-    """Build server URL dict from FACTORY_*_URL env vars, falling back to defaults."""
+
+def _candidate_runtime_manifest_paths(workspace_root: Path) -> list[Path]:
+    resolved_root = workspace_root.resolve()
+    candidates = [(resolved_root / _RUNTIME_MANIFEST_RELATIVE_PATH).resolve()]
+    if len(resolved_root.parents) > 1:
+        companion_manifest = (
+            resolved_root.parents[1] / _RUNTIME_MANIFEST_RELATIVE_PATH
+        ).resolve()
+        if companion_manifest not in candidates:
+            candidates.append(companion_manifest)
+    return candidates
+
+
+def _load_server_urls_from_runtime_manifest(workspace_root: Path) -> dict[str, str]:
+    """Load FACTORY MCP endpoints from the generated runtime manifest when present.
+
+    When invoked from the source checkout, fall back to the companion
+    installed-workspace manifest so direct orchestrator callers follow the same
+    canonical runtime contract as the bootloader-backed CLI path.
+    """
+    for manifest_path in _candidate_runtime_manifest_paths(workspace_root):
+        if not manifest_path.exists():
+            continue
+
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        server_urls: dict[str, str] = {}
+        for server_name, (section_name, runtime_name) in _RUNTIME_MANIFEST_SERVER_MAPPING.items():
+            section = manifest.get(section_name, {})
+            entry = section.get(runtime_name, {}) if isinstance(section, dict) else {}
+            if isinstance(entry, dict):
+                url = str(entry.get("url", "")).strip()
+                if url:
+                    server_urls[server_name] = url
+        if server_urls:
+            return server_urls
+
+    return {}
+
+
+def _load_server_urls(workspace_root: Path | None = None) -> dict[str, str]:
+    """Build server URLs from env, then runtime manifest, then legacy defaults."""
+    resolved_root = (workspace_root or Path.cwd()).resolve()
+    runtime_manifest_urls = _load_server_urls_from_runtime_manifest(resolved_root)
     mapping = {
         "mcp-memory": "FACTORY_MEMORY_URL",
         "mcp-agent-bus": "FACTORY_BUS_URL",
@@ -54,7 +110,10 @@ def _load_server_urls_from_env() -> dict[str, str]:
     }
     result: dict[str, str] = {}
     for name, env_key in mapping.items():
-        result[name] = os.environ.get(env_key, _DEFAULT_SERVERS[name])
+        result[name] = os.environ.get(
+            env_key,
+            runtime_manifest_urls.get(name, _DEFAULT_SERVERS[name]),
+        )
     return result
 
 
@@ -99,13 +158,14 @@ class FactoryOrchestrator:
         """
         Args:
             server_urls:    Dict of {server_name: url}.  Falls back to
-                            FACTORY_*_URL env vars or default localhost ports.
+                            FACTORY_*_URL env vars, generated runtime-manifest
+                            endpoints, or legacy localhost defaults.
             llm_client:     Optional AsyncOpenAI client (injected for testing).
             workspace_root: Root for file operations (defaults to cwd).
         """
-        self._server_urls = server_urls or _load_server_urls_from_env()
-        self._llm = llm_client
         self._root = workspace_root or Path.cwd()
+        self._server_urls = server_urls or _load_server_urls(self._root)
+        self._llm = llm_client
 
     async def run_issue(
         self,

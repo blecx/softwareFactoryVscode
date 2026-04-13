@@ -26,10 +26,10 @@
           "url": "http://127.0.0.1:3014/mcp"
         },
         "dockerCompose": {
-          "url": "http://127.0.0.1:3015/mcp"
+          "url": "http://127.0.0.1:3016/mcp"
         },
         "testRunner": {
-          "url": "http://127.0.0.1:3016/mcp"
+          "url": "http://127.0.0.1:3015/mcp"
         },
         "offlineDocs": {
           "url": "http://127.0.0.1:3017/mcp"

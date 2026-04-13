@@ -26,7 +26,12 @@ RUNTIME_MANIFEST_FILENAME = "runtime-manifest.json"
 REGISTRY_FILENAME = "workspace-registry.json"
 REGISTRY_VERSION = 1
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
+WORKSPACE_TEMPLATE_FILENAME = "workspace.code-workspace.template"
 PORT_BLOCK_STRIDE = 100
+DEFAULT_WORKSPACE_FOLDERS = [
+    {"name": "Host Project (Root)", "path": "."},
+    {"name": "AI Agent Factory", "path": FACTORY_DIRNAME},
+]
 
 PORT_LAYOUT: dict[str, int] = {
     "PORT_CONTEXT7": 3010,
@@ -320,6 +325,129 @@ def build_effective_workspace_settings(
     return settings
 
 
+def load_workspace_template(factory_dir: Path) -> dict[str, Any]:
+    template_path = factory_dir / WORKSPACE_TEMPLATE_FILENAME
+    template = load_json(template_path)
+    if not isinstance(template, dict):
+        template = {}
+
+    folders = template.get("folders")
+    if not isinstance(folders, list) or not folders:
+        template["folders"] = json.loads(json.dumps(DEFAULT_WORKSPACE_FOLDERS))
+
+    settings = template.get("settings")
+    if not isinstance(settings, dict):
+        template["settings"] = {}
+
+    return template
+
+
+def deep_merge_dict(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in overlay.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def merge_workspace_folders(
+    existing_folders: list[dict[str, Any]],
+    desired_folders: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    desired_pairs = {
+        (entry.get("name"), entry.get("path"))
+        for entry in desired_folders
+        if isinstance(entry, dict)
+    }
+    extras = [
+        entry
+        for entry in existing_folders
+        if isinstance(entry, dict)
+        and (entry.get("name"), entry.get("path")) not in desired_pairs
+    ]
+    return [*desired_folders, *extras]
+
+
+def can_refresh_managed_workspace(current_data: dict[str, Any]) -> bool:
+    allowed_top_level_keys = {"folders", "settings"}
+    if any(key not in allowed_top_level_keys for key in current_data):
+        return False
+
+    folders = current_data.get("folders")
+    if not isinstance(folders, list):
+        return False
+
+    current_pairs = {
+        (entry.get("name"), entry.get("path"))
+        for entry in folders
+        if isinstance(entry, dict)
+    }
+    required_pairs = {
+        (entry["name"], entry["path"]) for entry in DEFAULT_WORKSPACE_FOLDERS
+    }
+    return required_pairs.issubset(current_pairs)
+
+
+def merge_workspace_file_content(
+    current_data: dict[str, Any], desired_data: dict[str, Any]
+) -> dict[str, Any]:
+    merged = dict(current_data)
+    merged["folders"] = merge_workspace_folders(
+        current_data.get("folders", []),
+        desired_data.get("folders", []),
+    )
+
+    current_settings = current_data.get("settings", {})
+    desired_settings = desired_data.get("settings", {})
+    if not isinstance(current_settings, dict):
+        current_settings = {}
+    if not isinstance(desired_settings, dict):
+        desired_settings = {}
+    merged["settings"] = deep_merge_dict(current_settings, desired_settings)
+    return merged
+
+
+def render_workspace_file(config: WorkspaceRuntimeConfig) -> str:
+    workspace_data = load_workspace_template(config.factory_dir)
+    workspace_data["settings"] = config.workspace_settings
+    return json.dumps(workspace_data, indent=2, ensure_ascii=False) + "\n"
+
+
+def sync_workspace_file(config: WorkspaceRuntimeConfig) -> tuple[Path, str]:
+    workspace_path = config.workspace_file_path
+    workspace_path.parent.mkdir(parents=True, exist_ok=True)
+
+    desired = render_workspace_file(config)
+    if workspace_path.exists():
+        current = workspace_path.read_text(encoding="utf-8")
+        if current == desired:
+            return workspace_path, "unchanged"
+
+        try:
+            current_data = json.loads(current)
+            desired_data = json.loads(desired)
+        except json.JSONDecodeError:
+            return workspace_path, "skipped-conflict"
+
+        if not isinstance(current_data, dict):
+            return workspace_path, "skipped-conflict"
+
+        if can_refresh_managed_workspace(current_data):
+            merged_data = merge_workspace_file_content(current_data, desired_data)
+            merged = json.dumps(merged_data, indent=2, ensure_ascii=False) + "\n"
+            if merged != current:
+                workspace_path.write_text(merged, encoding="utf-8")
+                return workspace_path, "updated"
+            return workspace_path, "unchanged"
+
+        return workspace_path, "skipped-conflict"
+
+    workspace_path.write_text(desired, encoding="utf-8")
+    return workspace_path, "created"
+
+
 def find_available_port_index(
     *,
     registry_path: Path | None = None,
@@ -406,26 +534,32 @@ def build_runtime_config(
     existing_env = parse_env_file(env_path)
     existing_manifest = load_json(manifest_path)
 
-    project_workspace_id = existing_env.get(
-        "PROJECT_WORKSPACE_ID",
-        existing_manifest.get(
-            "project_workspace_id", slugify_identifier(resolved_target.name)
-        ),
+    project_workspace_id = str(
+        existing_env.get(
+            "PROJECT_WORKSPACE_ID",
+            existing_manifest.get(
+                "project_workspace_id", slugify_identifier(resolved_target.name)
+            ),
+        )
     )
     project_workspace_id = slugify_identifier(project_workspace_id)
 
-    factory_instance_id = existing_env.get(
-        "FACTORY_INSTANCE_ID",
-        existing_manifest.get(
-            "factory_instance_id", derive_instance_id(resolved_target)
-        ),
+    factory_instance_id = str(
+        existing_env.get(
+            "FACTORY_INSTANCE_ID",
+            existing_manifest.get(
+                "factory_instance_id", derive_instance_id(resolved_target)
+            ),
+        )
     )
 
-    compose_project_name = existing_env.get(
-        "COMPOSE_PROJECT_NAME",
-        existing_manifest.get(
-            "compose_project_name", f"factory_{project_workspace_id}"
-        ),
+    compose_project_name = str(
+        existing_env.get(
+            "COMPOSE_PROJECT_NAME",
+            existing_manifest.get(
+                "compose_project_name", f"factory_{project_workspace_id}"
+            ),
+        )
     )
 
     preferred_index: int | None = None
@@ -633,6 +767,7 @@ def sync_runtime_artifacts(
     write_env_file(
         config.target_dir / FACTORY_DIRNAME / ".factory.env", config.env_values
     )
+    sync_workspace_file(config)
 
     manifest = build_runtime_manifest(config)
     write_json_atomic(config.runtime_manifest_path, manifest)

@@ -146,6 +146,38 @@ def test_tasks_no_longer_invoke_legacy_issue_loop_scripts():
         assert "WORK-ISSUE-WORKFLOW.md" in serialized
 
 
+def test_source_checkout_does_not_commit_static_mcp_server_urls():
+    repo_root = Path(__file__).parent.parent
+    settings = json.loads((repo_root / ".vscode" / "settings.json").read_text(encoding="utf-8"))
+
+    assert "mcp" not in settings
+
+
+def test_canonical_agent_settings_template_matches_runtime_port_contract():
+    repo_root = Path(__file__).parent.parent
+    settings = json.loads(
+        (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    servers = settings["workspace"]["mcp"]["servers"]
+
+    assert servers["dockerCompose"]["url"] == "http://127.0.0.1:3016/mcp"
+    assert servers["testRunner"]["url"] == "http://127.0.0.1:3015/mcp"
+
+
+def test_docker_build_start_task_no_longer_auto_runs_on_folder_open():
+    repo_root = Path(__file__).parent.parent
+    tasks = json.loads(
+        (repo_root / ".vscode" / "tasks.json").read_text(encoding="utf-8")
+    )
+    task_map = {task["label"]: task for task in tasks["tasks"]}
+
+    docker_start = task_map["🐳 Docker: Build & Start"]
+
+    assert docker_start.get("runOptions", {}).get("runOn") != "folderOpen"
+
+
 def test_issue_templates_use_live_repo_labels():
     repo_root = Path(__file__).parent.parent
     feature_template = (
@@ -427,6 +459,7 @@ def _load_next_pr_module():
     repo_root = Path(__file__).parent.parent
     next_pr_path = repo_root / "scripts" / "next-pr.py"
     spec = importlib.util.spec_from_file_location("next_pr_module", next_pr_path)
+    assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module
@@ -438,6 +471,7 @@ def _load_next_issue_module():
     repo_root = Path(__file__).parent.parent
     next_issue_path = repo_root / "scripts" / "next-issue.py"
     spec = importlib.util.spec_from_file_location("next_issue_module", next_issue_path)
+    assert spec is not None
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     sys.modules[spec.name] = module

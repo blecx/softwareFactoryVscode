@@ -6,13 +6,11 @@ A quick reference guide for operating the Software Factory VS Code environment.
 
 Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), type `Run Task`, and select:
 
-| Task Name                      | Description                                                               |
-| ------------------------------ | ------------------------------------------------------------------------- |
-| `Docker: Build & Start`        | (Runs automatically on startup) Boots the MCP services in the background. |
-| `Docker: Stop`                 | Force-stops the running factory containers.                               |
-| `📦 Select Next PR`            | Picks the next available pull request from the queue to review.           |
-| `🔀 Merge PR`                  | Merges the selected/currently active PR.                                  |
-| `✅ Validate: Factory Quality` | Runs `black`, `flake8`, and `isort` on the codebase.                      |
+- `Docker: Build & Start` — starts the companion Software Factory runtime when a local workspace env contract exists.
+- `Docker: Stop` — force-stops the running factory containers.
+- `📦 Select Next PR` — picks the next available pull request from the queue to review.
+- `🔀 Merge PR` — merges the selected/currently active PR.
+- `✅ Validate: Factory Quality` — runs `black`, `flake8`, and `isort` on the codebase.
 
 ## 💻 CLI Commands: Factory Stack (`scripts/factory_stack.py`)
 

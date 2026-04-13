@@ -54,7 +54,20 @@ def load_json(path: Path) -> dict[str, Any]:
 def resolve_env_file(repo_root: Path, env_file: Path | None = None) -> Path:
     if env_file is not None:
         return env_file.expanduser().resolve()
-    return (repo_root / ".factory.env").resolve()
+
+    candidates = [(repo_root / ".factory.env").resolve()]
+    if len(repo_root.parents) > 1:
+        companion_env = (
+            repo_root.parents[1] / factory_workspace.FACTORY_DIRNAME / ".factory.env"
+        ).resolve()
+        if companion_env not in candidates:
+            candidates.append(companion_env)
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    return candidates[0]
 
 
 def build_compose_command(
@@ -501,6 +514,16 @@ def sync_workspace_runtime(
     return config
 
 
+def collect_unavailable_ports(
+    config: factory_workspace.WorkspaceRuntimeConfig,
+) -> list[str]:
+    return [
+        f"{key}={value}"
+        for key, value in sorted(config.ports.items())
+        if not factory_workspace.can_bind_port(value)
+    ]
+
+
 def ensure_ports_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> None:
     try:
         running_services = collect_running_services(config.compose_project_name)
@@ -508,15 +531,16 @@ def ensure_ports_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> None
         running_services = {}
     if running_services:
         return
-    if not factory_workspace.ports_available(config.ports):
-        used_ports = [
-            f"{key}={value}"
-            for key, value in sorted(config.ports.items())
-            if not factory_workspace.can_bind_port(value)
-        ]
-        raise RuntimeError(
-            "Workspace runtime ports are not available: " + ", ".join(used_ports)
-        )
+    if factory_workspace.ports_available(config.ports):
+        return
+
+    used_ports = collect_unavailable_ports(config)
+    details = ", ".join(used_ports) if used_ports else "unknown ports"
+    print(
+        "⚠️ Workspace runtime ports still appear busy before start; proceeding because "
+        "the local bind probe can false-positive while Docker is reconciling listeners: "
+        + details
+    )
 
 
 def ensure_data_dirs_ready(config: factory_workspace.WorkspaceRuntimeConfig) -> None:
@@ -820,8 +844,10 @@ def parse_args() -> argparse.Namespace:
         "--env-file",
         default="",
         help=(
-            "Optional explicit .factory.env path. Defaults to repo-root/.factory.env "
-            "(for the canonical namespaced install, repo-root is `.copilot/softwareFactoryVscode`)."
+            "Optional explicit .factory.env path. Defaults to repo-root/.factory.env, "
+            "or when running from the source checkout falls back to the companion "
+            "installed-workspace env at `<target>/.copilot/softwareFactoryVscode/.factory.env` "
+            "when present."
         ),
     )
     parser.add_argument(
