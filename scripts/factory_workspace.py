@@ -743,6 +743,95 @@ def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
     }
 
 
+def build_registry_record_from_manifest(
+    manifest: dict[str, Any],
+    *,
+    runtime_state: str = "installed",
+    existing_record: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    existing = existing_record if isinstance(existing_record, dict) else {}
+    installed_at = existing.get("installed_at", utc_now_iso())
+    normalized_runtime_state = str(runtime_state).strip() or "installed"
+    factory_release = (
+        manifest.get("factory_release", {})
+        if isinstance(manifest.get("factory_release"), dict)
+        else {}
+    )
+
+    return {
+        "factory_instance_id": str(manifest.get("factory_instance_id", "")),
+        "project_workspace_id": str(manifest.get("project_workspace_id", "")),
+        "target_workspace_path": str(manifest.get("target_workspace_path", "")),
+        "factory_dir": str(manifest.get("factory_dir", "")),
+        "workspace_file_path": str(manifest.get("workspace_file_path", "")),
+        "compose_project_name": str(manifest.get("compose_project_name", "")),
+        "port_index": manifest.get("port_index", 0),
+        "ports": manifest.get("ports", {}),
+        "factory_version": str(manifest.get("factory_version", "unknown")),
+        "factory_display_version": str(manifest.get("factory_display_version", "")),
+        "factory_commit": str(factory_release.get("commit_sha", "")),
+        "runtime_state": normalized_runtime_state,
+        "installed_at": installed_at,
+        "last_activated_at": existing.get("last_activated_at"),
+        "updated_at": utc_now_iso(),
+    }
+
+
+def normalize_record_ports(record: dict[str, Any]) -> dict[str, int]:
+    raw_ports = record.get("ports", {}) if isinstance(record, dict) else {}
+    if not isinstance(raw_ports, dict):
+        return {}
+
+    normalized: dict[str, int] = {}
+    for key, value in raw_ports.items():
+        if key not in PORT_LAYOUT:
+            continue
+        try:
+            normalized[key] = int(value)
+        except (TypeError, ValueError):
+            continue
+    return normalized
+
+
+def load_or_rebuild_runtime_manifest(
+    target_dir: Path,
+    *,
+    registry_path: Path | None = None,
+) -> tuple[dict[str, Any], bool]:
+    resolved_target = target_dir.expanduser().resolve()
+    manifest_path = resolved_target / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME
+
+    manifest: dict[str, Any] = {}
+    if manifest_path.exists():
+        try:
+            loaded = load_json(manifest_path)
+            if isinstance(loaded, dict):
+                manifest = loaded
+        except Exception:
+            manifest = {}
+
+    if str(manifest.get("factory_instance_id", "")).strip():
+        return manifest, False
+
+    factory_dir = resolved_target / FACTORY_DIRNAME
+    env_path = factory_dir / ".factory.env"
+    if not factory_dir.exists() or not env_path.exists():
+        return {}, False
+
+    try:
+        config = build_runtime_config(
+            resolved_target,
+            factory_dir=factory_dir,
+            registry_path=registry_path,
+        )
+    except Exception:
+        return {}, False
+
+    rebuilt_manifest = build_runtime_manifest(config)
+    write_json_atomic(manifest_path, rebuilt_manifest)
+    return rebuilt_manifest, True
+
+
 def ensure_factory_data_dirs(config: WorkspaceRuntimeConfig) -> None:
     """Ensure bind-mounted runtime data directories exist for this workspace."""
 
@@ -810,36 +899,13 @@ def upsert_workspace_record(
         raise ValueError("Runtime manifest is missing factory_instance_id.")
 
     existing = registry["workspaces"].get(instance_id, {})
-    installed_at = (
-        existing.get("installed_at", utc_now_iso())
-        if isinstance(existing, dict)
-        else utc_now_iso()
+    record = build_registry_record_from_manifest(
+        manifest,
+        runtime_state=runtime_state,
+        existing_record=existing,
     )
-    record = {
-        "factory_instance_id": instance_id,
-        "project_workspace_id": manifest.get("project_workspace_id", ""),
-        "target_workspace_path": manifest.get("target_workspace_path", ""),
-        "factory_dir": manifest.get("factory_dir", ""),
-        "workspace_file_path": manifest.get("workspace_file_path", ""),
-        "compose_project_name": manifest.get("compose_project_name", ""),
-        "port_index": manifest.get("port_index", 0),
-        "ports": manifest.get("ports", {}),
-        "factory_version": manifest.get("factory_version", "unknown"),
-        "factory_display_version": manifest.get("factory_display_version", ""),
-        "factory_commit": (
-            manifest.get("factory_release", {}).get("commit_sha", "")
-            if isinstance(manifest.get("factory_release"), dict)
-            else ""
-        ),
-        "runtime_state": runtime_state,
-        "installed_at": installed_at,
-        "last_activated_at": (
-            existing.get("last_activated_at")
-            if existing.get("last_activated_at")
-            else (utc_now_iso() if active else None)
-        ),
-        "updated_at": utc_now_iso(),
-    }
+    if active and not record.get("last_activated_at"):
+        record["last_activated_at"] = utc_now_iso()
     registry["workspaces"][instance_id] = record
 
     if active is True:
@@ -903,46 +969,169 @@ def is_ephemeral_workspace_path(target_dir: Path) -> bool:
 def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
     registry = load_registry(registry_path)
     workspaces = registry.get("workspaces", {})
-    active_workspace = registry.get("active_workspace", "")
-    stale_ids = []
+    if not isinstance(workspaces, dict):
+        workspaces = {}
+
+    active_workspace = str(registry.get("active_workspace", ""))
+    stale_ids: list[str] = []
+    recovered_ids: list[str] = []
+    rebuilt_manifest_ids: list[str] = []
+    remapped_instance_ids: dict[str, str] = {}
+    conflicts: list[str] = []
+    canonical_records: dict[str, dict[str, Any]] = {}
+    target_owners: dict[str, str] = {}
+
     for iid, record in workspaces.items():
         if not isinstance(record, dict):
             stale_ids.append(iid)
             continue
+
+        target_value = str(record.get("target_workspace_path", "")).strip()
+        if not target_value:
+            stale_ids.append(iid)
+            continue
+
         try:
-            target_dir = Path(record.get("target_workspace_path", ""))
-            if not target_dir.exists() or not target_dir.is_dir():
-                stale_ids.append(iid)
-                continue
-            if iid != active_workspace and is_ephemeral_workspace_path(target_dir):
-                stale_ids.append(iid)
-                continue
-            manifest_path = target_dir / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME
-            if not manifest_path.exists():
-                stale_ids.append(iid)
-                continue
+            target_dir = Path(target_value).expanduser().resolve()
         except Exception:
             stale_ids.append(iid)
+            continue
 
-    for iid in stale_ids:
-        del registry["workspaces"][iid]
-        if registry.get("active_workspace") == iid:
-            registry["active_workspace"] = ""
+        if not target_dir.exists() or not target_dir.is_dir():
+            stale_ids.append(iid)
+            continue
 
-    if stale_ids:
-        save_registry(registry, registry_path)
+        if iid != active_workspace and is_ephemeral_workspace_path(target_dir):
+            stale_ids.append(iid)
+            continue
 
-    return {"stale_removed": stale_ids, "remaining": len(registry["workspaces"])}
+        manifest, rebuilt_manifest = load_or_rebuild_runtime_manifest(
+            target_dir,
+            registry_path=registry_path,
+        )
+        if rebuilt_manifest:
+            rebuilt_manifest_ids.append(iid)
+
+        canonical_iid = str(manifest.get("factory_instance_id", "")).strip()
+        if not canonical_iid:
+            stale_ids.append(iid)
+            continue
+
+        if canonical_iid != iid:
+            remapped_instance_ids[iid] = canonical_iid
+            recovered_ids.append(iid)
+
+        target_key = str(target_dir)
+        target_owner = target_owners.get(target_key)
+        if target_owner and target_owner != canonical_iid:
+            conflicts.append(
+                "Duplicate registry ownership for target "
+                f"`{target_key}` via `{target_owner}` and `{canonical_iid}`."
+            )
+            continue
+        target_owners[target_key] = canonical_iid
+
+        existing_canonical = canonical_records.get(canonical_iid)
+        if isinstance(existing_canonical, dict):
+            existing_target = str(
+                existing_canonical.get("target_workspace_path", "")
+            ).strip()
+            if existing_target != target_key:
+                conflicts.append(
+                    "Instance identity conflict for registry workspace "
+                    f"`{canonical_iid}` (`{existing_target}` vs `{target_key}`)."
+                )
+                continue
+
+        runtime_state = (
+            str(record.get("runtime_state", "installed")).strip() or "installed"
+        )
+        if isinstance(existing_canonical, dict):
+            existing_runtime_state = str(
+                existing_canonical.get("runtime_state", "")
+            ).strip()
+            if existing_runtime_state and existing_runtime_state != "installed":
+                runtime_state = existing_runtime_state
+
+        canonical_records[canonical_iid] = build_registry_record_from_manifest(
+            manifest,
+            runtime_state=runtime_state,
+            existing_record=existing_canonical or record,
+        )
+
+    port_sets: list[tuple[str, dict[str, int], str]] = []
+    for iid, record in canonical_records.items():
+        ports = normalize_record_ports(record)
+        target = str(record.get("target_workspace_path", ""))
+        for other_iid, other_ports, other_target in port_sets:
+            if ports and other_ports and ports_conflict(ports, other_ports):
+                conflicts.append(
+                    "Port ownership conflict between registry workspaces "
+                    f"`{iid}` ({target}) and `{other_iid}` ({other_target})."
+                )
+        port_sets.append((iid, ports, target))
+
+    if conflicts:
+        details = "\n".join(f"- {message}" for message in conflicts)
+        raise RuntimeError(
+            "Registry reconciliation detected conflicting records. "
+            "Resolve duplicates/inconsistent ownership before retrying:\n"
+            f"{details}"
+        )
+
+    resolved_active_workspace = remapped_instance_ids.get(
+        active_workspace, active_workspace
+    )
+    if resolved_active_workspace not in canonical_records:
+        resolved_active_workspace = ""
+
+    updated_registry = {
+        **registry,
+        "workspaces": canonical_records,
+        "active_workspace": resolved_active_workspace,
+    }
+
+    changed = updated_registry != registry
+    if changed:
+        save_registry(updated_registry, registry_path)
+
+    return {
+        "stale_removed": stale_ids,
+        "recovered_ids": recovered_ids,
+        "rebuilt_manifest_ids": rebuilt_manifest_ids,
+        "remaining": len(canonical_records),
+    }
 
 
 def refresh_registry_entry(
     target_dir: Path, *, registry_path: Path | None = None
 ) -> None:
-    manifest_path = target_dir / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME
-    if manifest_path.exists():
-        manifest = load_json(manifest_path)
-        if "factory_instance_id" in manifest:
-            upsert_workspace_record(manifest, registry_path=registry_path)
+    resolved_target = target_dir.expanduser().resolve()
+    manifest, _ = load_or_rebuild_runtime_manifest(
+        resolved_target,
+        registry_path=registry_path,
+    )
+    instance_id = str(manifest.get("factory_instance_id", "")).strip()
+    if not instance_id:
+        raise FileNotFoundError(
+            "Unable to refresh workspace registry entry for "
+            f"`{resolved_target}` because runtime metadata is missing."
+        )
+
+    existing_record = (
+        load_registry(registry_path).get("workspaces", {}).get(instance_id, {})
+    )
+    runtime_state = (
+        str(existing_record.get("runtime_state", "installed"))
+        if isinstance(existing_record, dict)
+        else "installed"
+    )
+    upsert_workspace_record(
+        manifest,
+        registry_path=registry_path,
+        runtime_state=runtime_state,
+        active=None,
+    )
 
 
 if __name__ == "__main__":

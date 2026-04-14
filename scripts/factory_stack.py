@@ -719,6 +719,18 @@ def list_workspaces() -> int:
     if res.get("stale_removed"):
         for stale_id in res["stale_removed"]:
             print(f"🧹 Removed stale registry record for: {stale_id}")
+    if res.get("recovered_ids"):
+        for recovered_id in res["recovered_ids"]:
+            print(
+                "♻️ Recovered registry identity from runtime metadata for: "
+                f"{recovered_id}"
+            )
+    if res.get("rebuilt_manifest_ids"):
+        for rebuilt_id in res["rebuilt_manifest_ids"]:
+            print(
+                "🛠️ Rebuilt missing runtime manifest from local workspace metadata for: "
+                f"{rebuilt_id}"
+            )
     registry = factory_workspace.load_registry()
     active_workspace = registry.get("active_workspace", "")
     for instance_id, record in sorted(registry.get("workspaces", {}).items()):

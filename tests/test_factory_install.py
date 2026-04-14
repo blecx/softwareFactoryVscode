@@ -3415,7 +3415,17 @@ def test_reconcile_registry_prunes_ephemeral_pytest_workspaces(
         ephemeral_target
         / ".copilot/softwareFactoryVscode/.tmp"
         / "runtime-manifest.json"
-    ).write_text("{}\n", encoding="utf-8")
+    ).write_text(
+        json.dumps(
+            {
+                "factory_instance_id": "factory-ephemeral",
+                "target_workspace_path": str(ephemeral_target),
+                "ports": {},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     persistent_target = Path("/tmp") / "factory-registry-persistent-target"
     if persistent_target.exists():
@@ -3431,7 +3441,17 @@ def test_reconcile_registry_prunes_ephemeral_pytest_workspaces(
             / "softwareFactoryVscode"
             / ".tmp"
             / "runtime-manifest.json"
-        ).write_text("{}\n", encoding="utf-8")
+        ).write_text(
+            json.dumps(
+                {
+                    "factory_instance_id": "factory-persistent",
+                    "target_workspace_path": str(persistent_target),
+                    "ports": {},
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
         registry = {
             "version": 1,
@@ -3459,6 +3479,196 @@ def test_reconcile_registry_prunes_ephemeral_pytest_workspaces(
         assert "factory-persistent" in updated["workspaces"]
     finally:
         shutil.rmtree(persistent_target, ignore_errors=True)
+
+
+def test_refresh_registry_entry_rebuilds_missing_record_from_local_metadata(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+    )
+
+    runtime_manifest_path = config.runtime_manifest_path
+    runtime_manifest_path.unlink()
+    factory_workspace.write_json_atomic(
+        registry_path,
+        {
+            "version": 1,
+            "active_workspace": "",
+            "workspaces": {},
+        },
+    )
+
+    factory_workspace.refresh_registry_entry(target_repo, registry_path=registry_path)
+
+    updated = factory_workspace.load_registry(registry_path=registry_path)
+    assert config.factory_instance_id in updated.get("workspaces", {})
+    assert runtime_manifest_path.exists()
+    rebuilt_manifest = json.loads(runtime_manifest_path.read_text(encoding="utf-8"))
+    assert rebuilt_manifest["factory_instance_id"] == config.factory_instance_id
+
+
+def test_reconcile_registry_recovers_mismatched_instance_identity(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=True,
+    )
+
+    stale_id = "factory-stale-alias"
+    registry = factory_workspace.load_registry(registry_path=registry_path)
+    stale_record = registry["workspaces"].pop(config.factory_instance_id)
+    stale_record["factory_instance_id"] = stale_id
+    registry["workspaces"][stale_id] = stale_record
+    registry["active_workspace"] = stale_id
+    factory_workspace.write_json_atomic(registry_path, registry)
+
+    result = factory_workspace.reconcile_registry(registry_path=registry_path)
+    updated = factory_workspace.load_registry(registry_path=registry_path)
+
+    assert stale_id in result["recovered_ids"]
+    assert config.factory_instance_id in updated["workspaces"]
+    assert stale_id not in updated["workspaces"]
+    assert updated["active_workspace"] == config.factory_instance_id
+    assert (
+        updated["workspaces"][config.factory_instance_id]["runtime_state"] == "running"
+    )
+
+
+def test_reconcile_registry_rejects_conflicting_port_ownership(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+
+    target_a = Path("/tmp") / "factory-registry-conflict-a"
+    target_b = Path("/tmp") / "factory-registry-conflict-b"
+    for target in (target_a, target_b):
+        if target.exists():
+            shutil.rmtree(target, ignore_errors=True)
+
+    target_a_manifest_path = (
+        target_a / ".copilot/softwareFactoryVscode/.tmp/runtime-manifest.json"
+    )
+    target_b_manifest_path = (
+        target_b / ".copilot/softwareFactoryVscode/.tmp/runtime-manifest.json"
+    )
+    target_a_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    target_b_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    shared_ports = factory_workspace.build_port_values(0)
+    manifest_a = {
+        "factory_instance_id": "factory-a",
+        "project_workspace_id": "project-a",
+        "target_workspace_path": str(target_a),
+        "factory_dir": str(target_a / ".copilot/softwareFactoryVscode"),
+        "workspace_file_path": str(target_a / "software-factory.code-workspace"),
+        "compose_project_name": "factory_project-a",
+        "port_index": 0,
+        "ports": shared_ports,
+        "factory_version": "test",
+        "factory_display_version": "test+local",
+        "factory_release": {"commit_sha": "a" * 40},
+    }
+    manifest_b = {
+        "factory_instance_id": "factory-b",
+        "project_workspace_id": "project-b",
+        "target_workspace_path": str(target_b),
+        "factory_dir": str(target_b / ".copilot/softwareFactoryVscode"),
+        "workspace_file_path": str(target_b / "software-factory.code-workspace"),
+        "compose_project_name": "factory_project-b",
+        "port_index": 0,
+        "ports": shared_ports,
+        "factory_version": "test",
+        "factory_display_version": "test+local",
+        "factory_release": {"commit_sha": "b" * 40},
+    }
+    target_a_manifest_path.write_text(
+        json.dumps(manifest_a, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    target_b_manifest_path.write_text(
+        json.dumps(manifest_b, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    factory_workspace.write_json_atomic(
+        registry_path,
+        {
+            "version": 1,
+            "active_workspace": "",
+            "workspaces": {
+                "factory-a": {
+                    "factory_instance_id": "factory-a",
+                    "target_workspace_path": str(target_a),
+                    "runtime_state": "installed",
+                    "ports": shared_ports,
+                },
+                "factory-b": {
+                    "factory_instance_id": "factory-b",
+                    "target_workspace_path": str(target_b),
+                    "runtime_state": "installed",
+                    "ports": shared_ports,
+                },
+            },
+        },
+    )
+
+    try:
+        try:
+            factory_workspace.reconcile_registry(registry_path=registry_path)
+        except RuntimeError as exc:
+            assert "Port ownership conflict" in str(exc)
+        else:
+            raise AssertionError(
+                "Expected reconciliation to fail on duplicate port ownership"
+            )
+    finally:
+        shutil.rmtree(target_a, ignore_errors=True)
+        shutil.rmtree(target_b, ignore_errors=True)
 
 
 def test_agent_worker_entrypoint_targets_supported_factory_cli_mode() -> None:
