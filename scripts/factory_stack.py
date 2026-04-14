@@ -621,6 +621,7 @@ def stop_stack(
     *,
     env_file: Path | None = None,
     remove_volumes: bool = False,
+    preserve_runtime_state: bool = False,
 ) -> Path:
     resolved_env_file = resolve_env_file(repo_root, env_file)
     config = sync_workspace_runtime(repo_root, env_file=resolved_env_file)
@@ -632,7 +633,8 @@ def stop_stack(
         repo_root,
         build_compose_command(repo_root, resolved_env_file, action),
     )
-    factory_workspace.update_runtime_state(config.factory_instance_id, "stopped")
+    if not preserve_runtime_state:
+        factory_workspace.update_runtime_state(config.factory_instance_id, "stopped")
     return resolved_env_file
 
 
@@ -880,6 +882,14 @@ def parse_args() -> argparse.Namespace:
         help="Also remove named volumes while stopping the stack.",
     )
     parser.add_argument(
+        "--preserve-runtime-state",
+        action="store_true",
+        help=(
+            "When stopping for refresh/update flows, keep existing runtime_state metadata "
+            "instead of demoting to `stopped`."
+        ),
+    )
+    parser.add_argument(
         "--foreground",
         action="store_true",
         help="Start attached in the foreground (without -d or --wait).",
@@ -906,6 +916,7 @@ def main() -> int:
             repo_root,
             env_file=env_file,
             remove_volumes=args.remove_volumes,
+            preserve_runtime_state=args.preserve_runtime_state,
         )
     elif args.command == "cleanup":
         return cleanup_workspace(
