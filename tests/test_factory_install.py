@@ -962,6 +962,111 @@ def test_update_removes_legacy_factory_gitignore_block(tmp_path: Path) -> None:
     assert ".copilot/softwareFactoryVscode/.factory.env" in gitignore
 
 
+def test_update_refresh_preserves_active_workspace_and_runtime_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "run_compose_command",
+        lambda _repo_root, _command: None,
+    )
+
+    source_repo = tmp_path / "source-factory"
+    target_repo = tmp_path / "target-project"
+    create_source_factory_repo(source_repo)
+    init_git_repo(target_repo)
+
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    git("clone", str(source_repo), str(factory_dir), cwd=target_repo)
+    subprocess.run(["bash", "setup.sh"], cwd=factory_dir, check=True, text=True)
+
+    assert (
+        bootstrap_host.main(
+            [
+                "--target",
+                str(target_repo),
+                "--repo-url",
+                str(source_repo),
+            ]
+        )
+        == 0
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo,
+        factory_dir=factory_dir,
+    )
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=True,
+    )
+
+    (source_repo / "RUNTIME_STATE_UPDATE_MARKER.txt").write_text(
+        "advance source for state-preserving update\n",
+        encoding="utf-8",
+    )
+    git("add", "RUNTIME_STATE_UPDATE_MARKER.txt", cwd=source_repo)
+    git(
+        "commit",
+        "-m",
+        "Advance source for state-preserving update",
+        cwd=source_repo,
+    )
+    refresh_source_release_manifest(source_repo)
+
+    real_subprocess_run = install_factory.subprocess.run
+    intercepted_stop_commands: list[list[str]] = []
+
+    def _patched_subprocess_run(command, *args, **kwargs):
+        command_parts = [str(part) for part in command]
+        if (
+            len(command_parts) >= 5
+            and command_parts[1].endswith("factory_stack.py")
+            and command_parts[2] == "stop"
+        ):
+            intercepted_stop_commands.append(command_parts)
+            repo_root_value = command_parts[command_parts.index("--repo-root") + 1]
+            factory_stack.stop_stack(
+                Path(repo_root_value),
+                preserve_runtime_state="--preserve-runtime-state" in command_parts,
+            )
+            return subprocess.CompletedProcess(command_parts, 0, "", "")
+
+        return real_subprocess_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(install_factory.subprocess, "run", _patched_subprocess_run)
+
+    assert (
+        install_factory.main(
+            [
+                "--target",
+                str(target_repo),
+                "--repo-url",
+                str(source_repo),
+                "--update",
+            ]
+        )
+        == 0
+    )
+
+    assert intercepted_stop_commands
+    assert "--preserve-runtime-state" in intercepted_stop_commands[0]
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert registry["active_workspace"] == config.factory_instance_id
+    assert (
+        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "running"
+    )
+
+
 def test_bootstrap_force_workspace_overwrites_existing_workspace(
     tmp_path: Path,
 ) -> None:
