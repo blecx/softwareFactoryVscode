@@ -1682,6 +1682,10 @@ def test_verify_factory_runtime_passes_with_mocked_services(
     monkeypatch,
     capsys,
 ) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
     target_repo = tmp_path / "target-project"
     target_repo.mkdir(parents=True, exist_ok=True)
     factory_dir = target_repo / ".copilot/softwareFactoryVscode"
@@ -1857,6 +1861,10 @@ def test_verify_factory_runtime_fails_when_required_service_missing(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
     target_repo = tmp_path / "target-project"
     target_repo.mkdir(parents=True, exist_ok=True)
     factory_dir = target_repo / ".copilot/softwareFactoryVscode"
@@ -3546,6 +3554,205 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
     assert "http://127.0.0.1:3211/mcp" in probed_urls
 
 
+def test_verify_runtime_prefers_preflight_effective_ports_when_env_is_stale(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".git").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "scripts").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
+    for script_name in (
+        "factory_release.py",
+        "factory_update.py",
+        "install_factory.py",
+        "bootstrap_host.py",
+        "verify_factory_install.py",
+    ):
+        (factory_dir / "scripts" / script_name).write_text("# stub\n", encoding="utf-8")
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (factory_dir / "configs" / "bash_gateway_policy.default.yml").write_text(
+        (REPO_ROOT / "configs" / "bash_gateway_policy.default.yml").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    non_default_env = "\n".join(
+        [
+            f"TARGET_WORKSPACE_PATH={target_repo}",
+            f"PROJECT_WORKSPACE_ID={target_repo.name}",
+            f"COMPOSE_PROJECT_NAME=factory_{target_repo.name}",
+            f"FACTORY_DIR={factory_dir}",
+            "FACTORY_INSTANCE_ID=factory-custom",
+            "FACTORY_PORT_INDEX=2",
+            "PORT_CONTEXT7=3210",
+            "PORT_BASH=3211",
+            "PORT_FS=3212",
+            "PORT_GIT=3213",
+            "PORT_SEARCH=3214",
+            "PORT_TEST=3215",
+            "PORT_COMPOSE=3216",
+            "PORT_DOCS=3217",
+            "PORT_GITHUB=3218",
+            "MEMORY_MCP_PORT=3230",
+            "AGENT_BUS_PORT=3231",
+            "APPROVAL_GATE_PORT=8201",
+            "PORT_TUI=9290",
+            "CONTEXT7_API_KEY=",
+            "",
+        ]
+    )
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    env_path.write_text(non_default_env, encoding="utf-8")
+
+    config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+
+    stale_env = "\n".join(
+        [
+            f"TARGET_WORKSPACE_PATH={target_repo}",
+            f"PROJECT_WORKSPACE_ID={target_repo.name}",
+            f"COMPOSE_PROJECT_NAME=factory_{target_repo.name}",
+            f"FACTORY_DIR={factory_dir}",
+            f"FACTORY_INSTANCE_ID={config.factory_instance_id}",
+            "FACTORY_PORT_INDEX=0",
+            "PORT_CONTEXT7=3010",
+            "PORT_BASH=3011",
+            "PORT_FS=3012",
+            "PORT_GIT=3013",
+            "PORT_SEARCH=3014",
+            "PORT_TEST=3015",
+            "PORT_COMPOSE=3016",
+            "PORT_DOCS=3017",
+            "PORT_GITHUB=3018",
+            "MEMORY_MCP_PORT=3030",
+            "AGENT_BUS_PORT=3031",
+            "APPROVAL_GATE_PORT=8001",
+            "PORT_TUI=9090",
+            "CONTEXT7_API_KEY=",
+            "",
+        ]
+    )
+    env_path.write_text(stale_env, encoding="utf-8")
+
+    probed_urls: list[str] = []
+
+    monkeypatch.setattr(
+        verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "recommended_action": "none",
+            "issues": [],
+            "config": config,
+            "workspace_urls": config.mcp_server_urls,
+            "service_inventory": build_full_service_inventory(config),
+        },
+    )
+    monkeypatch.setattr(
+        verify_factory_install,
+        "probe_http_url",
+        lambda url, timeout, allow_http_error: probed_urls.append(url) or None,
+    )
+
+    violations = verify_factory_install.verify_runtime(
+        target_repo,
+        workspace_file="software-factory.code-workspace",
+        timeout=1.0,
+        check_vscode_mcp=False,
+    )
+
+    assert violations == []
+    assert f"http://127.0.0.1:{config.ports['MEMORY_MCP_PORT']}/mcp" in probed_urls
+    assert f"http://127.0.0.1:{config.ports['AGENT_BUS_PORT']}/mcp" in probed_urls
+    assert (
+        f"http://127.0.0.1:{config.ports['APPROVAL_GATE_PORT']}/health" in probed_urls
+    )
+    assert f"http://127.0.0.1:{config.ports['PORT_TUI']}/admin/mocks" in probed_urls
+
+
+def test_verify_runtime_reports_preflight_status_and_action_for_drift(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    env_path.write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                f"FACTORY_DIR={factory_dir}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "config-drift",
+            "recommended_action": "re-bootstrap",
+            "issues": [
+                (
+                    "Generated workspace MCP URL drift detected for `context7` "
+                    "(expected `http://127.0.0.1:3210/mcp`, found "
+                    "`http://127.0.0.1:3010/mcp`)."
+                )
+            ],
+            "service_inventory": {},
+            "workspace_urls": {},
+        },
+    )
+
+    violations = verify_factory_install.verify_runtime(
+        target_repo,
+        workspace_file="software-factory.code-workspace",
+        timeout=1.0,
+        check_vscode_mcp=True,
+    )
+
+    assert (
+        violations[0]
+        == "Runtime preflight reported `config-drift` (recommended_action=`re-bootstrap`)."
+    )
+    assert any(
+        "Generated workspace MCP URL drift detected" in violation
+        for violation in violations
+    )
+
+
 def test_verify_runtime_short_circuits_on_preflight_issues(
     tmp_path: Path,
     monkeypatch,
@@ -3598,7 +3805,10 @@ def test_verify_runtime_short_circuits_on_preflight_issues(
         check_vscode_mcp=True,
     )
 
-    assert violations == ["Runtime preflight detected no running containers."]
+    assert violations == [
+        "Runtime preflight reported `needs-ramp-up`.",
+        "Runtime preflight detected no running containers.",
+    ]
 
 
 def test_validate_throwaway_install_uses_canonical_stack_helper(

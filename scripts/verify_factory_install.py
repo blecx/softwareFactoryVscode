@@ -120,7 +120,10 @@ def render_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
             "",
             "Please verify and report PASS/FAIL with evidence for:",
             "- The workspace shows both the host project root and `.copilot/softwareFactoryVscode`.",
-            "- `.copilot/softwareFactoryVscode/lock.json`, `.copilot/softwareFactoryVscode/.factory.env`, and the workspace file exist.",
+            (
+                "- `.copilot/softwareFactoryVscode/lock.json`, "
+                "`.copilot/softwareFactoryVscode/.factory.env`, and the workspace file exist."
+            ),
             "- `.copilot/softwareFactoryVscode/scripts/verify_factory_install.py` appears present.",
             "- The installation looks compliant with namespace-first and ready for VS Code usage.",
             "",
@@ -236,6 +239,53 @@ def load_vscode_mcp_server_urls(
         if isinstance(data, dict) and isinstance(data.get("url"), str):
             urls[name] = data["url"]
     return urls
+
+
+def build_effective_runtime_ports(
+    preflight: dict[str, Any],
+    runtime_manifest: dict[str, Any],
+    env_values: dict[str, str],
+) -> dict[str, int]:
+    preflight_config = preflight.get("config")
+    preflight_ports = getattr(preflight_config, "ports", None)
+    if isinstance(preflight_ports, dict) and preflight_ports:
+        effective_ports: dict[str, int] = {}
+        for key, value in preflight_ports.items():
+            if key not in factory_workspace.PORT_LAYOUT:
+                continue
+            try:
+                effective_ports[key] = int(value)
+            except (TypeError, ValueError):
+                continue
+        if effective_ports:
+            return effective_ports
+
+    ports = factory_workspace.build_port_values(0)
+    manifest_ports = runtime_manifest.get("ports", {})
+    manifest_override: dict[str, int] = {}
+    if isinstance(manifest_ports, dict):
+        for key, value in manifest_ports.items():
+            if key not in ports:
+                continue
+            try:
+                manifest_override[key] = int(value)
+            except (TypeError, ValueError):
+                continue
+
+    ports.update(manifest_override)
+
+    for key in ports:
+        raw_value = env_values.get(key, "").strip()
+        if not raw_value:
+            continue
+        try:
+            parsed_value = int(raw_value)
+        except ValueError:
+            continue
+        if key not in manifest_override:
+            ports[key] = parsed_value
+
+    return ports
 
 
 def check_factory_tree(target_dir: Path, violations: list[str]) -> Path | None:
@@ -563,34 +613,34 @@ def verify_runtime(
         env_file=env_path,
         workspace_file=workspace_file,
     )
-    if preflight["status"] != "ready":
-        return [str(issue) for issue in preflight["issues"]]
+    preflight_status = str(preflight.get("status", "unknown"))
+    preflight_recommended_action = str(preflight.get("recommended_action", ""))
+    if preflight_status != "ready":
+        issues = [str(issue) for issue in preflight.get("issues", []) if str(issue)]
+        if preflight_recommended_action:
+            summary = (
+                "Runtime preflight reported "
+                f"`{preflight_status}` (recommended_action="
+                f"`{preflight_recommended_action}`)."
+            )
+        else:
+            summary = f"Runtime preflight reported `{preflight_status}`."
+        return [summary, *issues] if issues else [summary]
 
     runtime_manifest = load_runtime_manifest(target_dir)
+    preflight_config = preflight.get("config")
+    preflight_compose_project_name = str(
+        getattr(preflight_config, "compose_project_name", "")
+    )
     compose_project_name = str(
-        runtime_manifest.get("compose_project_name")
+        preflight_compose_project_name
+        or runtime_manifest.get("compose_project_name")
         or env_values.get("COMPOSE_PROJECT_NAME", "")
     )
     if not compose_project_name:
         return ["COMPOSE_PROJECT_NAME is missing or empty in .factory.env"]
 
-    ports = factory_workspace.build_port_values(0)
-    manifest_ports = runtime_manifest.get("ports", {})
-    if isinstance(manifest_ports, dict):
-        for key, value in manifest_ports.items():
-            if key in ports:
-                try:
-                    ports[key] = int(value)
-                except (TypeError, ValueError):
-                    continue
-    for key in ports:
-        raw_value = env_values.get(key, "").strip()
-        if not raw_value:
-            continue
-        try:
-            ports[key] = int(raw_value)
-        except ValueError:
-            continue
+    ports = build_effective_runtime_ports(preflight, runtime_manifest, env_values)
 
     running_services = {
         service_name: str(data.get("status", ""))
@@ -619,16 +669,31 @@ def verify_runtime(
         port_key = metadata["port_key"]
         health_path = metadata["health_path"]
         if port_key and health_path:
-            health_url = f"http://127.0.0.1:{ports[port_key]}{health_path}"
+            port_value = ports.get(port_key)
+            if not isinstance(port_value, int):
+                violations.append(
+                    "Effective runtime contract is missing port key "
+                    f"`{port_key}` for runtime service `{service_name}`."
+                )
+                continue
+
+            health_url = f"http://127.0.0.1:{port_value}{health_path}"
             error = probe_http_url(
                 health_url,
                 timeout=timeout,
                 allow_http_error=bool(metadata.get("allow_http_error", False)),
             )
             if error:
-                violations.append(error)
+                violations.append(
+                    "Runtime endpoint probe failed for service "
+                    f"`{service_name}` at {health_url}: {error}"
+                )
 
     if check_vscode_mcp:
+        expected_server_urls = {
+            name: str(url)
+            for name, url in getattr(preflight_config, "mcp_server_urls", {}).items()
+        }
         server_urls = preflight["workspace_urls"] or load_vscode_mcp_server_urls(
             target_dir, workspace_file
         )
@@ -638,6 +703,13 @@ def verify_runtime(
                 "the generated workspace file or canonical VS Code MCP config."
             )
         for server_name, url in server_urls.items():
+            expected_url = expected_server_urls.get(server_name)
+            if expected_url and expected_url != url:
+                violations.append(
+                    "VS Code MCP endpoint drift detected for "
+                    f"`{server_name}` (expected `{expected_url}`, found `{url}`)."
+                )
+
             if not url.startswith("http://127.0.0.1") and not url.startswith(
                 "http://localhost"
             ):
