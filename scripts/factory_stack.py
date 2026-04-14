@@ -437,6 +437,22 @@ def infer_runtime_state_from_services(running_services: dict[str, str]) -> str:
     return "degraded" if degraded else "running"
 
 
+def resolve_status_runtime_state(
+    persisted_state: str,
+    inferred_state: str,
+    *,
+    docker_state_available: bool,
+) -> str:
+    normalized_persisted = persisted_state.strip() or "installed"
+    if not docker_state_available:
+        return normalized_persisted
+    if inferred_state == "stopped":
+        if normalized_persisted in {"installed", "failed"}:
+            return normalized_persisted
+        return "stopped"
+    return inferred_state
+
+
 def resolve_target_dir_from_env(repo_root: Path, env_file: Path) -> Path:
     env_values = factory_workspace.parse_env_file(env_file)
     target_value = env_values.get("TARGET_WORKSPACE_PATH", "").strip()
@@ -572,6 +588,7 @@ def start_stack(
             action.extend(["--wait", "--wait-timeout", str(wait_timeout)])
     factory_workspace.update_runtime_state(config.factory_instance_id, "starting")
     if foreground:
+        final_state = "stopped"
         try:
             factory_workspace.update_runtime_state(
                 config.factory_instance_id, "running"
@@ -581,17 +598,15 @@ def start_stack(
                 build_compose_command(repo_root, resolved_env_file, action),
             )
         except subprocess.CalledProcessError:
-            factory_workspace.update_runtime_state(
-                config.factory_instance_id, "stopped"
-            )
+            final_state = "failed"
             raise
         except KeyboardInterrupt:
             print("\nShutting down stack...")
         finally:
             factory_workspace.update_runtime_state(
-                config.factory_instance_id, "stopped"
+                config.factory_instance_id, final_state
             )
-            return resolved_env_file
+        return resolved_env_file
     else:
         try:
             run_compose_command(
@@ -629,10 +644,19 @@ def stop_stack(
     if remove_volumes:
         action.append("-v")
 
-    run_compose_command(
-        repo_root,
-        build_compose_command(repo_root, resolved_env_file, action),
-    )
+    try:
+        run_compose_command(
+            repo_root,
+            build_compose_command(repo_root, resolved_env_file, action),
+        )
+    except subprocess.CalledProcessError:
+        factory_workspace.update_runtime_state(config.factory_instance_id, "failed")
+        print(
+            "❌ Failed to stop workspace "
+            f"`{config.project_workspace_id}` [{config.factory_instance_id}]. "
+            "Runtime state marked as `failed` for operator visibility."
+        )
+        raise
     if not preserve_runtime_state:
         factory_workspace.update_runtime_state(config.factory_instance_id, "stopped")
     return resolved_env_file
@@ -715,7 +739,12 @@ def cleanup_workspace(
 
 
 def list_workspaces() -> int:
-    res = factory_workspace.reconcile_registry()
+    try:
+        res = factory_workspace.reconcile_registry()
+    except RuntimeError as exc:
+        print("❌ Registry reconciliation failed; lifecycle state may be inconsistent.")
+        print(str(exc))
+        return 1
     if res.get("stale_removed"):
         for stale_id in res["stale_removed"]:
             print(f"🧹 Removed stale registry record for: {stale_id}")
@@ -749,19 +778,69 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
         repo_root, env_file=resolved_env_file, persist=False
     )
     registry = factory_workspace.load_registry()
-    record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
+    record = registry.get("workspaces", {}).get(config.factory_instance_id)
+    record_persisted = isinstance(record, dict) and bool(record)
+    if not isinstance(record, dict) or not record:
+        try:
+            factory_workspace.refresh_registry_entry(config.target_dir)
+        except FileNotFoundError as exc:
+            print(
+                "⚠️ Unable to resolve workspace registry record for "
+                f"`{config.target_dir}`. Continuing with transient installed state."
+            )
+            print(f"error={exc}")
+            record = {"runtime_state": "installed"}
+            record_persisted = False
+        else:
+            registry = factory_workspace.load_registry()
+            record = registry.get("workspaces", {}).get(config.factory_instance_id)
+            if not isinstance(record, dict) or not record:
+                print(
+                    "⚠️ Unable to recover workspace registry record for "
+                    f"`{config.factory_instance_id}` after refresh. "
+                    "Continuing with transient installed state."
+                )
+                record = {"runtime_state": "installed"}
+                record_persisted = False
+            else:
+                record_persisted = True
+                print(
+                    "♻️ Recovered missing registry record for: "
+                    f"{config.factory_instance_id}"
+                )
+
+    docker_state_available = True
     try:
         running_services = collect_running_services(config.compose_project_name)
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as exc:
         running_services = {}
+        docker_state_available = False
+        print(
+            "⚠️ Unable to inspect Docker runtime state for compose project "
+            f"`{config.compose_project_name}`: {exc}. "
+            "Preserving persisted runtime_state."
+        )
 
     inferred_state = infer_runtime_state_from_services(running_services)
     persisted_state = str(record.get("runtime_state", "installed"))
-    runtime_state = inferred_state if inferred_state != "stopped" else persisted_state
-    if runtime_state != persisted_state:
-        factory_workspace.update_runtime_state(
-            config.factory_instance_id, runtime_state
-        )
+    runtime_state = resolve_status_runtime_state(
+        persisted_state,
+        inferred_state,
+        docker_state_available=docker_state_available,
+    )
+    if runtime_state != persisted_state and record_persisted:
+        try:
+            factory_workspace.update_runtime_state(
+                config.factory_instance_id, runtime_state
+            )
+        except KeyError:
+            print(
+                "❌ Workspace registry entry disappeared while updating runtime state "
+                f"for `{config.factory_instance_id}`."
+            )
+            return 1
+        registry = factory_workspace.load_registry()
+        record = registry.get("workspaces", {}).get(config.factory_instance_id, record)
 
     active = registry.get("active_workspace", "") == config.factory_instance_id
     lock_path = config.target_dir / ".copilot/softwareFactoryVscode/lock.json"
@@ -787,7 +866,15 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"factory_commit={head_commit}")
     print(f"lock_commit={lock_commit}")
     print(f"needs_rebuild={str(needs_rebuild).lower()}")
-    preflight = build_preflight_report(repo_root, env_file=resolved_env_file)
+    try:
+        preflight = build_preflight_report(repo_root, env_file=resolved_env_file)
+    except RuntimeError as exc:
+        print("preflight_status=error")
+        print("recommended_action=inspect-registry")
+        print(f"preflight_error={exc}")
+        for name, url in sorted(config.mcp_server_urls.items()):
+            print(f"mcp.{name}={url}")
+        return 1
     print(f"preflight_status={preflight['status']}")
     print(f"recommended_action={preflight['recommended_action']}")
     for name, url in sorted(config.mcp_server_urls.items()):
