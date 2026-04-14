@@ -2404,6 +2404,176 @@ def test_activate_workspace_refreshes_generated_runtime_artifacts(
     assert registry["active_workspace"] == config.factory_instance_id
 
 
+def test_activate_workspace_is_idempotent_when_runtime_metadata_is_unchanged(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+    )
+
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    workspace_path = target_repo / "software-factory.code-workspace"
+
+    factory_stack.activate_workspace(repo_root, env_file=env_path)
+    first_workspace = workspace_path.read_text(encoding="utf-8")
+    first_env = env_path.read_text(encoding="utf-8")
+    first_manifest = json.loads(
+        config.runtime_manifest_path.read_text(encoding="utf-8")
+    )
+
+    factory_stack.activate_workspace(repo_root, env_file=env_path)
+    second_workspace = workspace_path.read_text(encoding="utf-8")
+    second_env = env_path.read_text(encoding="utf-8")
+    second_manifest = json.loads(
+        config.runtime_manifest_path.read_text(encoding="utf-8")
+    )
+
+    assert second_workspace == first_workspace
+    assert second_env == first_env
+    assert second_manifest["mcp_servers"] == first_manifest["mcp_servers"]
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert registry["active_workspace"] == config.factory_instance_id
+
+
+def test_activate_workspace_recovers_effective_ports_from_runtime_metadata_when_env_drifted(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    non_default_env = "\n".join(
+        [
+            f"TARGET_WORKSPACE_PATH={target_repo}",
+            "PROJECT_WORKSPACE_ID=target-project",
+            "COMPOSE_PROJECT_NAME=factory_target-project",
+            f"FACTORY_DIR={repo_root}",
+            "FACTORY_INSTANCE_ID=factory-custom",
+            "FACTORY_PORT_INDEX=2",
+            "PORT_CONTEXT7=3210",
+            "PORT_BASH=3211",
+            "PORT_FS=3212",
+            "PORT_GIT=3213",
+            "PORT_SEARCH=3214",
+            "PORT_TEST=3215",
+            "PORT_COMPOSE=3216",
+            "PORT_DOCS=3217",
+            "PORT_GITHUB=3218",
+            "MEMORY_MCP_PORT=3230",
+            "AGENT_BUS_PORT=3231",
+            "APPROVAL_GATE_PORT=8201",
+            "PORT_TUI=9290",
+            "CONTEXT7_API_KEY=",
+            "",
+        ]
+    )
+    env_path.write_text(non_default_env, encoding="utf-8")
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+    )
+
+    stale_default_ports = factory_workspace.build_port_values(0)
+    drifted_env = "\n".join(
+        [
+            f"TARGET_WORKSPACE_PATH={target_repo}",
+            "PROJECT_WORKSPACE_ID=target-project",
+            "COMPOSE_PROJECT_NAME=factory_target-project",
+            f"FACTORY_DIR={repo_root}",
+            f"FACTORY_INSTANCE_ID={config.factory_instance_id}",
+            "FACTORY_PORT_INDEX=0",
+            *[f"{key}={value}" for key, value in stale_default_ports.items()],
+            "CONTEXT7_API_KEY=",
+            "",
+        ]
+    )
+    env_path.write_text(drifted_env, encoding="utf-8")
+
+    workspace_path = target_repo / "software-factory.code-workspace"
+    stale_workspace = json.loads(workspace_path.read_text(encoding="utf-8"))
+    stale_workspace["settings"]["mcp"]["servers"]["context7"][
+        "url"
+    ] = "http://127.0.0.1:3010/mcp"
+    stale_workspace["settings"]["mcp"]["servers"]["bashGateway"][
+        "url"
+    ] = "http://127.0.0.1:3011/mcp"
+    workspace_path.write_text(
+        json.dumps(stale_workspace, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+
+    factory_stack.activate_workspace(repo_root, env_file=env_path)
+
+    refreshed_env = factory_workspace.parse_env_file(env_path)
+    refreshed_workspace = json.loads(workspace_path.read_text(encoding="utf-8"))
+    refreshed_manifest = json.loads(
+        config.runtime_manifest_path.read_text(encoding="utf-8")
+    )
+
+    assert refreshed_env["FACTORY_PORT_INDEX"] == str(config.port_index)
+    assert refreshed_env["PORT_CONTEXT7"] == str(config.ports["PORT_CONTEXT7"])
+    assert refreshed_env["PORT_BASH"] == str(config.ports["PORT_BASH"])
+
+    assert (
+        refreshed_workspace["settings"]["mcp"]["servers"]["context7"]["url"]
+        == config.mcp_server_urls["context7"]
+    )
+    assert (
+        refreshed_workspace["settings"]["mcp"]["servers"]["bashGateway"]["url"]
+        == config.mcp_server_urls["bashGateway"]
+    )
+    assert (
+        refreshed_manifest["mcp_servers"]["context7"]["url"]
+        == config.mcp_server_urls["context7"]
+    )
+    assert (
+        refreshed_manifest["mcp_servers"]["bashGateway"]["url"]
+        == config.mcp_server_urls["bashGateway"]
+    )
+
+
 def test_factory_stack_start_rolls_back_runtime_state_when_compose_fails(
     tmp_path: Path,
     monkeypatch,
