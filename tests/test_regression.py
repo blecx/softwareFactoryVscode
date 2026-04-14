@@ -1,6 +1,7 @@
 import asyncio
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -738,6 +739,20 @@ def _load_next_issue_module():
     return module
 
 
+def _load_local_ci_parity_module():
+    repo_root = Path(__file__).parent.parent
+    local_ci_path = repo_root / "scripts" / "local_ci_parity.py"
+    spec = importlib.util.spec_from_file_location(
+        "local_ci_parity_module", local_ci_path
+    )
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_next_pr_resolves_current_backend_repo_and_skips_placeholder_client(
     monkeypatch,
 ):
@@ -820,3 +835,96 @@ def test_next_issue_resolves_current_repo_when_target_repo_is_placeholder(
     )
 
     assert module._resolve_github_repo() == "blecx/softwareFactoryVscode"
+
+
+def test_local_ci_parity_reports_findings_list_and_improvement_plan(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+    executed_commands: list[tuple[str, ...]] = []
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        executed_commands.append(command_tuple)
+
+        if "black" in command_tuple:
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                1,
+                stdout="",
+                stderr="would reformat scripts/demo.py\n",
+            )
+
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--skip-integration",
+            "--skip-pr-template-check",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert any("black" in command for command in executed_commands)
+    assert any("flake8" in command for command in executed_commands)
+
+    assert "Findings" in captured.out
+    assert "[ERROR] Black format check" in captured.out
+    assert "[WARNING] Integration regression" in captured.out
+    assert "[WARNING] PR-template format validation" in captured.out
+    assert "[WARNING] Docker image build parity" in captured.out
+    assert "Improvement plan" in captured.out
+    assert (
+        "Run Black on `factory_runtime/`, `scripts/`, and `tests/`, then review the diffs."
+        in captured.out
+    )
+    assert (
+        "Run the standard precheck again without `--skip-integration` before "
+        "finalizing the PR." in captured.out
+    )
+    assert "would reformat scripts/demo.py" in captured.err
+
+
+def test_local_ci_parity_warnings_do_not_fail_the_standard_precheck(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Summary: 0 error(s), 1 warning(s)." in captured.out
+    assert "[WARNING] Docker image build parity" in captured.out
+    assert "Improvement plan" in captured.out
+    assert "passed with 1 warning(s)" in captured.out
