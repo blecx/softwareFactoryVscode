@@ -146,6 +146,19 @@ def test_tasks_no_longer_invoke_legacy_issue_loop_scripts():
         assert "WORK-ISSUE-WORKFLOW.md" in serialized
 
 
+def test_tasks_expose_local_ci_parity_default_precheck():
+    repo_root = Path(__file__).parent.parent
+    tasks = json.loads(
+        (repo_root / ".vscode" / "tasks.json").read_text(encoding="utf-8")
+    )
+    task_map = {task["label"]: task for task in tasks["tasks"]}
+
+    ci_parity = task_map["✅ Validate: Local CI Parity"]
+    assert ci_parity["command"] == "${workspaceFolder}/.venv/bin/python"
+    assert ci_parity["args"] == ["${workspaceFolder}/scripts/local_ci_parity.py"]
+    assert ci_parity["group"] == {"kind": "test", "isDefault": True}
+
+
 def test_source_checkout_does_not_commit_static_mcp_server_urls():
     repo_root = Path(__file__).parent.parent
     settings = json.loads(
@@ -203,8 +216,12 @@ def test_work_issue_workflow_restores_template_and_precheck_guardrails():
     assert ".github/ISSUE_TEMPLATE/bug_report.yml" in workflow_doc
     assert ".github/pull_request_template.md" in workflow_doc
     assert ".github/workflows/ci.yml" in workflow_doc
+    assert "scripts/local_ci_parity.py" in workflow_doc
+    assert "scripts/verify_release_docs.py" in workflow_doc
+    assert "scripts/factory_release.py write-manifest" in workflow_doc
     assert "./scripts/validate-pr-template.sh" in workflow_doc
     assert "./tests/run-integration-test.sh" in workflow_doc
+    assert "--include-docker-build" in workflow_doc
     assert "ADR-005-Strong-Templating-Enforcement.md" in workflow_doc
     assert "ADR-006-Local-CI-Parity-Prechecks.md" in workflow_doc
 
@@ -225,12 +242,16 @@ def test_new_adrs_capture_template_and_local_ci_contracts():
     assert "queue-phase-2" in adr_005
 
     assert ".github/workflows/ci.yml" in adr_006
+    assert "./scripts/local_ci_parity.py" in adr_006
+    assert "./scripts/verify_release_docs.py" in adr_006
+    assert "factory_release.py write-manifest" in adr_006
     assert "./.venv/bin/black --check factory_runtime/ scripts/ tests/" in adr_006
     assert "./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/" in adr_006
     assert "./.venv/bin/flake8 factory_runtime/ scripts/ tests/" in adr_006
     assert "./.venv/bin/pytest tests/" in adr_006
     assert "./tests/run-integration-test.sh" in adr_006
     assert "./scripts/validate-pr-template.sh <pr-body-file>" in adr_006
+    assert "--include-docker-build" in adr_006
 
 
 def test_queue_skills_reference_historical_guardrails():
@@ -485,7 +506,10 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
     assert "## Execution Guardrails for This Rework" in plan_doc
     assert "## Mitigation Map and Current Resolution Status" in plan_doc
     assert "## Proposed ADR to Production Promotion Path" in plan_doc
-    assert "## Practical delivery split while shared-service promotion remains blocked" in plan_doc
+    assert (
+        "## Practical delivery split while shared-service promotion remains blocked"
+        in plan_doc
+    )
     assert "| Scope | Status | Priority now | Why it matters |" in plan_doc
     assert "Blocked for now" in plan_doc
     assert "## Practical execution plan for a working system" in plan_doc
@@ -494,8 +518,13 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
         "### Priority 1: Lifecycle truth, activation behavior, and per-workspace verification"
         in plan_doc
     )
-    assert "### Priority 2: Docs, regression coverage, and day-two operator confidence" in plan_doc
-    assert "### Deferred phase: Shared multi-tenant promotion remains blocked" in plan_doc
+    assert (
+        "### Priority 2: Docs, regression coverage, and day-two operator confidence"
+        in plan_doc
+    )
+    assert (
+        "### Deferred phase: Shared multi-tenant promotion remains blocked" in plan_doc
+    )
     assert "## Program-level definition of done" in plan_doc
     assert "## Mandatory quality gates for this rework" in plan_doc
     assert "## Transition, update, and upgrade safety rules" in plan_doc

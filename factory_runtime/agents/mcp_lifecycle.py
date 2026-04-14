@@ -62,7 +62,9 @@ class MCPBootloader:
         `scripts/factory_stack.py` so FACTORY issue runs follow the same generated
         `.factory.env` and runtime-manifest contract as the installed workspace.
         """
-        logger.info("Initializing MCP Bootloader via canonical factory_stack lifecycle...")
+        logger.info(
+            "Initializing MCP Bootloader via canonical factory_stack lifecycle..."
+        )
 
         self._factory_repo_root = self._resolve_factory_repo_root()
         self._factory_stack = self._load_factory_stack_module(self._factory_repo_root)
@@ -151,7 +153,11 @@ class MCPBootloader:
         server_urls: dict[str, str] = {}
         for server_name, (section_name, runtime_name) in SERVER_URL_MAPPINGS.items():
             section = report.get(section_name, {})
-            url = str(section.get(runtime_name, "")).strip() if isinstance(section, dict) else ""
+            url = (
+                str(section.get(runtime_name, "")).strip()
+                if isinstance(section, dict)
+                else ""
+            )
             if not url:
                 raise RuntimeError(
                     "Runtime preflight did not publish a URL for required MCP service "
@@ -176,9 +182,7 @@ class MCPBootloader:
         self._teardown_handled = True
 
         if self.kill_mcps_on_exit:
-            logger.info(
-                "Stopping canonical MCP runtime (--kill-mcps-on-exit is set)."
-            )
+            logger.info("Stopping canonical MCP runtime (--kill-mcps-on-exit is set).")
             self._stop_containers()
         else:
             logger.info("Skipping orphan sweep. Containers will remain running.")

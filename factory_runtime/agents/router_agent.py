@@ -102,9 +102,7 @@ class RouterAgent:
         hinted_files = list(dict.fromkeys(_FILE_PATH_RE.findall(issue_body)))
         if changed_files:
             hinted_files.extend(
-                path
-                for path in changed_files
-                if path and path not in hinted_files
+                path for path in changed_files if path and path not in hinted_files
             )
 
         # Step 2: memory lookup for similar past issues

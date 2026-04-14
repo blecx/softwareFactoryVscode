@@ -119,7 +119,9 @@ def build_source_workspace_settings(repo_root: Path) -> Dict[str, Any]:
     second static MCP URL contract into `.vscode/settings.json`.
     """
 
-    settings = copy.deepcopy(factory_workspace.load_canonical_workspace_settings(repo_root))
+    settings = copy.deepcopy(
+        factory_workspace.load_canonical_workspace_settings(repo_root)
+    )
     settings.pop("mcp", None)
     return settings
 
