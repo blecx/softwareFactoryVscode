@@ -40,6 +40,16 @@ The throwaway-target regression in `tests/test_factory_install.py` validates the
 - post-install verifier success
 - non-mutating smoke prompt output contract
 
+## Practical baseline coverage map (P0/P1/P2 lock)
+
+The practical per-workspace baseline is protected by a mix of functional and documentation regressions:
+
+- **Install/update contract:** `tests/test_factory_install.py`
+- **Lifecycle/activation/verification guidance drift:** `tests/test_regression.py`
+- **Host-isolation boundaries and subsystem mount safety:** `tests/run-integration-test.sh`
+
+The baseline intentionally distinguishes current per-workspace support from the still-blocked shared multi-tenant promotion phase.
+
 Default throwaway install/runtime validation should stay inside the source repository's gitignored `.tmp/` tree (for example `.tmp/throwaway-targets/`) unless a test explicitly opts into an external target. This keeps disposable targets in-workspace and avoids accidentally tainting unrelated repositories or non-repository paths.
 
 ---
