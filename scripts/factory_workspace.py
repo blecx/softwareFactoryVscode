@@ -472,7 +472,20 @@ def find_available_port_index(
     preferred_index: int | None = None,
     exclude_instance_id: str = "",
     max_port_index: int = 200,
+    reconcile_before_scan: bool = True,
 ) -> int:
+    if reconcile_before_scan:
+        try:
+            reconcile_registry(
+                registry_path=registry_path,
+                prune_ephemeral=False,
+            )
+        except RuntimeError as exc:
+            raise RuntimeError(
+                "Unable to reconcile workspace registry before port allocation. "
+                "Conflicting ownership records remain and require explicit operator resolution."
+            ) from exc
+
     registry = load_registry(registry_path)
     used_indices = {
         int(record.get("port_index", -1))
@@ -506,9 +519,9 @@ def find_available_port_index(
             return index
     raise RuntimeError(
         "Unable to allocate a free workspace port block. "
-        f"Checked {max_port_index} blocks ({PORT_BLOCK_STRIDE} ports each). "
-        "Try cleaning stale registry entries with `factory_stack.py list`/`cleanup`, "
-        "or free conflicting local ports."
+        f"Checked {max_port_index} blocks ({PORT_BLOCK_STRIDE} ports each) "
+        "after automatic stale-registry reconciliation. "
+        "Run `factory_stack.py list` to inspect remaining conflicts or free local ports."
     )
 
 
@@ -540,6 +553,7 @@ def build_runtime_config(
     factory_dir: Path | None = None,
     workspace_file: str = DEFAULT_WORKSPACE_FILENAME,
     registry_path: Path | None = None,
+    reconcile_registry_before_allocating: bool = True,
 ) -> WorkspaceRuntimeConfig:
     resolved_target = target_dir.expanduser().resolve()
     resolved_factory = (
@@ -547,6 +561,19 @@ def build_runtime_config(
         if factory_dir is not None
         else (resolved_target / FACTORY_DIRNAME).resolve()
     )
+
+    if reconcile_registry_before_allocating:
+        try:
+            reconcile_registry(
+                registry_path=registry_path,
+                prune_ephemeral=False,
+            )
+        except RuntimeError as exc:
+            raise RuntimeError(
+                "Unable to reconcile workspace registry before generating runtime metadata. "
+                "Resolve conflicting workspace ownership records and retry."
+            ) from exc
+
     env_path = resolved_target / FACTORY_DIRNAME / ".factory.env"
     manifest_path = resolved_target / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME
     existing_env = parse_env_file(env_path)
@@ -665,6 +692,7 @@ def build_runtime_config(
             registry_path=registry_path,
             preferred_index=preferred_index if preferred_index is not None else 0,
             exclude_instance_id=factory_instance_id,
+            reconcile_before_scan=False,
         )
         ports = build_port_values(port_index)
 
@@ -853,6 +881,7 @@ def load_or_rebuild_runtime_manifest(
             resolved_target,
             factory_dir=factory_dir,
             registry_path=registry_path,
+            reconcile_registry_before_allocating=False,
         )
     except Exception:
         return {}, False
@@ -996,7 +1025,27 @@ def is_ephemeral_workspace_path(target_dir: Path) -> bool:
     return "/pytest-of-" in target or "/pytest-" in target
 
 
-def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
+def has_managed_workspace_contract(target_dir: Path) -> bool:
+    """Return True when target path contains managed factory runtime artifacts."""
+
+    factory_dir = target_dir / FACTORY_DIRNAME
+    if not factory_dir.exists() or not factory_dir.is_dir():
+        return False
+
+    markers = (
+        factory_dir / ".factory.env",
+        factory_dir / "lock.json",
+        target_dir / TMP_SUBPATH / RUNTIME_MANIFEST_FILENAME,
+        target_dir / DEFAULT_WORKSPACE_FILENAME,
+    )
+    return any(path.exists() for path in markers)
+
+
+def reconcile_registry(
+    *,
+    registry_path: Path | None = None,
+    prune_ephemeral: bool = True,
+) -> dict[str, Any]:
     registry = load_registry(registry_path)
     workspaces = registry.get("workspaces", {})
     if not isinstance(workspaces, dict):
@@ -1004,6 +1053,9 @@ def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
 
     active_workspace = str(registry.get("active_workspace", ""))
     stale_ids: list[str] = []
+    missing_target_ids: list[str] = []
+    invalid_target_ids: list[str] = []
+    ephemeral_target_ids: list[str] = []
     recovered_ids: list[str] = []
     rebuilt_manifest_ids: list[str] = []
     remapped_instance_ids: dict[str, str] = {}
@@ -1025,14 +1077,26 @@ def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
             target_dir = Path(target_value).expanduser().resolve()
         except Exception:
             stale_ids.append(iid)
+            invalid_target_ids.append(iid)
             continue
 
         if not target_dir.exists() or not target_dir.is_dir():
             stale_ids.append(iid)
+            missing_target_ids.append(iid)
             continue
 
-        if iid != active_workspace and is_ephemeral_workspace_path(target_dir):
+        if (
+            prune_ephemeral
+            and iid != active_workspace
+            and is_ephemeral_workspace_path(target_dir)
+        ):
             stale_ids.append(iid)
+            ephemeral_target_ids.append(iid)
+            continue
+
+        if not has_managed_workspace_contract(target_dir):
+            stale_ids.append(iid)
+            invalid_target_ids.append(iid)
             continue
 
         manifest, rebuilt_manifest = load_or_rebuild_runtime_manifest(
@@ -1045,6 +1109,7 @@ def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
         canonical_iid = str(manifest.get("factory_instance_id", "")).strip()
         if not canonical_iid:
             stale_ids.append(iid)
+            invalid_target_ids.append(iid)
             continue
 
         if canonical_iid != iid:
@@ -1127,6 +1192,9 @@ def reconcile_registry(*, registry_path: Path | None = None) -> dict[str, Any]:
 
     return {
         "stale_removed": stale_ids,
+        "missing_targets_removed": missing_target_ids,
+        "invalid_targets_removed": invalid_target_ids,
+        "ephemeral_targets_removed": ephemeral_target_ids,
         "recovered_ids": recovered_ids,
         "rebuilt_manifest_ids": rebuilt_manifest_ids,
         "remaining": len(canonical_records),

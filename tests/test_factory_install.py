@@ -4110,6 +4110,141 @@ def test_reconcile_registry_prunes_ephemeral_pytest_workspaces(
         shutil.rmtree(persistent_target, ignore_errors=True)
 
 
+def test_reconcile_registry_prunes_existing_non_managed_targets(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+
+    invalid_target = tmp_path / "home-sw-like"
+    invalid_target.mkdir(parents=True, exist_ok=True)
+
+    factory_workspace.write_json_atomic(
+        registry_path,
+        {
+            "version": 1,
+            "active_workspace": "factory-invalid",
+            "workspaces": {
+                "factory-invalid": {
+                    "factory_instance_id": "factory-invalid",
+                    "project_workspace_id": "invalid",
+                    "target_workspace_path": str(invalid_target),
+                    "port_index": 0,
+                    "ports": factory_workspace.build_port_values(0),
+                    "runtime_state": "installed",
+                }
+            },
+        },
+    )
+
+    result = factory_workspace.reconcile_registry(registry_path=registry_path)
+    updated = factory_workspace.load_registry(registry_path=registry_path)
+
+    assert "factory-invalid" in result["stale_removed"]
+    assert "factory-invalid" in result["invalid_targets_removed"]
+    assert updated["active_workspace"] == ""
+    assert updated["workspaces"] == {}
+
+
+def test_build_runtime_config_reconciles_stale_missing_registry_entries_before_allocation(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    stale_registry = {
+        "version": 1,
+        "active_workspace": "",
+        "workspaces": {},
+    }
+    for index in range(200):
+        instance_id = f"factory-stale-{index}"
+        stale_registry["workspaces"][instance_id] = {
+            "factory_instance_id": instance_id,
+            "project_workspace_id": f"stale-{index}",
+            "target_workspace_path": str(tmp_path / f"missing-target-{index}"),
+            "port_index": index,
+            "ports": factory_workspace.build_port_values(index),
+            "runtime_state": "installed",
+        }
+    factory_workspace.write_json_atomic(registry_path, stale_registry)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    registry_after = factory_workspace.load_registry(registry_path=registry_path)
+
+    assert config.port_index == 0
+    assert registry_after.get("workspaces", {}) == {}
+
+
+def test_bootstrap_sync_runtime_contract_recovers_from_stale_registry_exhaustion(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        bootstrap_host.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+
+    stale_registry = {
+        "version": 1,
+        "active_workspace": "",
+        "workspaces": {},
+    }
+    for index in range(200):
+        instance_id = f"factory-stale-{index}"
+        stale_registry["workspaces"][instance_id] = {
+            "factory_instance_id": instance_id,
+            "project_workspace_id": f"stale-{index}",
+            "target_workspace_path": str(tmp_path / f"gone-{index}"),
+            "port_index": index,
+            "ports": factory_workspace.build_port_values(index),
+            "runtime_state": "installed",
+        }
+    factory_workspace.write_json_atomic(registry_path, stale_registry)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config, factory_env_created = bootstrap_host.sync_factory_runtime_contract(
+        target_repo,
+        workspace_file="software-factory.code-workspace",
+    )
+    registry_after = factory_workspace.load_registry(registry_path=registry_path)
+
+    assert factory_env_created is True
+    assert config.port_index == 0
+    assert set(registry_after.get("workspaces", {}).keys()) == {
+        config.factory_instance_id
+    }
+
+
 def test_refresh_registry_entry_rebuilds_missing_record_from_local_metadata(
     tmp_path: Path,
     monkeypatch,

@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.test_factory_install import create_source_factory_repo, init_git_repo, install_factory
+from tests.test_factory_install import (
+    create_source_factory_repo,
+    init_git_repo,
+    install_factory,
+)
 
 
 def test_install_factory_removes_legacy_structure_after_spinning_down(tmp_path: Path):

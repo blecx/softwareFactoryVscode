@@ -8,7 +8,6 @@ import json
 import subprocess
 from pathlib import Path
 
-
 RELEASE_STATUS_HEADING = "## Delivery status snapshot"
 RELEASE_STATUS_TABLE_HEADER = "| Scope | Status | Why it matters |"
 RELEASE_STATUS_TABLE_DIVIDER = "| --- | --- | --- |"

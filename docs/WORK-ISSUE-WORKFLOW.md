@@ -28,15 +28,41 @@ Use these Copilot agents in VS Code Chat:
 - PR descriptions must follow `.github/pull_request_template.md` exactly.
 - Before opening or finalizing a PR, run the local equivalents of `.github/workflows/ci.yml`:
 
+   Primary one-command path:
+
+   ```text
+   ./.venv/bin/python ./scripts/local_ci_parity.py
+   ```
+
+   This executes release-doc policy, release-manifest parity, Black/isort/Flake8,
+   `pytest tests/`, integration regression, and PR-template validation against
+   `.github/pull_request_template.md`.
+
+   Optional expanded parity:
+
+   ```text
+   ./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build
+   ```
+
+   Equivalent explicit checks (for troubleshooting/granular reruns):
+
   ```text
+   ./.venv/bin/python ./scripts/verify_release_docs.py --repo-root . --base-rev <base> --head-rev HEAD
+   ./.venv/bin/python ./scripts/factory_release.py write-manifest --repo-root . --repo-url https://github.com/blecx/softwareFactoryVscode.git --check
   ./.venv/bin/black --check factory_runtime/ scripts/ tests/
   ./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/
   ./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841
   ./.venv/bin/pytest tests/
   ./tests/run-integration-test.sh
+   ./scripts/validate-pr-template.sh ./.github/pull_request_template.md
   ```
 
-- Validate generated PR bodies locally with `./scripts/validate-pr-template.sh` before asking GitHub to enforce the same template in CI.
+- Validate generated PR bodies locally with `./scripts/validate-pr-template.sh <pr-body-file>`
+   (or `./.venv/bin/python ./scripts/local_ci_parity.py --pr-body-file <pr-body-file>`)
+   before asking GitHub to enforce the same template in CI.
+- Docker image build parity exists in CI and is intentionally optional for the
+   default local precheck path due host/runtime constraints; use
+   `--include-docker-build` when you need full container-build parity pre-push.
 - Keep the remote repository protections aligned with `docs/setup-github-repository.md` so required status checks and PR-before-merge rules backstop the local workflow.
 
 These are not optional style notes; they are the historical guardrails defined by `docs/architecture/ADR-001-AI-Workflow-Guardrails.md`, reinforced by `docs/architecture/ADR-005-Strong-Templating-Enforcement.md` and `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md`, plus `.copilot/skills/a2a-communication/SKILL.md`, `.github/workflows/ci.yml`, and the remote protection guidance in `docs/setup-github-repository.md`.
