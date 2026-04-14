@@ -11,6 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -2598,6 +2599,254 @@ def test_factory_stack_status_reports_degraded_when_required_service_restarts(
         registry["workspaces"][config.factory_instance_id]["runtime_state"]
         == "degraded"
     )
+
+
+def test_factory_stack_status_demotes_running_workspace_to_stopped_when_services_missing(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda compose_project_name: {},
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "needs-ramp-up",
+            "recommended_action": "start",
+        },
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "runtime_state=stopped" in output
+    assert "recommended_action=start" in output
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert (
+        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "stopped"
+    )
+
+
+def test_factory_stack_status_preserves_failed_state_when_services_missing(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="failed",
+        active=False,
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda compose_project_name: {},
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "needs-ramp-up",
+            "recommended_action": "start",
+        },
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "runtime_state=failed" in output
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert (
+        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "failed"
+    )
+
+
+def test_factory_stack_status_recovers_missing_registry_record(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    del registry["workspaces"][config.factory_instance_id]
+    factory_workspace.save_registry(registry, registry_path)
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda compose_project_name: {},
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "needs-ramp-up",
+            "recommended_action": "start",
+        },
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "Recovered missing registry record" in output
+
+    updated = factory_workspace.load_registry(registry_path)
+    assert config.factory_instance_id in updated.get("workspaces", {})
+
+
+def test_factory_stack_stop_marks_failed_state_when_compose_down_fails(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+
+    def _raise_stop_failure(_repo_root: Path, _command: list[str]) -> None:
+        raise subprocess.CalledProcessError(1, ["docker", "compose", "down"])
+
+    monkeypatch.setattr(factory_stack, "run_compose_command", _raise_stop_failure)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        factory_stack.stop_stack(
+            repo_root,
+            env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+        )
+
+    output = capsys.readouterr().out
+    assert "Runtime state marked as `failed`" in output
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert (
+        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "failed"
+    )
+
+
+def test_factory_stack_list_reports_registry_reconciliation_conflicts(
+    monkeypatch,
+    capsys,
+) -> None:
+    def _raise_reconciliation_conflict(*_args, **_kwargs):
+        raise RuntimeError("simulated registry conflict")
+
+    monkeypatch.setattr(
+        factory_stack.factory_workspace,
+        "reconcile_registry",
+        _raise_reconciliation_conflict,
+    )
+
+    exit_code = factory_stack.list_workspaces()
+    output = capsys.readouterr().out
+
+    assert exit_code == 1
+    assert "Registry reconciliation failed" in output
+    assert "simulated registry conflict" in output
 
 
 def test_build_runtime_config_preserves_persisted_ports_when_workspace_reopens(
