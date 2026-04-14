@@ -370,6 +370,7 @@ def main(argv: list[str] | None = None) -> int:
                         "stop",
                         "--repo-root",
                         str(factory_dir),
+                        "--preserve-runtime-state",
                     ],
                     check=False,
                     stdout=subprocess.DEVNULL,
