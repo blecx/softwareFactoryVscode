@@ -336,6 +336,42 @@ def test_integration_regression_script_uses_repo_local_tmp_guardrail():
     assert "--exclude=.tmp" in integration_script
 
 
+def test_install_doc_locks_practical_per_workspace_baseline():
+    repo_root = Path(__file__).parent.parent
+    install_doc = (repo_root / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+
+    assert "## Supported practical baseline (what this guide promises)" in install_doc
+    assert ".copilot/softwareFactoryVscode/" in install_doc
+    assert "software-factory.code-workspace" in install_doc
+    assert "factory_stack.py preflight" in install_doc
+    assert "factory_stack.py activate" in install_doc
+    assert "verify_factory_install.py --target . --runtime" in install_doc
+    assert (
+        "verify_factory_install.py --target . --runtime --check-vscode-mcp"
+        in install_doc
+    )
+    assert "Shared multi-tenant promotion remains blocked" in install_doc
+
+
+def test_tests_readme_maps_practical_baseline_coverage_surfaces():
+    repo_root = Path(__file__).parent.parent
+    tests_readme = (repo_root / "tests" / "README.md").read_text(encoding="utf-8")
+
+    assert "## Practical baseline coverage map (P0/P1/P2 lock)" in tests_readme
+    assert (
+        "**Install/update contract:** `tests/test_factory_install.py`" in tests_readme
+    )
+    assert (
+        "**Lifecycle/activation/verification guidance drift:** "
+        "`tests/test_regression.py`" in tests_readme
+    )
+    assert (
+        "**Host-isolation boundaries and subsystem mount safety:** "
+        "`tests/run-integration-test.sh`" in tests_readme
+    )
+    assert "still-blocked shared multi-tenant promotion phase" in tests_readme
+
+
 def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     repo_root = Path(__file__).parent.parent
     handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
@@ -353,6 +389,20 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "refreshes generated runtime artifacts" in cheat_sheet
     assert "VS Code / Copilot CLI workflow" in cheat_sheet
     assert "stale registry data" not in cheat_sheet
+
+
+def test_release_template_distinguishes_practical_vs_blocked_scope():
+    repo_root = Path(__file__).parent.parent
+    release_template = (repo_root / ".github" / "releases" / "TEMPLATE.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "## Delivery status snapshot" in release_template
+    assert "| Scope | Status | Why it matters |" in release_template
+    assert "Practical per-workspace baseline" in release_template
+    assert "Shared multi-tenant promotion (still blocked)" in release_template
+    assert "Do not mark shared multi-tenant promotion as fulfilled" in release_template
+    assert "ADR-008" in release_template
 
 
 def test_multi_workspace_architecture_docs_capture_current_authority():

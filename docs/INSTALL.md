@@ -12,6 +12,17 @@ The supported operating model is **namespace-first**:
 
 This removes ambiguity between "installed successfully" and "usable from VS Code."
 
+## Supported practical baseline (what this guide promises)
+
+This guide documents the current practical per-workspace baseline:
+
+- namespaced install and update under `.copilot/softwareFactoryVscode/`
+- explicit runtime lifecycle (`preflight`, `start`, `stop`, `activate`, `deactivate`, `cleanup`)
+- per-workspace verification against generated effective endpoints
+- generated `software-factory.code-workspace` as the operator entrypoint
+
+This guide does **not** claim that candidate shared services are already promoted to a production shared multi-tenant control plane. Shared multi-tenant promotion remains blocked until its ADR and rollout criteria are explicitly satisfied.
+
 ## Prerequisites
 
 Before installation, verify you have the following installed on your local host:
