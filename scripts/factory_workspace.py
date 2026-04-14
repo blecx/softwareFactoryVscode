@@ -269,6 +269,17 @@ def build_port_values(port_index: int) -> dict[str, int]:
     return {key: default + offset for key, default in PORT_LAYOUT.items()}
 
 
+def infer_port_index_from_ports(ports: dict[str, int]) -> int | None:
+    for key, default in PORT_LAYOUT.items():
+        value = ports.get(key)
+        if not isinstance(value, int):
+            continue
+        offset = value - default
+        if offset >= 0 and offset % PORT_BLOCK_STRIDE == 0:
+            return offset // PORT_BLOCK_STRIDE
+    return None
+
+
 def ports_conflict(left: dict[str, int], right: dict[str, int]) -> bool:
     return bool(set(left.values()) & set(right.values()))
 
@@ -569,30 +580,41 @@ def build_runtime_config(
         )
     )
 
-    preferred_index: int | None = None
-    raw_index = existing_env.get(
-        "FACTORY_PORT_INDEX",
-        str(existing_manifest.get("port_index", "")).strip(),
-    ).strip()
-    if raw_index:
-        try:
-            preferred_index = int(raw_index)
-        except ValueError:
-            preferred_index = None
+    registry = load_registry(registry_path)
+    existing_record = registry.get("workspaces", {}).get(factory_instance_id, {})
+    if not isinstance(existing_record, dict):
+        existing_record = {}
 
-    existing_record: dict[str, Any] = {}
-    if preferred_index is None:
-        registry = load_registry(registry_path)
-        existing_record = registry.get("workspaces", {}).get(factory_instance_id, {})
-        if isinstance(existing_record, dict):
-            existing_index = existing_record.get("port_index")
-            if isinstance(existing_index, int):
-                preferred_index = existing_index
-    else:
-        registry = load_registry(registry_path)
-        existing_record = registry.get("workspaces", {}).get(factory_instance_id, {})
-        if not isinstance(existing_record, dict):
-            existing_record = {}
+    env_preferred_index: int | None = None
+    raw_env_index = existing_env.get("FACTORY_PORT_INDEX", "").strip()
+    if raw_env_index:
+        try:
+            env_preferred_index = int(raw_env_index)
+        except ValueError:
+            env_preferred_index = None
+
+    manifest_preferred_index: int | None = None
+    raw_manifest_index = str(existing_manifest.get("port_index", "")).strip()
+    if raw_manifest_index:
+        try:
+            manifest_preferred_index = int(raw_manifest_index)
+        except ValueError:
+            manifest_preferred_index = None
+
+    record_preferred_index: int | None = None
+    raw_record_index = existing_record.get("port_index")
+    if isinstance(raw_record_index, int):
+        record_preferred_index = raw_record_index
+
+    preferred_index = (
+        manifest_preferred_index
+        if manifest_preferred_index is not None
+        else (
+            record_preferred_index
+            if record_preferred_index is not None
+            else env_preferred_index
+        )
+    )
 
     persisted_ports: dict[str, int] = {}
     manifest_ports = existing_manifest.get("ports", {})
@@ -615,16 +637,24 @@ def build_runtime_config(
             except (TypeError, ValueError):
                 continue
 
+    metadata_ports_available = bool(persisted_ports)
+
     for key in PORT_LAYOUT:
         raw_value = existing_env.get(key, "").strip()
         if not raw_value:
             continue
         try:
-            persisted_ports[key] = int(raw_value)
+            parsed_value = int(raw_value)
         except ValueError:
             continue
+        if metadata_ports_available:
+            persisted_ports.setdefault(key, parsed_value)
+        else:
+            persisted_ports[key] = parsed_value
 
     if persisted_ports:
+        if preferred_index is None:
+            preferred_index = infer_port_index_from_ports(persisted_ports)
         port_index = preferred_index if preferred_index is not None else 0
         ports = {
             **build_port_values(port_index),
