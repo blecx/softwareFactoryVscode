@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-04-18T19:26:10+02:00",
+  "generated_at": "2026-04-18T20:25:51+02:00",
   "source": {
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "default_branch": "main",
@@ -11,34 +11,34 @@
     "schema_version": 1,
     "version_core": "2.4",
     "normalized_version": "2.4.0",
-    "display_version": "2.4+99.gdbf388f",
+    "display_version": "2.4+100.g84a8a9a",
     "channel": "stable",
-    "build_number": 99,
-    "commit_sha": "dbf388ffd40ba08b668d0888f726e12113d1812d",
-    "commit_short": "dbf388f",
+    "build_number": 100,
+    "commit_sha": "84a8a9a42342ec0339887400f101a064ea2fb953",
+    "commit_short": "84a8a9a",
     "version_tag": "",
     "source_ref": "main",
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "manifest_path": "manifests/release-manifest.json",
     "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
-    "generated_at": "2026-04-18T19:26:10+02:00"
+    "generated_at": "2026-04-18T20:25:51+02:00"
   },
   "channels": {
     "stable": {
       "schema_version": 1,
       "version_core": "2.4",
       "normalized_version": "2.4.0",
-      "display_version": "2.4+99.gdbf388f",
+      "display_version": "2.4+100.g84a8a9a",
       "channel": "stable",
-      "build_number": 99,
-      "commit_sha": "dbf388ffd40ba08b668d0888f726e12113d1812d",
-      "commit_short": "dbf388f",
+      "build_number": 100,
+      "commit_sha": "84a8a9a42342ec0339887400f101a064ea2fb953",
+      "commit_short": "84a8a9a",
       "version_tag": "",
       "source_ref": "main",
       "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
       "manifest_path": "manifests/release-manifest.json",
       "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
-      "generated_at": "2026-04-18T19:26:10+02:00"
+      "generated_at": "2026-04-18T20:25:51+02:00"
     }
   },
   "update_policy": {
