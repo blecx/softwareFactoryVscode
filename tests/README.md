@@ -26,6 +26,12 @@ That installs:
 - runtime dependencies from `factory_runtime/agents/requirements.txt`
 - development and test tooling from `requirements.dev.txt`
 
+If `./.venv/bin/python -m pytest` or `./.venv/bin/python -m black` fails with
+`No module named ...`, the repo `.venv` is missing the development/test tooling
+from `requirements.dev.txt`. Re-run `./setup.sh` to repair the environment
+before retrying local checks. The local CI-parity precheck performs a Python
+environment preflight and points back to the same repair path.
+
 Run the installer regression suite with the supported environment:
 
 ```bash
