@@ -499,6 +499,43 @@ def main(argv: list[str] | None = None) -> int:
         existing = (
             target_path.read_text(encoding="utf-8") if target_path.exists() else ""
         )
+
+        # Compare ignoring volatile git fields
+        if existing:
+            try:
+                existing_json = json.loads(existing)
+                # Copy volatile fields from existing so it matches if only these differ
+                for field in [
+                    "commit_sha",
+                    "commit_short",
+                    "display_version",
+                    "generated_at",
+                    "build_number",
+                ]:
+                    if field in existing_json.get("latest", {}):
+                        manifest["latest"][field] = existing_json["latest"][field]
+                    if (
+                        "stable" in existing_json.get("channels", {})
+                        and field in existing_json["channels"]["stable"]
+                    ):
+                        manifest["channels"]["stable"][field] = existing_json[
+                            "channels"
+                        ]["stable"][field]
+                if "generated_at" in existing_json:
+                    manifest["generated_at"] = existing_json["generated_at"]
+
+                rendered_for_check = (
+                    json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
+                )
+
+                if existing != rendered_for_check:
+                    print(f"Release manifest drift detected: {target_path}")
+                    return 1
+                print(f"Release manifest is current: {target_path}")
+                return 0
+            except json.JSONDecodeError:
+                pass
+
         if existing != rendered:
             print(f"Release manifest drift detected: {target_path}")
             return 1
