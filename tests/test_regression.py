@@ -394,6 +394,16 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
     assert "still-blocked shared multi-tenant promotion phase" in tests_readme
 
 
+def test_tests_readme_documents_python_env_repair_path():
+    repo_root = Path(__file__).parent.parent
+    tests_readme = (repo_root / "tests" / "README.md").read_text(encoding="utf-8")
+
+    assert "No module named ..." in tests_readme
+    assert "./setup.sh" in tests_readme
+    assert "requirements.dev.txt" in tests_readme
+    assert "environment preflight" in tests_readme.lower()
+
+
 def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     repo_root = Path(__file__).parent.parent
     handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
@@ -850,7 +860,7 @@ def test_local_ci_parity_reports_findings_list_and_improvement_plan(
         command_tuple = tuple(command)
         executed_commands.append(command_tuple)
 
-        if "black" in command_tuple:
+        if command_tuple[1:3] == ("-m", "black"):
             return subprocess.CompletedProcess(
                 list(command_tuple),
                 1,
@@ -928,3 +938,56 @@ def test_local_ci_parity_warnings_do_not_fail_the_standard_precheck(
     assert "[WARNING] Docker image build parity" in captured.out
     assert "Improvement plan" in captured.out
     assert "passed with 1 warning(s)" in captured.out
+
+
+def test_local_ci_parity_reports_missing_dev_dependencies_before_quality_steps(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+    executed_commands: list[tuple[str, ...]] = []
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        executed_commands.append(command_tuple)
+
+        if any("find_spec" in part for part in command_tuple):
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                1,
+                stdout='["black", "pytest"]\n',
+                stderr="",
+            )
+
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--skip-integration",
+            "--skip-pr-template-check",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "[ERROR] Python environment preflight" in captured.out
+    assert "development/test modules: black, pytest" in captured.out
+    assert "Run `./setup.sh`" in captured.out
+    assert "Skipping Python quality/test steps" in captured.out
+    assert "[ERROR] Black format check" not in captured.out
+    assert "[ERROR] Pytest suite (tests/)" not in captured.out
+    assert not any(command[1:3] == ("-m", "black") for command in executed_commands)
+    assert not any(command[1:3] == ("-m", "pytest") for command in executed_commands)

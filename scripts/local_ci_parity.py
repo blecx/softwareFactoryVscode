@@ -9,6 +9,7 @@ but is optional by default because it is slower and host-dependent.
 from __future__ import annotations
 
 import argparse
+import json
 import shlex
 import shutil
 import subprocess
@@ -18,6 +19,7 @@ from pathlib import Path
 from typing import Sequence
 
 DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
+REQUIRED_DEV_TOOL_MODULES = ("black", "flake8", "isort", "pytest")
 
 
 @dataclass(frozen=True)
@@ -122,7 +124,7 @@ def resolve_base_rev(repo_root: Path, *, base_rev: str, head_rev: str) -> str:
     return head_rev
 
 
-def build_standard_steps(
+def build_release_contract_steps(
     args: argparse.Namespace, *, base_rev: str
 ) -> list[StepDefinition]:
     return [
@@ -164,6 +166,11 @@ def build_standard_steps(
                 f"--repo-url {DEFAULT_REPO_URL}`, review the diff, and rerun the precheck."
             ),
         ),
+    ]
+
+
+def build_python_quality_steps(args: argparse.Namespace) -> list[StepDefinition]:
+    return [
         StepDefinition(
             name="Black format check",
             command=(
@@ -226,6 +233,104 @@ def build_standard_steps(
             ),
         ),
     ]
+
+
+def build_standard_steps(
+    args: argparse.Namespace, *, base_rev: str
+) -> list[StepDefinition]:
+    return [
+        *build_release_contract_steps(args, base_rev=base_rev),
+        *build_python_quality_steps(args),
+    ]
+
+
+def build_python_environment_preflight_command(
+    python_executable: str,
+) -> tuple[str, ...]:
+    return (
+        python_executable,
+        "-c",
+        (
+            "import importlib.util, json, sys; "
+            "missing=[name for name in sys.argv[1:] "
+            "if importlib.util.find_spec(name) is None]; "
+            "print(json.dumps(missing)); "
+            "raise SystemExit(1 if missing else 0)"
+        ),
+        *REQUIRED_DEV_TOOL_MODULES,
+    )
+
+
+def run_python_environment_preflight(
+    python_executable: str, *, cwd: Path
+) -> Finding | None:
+    print("\n▶ Python environment preflight")
+    command = build_python_environment_preflight_command(python_executable)
+
+    try:
+        result = run_command(command, cwd=cwd)
+    except OSError as exc:
+        return Finding(
+            severity="error",
+            name="Python environment preflight",
+            summary=(
+                "Python environment preflight could not start the selected "
+                f"interpreter ({exc})."
+            ),
+            remediation=(
+                "Run `./setup.sh` to install runtime and development/test "
+                "dependencies into `.venv`, or point `--python` at a usable "
+                "interpreter and rerun the precheck."
+            ),
+            command=command,
+        )
+
+    if result.stderr:
+        print(
+            result.stderr,
+            file=sys.stderr,
+            end="" if result.stderr.endswith("\n") else "\n",
+        )
+
+    missing_modules: list[str] = []
+    if result.stdout.strip():
+        try:
+            parsed = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            parsed = []
+        if isinstance(parsed, list):
+            missing_modules = [str(item) for item in parsed]
+
+    if result.returncode == 0 and not missing_modules:
+        print(
+            "✅ Selected Python environment includes the required "
+            "development/test modules."
+        )
+        return None
+
+    if not missing_modules:
+        missing_modules = list(REQUIRED_DEV_TOOL_MODULES)
+
+    print(
+        "⚠️  Missing development/test modules in the selected Python "
+        f"environment: {', '.join(missing_modules)}."
+    )
+    return Finding(
+        severity="error",
+        name="Python environment preflight",
+        summary=(
+            "The selected Python environment is missing required "
+            f"development/test modules: {', '.join(missing_modules)}."
+        ),
+        remediation=(
+            "Run `./setup.sh` to install runtime and development/test "
+            "dependencies into `.venv`, or point `--python` at an interpreter "
+            "that already has `requirements.dev.txt` installed, then rerun the "
+            "precheck."
+        ),
+        command=command,
+        returncode=result.returncode or 1,
+    )
 
 
 def run_docker_build_validation(repo_root: Path) -> list[Finding]:
@@ -404,10 +509,25 @@ def main(argv: list[str] | None = None) -> int:
 
     findings: list[Finding] = []
 
-    for step in build_standard_steps(args, base_rev=base_rev):
+    for step in build_release_contract_steps(args, base_rev=base_rev):
         finding = run_step(step, cwd=repo_root)
         if finding is not None:
             findings.append(finding)
+
+    python_environment_finding = run_python_environment_preflight(
+        args.python, cwd=repo_root
+    )
+    if python_environment_finding is not None:
+        findings.append(python_environment_finding)
+        print(
+            "ℹ️ Skipping Python quality/test steps until the selected "
+            "environment has the required development/test modules."
+        )
+    else:
+        for step in build_python_quality_steps(args):
+            finding = run_step(step, cwd=repo_root)
+            if finding is not None:
+                findings.append(finding)
 
     if args.skip_integration:
         warning = "Integration regression was skipped by request (--skip-integration)."
