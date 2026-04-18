@@ -47,6 +47,7 @@ The practical per-workspace baseline is protected by a mix of functional and doc
 - **Install/update contract:** `tests/test_factory_install.py`
 - **Lifecycle/activation/verification guidance drift:** `tests/test_regression.py`
 - **Host-isolation boundaries and subsystem mount safety:** `tests/run-integration-test.sh`
+- **Todo-app throwaway regression contract:** `.copilot/skills/todo-app-regression/SKILL.md`, `scripts/todo_app_regression.py`, and `tests/test_todo_regression_contract.py`
 
 The baseline intentionally distinguishes current per-workspace support from the still-blocked shared multi-tenant promotion phase.
 

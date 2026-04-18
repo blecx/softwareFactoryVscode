@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "github-gpt-4o",
+      "provider": "github",
+      "model": "openai/gpt-4o",
+      "template": false,
+      "response": "Create the todo app inside .tmp/todo-regression-run/workspace. Support adding todos, editing existing items, toggling tasks complete or incomplete, deleting tasks, rendering an empty state, and persisting the task list after reload."
+    },
+    {
+      "id": "github-gpt-4o-mini",
+      "provider": "github",
+      "model": "openai/gpt-4o-mini",
+      "template": false,
+      "response": "When running from an installed host, keep all generated files inside .copilot/softwareFactoryVscode/.tmp/todo-regression-run/workspace. The deliverable must let users add new todos, update current todos, mark tasks done or undone, remove items, show a no-todos empty state, and keep the data across refreshes."
+    },
+    {
+      "id": "github-generic-template",
+      "provider": "github",
+      "model": "*",
+      "template": true,
+      "response": "Use only {workspace} for the throwaway run. The todo-app deliverable must include create, edit, complete/incomplete, delete, empty-state, and persistence behavior so a supported GitHub model {model} still satisfies the semantic regression contract."
+    }
+  ]
+}
