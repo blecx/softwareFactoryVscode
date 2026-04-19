@@ -3882,6 +3882,33 @@ def test_runtime_compose_shared_services_do_not_override_internal_ports() -> Non
     assert "APPROVAL_GATE_PORT" not in approval_env
 
 
+def test_runtime_compose_shared_services_expose_tenancy_mode_switch() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+
+    expected = "${FACTORY_TENANCY_MODE:-compatibility}"
+
+    assert (
+        services.get("mcp-memory", {})
+        .get("environment", {})
+        .get("FACTORY_TENANCY_MODE")
+        == expected
+    )
+    assert (
+        services.get("mcp-agent-bus", {})
+        .get("environment", {})
+        .get("FACTORY_TENANCY_MODE")
+        == expected
+    )
+    assert (
+        services.get("approval-gate", {})
+        .get("environment", {})
+        .get("FACTORY_TENANCY_MODE")
+        == expected
+    )
+
+
 def test_runtime_compose_interservice_urls_use_fixed_internal_ports() -> None:
     compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
     data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))

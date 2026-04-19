@@ -16,36 +16,67 @@ Implements: GitHub issue #708
 """
 
 import os
+from pathlib import Path
 from typing import Any, Optional
 
 import uvicorn
 from mcp.server.fastmcp import Context, FastMCP
 
+from factory_runtime.shared_tenancy import (
+    default_project_id,
+    header_workspace_id,
+    resolve_tenant_identity,
+)
+
 from .store import MemoryStore
 
-_db_path = os.getenv("MEMORY_DB_PATH", "/data/memory.db")
+
+def _container_data_dir_is_writable() -> bool:
+    container_data_dir = Path("/data")
+    return container_data_dir.is_dir() and os.access(container_data_dir, os.W_OK)
+
+
+def resolve_memory_db_path() -> str:
+    explicit_path = str(os.getenv("MEMORY_DB_PATH", "")).strip()
+    if explicit_path:
+        return explicit_path
+
+    instance_id = str(os.getenv("FACTORY_INSTANCE_ID", "default")).strip() or "default"
+    factory_data_dir = str(os.getenv("FACTORY_DATA_DIR", "")).strip()
+    if factory_data_dir:
+        return str(
+            Path(factory_data_dir).expanduser() / "memory" / instance_id / "memory.db"
+        )
+
+    if _container_data_dir_is_writable():
+        return "/data/memory.db"
+
+    repo_root = Path(__file__).resolve().parents[4]
+    return str(
+        repo_root / ".tmp" / "runtime-data" / "memory" / instance_id / "memory.db"
+    )
+
+
+_db_path = resolve_memory_db_path()
 _store = MemoryStore(db_path=_db_path)
 
 mcp = FastMCP("mcp-memory", json_response=True)
 
 
-def default_project_id() -> str:
-    return os.getenv("PROJECT_WORKSPACE_ID", "default")
-
-
 def extract_project_id(ctx: Context) -> str:
     """Extract the workspace tenant ID from the HTTP request context.
 
-    In Phase D, all VS Code side clients will pass an X-Workspace-ID header.
-    Fallback to 'default' if not present or during testing.
+    Compatibility mode may fall back to ``PROJECT_WORKSPACE_ID`` for the
+    per-workspace runtime. Promoted shared mode must receive an explicit tenant
+    selector and rejects missing or ambiguous identity.
     """
-    fallback_project_id = default_project_id()
+    headers = None
     if ctx.request_context and hasattr(ctx.request_context, "request"):
-        return ctx.request_context.request.headers.get(
-            "X-Workspace-ID",
-            fallback_project_id,
-        )
-    return fallback_project_id
+        headers = getattr(ctx.request_context.request, "headers", None)
+    return resolve_tenant_identity(
+        header_project_id=header_workspace_id(headers),
+        fallback_project_id=default_project_id(),
+    )
 
 
 # ---------------------------------------------------------------------------
