@@ -422,6 +422,9 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "factory_stack.py preflight" in cheat_sheet
     assert "refreshes generated runtime artifacts" in cheat_sheet
     assert "VS Code / Copilot CLI workflow" in cheat_sheet
+    assert "shared_mode_status" in cheat_sheet
+    assert "X-Workspace-ID" in cheat_sheet
+    assert "PROJECT_WORKSPACE_ID" in cheat_sheet
     assert "stale registry data" not in cheat_sheet
 
 
