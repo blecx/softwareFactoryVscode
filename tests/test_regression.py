@@ -432,6 +432,36 @@ def test_execution_surface_routing_contract_is_documented() -> None:
     assert "generated `software-factory.code-workspace` surface" in instructions
 
 
+def test_noninteractive_terminal_guidance_is_documented() -> None:
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    issue_skill = (
+        repo_root / ".copilot" / "skills" / "issue-creation-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## Non-interactive GitHub / terminal patterns" in workflow_doc
+    assert "scripts/noninteractive_gh.py" in workflow_doc
+    assert "gh pr checks --watch" in workflow_doc
+    assert "heredoc" in workflow_doc
+    assert "Long-running Docker/test output" in workflow_doc
+
+    assert (
+        "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER>"
+        in merge_skill
+    )
+    assert "gh pr checks --watch" in merge_skill
+    assert "./.venv/bin/python ./scripts/noninteractive_gh.py issue-list" in issue_skill
+    assert "heredoc-based Python command" in resolve_skill
+
+
 def test_setup_repo_doc_matches_current_ci_checks():
     repo_root = Path(__file__).parent.parent
     setup_doc = (repo_root / "docs" / "setup-github-repository.md").read_text(
