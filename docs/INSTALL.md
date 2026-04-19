@@ -187,6 +187,12 @@ If you set `FACTORY_SHARED_SERVICE_MODE=shared`, the workspace runtime expects
 `approval-gate` can be discovered as shared services instead of being treated as
 workspace-owned containers.
 
+When shared-capable services are used in that topology, the persistence contract
+is tenant-partitioned: `mcp-memory` and `mcp-agent-bus` persist `project_id`
+with every tenant-scoped row, mutation audit records are labeled with the same
+tenant identity, and purge/admin helpers only delete rows owned by the matching
+tenant selector.
+
 The runtime helper now understands workspace-aware lifecycle commands as well:
 
 ```bash
@@ -218,6 +224,11 @@ generated workspace MCP URLs before any live endpoint probing. That lets you tel
 `preflight` and `status` also print a `topology_mode` so operators can tell whether
 the workspace is using the default per-workspace runtime or an explicit shared-service
 topology for the ADR-008 candidate shared services.
+
+That shared-mode contract now extends beyond discovery: if runtime verification
+passes, operators can expect memory, bus child records, and shared-service audit
+evidence to remain partitioned by tenant identity rather than mixed in ad hoc
+shared tables.
 
 Important: workspaces do **not** start Docker services automatically when they are installed.
 Only an explicit `start` command should create running containers.
