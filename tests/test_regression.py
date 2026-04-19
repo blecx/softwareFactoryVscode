@@ -364,6 +364,10 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     install_doc = (repo_root / "docs" / "INSTALL.md").read_text(encoding="utf-8")
 
     assert "## Supported practical baseline (what this guide promises)" in install_doc
+    assert (
+        "## Shared multi-tenant promotion gate (how to read release/docs status)"
+        in install_doc
+    )
     assert ".copilot/softwareFactoryVscode/" in install_doc
     assert "software-factory.code-workspace" in install_doc
     assert "factory_stack.py preflight" in install_doc
@@ -375,6 +379,8 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     )
     assert "`ADR-008` is accepted as the governing architecture" in install_doc
     assert "rollout remains open" in install_doc
+    assert "advanced groundwork" in install_doc
+    assert "final architecture/documentation review" in install_doc
 
 
 def test_tests_readme_maps_practical_baseline_coverage_surfaces():
@@ -419,6 +425,8 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "VS Code / Copilot CLI workflow" in handout
     assert "workspace.code-workspace" not in handout
     assert "automatically start the background task" not in handout
+    assert "advanced groundwork" in handout
+    assert "final architecture/documentation review" in handout
 
     assert "factory_stack.py activate" in cheat_sheet
     assert "factory_stack.py preflight" in cheat_sheet
@@ -428,6 +436,8 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "X-Workspace-ID" in cheat_sheet
     assert "PROJECT_WORKSPACE_ID" in cheat_sheet
     assert "stale registry data" not in cheat_sheet
+    assert "advanced groundwork" in cheat_sheet
+    assert "final architecture/documentation review" in cheat_sheet
 
 
 def test_release_template_distinguishes_practical_vs_open_rollout_scope():
@@ -442,11 +452,16 @@ def test_release_template_distinguishes_practical_vs_open_rollout_scope():
         release_template,
     )
     assert "Practical per-workspace baseline" in release_template
+    assert "Shared multi-tenant promotion (ADR-008 accepted)" in release_template
+    assert "advanced groundwork" in release_template
+    assert "Do not mark shared multi-tenant promotion as fulfilled" in release_template
+    assert "## Shared multi-tenant promotion gate" in release_template
+    assert "Before using `fulfilled`, verify" in release_template
     assert (
-        "Shared multi-tenant promotion (ADR-008 accepted, rollout open)"
+        "cross-tenant regression coverage and Docker-backed validation"
         in release_template
     )
-    assert "Do not mark shared multi-tenant promotion as fulfilled" in release_template
+    assert "final architecture/documentation review" in release_template
 
 
 def test_multi_workspace_architecture_docs_capture_current_authority():
