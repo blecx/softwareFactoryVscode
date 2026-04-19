@@ -7,8 +7,8 @@ Maintained synthesis
 This document is a maintained architecture synthesis. It is not a replacement for the ADRs.
 
 - Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, while this document explains and synthesizes them.
-- Accepted runtime contracts live in `ADR-012`, `ADR-007`, `ADR-009`, and `ADR-010`.
-- Hybrid-tenancy promotion rules are currently proposed in `ADR-008`; candidate shared services are not treated as a fully promoted shared control plane until those rules are accepted and satisfied in code and tests.
+- Accepted runtime contracts live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, and `ADR-010`.
+- Hybrid-tenancy promotion rules now live in accepted `ADR-008`; candidate shared services are not treated as a fully promoted shared control plane until those accepted rules are satisfied in code, tests, and operator diagnostics.
 - This document explains how those decisions fit together, maps them onto the current codebase, and keeps future-work boundaries explicit.
 
 When this document lags, the accepted ADRs and verified code are authoritative.
@@ -70,7 +70,7 @@ Source-checkout `.vscode/settings.json` must not commit a second static MCP URL 
 
 Per `ADR-008`, services that assume one repository root or direct project filesystem state remain workspace-scoped until deliberately redesigned.
 
-Candidate shared services such as `mcp-memory`, `mcp-agent-bus`, and `approval-gate` may carry tenant-aware groundwork, but they are not treated as a fully promoted shared control plane until they satisfy the proposed promotion rules in `ADR-008` and those rules are accepted into the architecture.
+Candidate shared services such as `mcp-memory`, `mcp-agent-bus`, and `approval-gate` may carry tenant-aware groundwork, but they are not treated as a fully promoted shared control plane until they satisfy the accepted promotion rules in `ADR-008`.
 
 ## Current supported architecture
 
@@ -158,7 +158,7 @@ Current candidate shared services include:
 - `approval-gate`
 - supporting orchestration services that depend on the same control-plane lifecycle
 
-Current code already carries tenant-aware storage/routing groundwork in these services, but that does **not** mean they are approved as a final shared multi-tenant control plane.
+Current code already carries tenant-aware storage/routing groundwork in these services, but that does **not** mean the rollout is complete or approved as a final shared multi-tenant control plane.
 
 ### 6. Active workspace semantics
 
@@ -202,7 +202,7 @@ Broader discovery-time reconciliation hardening is still governed by `ADR-010` a
 
 ### Still future or intentionally incomplete
 
-- treating candidate shared services as a generally approved multi-tenant control plane
+- completing rollout promotion of candidate shared services as a generally approved multi-tenant control plane
 - strict no-ambiguity tenant enforcement across every shared-service entrypoint
 - broader registry rebuild and discovery-time hardening beyond the currently implemented reconciliation paths
 - shared-service optimization that reduces per-workspace infrastructure only after isolation proof exists
