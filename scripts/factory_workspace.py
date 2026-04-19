@@ -56,6 +56,16 @@ PORT_LAYOUT: dict[str, int] = {
     "PORT_TUI": 9090,
 }
 
+SHARED_SERVICE_MODE_ENV_KEY = "FACTORY_SHARED_SERVICE_MODE"
+PER_WORKSPACE_TOPOLOGY_MODE = "per-workspace"
+SHARED_TOPOLOGY_MODE = "shared"
+SHARED_SERVICE_URL_ENV_KEYS: dict[str, str] = {
+    "mcp-memory": "FACTORY_SHARED_MEMORY_URL",
+    "mcp-agent-bus": "FACTORY_SHARED_AGENT_BUS_URL",
+    "approval-gate": "FACTORY_SHARED_APPROVAL_GATE_URL",
+}
+PROMOTABLE_SHARED_SERVICES = set(SHARED_SERVICE_URL_ENV_KEYS)
+
 MCP_SERVER_PORT_KEYS: dict[str, str] = {
     "context7": "PORT_CONTEXT7",
     "bashGateway": "PORT_BASH",
@@ -74,7 +84,7 @@ RUNTIME_SERVICE_CONTRACT: dict[str, dict[str, Any]] = {
         "health_path": "/admin/mocks",
         "require_healthy_status": True,
         "allow_http_error": False,
-        "scope": "candidate-shared",
+        "scope": "workspace-scoped",
     },
     "mcp-memory": {
         "port_key": "MEMORY_MCP_PORT",
@@ -102,7 +112,7 @@ RUNTIME_SERVICE_CONTRACT: dict[str, dict[str, Any]] = {
         "health_path": "",
         "require_healthy_status": True,
         "allow_http_error": False,
-        "scope": "candidate-shared",
+        "scope": "workspace-scoped",
     },
 }
 
@@ -156,6 +166,8 @@ class WorkspaceRuntimeConfig:
     port_index: int
     env_values: dict[str, str]
     ports: dict[str, int]
+    shared_service_mode: str
+    shared_service_urls: dict[str, str]
     mcp_server_urls: dict[str, str]
     workspace_settings: dict[str, Any]
 
@@ -314,6 +326,109 @@ def build_health_urls(ports: dict[str, int]) -> dict[str, str]:
     return {
         service_name: f"http://127.0.0.1:{ports[port_key]}{path}"
         for service_name, (port_key, path) in HEALTH_ENDPOINTS.items()
+    }
+
+
+def normalize_shared_service_mode(raw_value: str | None) -> str:
+    normalized = str(raw_value or "").strip().lower()
+    if normalized in {"", PER_WORKSPACE_TOPOLOGY_MODE, "workspace", "local"}:
+        return PER_WORKSPACE_TOPOLOGY_MODE
+    if normalized in {SHARED_TOPOLOGY_MODE, "external-shared", "promoted-shared"}:
+        return SHARED_TOPOLOGY_MODE
+    return PER_WORKSPACE_TOPOLOGY_MODE
+
+
+def build_service_probe_url(discovery_url: str, health_path: str) -> str:
+    normalized_url = discovery_url.strip().rstrip("/")
+    if not normalized_url:
+        return ""
+    normalized_path = health_path.strip()
+    if not normalized_path:
+        return normalized_url
+    if normalized_url.endswith(normalized_path):
+        return normalized_url
+    return f"{normalized_url}{normalized_path}"
+
+
+def build_runtime_topology(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
+    local_health_urls = build_health_urls(config.ports)
+    services: dict[str, dict[str, Any]] = {}
+
+    for service_name, metadata in RUNTIME_SERVICE_CONTRACT.items():
+        architectural_scope = str(metadata.get("scope", "workspace-scoped"))
+        topology_mode = PER_WORKSPACE_TOPOLOGY_MODE
+        if (
+            config.shared_service_mode == SHARED_TOPOLOGY_MODE
+            and service_name in PROMOTABLE_SHARED_SERVICES
+        ):
+            topology_mode = SHARED_TOPOLOGY_MODE
+
+        workspace_owned = topology_mode != SHARED_TOPOLOGY_MODE
+        shared_service_env_key = SHARED_SERVICE_URL_ENV_KEYS.get(service_name, "")
+        discovery_url = (
+            local_health_urls.get(service_name, "")
+            if workspace_owned
+            else config.shared_service_urls.get(service_name, "").strip()
+        )
+        services[service_name] = {
+            "scope": architectural_scope,
+            "topology_mode": topology_mode,
+            "workspace_owned": workspace_owned,
+            "launch_scope": (
+                "workspace-compose" if workspace_owned else "external-shared"
+            ),
+            "discovery_url": discovery_url,
+            "probe_url": build_service_probe_url(
+                discovery_url, str(metadata.get("health_path", ""))
+            ),
+            "configured_via": (
+                str(metadata.get("port_key", ""))
+                if workspace_owned
+                else shared_service_env_key
+            ),
+            "shared_service_env_key": shared_service_env_key,
+        }
+
+    return {"mode": config.shared_service_mode, "services": services}
+
+
+def build_runtime_health_urls_for_topology(
+    config: WorkspaceRuntimeConfig,
+) -> dict[str, str]:
+    topology = build_runtime_topology(config)
+    return {
+        service_name: str(entry.get("probe_url", ""))
+        for service_name, entry in topology["services"].items()
+        if str(entry.get("probe_url", "")).strip()
+    }
+
+
+def validate_runtime_topology(config: WorkspaceRuntimeConfig) -> list[str]:
+    topology = build_runtime_topology(config)
+    if topology["mode"] != SHARED_TOPOLOGY_MODE:
+        return []
+
+    issues: list[str] = []
+    for service_name in sorted(PROMOTABLE_SHARED_SERVICES):
+        entry = topology["services"][service_name]
+        discovery_url = str(entry.get("discovery_url", "")).strip()
+        if discovery_url:
+            continue
+        env_key = str(entry.get("shared_service_env_key", "")).strip()
+        issues.append(
+            "Shared-service topology requires an explicit discovery URL for "
+            f"`{service_name}` via `{env_key}` when "
+            f"`{SHARED_SERVICE_MODE_ENV_KEY}={SHARED_TOPOLOGY_MODE}`."
+        )
+    return issues
+
+
+def workspace_owned_runtime_services(config: WorkspaceRuntimeConfig) -> set[str]:
+    topology = build_runtime_topology(config)
+    return {
+        service_name
+        for service_name, entry in topology["services"].items()
+        if bool(entry.get("workspace_owned"))
     }
 
 
@@ -725,6 +840,14 @@ def build_runtime_config(
         if key not in managed_env and key not in MANAGED_ENV_KEYS
     }
     env_values = {**managed_env, **extra_env}
+    shared_service_mode = normalize_shared_service_mode(
+        existing_env.get(SHARED_SERVICE_MODE_ENV_KEY, "")
+    )
+    shared_service_urls = {
+        service_name: existing_env.get(env_key, "").strip()
+        for service_name, env_key in SHARED_SERVICE_URL_ENV_KEYS.items()
+        if existing_env.get(env_key, "").strip()
+    }
 
     workspace_file_path = (
         Path(workspace_file).expanduser().resolve()
@@ -745,13 +868,15 @@ def build_runtime_config(
         port_index=port_index,
         env_values=env_values,
         ports=ports,
+        shared_service_mode=shared_service_mode,
+        shared_service_urls=shared_service_urls,
         mcp_server_urls=build_mcp_server_urls(ports),
         workspace_settings=workspace_settings,
     )
 
 
 def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
-    health_urls = build_health_urls(config.ports)
+    runtime_topology = build_runtime_topology(config)
     release_metadata = factory_release.build_release_metadata(
         config.factory_dir,
         repo_url=factory_release.git_output(
@@ -776,6 +901,7 @@ def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
         "factory_version": factory_version,
         "factory_display_version": release_metadata["display_version"],
         "factory_release": release_metadata,
+        "runtime_topology": runtime_topology,
         "mcp_servers": {
             name: {
                 "url": url,
@@ -784,19 +910,30 @@ def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
                     if name in WORKSPACE_SCOPED_SERVICES
                     else "candidate-shared"
                 ),
+                "topology_mode": PER_WORKSPACE_TOPOLOGY_MODE,
+                "workspace_owned": True,
+                "launch_scope": "workspace-compose",
             }
             for name, url in config.mcp_server_urls.items()
         },
         "runtime_health": {
             service_name: {
-                "url": url,
-                "scope": (
-                    "candidate-shared"
-                    if service_name in CANDIDATE_SHARED_SERVICES
-                    else "workspace-scoped"
+                "url": str(runtime_topology["services"][service_name]["probe_url"]),
+                "scope": str(runtime_topology["services"][service_name]["scope"]),
+                "topology_mode": str(
+                    runtime_topology["services"][service_name]["topology_mode"]
+                ),
+                "workspace_owned": bool(
+                    runtime_topology["services"][service_name]["workspace_owned"]
+                ),
+                "launch_scope": str(
+                    runtime_topology["services"][service_name]["launch_scope"]
+                ),
+                "discovery_url": str(
+                    runtime_topology["services"][service_name]["discovery_url"]
                 ),
             }
-            for service_name, url in health_urls.items()
+            for service_name in HEALTH_ENDPOINTS
         },
     }
 
