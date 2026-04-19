@@ -23,6 +23,40 @@ This guide documents the current practical per-workspace baseline:
 
 This guide does **not** claim that candidate shared services are already rolled out as a fulfilled production shared multi-tenant control plane. `ADR-008` is accepted as the governing architecture for that promotion, but rollout remains open until its implementation, isolation-proof, and operator-diagnostic criteria are explicitly satisfied.
 
+## Shared multi-tenant promotion gate (how to read release/docs status)
+
+Release notes and operator-facing docs in this repository use the same status
+words for the ADR-008 shared-service rollout:
+
+- `open` — one or more rollout tracks are still incomplete, so shared
+   multi-tenant promotion must be described as still gated.
+- `advanced groundwork` — important rollout slices have landed and may be
+   called out, but the repository still cannot honestly claim fulfilled shared
+   promotion.
+- `fulfilled` — only allowed when the full evidence threshold is met and a
+   final architecture/documentation review confirms that the claim matches the
+   repository's real code and diagnostics.
+
+Before any release or operator guide flips shared multi-tenant promotion to
+`fulfilled`, the evidence threshold must be met explicitly:
+
+- tenant identity is enforced end to end for promoted shared mode;
+- runtime topology, verification output, and operator diagnostics truthfully
+   distinguish shared versus per-workspace behavior;
+- storage, logs, metrics, and audit trails are partitioned or labeled by
+   tenant identity;
+- cross-tenant regression coverage and Docker-backed validation prove the
+   isolation contract;
+- operator guidance is complete enough for repeatable day-two shared-mode use;
+   and
+- a final architecture/documentation review against
+   `docs/architecture/ADR-008-Hybrid-Tenancy-Model-for-MCP-Services.md` and
+   `docs/architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md` confirms the
+   fulfilled claim.
+
+Until then, keep the wording at `open` or `advanced groundwork` rather than
+implying that ADR acceptance alone finished the rollout.
+
 ## Prerequisites
 
 Before installation, verify you have the following installed on your local host:

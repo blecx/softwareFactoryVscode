@@ -73,6 +73,14 @@ The runtime currently uses a hybrid model:
 
 That distinction matters: multiple installed workspaces can coexist safely today without pretending every service is already globally shared.
 
+### How to read shared-service rollout status
+
+Release notes and operator docs use the same ADR-008 promotion vocabulary:
+
+- `open` — rollout tracks are still incomplete, so shared promotion remains gated
+- `advanced groundwork` — important rollout slices have landed, but the final promotion gate is still not satisfied
+- `fulfilled` — only allowed after the evidence threshold is met in code, tests, diagnostics, and operator guidance, and after a final architecture/documentation review confirms the claim
+
 ## 🏢 Working with multiple workspaces
 
 You can run multiple installed workspaces on the same host.
