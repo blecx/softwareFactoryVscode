@@ -406,6 +406,32 @@ def test_workflow_doc_links_remote_protection_guide():
     assert "docs/setup-github-repository.md" in workflow_doc
 
 
+def test_execution_surface_routing_contract_is_documented() -> None:
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "## Execution surfaces" in workflow_doc
+    assert "**Source checkout**" in workflow_doc
+    assert "**Generated workspace**" in workflow_doc
+    assert "**Companion runtime metadata**" in workflow_doc
+    assert "scripts/workspace_surface_guard.py" in workflow_doc
+    assert "Host Project (Root)" in workflow_doc
+
+    assert "scripts/workspace_surface_guard.py" in resolve_skill
+    assert "source checkout as a second static runtime contract" in resolve_skill
+
+    assert "Respect execution surfaces" in instructions
+    assert "generated `software-factory.code-workspace` surface" in instructions
+
+
 def test_setup_repo_doc_matches_current_ci_checks():
     repo_root = Path(__file__).parent.parent
     setup_doc = (repo_root / "docs" / "setup-github-repository.md").read_text(
