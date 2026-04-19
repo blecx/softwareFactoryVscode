@@ -10,6 +10,7 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - **Consult Guardrails Before Fixing:** Before proposing or implementing any fix, you must mentally cross-reference the architecture documentation (`docs/architecture/ADR-*.md`).
 - **No Destructive Workarounds:** Do not mutate, ignore, or bypass strict repository contracts (e.g., namespace definitions, installation boundaries like ADR-012, or ephemeral `TMPDIR` constraints) just to unblock an error message.
 - **Fail Safe:** If a bug fix requires violating a known constraint or ADR, you must pause, escalate the conflict to the human user, and ask for architectural clarification rather than silently applying the non-compliant fix.
+- **Respect ordered-issue enforcement:** When work is moving through the issue → PR → merge loop, keep `.tmp/github-issue-queue-state.md` current. The repository-owned hook at `.github/hooks/github-issue-queue-guard.json` runs `python3 ./scripts/github_issue_queue_guard.py` and will block unsafe continuation, merge, close, or completion prompts until GitHub-truth evidence (`issue_state`, `pr_state`, `ci_state`, `cleanup_state`, `last_github_truth`) is recorded.
 
 ## 2. ADR and Architectural Awareness
 
