@@ -8,7 +8,7 @@ This document is a maintained architecture synthesis. It is not a replacement fo
 
 - Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, while this document explains and synthesizes them.
 - Accepted runtime contracts live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, and `ADR-010`.
-- Hybrid-tenancy promotion rules now live in accepted `ADR-008`; candidate shared services are not treated as a fully promoted shared control plane until those accepted rules are satisfied in code, tests, and operator diagnostics.
+- Hybrid-tenancy promotion rules now live in accepted `ADR-008`; the current default branch satisfies those rules for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`, while workspace-scoped services remain isolated by default.
 - This document explains how those decisions fit together, maps them onto the current codebase, and keeps future-work boundaries explicit.
 
 When this document lags, the accepted ADRs and verified code are authoritative.
@@ -26,7 +26,7 @@ The repository now supports:
 - host-level workspace registry and lifecycle commands,
 - and a deliberate path toward selected shared services without weakening workspace isolation by default.
 
-The remaining architecture work is not “invent multi-workspace support from scratch.” It is to keep the current runtime contract coherent, harden the control plane, and prevent candidate shared services from being treated as fully promoted multi-tenant infrastructure before their guardrails are satisfied.
+The remaining architecture work is not “invent multi-workspace support from scratch.” It is to keep the current runtime contract coherent, continue hardening the now-fulfilled shared control plane, and preserve workspace isolation for services that remain workspace-scoped by design.
 
 ## Core guardrails
 
@@ -70,7 +70,7 @@ Source-checkout `.vscode/settings.json` must not commit a second static MCP URL 
 
 Per `ADR-008`, services that assume one repository root or direct project filesystem state remain workspace-scoped until deliberately redesigned.
 
-Candidate shared services such as `mcp-memory`, `mcp-agent-bus`, and `approval-gate` may carry tenant-aware groundwork, but they are not treated as a fully promoted shared control plane until they satisfy the accepted promotion rules in `ADR-008`.
+`mcp-memory`, `mcp-agent-bus`, and `approval-gate` now satisfy the accepted promotion rules in `ADR-008` for deliberate shared-mode use. That does **not** make shared mode mandatory for every workspace: the practical default path remains the per-workspace runtime unless operators intentionally opt into shared topology.
 
 ## Current supported architecture
 
@@ -202,7 +202,7 @@ Broader discovery-time reconciliation hardening is still governed by `ADR-010` a
 
 ### Still future or intentionally incomplete
 
-- completing rollout promotion of candidate shared services as a generally approved multi-tenant control plane
+- continuing operational hardening and release communication around the now-fulfilled shared control plane
 - strict no-ambiguity tenant enforcement across every shared-service entrypoint
 - broader registry rebuild and discovery-time hardening beyond the currently implemented reconciliation paths
 - shared-service optimization that reduces per-workspace infrastructure only after isolation proof exists

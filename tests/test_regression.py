@@ -377,8 +377,10 @@ def test_install_doc_locks_practical_per_workspace_baseline():
         "verify_factory_install.py --target . --runtime --check-vscode-mcp"
         in install_doc
     )
-    assert "`ADR-008` is accepted as the governing architecture" in install_doc
-    assert "rollout remains open" in install_doc
+    assert "now-fulfilled `ADR-008` promotion gate" in install_doc
+    assert "Current default-branch status: `fulfilled`" in install_doc
+    assert "Historical releases may still use `open` or `advanced" in install_doc
+    assert "groundwork` when they describe earlier repository states." in install_doc
     assert "advanced groundwork" in install_doc
     assert "final architecture/documentation review" in install_doc
 
@@ -399,9 +401,12 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
         "**Host-isolation boundaries and subsystem mount safety:** "
         "`tests/run-integration-test.sh`" in tests_readme
     )
-    assert "accepted-but-still-open shared multi-tenant rollout program" in tests_readme
+    assert "now-fulfilled ADR-008 shared multi-tenant promotion" in tests_readme
     assert "service-boundary isolation assertions" in tests_readme
     assert "`tests/test_throwaway_runtime_docker.py`" in tests_readme
+    assert (
+        "operator/runtime wording locks in `tests/test_regression.py`" in tests_readme
+    )
 
 
 def test_tests_readme_documents_python_env_repair_path():
@@ -426,7 +431,7 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "workspace.code-workspace" not in handout
     assert "automatically start the background task" not in handout
     assert "advanced groundwork" in handout
-    assert "final architecture/documentation review" in handout
+    assert "current default branch now meets this threshold" in handout
 
     assert "factory_stack.py activate" in cheat_sheet
     assert "factory_stack.py preflight" in cheat_sheet
@@ -437,7 +442,7 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "PROJECT_WORKSPACE_ID" in cheat_sheet
     assert "stale registry data" not in cheat_sheet
     assert "advanced groundwork" in cheat_sheet
-    assert "final architecture/documentation review" in cheat_sheet
+    assert "current default branch now meets this threshold" in cheat_sheet
 
 
 def test_release_template_distinguishes_practical_vs_open_rollout_scope():
@@ -509,6 +514,10 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
         in architecture_doc
     )
     assert "activate` refreshes generated runtime artifacts" in architecture_doc
+    assert (
+        "satisfies those rules for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`"
+        in architecture_doc
+    )
 
     assert (
         "Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, and `ADR-010`."
@@ -520,6 +529,7 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
         "the meaning of `installed`, `running`, and `active` comes from `ADR-009`"
         in plan_doc
     )
+    assert "the ADR-008 rollout tracked here is now fulfilled on" in plan_doc
 
 
 def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
@@ -546,14 +556,14 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
     assert "## Mitigation Map and Current Resolution Status" in plan_doc
     assert "## Accepted ADR to Production Rollout Path" in plan_doc
     assert (
-        "## Practical delivery split while shared-service rollout remains open"
+        "## Historical delivery split while shared-service rollout remained open"
         in plan_doc
     )
     assert re.search(
         r"\|\s*Scope\s*\|\s*Status\s*\|\s*Priority now\s*\|\s*Why it matters\s*\|",
         plan_doc,
     )
-    assert "Rollout open" in plan_doc
+    assert "Fulfilled on default branch" in plan_doc
     assert "## Practical execution plan for a working system" in plan_doc
     assert "### Priority 0: New repo onboarding, install, and update safety" in plan_doc
     assert (
@@ -564,7 +574,7 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
         "### Priority 2: Docs, regression coverage, and day-two operator confidence"
         in plan_doc
     )
-    assert "### Shared multi-tenant rollout remains open" in plan_doc
+    assert "### Shared multi-tenant rollout completion note" in plan_doc
     assert "## Program-level definition of done" in plan_doc
     assert "## Mandatory quality gates for this rework" in plan_doc
     assert "## Transition, update, and upgrade safety rules" in plan_doc
