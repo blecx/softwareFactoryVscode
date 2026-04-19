@@ -5,12 +5,30 @@ from pathlib import Path
 import httpx
 import pytest
 
-from factory_runtime.apps.approval_gate import main as approval_gate_main
-from factory_runtime.apps.mcp.agent_bus import mcp_server as agent_bus_mcp_server
 from factory_runtime.apps.mcp.agent_bus.bus import AgentBus
-from factory_runtime.apps.mcp.memory import mcp_server as memory_mcp_server
 from factory_runtime.apps.mcp.memory.store import MemoryStore
 from factory_runtime.shared_tenancy import TenantIdentityError
+
+
+def _approval_gate_main():
+    pytest.importorskip("fastapi")
+    from factory_runtime.apps.approval_gate import main as approval_gate_main
+
+    return approval_gate_main
+
+
+def _memory_mcp_server():
+    pytest.importorskip("mcp.server.fastmcp")
+    from factory_runtime.apps.mcp.memory import mcp_server as memory_mcp_server
+
+    return memory_mcp_server
+
+
+def _agent_bus_mcp_server():
+    pytest.importorskip("mcp.server.fastmcp")
+    from factory_runtime.apps.mcp.agent_bus import mcp_server as agent_bus_mcp_server
+
+    return agent_bus_mcp_server
 
 
 class _FakeRequest:
@@ -127,6 +145,9 @@ def test_shared_service_extractors_allow_compatibility_fallback(monkeypatch):
     monkeypatch.delenv("FACTORY_TENANCY_MODE", raising=False)
     monkeypatch.setenv("PROJECT_WORKSPACE_ID", "compat-workspace")
 
+    approval_gate_main = _approval_gate_main()
+    memory_mcp_server = _memory_mcp_server()
+    agent_bus_mcp_server = _agent_bus_mcp_server()
     ctx = _FakeMCPContext()
     request = _FakeRequest()
     websocket = _FakeWebSocket()
@@ -143,6 +164,9 @@ def test_shared_service_extractors_require_explicit_identity_in_shared_mode(
     monkeypatch.setenv("FACTORY_TENANCY_MODE", "shared")
     monkeypatch.setenv("PROJECT_WORKSPACE_ID", "compat-workspace")
 
+    approval_gate_main = _approval_gate_main()
+    memory_mcp_server = _memory_mcp_server()
+    agent_bus_mcp_server = _agent_bus_mcp_server()
     ctx = _FakeMCPContext()
     request = _FakeRequest()
     websocket = _FakeWebSocket()
@@ -166,6 +190,9 @@ def test_shared_service_extractors_accept_explicit_identity_in_shared_mode(
     monkeypatch.setenv("FACTORY_TENANCY_MODE", "shared")
     monkeypatch.setenv("PROJECT_WORKSPACE_ID", "compat-workspace")
 
+    approval_gate_main = _approval_gate_main()
+    memory_mcp_server = _memory_mcp_server()
+    agent_bus_mcp_server = _agent_bus_mcp_server()
     ctx = _FakeMCPContext(headers={"X-Workspace-ID": "tenant-7"})
     request = _FakeRequest(headers={"X-Workspace-ID": "tenant-7"})
     websocket = _FakeWebSocket(query_params={"project_id": "tenant-7"})
@@ -180,6 +207,7 @@ def test_shared_service_extractors_reject_mismatched_explicit_selectors(
     monkeypatch,
 ):
     monkeypatch.setenv("FACTORY_TENANCY_MODE", "shared")
+    approval_gate_main = _approval_gate_main()
 
     websocket = _FakeWebSocket(
         headers={"X-Workspace-ID": "tenant-a"},
@@ -194,6 +222,7 @@ def test_agent_bus_server_resolves_db_path_from_factory_data_dir(monkeypatch):
     monkeypatch.delenv("AGENT_BUS_DB_PATH", raising=False)
     monkeypatch.setenv("FACTORY_DATA_DIR", "/tmp/factory-data")
     monkeypatch.setenv("FACTORY_INSTANCE_ID", "workspace-7")
+    agent_bus_mcp_server = _agent_bus_mcp_server()
 
     assert agent_bus_mcp_server.resolve_agent_bus_db_path() == (
         "/tmp/factory-data/bus/workspace-7/agent_bus.db"
@@ -204,6 +233,7 @@ def test_agent_bus_server_falls_back_to_repo_tmp_db_path(monkeypatch):
     monkeypatch.delenv("AGENT_BUS_DB_PATH", raising=False)
     monkeypatch.delenv("FACTORY_DATA_DIR", raising=False)
     monkeypatch.setenv("FACTORY_INSTANCE_ID", "workspace-8")
+    agent_bus_mcp_server = _agent_bus_mcp_server()
     monkeypatch.setattr(
         agent_bus_mcp_server,
         "_container_data_dir_is_writable",
@@ -226,6 +256,7 @@ def test_memory_server_resolves_db_path_from_factory_data_dir(monkeypatch):
     monkeypatch.delenv("MEMORY_DB_PATH", raising=False)
     monkeypatch.setenv("FACTORY_DATA_DIR", "/tmp/factory-data")
     monkeypatch.setenv("FACTORY_INSTANCE_ID", "workspace-7")
+    memory_mcp_server = _memory_mcp_server()
 
     assert memory_mcp_server.resolve_memory_db_path() == (
         "/tmp/factory-data/memory/workspace-7/memory.db"
@@ -236,6 +267,7 @@ def test_memory_server_falls_back_to_repo_tmp_db_path(monkeypatch):
     monkeypatch.delenv("MEMORY_DB_PATH", raising=False)
     monkeypatch.delenv("FACTORY_DATA_DIR", raising=False)
     monkeypatch.setenv("FACTORY_INSTANCE_ID", "workspace-8")
+    memory_mcp_server = _memory_mcp_server()
     monkeypatch.setattr(
         memory_mcp_server,
         "_container_data_dir_is_writable",
@@ -394,6 +426,72 @@ def test_memory_store_creates_parent_directory_for_file_backed_database(tmp_path
         store.close()
 
 
+def test_memory_store_partitions_relationships_and_audit_by_tenant():
+    """Relationship storage and mutation audit must remain tenant-partitioned."""
+    store = MemoryStore(db_path=":memory:")
+    try:
+        for tenant in ("tenant-A", "tenant-B"):
+            store.add_relationship(
+                from_entity="service:memory",
+                relation="depends_on",
+                to_entity="sqlite",
+                project_id=tenant,
+            )
+
+        tenant_a_relationships = store.get_related(
+            "service:memory",
+            relation="depends_on",
+            project_id="tenant-A",
+        )
+        tenant_b_relationships = store.get_related(
+            "service:memory",
+            relation="depends_on",
+            project_id="tenant-B",
+        )
+
+        assert len(tenant_a_relationships) == 1
+        assert len(tenant_b_relationships) == 1
+        assert all(row["project_id"] == "tenant-A" for row in tenant_a_relationships)
+        assert all(row["project_id"] == "tenant-B" for row in tenant_b_relationships)
+
+        tenant_a_audit = store.get_audit_log(project_id="tenant-A")
+        tenant_b_audit = store.get_audit_log(project_id="tenant-B")
+
+        assert tenant_a_audit[0]["action"] == "add_relationship"
+        assert tenant_b_audit[0]["action"] == "add_relationship"
+        assert all(event["project_id"] == "tenant-A" for event in tenant_a_audit)
+        assert all(event["project_id"] == "tenant-B" for event in tenant_b_audit)
+
+        counts = store.purge_workspace(project_id="tenant-A")
+
+        assert counts["relationships"] == 1
+        assert counts["audit_events"] == 1
+        assert (
+            store.get_related(
+                "service:memory",
+                relation="depends_on",
+                project_id="tenant-A",
+            )
+            == []
+        )
+        assert (
+            len(
+                store.get_related(
+                    "service:memory",
+                    relation="depends_on",
+                    project_id="tenant-B",
+                )
+            )
+            == 1
+        )
+
+        post_purge_audit = store.get_audit_log(project_id="tenant-A")
+        assert len(post_purge_audit) == 1
+        assert post_purge_audit[0]["action"] == "purge_workspace"
+    finally:
+        store.close()
+
+
 def test_agent_bus_context_packet_preserves_non_default_project_scope():
     """Context packets must return tenant-scoped plan, snapshot, validation, and checkpoint data."""
     bus = AgentBus(db_path=":memory:")
@@ -447,6 +545,106 @@ def test_agent_bus_context_packet_preserves_non_default_project_scope():
         with pytest.raises(ValueError):
             bus.read_context_packet(run_id, project_id="tenant-4")
     finally:
+        bus.close()
+
+
+def test_agent_bus_partitions_child_rows_and_audit_by_tenant():
+    """Every persisted child row and audit record must carry tenant identity."""
+    bus = AgentBus(db_path=":memory:")
+    try:
+        run_a = bus.create_run(
+            issue_number=501,
+            repo="org/tenant-a",
+            project_id="tenant-A",
+        )
+        run_b = bus.create_run(
+            issue_number=502,
+            repo="org/tenant-b",
+            project_id="tenant-B",
+        )
+
+        for run_id, tenant in ((run_a, "tenant-A"), (run_b, "tenant-B")):
+            bus.write_plan(
+                run_id,
+                goal=f"goal for {tenant}",
+                files=["src/example.py"],
+                acceptance_criteria=["criterion"],
+                validation_cmds=["pytest tests/test_multi_tenant.py"],
+                project_id=tenant,
+            )
+            bus.write_snapshot(
+                run_id,
+                filepath="src/example.py",
+                content_before="before",
+                content_after="after",
+                project_id=tenant,
+            )
+            bus.write_validation(
+                run_id,
+                command="pytest tests/test_multi_tenant.py",
+                stdout="ok",
+                stderr="",
+                exit_code=0,
+                passed=True,
+                project_id=tenant,
+            )
+            bus.write_checkpoint(
+                run_id,
+                label="validation_passed",
+                metadata={"tenant": tenant},
+                project_id=tenant,
+            )
+
+        packet = bus.read_context_packet(run_a, project_id="tenant-A")
+        assert packet["plan"]["project_id"] == "tenant-A"
+        assert packet["file_snapshots"][0]["project_id"] == "tenant-A"
+        assert packet["validation_results"][0]["project_id"] == "tenant-A"
+        assert packet["checkpoints"][0]["project_id"] == "tenant-A"
+
+        tenant_a_audit = bus.get_audit_log(project_id="tenant-A", run_id=run_a)
+        tenant_b_audit = bus.get_audit_log(project_id="tenant-B", run_id=run_b)
+
+        assert {event["action"] for event in tenant_a_audit} >= {
+            "create_run",
+            "write_plan",
+            "write_snapshot",
+            "write_validation",
+            "write_checkpoint",
+        }
+        assert all(event["project_id"] == "tenant-A" for event in tenant_a_audit)
+        assert all(event["project_id"] == "tenant-B" for event in tenant_b_audit)
+
+        counts = bus.purge_workspace(project_id="tenant-A")
+        assert counts["runs"] == 1
+        assert counts["plans"] == 1
+        assert counts["snapshots"] == 1
+        assert counts["validations"] == 1
+        assert counts["checkpoints"] == 1
+        assert counts["audit_events"] >= 5
+
+        assert bus.get_run(run_a, project_id="tenant-A") is None
+        assert bus.get_run(run_b, project_id="tenant-B") is not None
+        assert bus.get_plan(run_b, project_id="tenant-B") is not None
+
+        post_purge_audit = bus.get_audit_log(project_id="tenant-A")
+        assert len(post_purge_audit) == 1
+        assert post_purge_audit[0]["action"] == "purge_workspace"
+    finally:
+        bus.close()
+
+
+def test_partitioned_purge_rejects_blank_project_identity():
+    """Blank tenant selectors should never be accepted for destructive purge helpers."""
+    store = MemoryStore(db_path=":memory:")
+    bus = AgentBus(db_path=":memory:")
+    try:
+        with pytest.raises(ValueError, match="project_id"):
+            store.purge_workspace("")
+
+        with pytest.raises(ValueError, match="project_id"):
+            bus.purge_workspace("   ")
+    finally:
+        store.close()
         bus.close()
 
 
