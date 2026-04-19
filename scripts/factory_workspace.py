@@ -59,6 +59,10 @@ PORT_LAYOUT: dict[str, int] = {
 SHARED_SERVICE_MODE_ENV_KEY = "FACTORY_SHARED_SERVICE_MODE"
 PER_WORKSPACE_TOPOLOGY_MODE = "per-workspace"
 SHARED_TOPOLOGY_MODE = "shared"
+TENANCY_MODE_ENV_KEY = "FACTORY_TENANCY_MODE"
+COMPATIBILITY_TENANCY_MODE = "compatibility"
+PROMOTED_SHARED_TENANCY_MODE = "shared"
+WORKSPACE_ID_HEADER = "X-Workspace-ID"
 SHARED_SERVICE_URL_ENV_KEYS: dict[str, str] = {
     "mcp-memory": "FACTORY_SHARED_MEMORY_URL",
     "mcp-agent-bus": "FACTORY_SHARED_AGENT_BUS_URL",
@@ -338,6 +342,20 @@ def normalize_shared_service_mode(raw_value: str | None) -> str:
     return PER_WORKSPACE_TOPOLOGY_MODE
 
 
+def normalize_tenancy_mode(raw_value: str | None) -> str:
+    normalized = str(raw_value or "").strip().lower()
+    if normalized in {
+        "",
+        COMPATIBILITY_TENANCY_MODE,
+        "compat",
+        PER_WORKSPACE_TOPOLOGY_MODE,
+    }:
+        return COMPATIBILITY_TENANCY_MODE
+    if normalized in {PROMOTED_SHARED_TENANCY_MODE, "promoted-shared", "strict"}:
+        return PROMOTED_SHARED_TENANCY_MODE
+    return COMPATIBILITY_TENANCY_MODE
+
+
 def build_service_probe_url(discovery_url: str, health_path: str) -> str:
     normalized_url = discovery_url.strip().rstrip("/")
     if not normalized_url:
@@ -390,6 +408,75 @@ def build_runtime_topology(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
         }
 
     return {"mode": config.shared_service_mode, "services": services}
+
+
+def build_shared_mode_diagnostics(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
+    shared_mode_configured = config.shared_service_mode == SHARED_TOPOLOGY_MODE
+    tenant_identity_mode = normalize_tenancy_mode(
+        config.env_values.get(TENANCY_MODE_ENV_KEY, "")
+    )
+    expected_tenant_identity = config.project_workspace_id
+    expected_header_value = (
+        f"{WORKSPACE_ID_HEADER}: {expected_tenant_identity}"
+        if expected_tenant_identity
+        else WORKSPACE_ID_HEADER
+    )
+    tenant_identity_required = bool(
+        shared_mode_configured
+        and tenant_identity_mode == PROMOTED_SHARED_TENANCY_MODE
+        and expected_tenant_identity
+    )
+
+    if not shared_mode_configured:
+        shared_mode_status = "per-workspace-default"
+    elif tenant_identity_required:
+        shared_mode_status = "shared-ready"
+    else:
+        shared_mode_status = "shared-topology-without-tenant-enforcement"
+
+    missing_tenant_remediation = (
+        f"Send `{expected_header_value}` from workspace clients and configure "
+        f"`{TENANCY_MODE_ENV_KEY}={PROMOTED_SHARED_TENANCY_MODE}` for promoted shared services."
+        if expected_tenant_identity
+        else "Provide a non-empty PROJECT_WORKSPACE_ID before enabling promoted shared mode."
+    )
+    tenant_mismatch_remediation = (
+        "Align `X-Workspace-ID`, `project_id`, and any other explicit tenant selector "
+        f"to `{expected_tenant_identity}`."
+        if expected_tenant_identity
+        else "Align all explicit tenant selectors to the intended workspace identity."
+    )
+
+    return {
+        "shared_mode_configured": shared_mode_configured,
+        "shared_mode_status": shared_mode_status,
+        "tenant_identity_mode": tenant_identity_mode,
+        "tenant_identity_required": tenant_identity_required,
+        "expected_tenant_identity": expected_tenant_identity,
+        "tenant_identity_header": WORKSPACE_ID_HEADER,
+        "expected_tenant_header_value": expected_header_value,
+        "missing_tenant_remediation": missing_tenant_remediation,
+        "tenant_mismatch_remediation": tenant_mismatch_remediation,
+    }
+
+
+def build_shared_mode_diagnostic_issues(
+    config: WorkspaceRuntimeConfig,
+) -> list[str]:
+    diagnostics = build_shared_mode_diagnostics(config)
+    if not diagnostics["shared_mode_configured"]:
+        return []
+    if diagnostics["tenant_identity_required"]:
+        return []
+
+    return [
+        "Shared-mode rollout verification requires explicit tenant identity "
+        f"enforcement, but `{TENANCY_MODE_ENV_KEY}` resolves to "
+        f"`{diagnostics['tenant_identity_mode']}`. Expected tenant identity "
+        f"`{diagnostics['expected_tenant_identity']}` via "
+        f"`{diagnostics['tenant_identity_header']}`. Remediation: "
+        f"{diagnostics['missing_tenant_remediation']}"
+    ]
 
 
 def build_runtime_health_urls_for_topology(

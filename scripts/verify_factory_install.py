@@ -148,6 +148,10 @@ def render_runtime_smoke_prompt(target_dir: Path, workspace_file: str) -> str:
             "- The core compose services are running and healthy where health checks exist.",
             "- The generated runtime manifest and effective workspace settings agree on the active endpoint map.",
             "- The effective health endpoints respond for this workspace's assigned ports.",
+            "- If shared mode is configured, the diagnostics report whether "
+            "explicit `X-Workspace-ID` tenant identity is required, the expected "
+            "tenant identity, and the remediation for missing or mismatched "
+            "tenant selectors.",
             "- If MCP endpoints are part of this runtime, confirm whether the "
             "generated workspace MCP URLs appear reachable.",
             "",
@@ -298,6 +302,71 @@ def build_probe_url(url: str, health_path: str) -> str:
     if normalized_url.endswith(normalized_path):
         return normalized_url
     return f"{normalized_url}{normalized_path}"
+
+
+def build_shared_mode_expectation_violations(
+    shared_mode_diagnostics: dict[str, Any],
+) -> list[str]:
+    if not shared_mode_diagnostics.get("shared_mode_configured"):
+        return []
+    if shared_mode_diagnostics.get("tenant_identity_required"):
+        return []
+
+    return [
+        "Shared-mode verification requires explicit tenant identity enforcement, "
+        f"but `{factory_workspace.TENANCY_MODE_ENV_KEY}` resolves to "
+        f"`{shared_mode_diagnostics.get('tenant_identity_mode', '')}`. Expected "
+        "tenant identity "
+        f"`{shared_mode_diagnostics.get('expected_tenant_identity', '')}` via "
+        f"`{shared_mode_diagnostics.get('tenant_identity_header', '')}`. "
+        f"Remediation: {shared_mode_diagnostics.get('missing_tenant_remediation', '')}"
+    ]
+
+
+def format_shared_mode_probe_failure(
+    service_name: str,
+    error: str,
+    shared_mode_diagnostics: dict[str, Any],
+) -> str:
+    normalized_error = error.lower()
+    expected_tenant_identity = str(
+        shared_mode_diagnostics.get("expected_tenant_identity", "")
+    ).strip()
+    tenant_header = str(
+        shared_mode_diagnostics.get("tenant_identity_header", "X-Workspace-ID")
+    ).strip()
+    missing_tenant_remediation = str(
+        shared_mode_diagnostics.get("missing_tenant_remediation", "")
+    ).strip()
+    tenant_mismatch_remediation = str(
+        shared_mode_diagnostics.get("tenant_mismatch_remediation", "")
+    ).strip()
+
+    if "explicit tenant identity" in normalized_error:
+        return (
+            "Shared runtime endpoint probe failed for service "
+            f"`{service_name}` because no explicit tenant identity was supplied. "
+            f"Expected `{tenant_header}: {expected_tenant_identity}`. "
+            f"Remediation: {missing_tenant_remediation} "
+            f"Observed error: {error}"
+        )
+
+    if (
+        "tenant identity mismatch" in normalized_error
+        or "mismatch across explicit selectors" in normalized_error
+    ):
+        return (
+            "Shared runtime endpoint probe failed for service "
+            f"`{service_name}` because the observed tenant selectors do not match "
+            f"the expected tenant identity `{expected_tenant_identity}`. "
+            f"Observed mismatch: {error} "
+            f"Remediation: {tenant_mismatch_remediation}"
+        )
+
+    return (
+        "Shared runtime endpoint probe failed for service "
+        f"`{service_name}` at rollout boundary check time: {error}"
+    )
 
 
 def check_factory_tree(target_dir: Path, violations: list[str]) -> Path | None:
@@ -659,6 +728,12 @@ def verify_runtime(
         if isinstance(runtime_topology, dict)
         else {}
     )
+    shared_mode_diagnostics = (
+        factory_workspace.build_shared_mode_diagnostics(preflight_config)
+        if preflight_config is not None
+        else {}
+    )
+    violations.extend(build_shared_mode_expectation_violations(shared_mode_diagnostics))
 
     running_services = {
         service_name: str(data.get("status", ""))
@@ -697,8 +772,11 @@ def verify_runtime(
             )
             if error:
                 violations.append(
-                    "Shared runtime endpoint probe failed for service "
-                    f"`{service_name}` at {probe_url}: {error}"
+                    format_shared_mode_probe_failure(
+                        service_name,
+                        error,
+                        shared_mode_diagnostics,
+                    )
                 )
             continue
 

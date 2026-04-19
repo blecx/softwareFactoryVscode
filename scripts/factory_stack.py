@@ -218,6 +218,7 @@ def build_preflight_report(
     )
     runtime_manifest = factory_workspace.load_json(config.runtime_manifest_path)
     runtime_topology = factory_workspace.build_runtime_topology(config)
+    shared_mode_diagnostics = factory_workspace.build_shared_mode_diagnostics(config)
     workspace_urls = load_workspace_server_urls(config.target_dir, workspace_file)
     manifest_server_urls = {
         name: str(data.get("url", ""))
@@ -295,6 +296,7 @@ def build_preflight_report(
         }
 
     topology_issues = factory_workspace.validate_runtime_topology(config)
+    shared_mode_issues = factory_workspace.build_shared_mode_diagnostic_issues(config)
     service_issues: list[str] = []
     port_issues: list[str] = []
     running_service_count = 0
@@ -350,14 +352,21 @@ def build_preflight_report(
                 f"`{expected_port}` (found `{published_ports or 'none'}`)."
             )
 
-    if alignment_issues or port_issues or topology_issues:
+    if alignment_issues or port_issues or topology_issues or shared_mode_issues:
         status = "config-drift"
         recommended_action = (
             "inspect-shared-topology"
-            if topology_issues and not alignment_issues and not port_issues
+            if (topology_issues or shared_mode_issues)
+            and not alignment_issues
+            and not port_issues
             else "re-bootstrap"
         )
-        issues = [*alignment_issues, *port_issues, *topology_issues]
+        issues = [
+            *alignment_issues,
+            *port_issues,
+            *topology_issues,
+            *shared_mode_issues,
+        ]
     elif running_service_count == 0:
         status = "needs-ramp-up"
         recommended_action = "start"
@@ -385,12 +394,14 @@ def build_preflight_report(
         "expected_service_ports": expected_service_ports,
         "service_inventory": service_inventory,
         "runtime_topology": runtime_topology,
+        "shared_mode_diagnostics": shared_mode_diagnostics,
     }
 
 
 def print_preflight_report(report: dict[str, Any]) -> None:
     config = report["config"]
     runtime_topology = report.get("runtime_topology", {})
+    shared_mode_diagnostics = report.get("shared_mode_diagnostics", {})
     print(f"workspace_id={config.project_workspace_id}")
     print(f"instance_id={config.factory_instance_id}")
     print(f"target={config.target_dir}")
@@ -399,6 +410,39 @@ def print_preflight_report(report: dict[str, Any]) -> None:
         "topology_mode="
         f"{runtime_topology.get('mode', factory_workspace.PER_WORKSPACE_TOPOLOGY_MODE)}"
     )
+    if isinstance(shared_mode_diagnostics, dict):
+        print(
+            "shared_mode_configured="
+            f"{str(bool(shared_mode_diagnostics.get('shared_mode_configured'))).lower()}"
+        )
+        print(
+            "shared_mode_status="
+            f"{shared_mode_diagnostics.get('shared_mode_status', '')}"
+        )
+        print(
+            "tenant_identity_mode="
+            f"{shared_mode_diagnostics.get('tenant_identity_mode', '')}"
+        )
+        print(
+            "tenant_identity_required="
+            f"{str(bool(shared_mode_diagnostics.get('tenant_identity_required'))).lower()}"
+        )
+        print(
+            "expected_tenant_identity="
+            f"{shared_mode_diagnostics.get('expected_tenant_identity', '')}"
+        )
+        print(
+            "tenant_identity_header="
+            f"{shared_mode_diagnostics.get('tenant_identity_header', '')}"
+        )
+        print(
+            "missing_tenant_remediation="
+            f"{shared_mode_diagnostics.get('missing_tenant_remediation', '')}"
+        )
+        print(
+            "tenant_mismatch_remediation="
+            f"{shared_mode_diagnostics.get('tenant_mismatch_remediation', '')}"
+        )
     print(f"preflight_status={report['status']}")
     print(f"recommended_action={report['recommended_action']}")
     print(f"issue_count={len(report['issues'])}")
@@ -954,10 +998,36 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"preflight_status={preflight['status']}")
     print(f"recommended_action={preflight['recommended_action']}")
     preflight_topology = preflight.get("runtime_topology", {})
+    shared_mode_diagnostics = preflight.get("shared_mode_diagnostics", {})
     if isinstance(preflight_topology, dict):
         print(
             "preflight_topology_mode="
             f"{preflight_topology.get('mode', config.shared_service_mode)}"
+        )
+    if isinstance(shared_mode_diagnostics, dict):
+        print(
+            "shared_mode_configured="
+            f"{str(bool(shared_mode_diagnostics.get('shared_mode_configured'))).lower()}"
+        )
+        print(
+            "shared_mode_status="
+            f"{shared_mode_diagnostics.get('shared_mode_status', '')}"
+        )
+        print(
+            "tenant_identity_mode="
+            f"{shared_mode_diagnostics.get('tenant_identity_mode', '')}"
+        )
+        print(
+            "tenant_identity_required="
+            f"{str(bool(shared_mode_diagnostics.get('tenant_identity_required'))).lower()}"
+        )
+        print(
+            "expected_tenant_identity="
+            f"{shared_mode_diagnostics.get('expected_tenant_identity', '')}"
+        )
+        print(
+            "tenant_identity_header="
+            f"{shared_mode_diagnostics.get('tenant_identity_header', '')}"
         )
     for name, url in sorted(config.mcp_server_urls.items()):
         print(f"mcp.{name}={url}")
