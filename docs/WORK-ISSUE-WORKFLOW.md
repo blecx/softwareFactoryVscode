@@ -41,6 +41,31 @@ Use these Copilot agents in VS Code Chat:
   - `last_github_truth`
 - The hook blocks unsafe prompts such as “continue to the next issue”, “merge the PR”, or “close the issue” when the checkpoint is missing, incomplete, or lacks the required GitHub/cleanup evidence for the requested gate.
 
+## Resume after interruption
+
+- After a timeout, restart, compaction event, or tool uncertainty, re-anchor before resuming the current issue.
+- Use the dedicated workflow prompt at `.github/prompts/resume-after-interruption.prompt.md` or the companion skill at `.copilot/skills/interruption-recovery-workflow/SKILL.md`.
+- Capture a repo-owned recovery artifact under `.tmp/` with:
+
+  ```text
+  ./.venv/bin/python ./scripts/capture_recovery_snapshot.py
+  ```
+
+- When the interrupted task touched runtime, Docker, MCP, or workspace lifecycle state, include service diagnostics with:
+
+  ```text
+  ./.venv/bin/python ./scripts/capture_recovery_snapshot.py --include-runtime-status
+  ```
+
+- The helper writes `.tmp/interruption-recovery-snapshot.md` and records:
+  - current branch
+  - working tree state
+  - queue checkpoint contents from `.tmp/github-issue-queue-state.md`
+  - active issue/PR GitHub truth when available
+  - PR check output when available
+  - optional `factory_stack.py status` output for runtime-sensitive work
+- Review the recovery snapshot and update `.tmp/github-issue-queue-state.md` before resuming implementation, merge, cleanup, or queue selection.
+
 ## Required guardrails
 
 - Issues must follow `.github/ISSUE_TEMPLATE/feature_request.yml` or `.github/ISSUE_TEMPLATE/bug_report.yml`.
