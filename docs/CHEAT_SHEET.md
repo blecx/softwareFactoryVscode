@@ -103,3 +103,9 @@ The updater refreshes:
 - **Topology truth**: `preflight` and `status` now emit `topology_mode`. The default is `per-workspace`; if you opt into `FACTORY_SHARED_SERVICE_MODE=shared`, you must also provide `FACTORY_SHARED_MEMORY_URL`, `FACTORY_SHARED_AGENT_BUS_URL`, and `FACTORY_SHARED_APPROVAL_GATE_URL` so the workspace can discover the promoted shared services without owning duplicate local containers.
 - **Shared-mode tenant diagnostics**: when `FACTORY_SHARED_SERVICE_MODE=shared`, `preflight`, `status`, and runtime verification now report `shared_mode_status`, whether explicit `X-Workspace-ID` tenant identity is required, and the expected tenant identity from `PROJECT_WORKSPACE_ID`.
 - **Tenant mismatch remediation**: if shared mode reports missing or mismatched tenant selectors, send `X-Workspace-ID=<PROJECT_WORKSPACE_ID>` from workspace clients and align any `project_id` selector to that same value before treating the rollout checks as satisfied.
+
+## 🏷 How to read shared-service rollout status
+
+- `open` — one or more ADR-008 rollout tracks still block shared promotion
+- `advanced groundwork` — meaningful rollout slices landed, but the final gate is still open
+- `fulfilled` — only after code, tests, diagnostics, and operator guidance all support the claim and a final architecture/documentation review confirms it
