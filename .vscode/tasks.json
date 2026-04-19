@@ -424,7 +424,8 @@
       "type": "shell",
       "command": "python3",
       "args": [
-        "${workspaceFolder}/scripts/verify_factory_install.py",
+        "${workspaceFolder}/scripts/workspace_surface_guard.py",
+        "verify-install",
         "--target",
         "${workspaceFolder:Host Project (Root)}"
       ],
@@ -445,10 +446,10 @@
       "type": "shell",
       "command": "python3",
       "args": [
-        "${workspaceFolder}/scripts/verify_factory_install.py",
+        "${workspaceFolder}/scripts/workspace_surface_guard.py",
+        "verify-runtime",
         "--target",
-        "${workspaceFolder:Host Project (Root)}",
-        "--runtime"
+        "${workspaceFolder:Host Project (Root)}"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -467,11 +468,10 @@
       "type": "shell",
       "command": "python3",
       "args": [
-        "${workspaceFolder}/scripts/verify_factory_install.py",
+        "${workspaceFolder}/scripts/workspace_surface_guard.py",
+        "verify-runtime-mcp",
         "--target",
-        "${workspaceFolder:Host Project (Root)}",
-        "--runtime",
-        "--check-vscode-mcp"
+        "${workspaceFolder:Host Project (Root)}"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -514,8 +514,8 @@
       "type": "shell",
       "command": "python3",
       "args": [
-        "${workspaceFolder}/scripts/factory_update.py",
-        "check",
+        "${workspaceFolder}/scripts/workspace_surface_guard.py",
+        "update-check",
         "--target",
         "${workspaceFolder:Host Project (Root)}"
       ],
@@ -536,8 +536,8 @@
       "type": "shell",
       "command": "python3",
       "args": [
-        "${workspaceFolder}/scripts/factory_update.py",
-        "apply",
+        "${workspaceFolder}/scripts/workspace_surface_guard.py",
+        "update-apply",
         "--target",
         "${workspaceFolder:Host Project (Root)}"
       ],

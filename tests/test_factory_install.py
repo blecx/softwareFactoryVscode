@@ -5709,7 +5709,7 @@ def test_ci_workflow_has_container_build_job() -> None:
     ), "CI container-build job must reference Dockerfiles"
 
 
-def test_verify_tasks_target_host_workspace_root() -> None:
+def test_workspace_sensitive_tasks_use_surface_guard() -> None:
     tasks_path = REPO_ROOT / ".vscode" / "tasks.json"
     tasks_data = json.loads(tasks_path.read_text(encoding="utf-8"))
     tasks = {
@@ -5718,14 +5718,22 @@ def test_verify_tasks_target_host_workspace_root() -> None:
         if isinstance(task, dict) and isinstance(task.get("label"), str)
     }
 
-    for label in (
-        "🛂 Verify: Installation Compliance",
-        "🩺 Verify: Runtime Compliance",
-        "🩺 Verify: Runtime Compliance + MCP",
-    ):
+    expected_operations = {
+        "🛂 Verify: Installation Compliance": "verify-install",
+        "🩺 Verify: Runtime Compliance": "verify-runtime",
+        "🩺 Verify: Runtime Compliance + MCP": "verify-runtime-mcp",
+        "🔎 Check: Factory Updates": "update-check",
+        "⬆️ Update: Factory Install": "update-apply",
+    }
+
+    for label, operation in expected_operations.items():
         task = tasks[label]
-        assert task["args"][0] == "${workspaceFolder}/scripts/verify_factory_install.py"
-        assert task["args"][2] == "${workspaceFolder:Host Project (Root)}"
+        assert (
+            task["args"][0] == "${workspaceFolder}/scripts/workspace_surface_guard.py"
+        )
+        assert task["args"][1] == operation
+        assert task["args"][2] == "--target"
+        assert task["args"][3] == "${workspaceFolder:Host Project (Root)}"
 
     preflight_task = tasks["🧭 Runtime: Preflight"]
     assert preflight_task["args"] == [

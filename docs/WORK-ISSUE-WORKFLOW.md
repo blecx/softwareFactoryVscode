@@ -22,6 +22,20 @@ Use these Copilot agents in VS Code Chat:
 - Require explicit operator approval before continuing to the next issue.
 - Use `.tmp/`, never `/tmp`.
 
+## Execution surfaces
+
+Workflow execution surface is part of the supported contract.
+
+- **Source checkout** — the `softwareFactoryVscode` repository itself. Use this surface for factory implementation work, repo tests, docs, prompts, and lifecycle helpers that already know how to resolve the companion install.
+- **Generated workspace** — the host repository's `software-factory.code-workspace` file. This is the supported operator surface for tasks that need `Host Project (Root)` and the installed host contract.
+- **Companion runtime metadata** — the installed host repository state under `<host>/.copilot/softwareFactoryVscode/`, including `.factory.env`, `lock.json`, and `.tmp/runtime-manifest.json`.
+
+Routing rule:
+
+- If a task depends on `Host Project (Root)` or validates the installed host contract, it belongs to the generated workspace or an explicit companion runtime target, not the source checkout alone.
+- Repo-owned task wrappers must reject wrong-surface invocation with actionable guidance or require an explicit target; they must not silently fabricate a second runtime contract inside the source checkout.
+- The canonical guard for these task surfaces is `scripts/workspace_surface_guard.py`, which fails fast when the task is launched from the source checkout without a valid generated-workspace host target.
+
 ## Deterministic queue checkpoint enforcement
 
 - Ordered queue continuation, merge, and completion prompts are guarded by `.github/hooks/github-issue-queue-guard.json`, which runs `python3 ./scripts/github_issue_queue_guard.py`.
