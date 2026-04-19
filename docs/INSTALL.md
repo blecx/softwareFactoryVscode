@@ -138,6 +138,14 @@ PORT_TUI=9090
 
 # Required for AI/MCP connectivity
 CONTEXT7_API_KEY=your_context7_key_here
+
+# Optional shared-service topology override (ADR-008 rollout track)
+# Default is per-workspace ownership for mcp-memory, mcp-agent-bus, and approval-gate.
+FACTORY_SHARED_SERVICE_MODE=per-workspace
+# When FACTORY_SHARED_SERVICE_MODE=shared, provide explicit shared discovery URLs:
+# FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030
+# FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031
+# FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001
 ```
 
 The bootstrap step also generates `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`.
@@ -172,6 +180,13 @@ The helper preserves the supported runtime contract:
 - environment comes from `.copilot/softwareFactoryVscode/.factory.env`
 - startup remains deterministic via `up -d --build --wait --wait-timeout ...`
 
+For the current practical baseline, shared-service topology remains **opt-in**.
+If you set `FACTORY_SHARED_SERVICE_MODE=shared`, the workspace runtime expects
+`FACTORY_SHARED_MEMORY_URL`, `FACTORY_SHARED_AGENT_BUS_URL`, and
+`FACTORY_SHARED_APPROVAL_GATE_URL` so `mcp-memory`, `mcp-agent-bus`, and
+`approval-gate` can be discovered as shared services instead of being treated as
+workspace-owned containers.
+
 The runtime helper now understands workspace-aware lifecycle commands as well:
 
 ```bash
@@ -199,6 +214,10 @@ generated workspace MCP URLs before any live endpoint probing. That lets you tel
 - **needs-ramp-up** — the installation is fine but the runtime is not running yet
 - **config-drift** — generated workspace/runtime metadata no longer matches the effective port contract
 - **degraded** — services exist but are missing, unhealthy, or published on the wrong ports
+
+`preflight` and `status` also print a `topology_mode` so operators can tell whether
+the workspace is using the default per-workspace runtime or an explicit shared-service
+topology for the ADR-008 candidate shared services.
 
 Important: workspaces do **not** start Docker services automatically when they are installed.
 Only an explicit `start` command should create running containers.

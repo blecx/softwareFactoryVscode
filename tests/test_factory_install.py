@@ -3166,6 +3166,298 @@ def test_factory_stack_preflight_reports_needs_ramp_up_for_installed_workspace(
     assert "needs ramp-up" in report["issues"][0]
 
 
+def test_runtime_manifest_reports_shared_topology_when_configured(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True)
+    (factory_dir / ".copilot" / "config").mkdir(parents=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (factory_dir / ".factory.env").write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                f"FACTORY_DIR={factory_dir}",
+                "FACTORY_SHARED_SERVICE_MODE=shared",
+                "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
+                "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
+                "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    manifest = factory_workspace.build_runtime_manifest(config)
+
+    assert manifest["runtime_topology"]["mode"] == "shared"
+    assert manifest["runtime_health"]["mcp-memory"]["topology_mode"] == "shared"
+    assert manifest["runtime_health"]["mcp-memory"]["workspace_owned"] is False
+    assert (
+        manifest["runtime_health"]["mcp-memory"]["url"]
+        == "http://shared-memory.internal:3030/mcp"
+    )
+    assert (
+        manifest["runtime_health"]["approval-gate"]["url"]
+        == "http://shared-approval.internal:8001/health"
+    )
+
+
+def test_factory_stack_preflight_treats_promoted_shared_services_as_external(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(
+        factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                f"FACTORY_DIR={repo_root}",
+                "FACTORY_SHARED_SERVICE_MODE=shared",
+                "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
+                "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
+                "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    inventory = build_full_service_inventory(config)
+    for service_name in ("mcp-memory", "mcp-agent-bus", "approval-gate"):
+        del inventory[service_name]
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_service_inventory",
+        lambda _name: inventory,
+    )
+
+    report = factory_stack.build_preflight_report(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+
+    assert report["status"] == "ready"
+    assert report["runtime_topology"]["mode"] == "shared"
+    assert (
+        report["runtime_topology"]["services"]["mcp-memory"]["workspace_owned"] is False
+    )
+
+
+def test_factory_stack_preflight_flags_workspace_owned_duplicates_in_shared_mode(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(
+        factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                f"FACTORY_DIR={repo_root}",
+                "FACTORY_SHARED_SERVICE_MODE=shared",
+                "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
+                "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
+                "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_service_inventory",
+        lambda _name: build_full_service_inventory(config),
+    )
+
+    report = factory_stack.build_preflight_report(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+
+    assert report["status"] == "config-drift"
+    assert report["recommended_action"] == "inspect-shared-topology"
+    assert any(
+        "Shared-service topology drift detected" in issue for issue in report["issues"]
+    )
+
+
+def test_factory_stack_start_scales_promoted_shared_services_to_zero(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    env_path.write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                f"FACTORY_DIR={repo_root}",
+                "FACTORY_SHARED_SERVICE_MODE=shared",
+                "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
+                "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
+                "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    captured_commands: list[list[str]] = []
+    monkeypatch.setattr(
+        factory_stack,
+        "run_compose_command",
+        lambda _repo, command: captured_commands.append(list(command)),
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda compose_project_name: {},
+    )
+
+    factory_stack.start_stack(
+        repo_root,
+        env_file=env_path,
+        build=False,
+        wait=False,
+    )
+
+    command = captured_commands[0]
+    assert "--scale" in command
+    assert "mcp-memory=0" in command
+    assert "mcp-agent-bus=0" in command
+    assert "approval-gate=0" in command
+
+
 def test_factory_stack_preflight_detects_workspace_port_drift(
     tmp_path: Path,
     monkeypatch,
@@ -3753,6 +4045,80 @@ def test_verify_runtime_reports_preflight_status_and_action_for_drift(
     )
 
 
+def test_verify_runtime_uses_shared_service_discovery_when_shared_mode_enabled(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    env_path.write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                f"FACTORY_DIR={factory_dir}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                "FACTORY_SHARED_SERVICE_MODE=shared",
+                "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
+                "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
+                "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(
+        target_repo, factory_dir=factory_dir
+    )
+    topology = factory_workspace.build_runtime_topology(config)
+    inventory = build_full_service_inventory(config)
+    for service_name in ("mcp-memory", "mcp-agent-bus", "approval-gate"):
+        del inventory[service_name]
+
+    probed_urls: list[str] = []
+    monkeypatch.setattr(
+        verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "recommended_action": "none",
+            "issues": [],
+            "config": config,
+            "workspace_urls": config.mcp_server_urls,
+            "service_inventory": inventory,
+            "runtime_topology": topology,
+        },
+    )
+    monkeypatch.setattr(
+        verify_factory_install,
+        "probe_http_url",
+        lambda url, timeout, allow_http_error: probed_urls.append(url) or None,
+    )
+
+    violations = verify_factory_install.verify_runtime(
+        target_repo,
+        workspace_file="software-factory.code-workspace",
+        timeout=1.0,
+        check_vscode_mcp=False,
+    )
+
+    assert violations == []
+    assert "http://shared-memory.internal:3030/mcp" in probed_urls
+    assert "http://shared-bus.internal:3031/mcp" in probed_urls
+    assert "http://shared-approval.internal:8001/health" in probed_urls
+
+
 def test_verify_runtime_short_circuits_on_preflight_issues(
     tmp_path: Path,
     monkeypatch,
@@ -3908,6 +4274,27 @@ def test_runtime_compose_shared_services_expose_tenancy_mode_switch() -> None:
         == expected
     )
 
+    shared_topology_expected = "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"
+
+    assert (
+        services.get("mcp-memory", {})
+        .get("environment", {})
+        .get("FACTORY_SHARED_SERVICE_MODE")
+        == shared_topology_expected
+    )
+    assert (
+        services.get("mcp-agent-bus", {})
+        .get("environment", {})
+        .get("FACTORY_SHARED_SERVICE_MODE")
+        == shared_topology_expected
+    )
+    assert (
+        services.get("approval-gate", {})
+        .get("environment", {})
+        .get("FACTORY_SHARED_SERVICE_MODE")
+        == shared_topology_expected
+    )
+
 
 def test_runtime_compose_interservice_urls_use_fixed_internal_ports() -> None:
     compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
@@ -3917,10 +4304,22 @@ def test_runtime_compose_interservice_urls_use_fixed_internal_ports() -> None:
     approval_env = services.get("approval-gate", {}).get("environment", {})
     worker_env = services.get("agent-worker", {}).get("environment", {})
 
-    assert approval_env.get("AGENT_BUS_URL") == "http://mcp-agent-bus:3031"
-    assert worker_env.get("MEMORY_MCP_URL") == "http://mcp-memory:3030"
-    assert worker_env.get("AGENT_BUS_URL") == "http://mcp-agent-bus:3031"
-    assert worker_env.get("APPROVAL_GATE_URL") == "http://approval-gate:8001"
+    assert (
+        approval_env.get("AGENT_BUS_URL")
+        == "${FACTORY_SHARED_AGENT_BUS_URL:-http://mcp-agent-bus:3031}"
+    )
+    assert (
+        worker_env.get("MEMORY_MCP_URL")
+        == "${FACTORY_SHARED_MEMORY_URL:-http://mcp-memory:3030}"
+    )
+    assert (
+        worker_env.get("AGENT_BUS_URL")
+        == "${FACTORY_SHARED_AGENT_BUS_URL:-http://mcp-agent-bus:3031}"
+    )
+    assert (
+        worker_env.get("APPROVAL_GATE_URL")
+        == "${FACTORY_SHARED_APPROVAL_GATE_URL:-http://approval-gate:8001}"
+    )
 
 
 def test_runtime_compose_agent_worker_has_healthcheck() -> None:
