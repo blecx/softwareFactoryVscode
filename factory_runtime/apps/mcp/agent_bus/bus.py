@@ -18,6 +18,7 @@ Design: single SQLite file, no external deps, easy to wipe/reset.
 import json
 import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
 
@@ -53,6 +54,8 @@ class AgentBus:
 
     def __init__(self, db_path: str = ":memory:") -> None:
         self._db_path = db_path
+        if self._db_path != ":memory:":
+            Path(self._db_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(
             str(self._db_path),
             check_same_thread=False,

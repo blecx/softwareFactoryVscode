@@ -57,6 +57,7 @@ services:
     restart: unless-stopped
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      FACTORY_TENANCY_MODE: "${FACTORY_TENANCY_MODE:-compatibility}"
       MEMORY_DB_PATH: "/data/memory.db"
     volumes:
       - factory_memory_data:/data
@@ -88,6 +89,7 @@ services:
     restart: unless-stopped
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      FACTORY_TENANCY_MODE: "${FACTORY_TENANCY_MODE:-compatibility}"
       AGENT_BUS_DB_PATH: "/data/agent_bus.db"
     volumes:
       - factory_bus_data:/data
@@ -122,6 +124,7 @@ services:
         condition: service_healthy
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      FACTORY_TENANCY_MODE: "${FACTORY_TENANCY_MODE:-compatibility}"
       AGENT_BUS_URL: "http://mcp-agent-bus:3031"
     ports:
       - "${APPROVAL_GATE_PORT:-8001}:8001"
