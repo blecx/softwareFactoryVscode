@@ -264,6 +264,40 @@ def test_ordered_issue_queue_guard_assets_and_docs_exist():
     assert ".github/hooks/github-issue-queue-guard.json" in merge_skill
 
 
+def test_interruption_recovery_assets_and_docs_exist():
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    queue_prompt = (
+        repo_root / ".github" / "prompts" / "execute-github-issues-in-order.prompt.md"
+    ).read_text(encoding="utf-8")
+    recovery_prompt = (
+        repo_root / ".github" / "prompts" / "resume-after-interruption.prompt.md"
+    ).read_text(encoding="utf-8")
+    recovery_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "interruption-recovery-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert (repo_root / "scripts" / "capture_recovery_snapshot.py").exists()
+
+    for text in [workflow_doc, queue_prompt, recovery_prompt, recovery_skill]:
+        assert ".tmp/github-issue-queue-state.md" in text
+        assert "capture_recovery_snapshot.py" in text
+
+    assert ".tmp/interruption-recovery-snapshot.md" in workflow_doc
+    assert ".tmp/interruption-recovery-snapshot.md" in queue_prompt
+    assert ".tmp/interruption-recovery-snapshot.md" in recovery_prompt
+    assert ".tmp/interruption-recovery-snapshot.md" in recovery_skill
+    assert "factory_stack.py status" in workflow_doc
+    assert "factory_stack.py status" in recovery_prompt
+    assert "factory_stack.py status" in recovery_skill
+
+
 def test_new_adrs_capture_template_and_local_ci_contracts():
     repo_root = Path(__file__).parent.parent
     adr_005 = (
