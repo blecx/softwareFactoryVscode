@@ -62,7 +62,13 @@ def resolve_agent_bus_db_path() -> str:
 _db_path = resolve_agent_bus_db_path()
 _bus = AgentBus(db_path=_db_path)
 
-mcp = FastMCP("mcp-agent-bus", json_response=True)
+AGENT_BUS_MCP_HOST = os.getenv("AGENT_BUS_HOST", "0.0.0.0")
+
+mcp = FastMCP(
+    "mcp-agent-bus",
+    json_response=True,
+    host=AGENT_BUS_MCP_HOST,
+)
 
 
 def extract_project_id(ctx: Context) -> str:
@@ -360,10 +366,9 @@ def bus_write_checkpoint(
 
 def main() -> None:
     """Run mcp-agent-bus with Streamable HTTP transport mounted at /mcp."""
-    host = os.getenv("AGENT_BUS_HOST", "0.0.0.0")
     port = int(os.getenv("AGENT_BUS_PORT", "3031"))
     app = mcp.streamable_http_app()
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=AGENT_BUS_MCP_HOST, port=port)
 
 
 # ---------------------------------------------------------------------------
