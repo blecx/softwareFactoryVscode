@@ -60,7 +60,13 @@ def resolve_memory_db_path() -> str:
 _db_path = resolve_memory_db_path()
 _store = MemoryStore(db_path=_db_path)
 
-mcp = FastMCP("mcp-memory", json_response=True)
+MEMORY_MCP_HOST = os.getenv("MEMORY_MCP_HOST", "0.0.0.0")
+
+mcp = FastMCP(
+    "mcp-memory",
+    json_response=True,
+    host=MEMORY_MCP_HOST,
+)
 
 
 def extract_project_id(ctx: Context) -> str:
@@ -196,10 +202,9 @@ def memory_get_related(
 
 def main() -> None:
     """Run mcp-memory with Streamable HTTP transport mounted at /mcp."""
-    host = os.getenv("MEMORY_MCP_HOST", "0.0.0.0")
     port = int(os.getenv("MEMORY_MCP_PORT", "3030"))
     app = mcp.streamable_http_app()
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=MEMORY_MCP_HOST, port=port)
 
 
 if __name__ == "__main__":

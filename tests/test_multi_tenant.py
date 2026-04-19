@@ -162,6 +162,44 @@ def _mock_bus_transport(tools_call_payload: dict[str, object]) -> httpx.MockTran
     return httpx.MockTransport(handler)
 
 
+def _initialize_mcp_server(base_url: str, fastmcp_server) -> httpx.Response:
+    fastmcp_server._session_manager = None
+    app = fastmcp_server.streamable_http_app()
+    session_manager = fastmcp_server._session_manager
+    assert session_manager is not None
+
+    async def run() -> httpx.Response:
+        async with session_manager.run():
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=app),
+                base_url=base_url,
+            ) as client:
+                return await client.post(
+                    "/mcp",
+                    headers={
+                        "Accept": "application/json, text/event-stream",
+                        "Content-Type": "application/json",
+                        "mcp-protocol-version": "2025-03-26",
+                        "X-Workspace-ID": "tenant-A",
+                    },
+                    json={
+                        "jsonrpc": "2.0",
+                        "id": 1,
+                        "method": "initialize",
+                        "params": {
+                            "protocolVersion": "2025-03-26",
+                            "capabilities": {},
+                            "clientInfo": {
+                                "name": "tenant-proof-tests",
+                                "version": "1.0",
+                            },
+                        },
+                    },
+                )
+
+    return asyncio.run(run())
+
+
 def test_agent_bus_multi_tenant_isolation():
     """Test that two different workspaces inside AgentBus cannot see each other's data and are perfectly isolated."""
     # Use memory database for isolated testing
@@ -420,6 +458,30 @@ def test_agent_bus_mcp_server_keeps_pending_and_plan_cards_tenant_scoped(
             agent_bus_mcp_server.bus_approve_run(run_a, ctx=tenant_b_ctx)
     finally:
         bus.close()
+
+
+def test_agent_bus_mcp_server_accepts_internal_service_host_header() -> None:
+    agent_bus_mcp_server = _agent_bus_mcp_server()
+
+    response = _initialize_mcp_server(
+        "http://mcp-agent-bus:3031",
+        agent_bus_mcp_server.mcp,
+    )
+
+    assert response.status_code == 200
+    assert response.headers["mcp-session-id"]
+
+
+def test_memory_mcp_server_accepts_internal_service_host_header() -> None:
+    memory_mcp_server = _memory_mcp_server()
+
+    response = _initialize_mcp_server(
+        "http://mcp-memory:3030",
+        memory_mcp_server.mcp,
+    )
+
+    assert response.status_code == 200
+    assert response.headers["mcp-session-id"]
 
 
 def test_approval_gate_bus_client_prefers_structured_content(monkeypatch) -> None:
