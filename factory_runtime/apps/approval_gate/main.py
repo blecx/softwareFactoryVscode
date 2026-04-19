@@ -18,8 +18,23 @@ import os
 from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+    WebSocketException,
+    status,
+)
 from fastapi.responses import JSONResponse
+
+from factory_runtime.shared_tenancy import (
+    TenantIdentityError,
+    default_project_id,
+    header_workspace_id,
+    resolve_tenant_identity,
+)
 
 from .bus_client import BusClient
 from .plan_card import ApprovalRequest, PendingRun, PlanCard
@@ -29,20 +44,36 @@ app = FastAPI(title="FACTORY Approval Gate", version="1.0.0")
 _bus = BusClient(base_url=os.getenv("AGENT_BUS_URL", "http://localhost:3031"))
 
 
-def default_project_id() -> str:
-    return os.getenv("PROJECT_WORKSPACE_ID", "default")
-
-
 def request_project_id(request: Request) -> str:
-    return request.headers.get("X-Workspace-ID", default_project_id())
+    return resolve_tenant_identity(
+        header_project_id=header_workspace_id(request.headers),
+        fallback_project_id=default_project_id(),
+    )
 
 
 def websocket_project_id(websocket: WebSocket) -> str:
-    return (
-        websocket.query_params.get("project_id")
-        or websocket.headers.get("X-Workspace-ID")
-        or default_project_id()
+    return resolve_tenant_identity(
+        header_project_id=header_workspace_id(websocket.headers),
+        query_project_id=websocket.query_params.get("project_id"),
+        fallback_project_id=default_project_id(),
     )
+
+
+def _request_project_id_or_400(request: Request) -> str:
+    try:
+        return request_project_id(request)
+    except TenantIdentityError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _websocket_project_id_or_1008(websocket: WebSocket) -> str:
+    try:
+        return websocket_project_id(websocket)
+    except TenantIdentityError as exc:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason=str(exc),
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +94,7 @@ async def health() -> dict[str, str]:
 
 @app.get("/pending", response_model=list[PendingRun])
 async def get_pending(request: Request) -> list[dict[str, Any]]:
-    project_id = request_project_id(request)
+    project_id = _request_project_id_or_400(request)
     """Return all runs currently awaiting human approval."""
     runs = await _bus.list_pending(project_id=project_id)
     return [
@@ -84,7 +115,7 @@ async def get_pending(request: Request) -> list[dict[str, Any]]:
 
 @app.get("/plan/{run_id}", response_model=PlanCard)
 async def get_plan(run_id: str, request: Request) -> dict[str, Any]:
-    project_id = request_project_id(request)
+    project_id = _request_project_id_or_400(request)
     """Return the full plan card for a run awaiting approval."""
     try:
         packet = await _bus.read_context_packet(run_id, project_id=project_id)
@@ -118,7 +149,7 @@ async def get_plan(run_id: str, request: Request) -> dict[str, Any]:
 async def approve(
     run_id: str, body: ApprovalRequest, request: Request
 ) -> dict[str, Any]:
-    project_id = request_project_id(request)
+    project_id = _request_project_id_or_400(request)
     """Approve or reject a plan.
 
     - ``approved=true``  → transitions run to 'approved' so CoderAgent continues
@@ -146,7 +177,7 @@ async def approve(
 
 @app.websocket("/ws/approvals")
 async def ws_approvals(websocket: WebSocket) -> None:
-    project_id = websocket_project_id(websocket)
+    project_id = _websocket_project_id_or_1008(websocket)
     """Push new pending plans to connected clients.
 
     Polls mcp-agent-bus every 5 seconds and pushes any runs that are

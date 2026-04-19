@@ -18,35 +18,67 @@ Implements: GitHub issue #710
 """
 
 import os
+from pathlib import Path
 from typing import Any, Optional
 
 import uvicorn
 from mcp.server.fastmcp import Context, FastMCP
 
+from factory_runtime.shared_tenancy import (
+    default_project_id,
+    header_workspace_id,
+    resolve_tenant_identity,
+)
+
 from .bus import AgentBus, InvalidStatusTransitionError
 
-_db_path = os.getenv("AGENT_BUS_DB_PATH", "/data/agent_bus.db")
+
+def _container_data_dir_is_writable() -> bool:
+    container_data_dir = Path("/data")
+    return container_data_dir.is_dir() and os.access(container_data_dir, os.W_OK)
+
+
+def resolve_agent_bus_db_path() -> str:
+    explicit_path = str(os.getenv("AGENT_BUS_DB_PATH", "")).strip()
+    if explicit_path:
+        return explicit_path
+
+    instance_id = str(os.getenv("FACTORY_INSTANCE_ID", "default")).strip() or "default"
+    factory_data_dir = str(os.getenv("FACTORY_DATA_DIR", "")).strip()
+    if factory_data_dir:
+        return str(
+            Path(factory_data_dir).expanduser() / "bus" / instance_id / "agent_bus.db"
+        )
+
+    if _container_data_dir_is_writable():
+        return "/data/agent_bus.db"
+
+    repo_root = Path(__file__).resolve().parents[4]
+    return str(
+        repo_root / ".tmp" / "runtime-data" / "bus" / instance_id / "agent_bus.db"
+    )
+
+
+_db_path = resolve_agent_bus_db_path()
 _bus = AgentBus(db_path=_db_path)
 
 mcp = FastMCP("mcp-agent-bus", json_response=True)
 
 
 def extract_project_id(ctx: Context) -> str:
-    """Extract the workspace tenant ID from the HTTP request headers."""
-    default_id = os.getenv("PROJECT_WORKSPACE_ID", "default")
+    """Extract the workspace tenant ID from the request contract."""
+    headers = None
     if (
         not ctx
         or not ctx.request_context
         or not getattr(ctx.request_context, "request", None)
     ):
-        return default_id
-    # Starlette/FastAPI headers are typically accessible via request.headers
-    try:
-        headers = dict(ctx.request_context.request.headers)
-        return headers.get("x-workspace-id", default_id)
-    except Exception:
-        pass
-    return default_id
+        return resolve_tenant_identity(fallback_project_id=default_project_id())
+    headers = getattr(ctx.request_context.request, "headers", None)
+    return resolve_tenant_identity(
+        header_project_id=header_workspace_id(headers),
+        fallback_project_id=default_project_id(),
+    )
 
 
 # ---------------------------------------------------------------------------
