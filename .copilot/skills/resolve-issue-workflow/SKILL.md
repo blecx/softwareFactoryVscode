@@ -25,6 +25,7 @@ Provides context and instructions for the `resolve-issue-workflow` skill module.
 4. Apply UX delegation policy from `.copilot/skills/ux-delegation-policy/SKILL.md` and capture required consultation outcome.
 5. Read `.github/workflows/ci.yml` and treat its checks as the minimum local precheck contract for this slice.
 6. Implement minimal code changes in a dedicated branch.
+   - When a workflow task depends on `Host Project (Root)` or the installed-workspace contract, route it through the generated `software-factory.code-workspace` surface or the repo-owned `scripts/workspace_surface_guard.py` helper. Do not treat the source checkout as a second static runtime contract.
 7. Run required validations explicitly using the repo venv (NEVER global python), including the local equivalents of `.github/workflows/ci.yml` before opening a PR:
    - `./.venv/bin/black --check factory_runtime/ scripts/ tests/`
    - `./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/`
@@ -79,5 +80,5 @@ Return a concise result that states:
 - validation status,
 - PR or blocking condition,
 - any follow-up split/dependency if scope exceeded the slice.
-  </file>
-  </skill>
+</file>
+</skill>
