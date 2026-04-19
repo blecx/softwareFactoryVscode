@@ -31,6 +31,7 @@ Provides context and instructions for the `pr-merge-workflow` skill module.
    - `./tests/run-integration-test.sh`
 4. Confirm required CI/CD checks are green by explicitly running:
    `gh pr checks <PR_NUMBER>`
+   - Refresh `.tmp/github-issue-queue-state.md` from GitHub truth before merge/close narration. Record `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; `.github/hooks/github-issue-queue-guard.json` / `scripts/github_issue_queue_guard.py` treat that checkpoint as the enforced merge and completion gate.
 5. Merge with squash and delete branch:
    `gh pr merge <PR_NUMBER> --squash --delete-branch`
 6. Comment and close linked issue (if needed).

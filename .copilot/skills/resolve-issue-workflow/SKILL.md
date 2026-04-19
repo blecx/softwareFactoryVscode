@@ -31,7 +31,9 @@ Provides context and instructions for the `resolve-issue-workflow` skill module.
    - `./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841`
    - `./.venv/bin/pytest tests/`
    - `./tests/run-integration-test.sh`
+   - Maintain `.tmp/github-issue-queue-state.md` throughout the slice and record the latest validation command/result there.
 8. Commit with `Fixes #<issue>` and push.
+   - Before handing off to merge, update `.tmp/github-issue-queue-state.md` with `status: ready-for-pr-merge` plus `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; `.github/hooks/github-issue-queue-guard.json` and `scripts/github_issue_queue_guard.py` enforce that gate.
 9. Create PR via GitHub CLI using the generated `.tmp` markdown file and `.github/pull_request_template.md` structure:
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`
 10. Run `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md` before creating or updating the PR.

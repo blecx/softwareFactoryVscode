@@ -228,6 +228,42 @@ def test_work_issue_workflow_restores_template_and_precheck_guardrails():
     assert "ADR-006-Local-CI-Parity-Prechecks.md" in workflow_doc
 
 
+def test_ordered_issue_queue_guard_assets_and_docs_exist():
+    repo_root = Path(__file__).parent.parent
+    hook_config = json.loads(
+        (repo_root / ".github" / "hooks" / "github-issue-queue-guard.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    guardrails_doc = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert hook_config["hooks"]["UserPromptSubmit"][0]["command"] == (
+        "python3 ./scripts/github_issue_queue_guard.py"
+    )
+    assert (repo_root / "scripts" / "github_issue_queue_guard.py").exists()
+
+    assert ".github/hooks/github-issue-queue-guard.json" in workflow_doc
+    assert "github_issue_queue_guard.py" in workflow_doc
+
+    for text in [workflow_doc, guardrails_doc, resolve_skill, merge_skill]:
+        assert ".tmp/github-issue-queue-state.md" in text
+
+    assert "github_issue_queue_guard.py" in guardrails_doc
+    assert ".github/hooks/github-issue-queue-guard.json" in resolve_skill
+    assert ".github/hooks/github-issue-queue-guard.json" in merge_skill
+
+
 def test_new_adrs_capture_template_and_local_ci_contracts():
     repo_root = Path(__file__).parent.parent
     adr_005 = (

@@ -22,29 +22,48 @@ Use these Copilot agents in VS Code Chat:
 - Require explicit operator approval before continuing to the next issue.
 - Use `.tmp/`, never `/tmp`.
 
+## Deterministic queue checkpoint enforcement
+
+- Ordered queue continuation, merge, and completion prompts are guarded by `.github/hooks/github-issue-queue-guard.json`, which runs `python3 ./scripts/github_issue_queue_guard.py`.
+- Keep `.tmp/github-issue-queue-state.md` updated throughout the current issue. The minimum checkpoint fields are:
+  - `active_issue`
+  - `active_branch`
+  - `active_pr`
+  - `status`
+  - `last_validation`
+  - `next_gate`
+  - `blocker`
+- Before invoking `@pr-merge`, narrating merge readiness, or claiming that an issue is complete, extend the checkpoint with GitHub-truth evidence:
+  - `issue_state`
+  - `pr_state`
+  - `ci_state`
+  - `cleanup_state`
+  - `last_github_truth`
+- The hook blocks unsafe prompts such as “continue to the next issue”, “merge the PR”, or “close the issue” when the checkpoint is missing, incomplete, or lacks the required GitHub/cleanup evidence for the requested gate.
+
 ## Required guardrails
 
 - Issues must follow `.github/ISSUE_TEMPLATE/feature_request.yml` or `.github/ISSUE_TEMPLATE/bug_report.yml`.
 - PR descriptions must follow `.github/pull_request_template.md` exactly.
 - Before opening or finalizing a PR, run the local equivalents of `.github/workflows/ci.yml`:
 
-   Primary one-command path:
+  Primary one-command path:
 
-   ```text
-   ./.venv/bin/python ./scripts/local_ci_parity.py
-   ```
+  ```text
+  ./.venv/bin/python ./scripts/local_ci_parity.py
+  ```
 
-   This executes release-doc policy, release-manifest parity, Black/isort/Flake8,
-   `pytest tests/`, integration regression, and PR-template validation against
-   `.github/pull_request_template.md`.
+  This executes release-doc policy, release-manifest parity, Black/isort/Flake8,
+  `pytest tests/`, integration regression, and PR-template validation against
+  `.github/pull_request_template.md`.
 
-   Optional expanded parity:
+  Optional expanded parity:
 
-   ```text
-   ./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build
-   ```
+  ```text
+  ./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build
+  ```
 
-   Equivalent explicit checks (for troubleshooting/granular reruns):
+  Equivalent explicit checks (for troubleshooting/granular reruns):
 
   ```text
    ./.venv/bin/python ./scripts/verify_release_docs.py --repo-root . --base-rev <base> --head-rev HEAD
@@ -58,11 +77,11 @@ Use these Copilot agents in VS Code Chat:
   ```
 
 - Validate generated PR bodies locally with `./scripts/validate-pr-template.sh <pr-body-file>`
-   (or `./.venv/bin/python ./scripts/local_ci_parity.py --pr-body-file <pr-body-file>`)
-   before asking GitHub to enforce the same template in CI.
+  (or `./.venv/bin/python ./scripts/local_ci_parity.py --pr-body-file <pr-body-file>`)
+  before asking GitHub to enforce the same template in CI.
 - Docker image build parity exists in CI and is intentionally optional for the
-   default local precheck path due host/runtime constraints; use
-   `--include-docker-build` when you need full container-build parity pre-push.
+  default local precheck path due host/runtime constraints; use
+  `--include-docker-build` when you need full container-build parity pre-push.
 - Keep the remote repository protections aligned with `docs/setup-github-repository.md` so required status checks and PR-before-merge rules backstop the local workflow.
 
 These are not optional style notes; they are the historical guardrails defined by `docs/architecture/ADR-001-AI-Workflow-Guardrails.md`, reinforced by `docs/architecture/ADR-005-Strong-Templating-Enforcement.md` and `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md`, plus `.copilot/skills/a2a-communication/SKILL.md`, `.github/workflows/ci.yml`, and the remote protection guidance in `docs/setup-github-repository.md`.
