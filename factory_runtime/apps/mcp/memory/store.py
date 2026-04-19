@@ -19,6 +19,13 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _normalize_project_id(project_id: str) -> str:
+    normalized = str(project_id).strip()
+    if not normalized:
+        raise ValueError("project_id must be a non-empty string")
+    return normalized
+
+
 class MemoryStore:
     """SQLite-backed memory store for FACTORY agent memory layers."""
 
@@ -71,11 +78,111 @@ class MemoryStore:
                 relation    TEXT NOT NULL,           -- 'belongs_to' | 'changed_by' | 'depends_on'
                 to_entity   TEXT NOT NULL,
                 ts          TEXT NOT NULL,
-                UNIQUE(from_entity, relation, to_entity)
+                UNIQUE(project_id, from_entity, relation, to_entity)
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_events (
+                project_id      TEXT NOT NULL DEFAULT 'default',
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                action      TEXT NOT NULL,
+                details     TEXT NOT NULL DEFAULT '{}',
+                ts          TEXT NOT NULL
             );
             """
         )
+        self._ensure_relationship_partitioning()
+        self._conn.executescript(
+            """
+            CREATE INDEX IF NOT EXISTS idx_lessons_project_issue_ts
+            ON lessons(project_id, issue_number, ts DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_entities_project_name_kind
+            ON entities(project_id, name, kind);
+
+            CREATE INDEX IF NOT EXISTS idx_relationships_project_from_relation
+            ON relationships(project_id, from_entity, relation);
+
+            CREATE INDEX IF NOT EXISTS idx_memory_audit_project_ts
+            ON audit_events(project_id, ts DESC);
+            """
+        )
         self._conn.commit()
+
+    def _relationship_unique_includes_project_id(self) -> bool:
+        indexes = self._conn.execute("PRAGMA index_list('relationships')").fetchall()
+        for index in indexes:
+            if not bool(index["unique"]):
+                continue
+            columns = [
+                str(row["name"])
+                for row in self._conn.execute(
+                    f"PRAGMA index_info('{index['name']}')"
+                ).fetchall()
+            ]
+            if columns == ["project_id", "from_entity", "relation", "to_entity"]:
+                return True
+        return False
+
+    def _ensure_relationship_partitioning(self) -> None:
+        table_exists = self._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'relationships'"
+        ).fetchone()
+        if table_exists is None or self._relationship_unique_includes_project_id():
+            return
+
+        self._conn.executescript(
+            """
+            DROP TABLE IF EXISTS relationships_legacy;
+
+            ALTER TABLE relationships RENAME TO relationships_legacy;
+
+            CREATE TABLE relationships (
+                project_id      TEXT NOT NULL DEFAULT 'default',
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                from_entity TEXT NOT NULL,
+                relation    TEXT NOT NULL,
+                to_entity   TEXT NOT NULL,
+                ts          TEXT NOT NULL,
+                UNIQUE(project_id, from_entity, relation, to_entity)
+            );
+
+            INSERT OR IGNORE INTO relationships (
+                project_id,
+                from_entity,
+                relation,
+                to_entity,
+                ts
+            )
+            SELECT
+                COALESCE(NULLIF(TRIM(project_id), ''), 'default'),
+                from_entity,
+                relation,
+                to_entity,
+                ts
+            FROM relationships_legacy;
+
+            DROP TABLE relationships_legacy;
+            """
+        )
+
+    def _record_audit(
+        self,
+        project_id: str,
+        action: str,
+        details: Optional[dict[str, Any]] = None,
+    ) -> None:
+        self._conn.execute(
+            """
+            INSERT INTO audit_events (project_id, action, details, ts)
+            VALUES (?, ?, ?, ?)
+            """,
+            (
+                _normalize_project_id(project_id),
+                action,
+                json.dumps(details or {}, sort_keys=True),
+                _now(),
+            ),
+        )
 
     # ------------------------------------------------------------------
     # Lessons (long-term memory)
@@ -91,7 +198,7 @@ class MemoryStore:
         project_id: str = "default",
     ) -> int:
         """Store a lesson from one completed issue run. Returns row id."""
-        import os
+        project_id = _normalize_project_id(project_id)
 
         cur = self._conn.execute(
             """
@@ -108,6 +215,16 @@ class MemoryStore:
                 _now(),
             ),
         )
+        self._record_audit(
+            project_id,
+            "store_lesson",
+            {
+                "issue_number": issue_number,
+                "lesson_id": cur.lastrowid,
+                "outcome": outcome,
+                "repo": repo,
+            },
+        )
         self._conn.commit()
         return cur.lastrowid  # type: ignore[return-value]
 
@@ -115,7 +232,7 @@ class MemoryStore:
         self, issue_number: int, project_id: str = "default"
     ) -> list[dict[str, Any]]:
         """Return all lessons for a given issue number."""
-        import os
+        project_id = _normalize_project_id(project_id)
 
         rows = self._conn.execute(
             "SELECT * FROM lessons WHERE issue_number = ? AND project_id = ? ORDER BY ts DESC",
@@ -131,7 +248,7 @@ class MemoryStore:
         Returns up to `limit` most-recent matching rows.
         Intentionally simple — no vector search in v1.
         """
-        import os
+        project_id = _normalize_project_id(project_id)
 
         words = query.lower().split()
         if not words:
@@ -158,7 +275,7 @@ class MemoryStore:
         self, limit: int = 10, project_id: str = "default"
     ) -> list[dict[str, Any]]:
         """Return the most recent `limit` lessons across all issues."""
-        import os
+        project_id = _normalize_project_id(project_id)
 
         rows = self._conn.execute(
             "SELECT * FROM lessons WHERE project_id = ? ORDER BY ts DESC LIMIT ?",
@@ -178,7 +295,7 @@ class MemoryStore:
         project_id: str = "default",
     ) -> None:
         """Insert or update a knowledge graph entity node."""
-        import os
+        project_id = _normalize_project_id(project_id)
 
         self._conn.execute(
             """
@@ -187,6 +304,11 @@ class MemoryStore:
             ON CONFLICT(project_id, name, kind) DO UPDATE SET metadata = excluded.metadata, ts = excluded.ts
             """,
             (project_id, name, kind, json.dumps(metadata or {}), _now()),
+        )
+        self._record_audit(
+            project_id,
+            "upsert_entity",
+            {"kind": kind, "name": name},
         )
         self._conn.commit()
 
@@ -198,7 +320,7 @@ class MemoryStore:
         project_id: str = "default",
     ) -> None:
         """Add or ignore a relationship edge between two entities."""
-        import os
+        project_id = _normalize_project_id(project_id)
 
         self._conn.execute(
             """
@@ -207,13 +329,22 @@ class MemoryStore:
             """,
             (project_id, from_entity, relation, to_entity, _now()),
         )
+        self._record_audit(
+            project_id,
+            "add_relationship",
+            {
+                "from_entity": from_entity,
+                "relation": relation,
+                "to_entity": to_entity,
+            },
+        )
         self._conn.commit()
 
     def get_related(
         self, entity: str, relation: Optional[str] = None, project_id: str = "default"
     ) -> list[dict[str, Any]]:
         """Return all entities related to `entity`, optionally filtered by relation type."""
-        import os
+        project_id = _normalize_project_id(project_id)
 
         if relation:
             rows = self._conn.execute(
@@ -229,16 +360,49 @@ class MemoryStore:
 
     def purge_workspace(self, project_id: str) -> dict[str, int]:
         """Deletes all records associated with a specific workspace tenant."""
+        project_id = _normalize_project_id(project_id)
         cursor = self._conn.cursor()
-        counts = {"lessons": 0, "entities": 0, "relationships": 0}
+        counts = {"lessons": 0, "entities": 0, "relationships": 0, "audit_events": 0}
+        cursor.execute("DELETE FROM audit_events WHERE project_id = ?", (project_id,))
+        counts["audit_events"] = cursor.rowcount
         cursor.execute("DELETE FROM relationships WHERE project_id = ?", (project_id,))
         counts["relationships"] = cursor.rowcount
         cursor.execute("DELETE FROM entities WHERE project_id = ?", (project_id,))
         counts["entities"] = cursor.rowcount
         cursor.execute("DELETE FROM lessons WHERE project_id = ?", (project_id,))
         counts["lessons"] = cursor.rowcount
+        self._record_audit(project_id, "purge_workspace", {"counts": counts})
         self._conn.commit()
         return counts
+
+    def get_audit_log(
+        self,
+        project_id: str = "default",
+        *,
+        action: Optional[str] = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Return the most recent tenant-scoped audit events."""
+        project_id = _normalize_project_id(project_id)
+        if action:
+            rows = self._conn.execute(
+                """
+                SELECT * FROM audit_events
+                WHERE project_id = ? AND action = ?
+                ORDER BY ts DESC LIMIT ?
+                """,
+                (project_id, action, limit),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                """
+                SELECT * FROM audit_events
+                WHERE project_id = ?
+                ORDER BY ts DESC LIMIT ?
+                """,
+                (project_id, limit),
+            ).fetchall()
+        return [_row_to_dict(r) for r in rows]
 
     def close(self) -> None:
         """Close the SQLite connection."""
@@ -248,7 +412,7 @@ class MemoryStore:
 def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     d = dict(row)
     # Deserialize JSON fields
-    for field in ("learnings", "metadata"):
+    for field in ("learnings", "metadata", "details"):
         if field in d and isinstance(d[field], str):
             try:
                 d[field] = json.loads(d[field])
