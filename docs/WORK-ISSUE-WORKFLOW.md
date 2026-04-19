@@ -36,6 +36,21 @@ Routing rule:
 - Repo-owned task wrappers must reject wrong-surface invocation with actionable guidance or require an explicit target; they must not silently fabricate a second runtime contract inside the source checkout.
 - The canonical guard for these task surfaces is `scripts/workspace_surface_guard.py`, which fails fast when the task is launched from the source checkout without a valid generated-workspace host target.
 
+## Non-interactive GitHub / terminal patterns
+
+- Prefer pager-free JSON polling for GitHub state queries in automation-heavy loops. The canonical helper is `./scripts/noninteractive_gh.py`, for example:
+
+  ```text
+  ./.venv/bin/python ./scripts/noninteractive_gh.py pr-view 68
+  ./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks 68
+  ./.venv/bin/python ./scripts/noninteractive_gh.py issue-list --state open --limit 50 --search "routing"
+  ```
+
+- Prefer polling the helper's JSON output over `gh pr checks --watch`, pager UI, or web/watch flows when you are inside an automation loop.
+- If the helper does not cover a one-off query yet, use an equivalent pager-free pattern such as `GH_PAGER=cat PAGER=cat gh ... --json ...`; do not rely on the CLI deciding whether to open a pager.
+- When transforming JSON in shell automation, pipe into `python -c '...'` or a dedicated script. Do **not** combine a pipe with a heredoc-based Python command such as `... | python - <<'PY'`, because the heredoc replaces stdin and the piped JSON never reaches `sys.stdin`.
+- Long-running Docker/test output is not itself evidence of an input prompt. Before sending terminal input, confirm that the terminal explicitly requests it (for example `Enter ...`, `[y/N]`, `Username:`, or a tool-level input-needed signal).
+
 ## Deterministic queue checkpoint enforcement
 
 - Ordered queue continuation, merge, and completion prompts are guarded by `.github/hooks/github-issue-queue-guard.json`, which runs `python3 ./scripts/github_issue_queue_guard.py`.

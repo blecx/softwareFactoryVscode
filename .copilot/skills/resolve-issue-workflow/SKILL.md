@@ -24,6 +24,7 @@ Provides context and instructions for the `resolve-issue-workflow` skill module.
 3. Reject or reformat work that does not follow `.github/ISSUE_TEMPLATE/feature_request.yml` or `.github/ISSUE_TEMPLATE/bug_report.yml`.
 4. Apply UX delegation policy from `.copilot/skills/ux-delegation-policy/SKILL.md` and capture required consultation outcome.
 5. Read `.github/workflows/ci.yml` and treat its checks as the minimum local precheck contract for this slice.
+   - Prefer `./scripts/noninteractive_gh.py` or another pager-free `gh ... --json ...` pattern for GitHub polling in automation-heavy loops, and never combine piped JSON with a heredoc-based Python command because the heredoc consumes stdin.
 6. Implement minimal code changes in a dedicated branch.
    - When a workflow task depends on `Host Project (Root)` or the installed-workspace contract, route it through the generated `software-factory.code-workspace` surface or the repo-owned `scripts/workspace_surface_guard.py` helper. Do not treat the source checkout as a second static runtime contract.
 7. Run required validations explicitly using the repo venv (NEVER global python), including the local equivalents of `.github/workflows/ci.yml` before opening a PR:

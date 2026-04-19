@@ -19,8 +19,9 @@ Provides context and instructions for the `pr-merge-workflow` skill module.
 
 ## Instructions
 
-1. Verify PR is open, mergeable, and not draft using:
-   `gh pr status` and `gh pr view`
+1. Verify PR is open, mergeable, and not draft using pager-free JSON queries:
+   `./.venv/bin/python ./scripts/noninteractive_gh.py pr-view <PR_NUMBER>`
+   - Prefer this helper (or another pager-free `gh ... --json ...` pattern) over watch/web flows while you are inside an automation loop.
 2. Confirm the PR description follows `.github/pull_request_template.md` and validate the body locally with:
    `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md`
 3. Confirm local CI-equivalent prechecks from `.github/workflows/ci.yml` were run for the PR branch and that evidence is present in the PR body:
@@ -29,8 +30,9 @@ Provides context and instructions for the `pr-merge-workflow` skill module.
    - `./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841`
    - `./.venv/bin/pytest tests/`
    - `./tests/run-integration-test.sh`
-4. Confirm required CI/CD checks are green by explicitly running:
-   `gh pr checks <PR_NUMBER>`
+4. Confirm required CI/CD checks are green by explicitly polling:
+   `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER>`
+   - Prefer JSON polling over `gh pr checks --watch`; watch/pager UI adds unnecessary terminal churn in repo automation.
    - Refresh `.tmp/github-issue-queue-state.md` from GitHub truth before merge/close narration. Record `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; `.github/hooks/github-issue-queue-guard.json` / `scripts/github_issue_queue_guard.py` treat that checkpoint as the enforced merge and completion gate.
 5. Merge with squash and delete branch:
    `gh pr merge <PR_NUMBER> --squash --delete-branch`

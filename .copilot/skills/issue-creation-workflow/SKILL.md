@@ -18,7 +18,9 @@ Provides context and instructions for the `issue-creation-workflow` skill module
 
 ## Instructions
 
-1. Search for duplicates and related issues using `gh issue list`.
+1. Search for duplicates and related issues using the pager-free helper:
+   `./.venv/bin/python ./scripts/noninteractive_gh.py issue-list --state open --limit 50 --search "<term>"`
+   - Prefer this helper (or an equivalent `GH_PAGER=cat PAGER=cat gh issue list --json ...` pattern) over interactive pager flows.
 2. Select repository (backend/client) and estimate size (S/M/L).
 3. Decide whether the work is a feature/enhancement or a bug/defect.
 4. Draft issue body by strictly adhering to the matching template sections found in:
