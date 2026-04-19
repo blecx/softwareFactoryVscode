@@ -69,7 +69,7 @@ After startup, you can run:
 The runtime currently uses a hybrid model:
 
 - **workspace-scoped services** stay isolated per workspace because they depend on one repository root or direct project state
-- **candidate shared services** such as memory, agent bus, and approval gate carry tenant-aware groundwork and now follow accepted `ADR-008` guardrails, but the rollout is still open rather than a fully fulfilled shared multi-tenant control plane
+- **shared-capable control-plane services** such as memory, agent bus, and approval gate now satisfy the fulfilled `ADR-008` promotion gate for deliberate shared-mode use, while the default operator path remains the practical per-workspace baseline
 
 That distinction matters: multiple installed workspaces can coexist safely today without pretending every service is already globally shared.
 
@@ -79,7 +79,7 @@ Release notes and operator docs use the same ADR-008 promotion vocabulary:
 
 - `open` — rollout tracks are still incomplete, so shared promotion remains gated
 - `advanced groundwork` — important rollout slices have landed, but the final promotion gate is still not satisfied
-- `fulfilled` — only allowed after the evidence threshold is met in code, tests, diagnostics, and operator guidance, and after a final architecture/documentation review confirms the claim
+- `fulfilled` — the current default branch now meets this threshold for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`; shared mode remains deliberate and opt-in rather than mandatory for every workspace
 
 ## 🏢 Working with multiple workspaces
 

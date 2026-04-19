@@ -6,6 +6,12 @@ Proposed
 
 This document is a sequencing plan, not the normative source of architecture truth. Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, architecture synthesis documents may explain but not override them, and plans remain authoritative only for sequencing and hardening work. Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, and `ADR-010`. `ADR-008` is now accepted and defines the hybrid-tenancy guardrails; this plan sequences the remaining rollout work required before shared-service promotion can be described as fulfilled in releases or operator guidance. `MULTI-WORKSPACE-MCP-ARCHITECTURE.md` is a maintained architecture synthesis that explains how those decisions fit together and maps them onto the current codebase. When this plan or that synthesis lags, the accepted ADRs and verified code are the source of truth.
 
+Status note (2026-04-19): the ADR-008 rollout tracked here is now fulfilled on
+`main` through PRs #53, #54, #55, #56, #57, #58, and #59. The sections below
+remain useful as sequencing history, quality gates, and review criteria, but
+they are no longer a statement that shared multi-tenant promotion is still open
+ on the default branch.
+
 For terminology and guardrails, this plan references the architecture rather than redefining it. In particular, the meaning of `installed`, `running`, and `active` comes from `ADR-009`; this plan is the source of truth for sequencing and hardening the implementation around those concepts.
 
 ## Objective
@@ -85,18 +91,19 @@ For this codebase, an accepted ADR does not jump directly to fulfilled rollout s
 4. Release notes and operator docs must describe shared-service rollout status honestly as open, advanced, or fulfilled rather than assuming that ADR acceptance equals completion.
 5. Only after the rollout criteria are verified may the behavior be treated as a production-ready shared-service capability.
 
-## Practical delivery split while shared-service rollout remains open
+## Historical delivery split while shared-service rollout remained open
 
-The current execution goal is a practical working per-workspace system for real
-repositories. Shared multi-tenant promotion remains an open rollout track as a later
-optimization and rollout step; it is not the current prerequisite for making
-new installs, updates, lifecycle commands, and verification trustworthy.
+The execution goal during this phase was a practical working per-workspace
+system for real repositories while the ADR-008 shared-service rollout was still
+open. That historical sequencing remains documented here because it explains
+why the practical baseline was stabilized first before shared promotion was
+marked fulfilled.
 
-| Scope                                                                              | Status       | Priority now                         | Why it matters                                                                                                                                                                                                                                        |
-| ---------------------------------------------------------------------------------- | ------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Practical per-workspace system for real repos                                      | In scope now | P0                                   | New repositories must install, update, start, activate, verify, and recover cleanly on the isolated per-workspace path.                                                                                                                               |
-| Shared multi-tenant promotion (`mcp-memory`, `mcp-agent-bus`, and `approval-gate`) | Rollout open | Deferred / last major promotion step | This is mainly a later efficiency and shared-control-plane optimization, and it remains gated by the accepted `ADR-008` rules, end-to-end tenant identity, partitioned storage and audit paths, cross-tenant proof, and operator-visible diagnostics. |
-| Whole roadmap                                                                      | Still open   | After the practical baseline         | The roadmap remains broader than the current isolated-path milestone because it still includes lifecycle polish, operator-facing docs and verification, and any later approved shared-service promotion.                                              |
+| Scope | Status | Priority now | Why it matters |
+| --- | --- | --- | --- |
+| Practical per-workspace system for real repos | In scope now | P0 | New repositories must install, update, start, activate, verify, and recover cleanly on the isolated per-workspace path. |
+| Shared multi-tenant promotion (`mcp-memory`, `mcp-agent-bus`, and `approval-gate`) | Fulfilled on default branch | Completed / historical sequencing | The accepted `ADR-008` rules, end-to-end tenant identity, partitioned storage and audit paths, cross-tenant proof, and operator-visible diagnostics are now implemented and verified on `main`. |
+| Whole roadmap | Still open | After the practical baseline | The roadmap remains broader than the current isolated-path milestone because it still includes lifecycle polish, operator-facing docs and verification, and later optimization work. |
 
 ### Execution rules for the shared-service rollout program
 
@@ -190,14 +197,13 @@ sequencing for the next implementation stretch.
 - fresh-install and update-in-place reruns when lifecycle or verification docs
   change.
 
-### Shared multi-tenant rollout remains open
+### Shared multi-tenant rollout completion note
 
-- do not treat shared multi-tenant promotion as already fulfilled in the current delivery target;
-- revisit it only after Priorities 0 through 2 are stable enough for real repo
-  onboarding and per-workspace operations;
-- require explicit tenant identity end to end, partitioned
-  storage and audit paths, cross-tenant regression coverage, and operator
-  diagnostics before marking rollout complete.
+- the ADR-008 promotion gate is now fulfilled on the default branch;
+- the practical per-workspace baseline remains the default supported operator
+  path even though shared mode is now fully defensible and verified; and
+- future work may keep hardening or optimizing shared mode, but it no longer
+  blocks truthful `fulfilled` release/operator wording.
 
 ## Current Baseline
 
@@ -207,7 +213,7 @@ sequencing for the next implementation stretch.
 
 ## ADR-008 rollout mitigation program
 
-Accepting `ADR-008` makes the hybrid-tenancy rules normative architecture. It does **not** by itself complete the shared-service rollout. The open rollout tracks below define the remaining work required before release notes or operator docs can describe shared multi-tenant promotion as fulfilled.
+Accepting `ADR-008` made the hybrid-tenancy rules normative architecture. It did **not** by itself complete the shared-service rollout. The tracks below defined the remaining work required before release notes or operator docs could describe shared multi-tenant promotion as fulfilled, and they are now complete on the default branch.
 
 ### Track 1: Promotion boundary and shared-mode contract
 
@@ -309,13 +315,13 @@ Accepting `ADR-008` makes the hybrid-tenancy rules normative architecture. It do
 
 ### Track 7: Release, operator docs, and regression promotion
 
-- move operator docs and release communications from “blocked ADR” wording to “accepted architecture, rollout open” wording now;
-- keep them honest until the rollout is truly fulfilled.
+- move operator docs and release communications from “blocked ADR” wording to “accepted architecture, rollout open” wording first, then to truthful fulfilled wording once every rollout track is complete;
+- keep the per-workspace baseline explicit even after shared promotion becomes fulfilled.
 
 #### Track 7 definition of done
 
-- release template, install guide, tests README, handout, cheat sheet, and architecture docs all reflect that `ADR-008` is accepted while rollout remains open;
-- regression tests fail if docs slip back into either “still proposed” or “already fulfilled” language.
+- release template, install guide, tests README, handout, cheat sheet, and architecture docs now reflect that the ADR-008 promotion gate is fulfilled while the practical per-workspace baseline remains the default supported path;
+- regression tests fail if docs drift back into either stale “rollout open” language or unsupported claims that ignore the practical baseline.
 
 #### Track 7 quality checks
 
