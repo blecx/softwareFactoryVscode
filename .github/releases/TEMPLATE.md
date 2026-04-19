@@ -25,18 +25,18 @@ Verified with:
 
 ## Delivery status snapshot
 
-| Scope | Status | Why it matters |
-| --- | --- | --- |
-| Practical per-workspace baseline | [fulfilled / improved / unchanged] | [what this release now supports confidently] |
-| Shared multi-tenant promotion (still blocked) | [blocked / advanced groundwork / not in scope] | [what is still gated and why] |
-| Whole implementation roadmap | [open / narrowed / complete] | [how far this release moves the overall program] |
+| Scope                                                          | Status                                   | Why it matters                                                           |
+| -------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------ |
+| Practical per-workspace baseline                               | [fulfilled / improved / unchanged]       | [what this release now supports confidently]                             |
+| Shared multi-tenant promotion (ADR-008 accepted, rollout open) | [open / advanced groundwork / fulfilled] | [what is still gated, what advanced, or why it is now honestly complete] |
+| Whole implementation roadmap                                   | [open / narrowed / complete]             | [how far this release moves the overall program]                         |
 
 Keep this table crisp and honest. It should tell a reviewer, operator, or future
 agent exactly what the release claims without forcing them to reverse-engineer the
 roadmap from prose.
 
-Do not mark shared multi-tenant promotion as fulfilled while `ADR-008` remains
-`Proposed` or while its rollout criteria are still open.
+Do not mark shared multi-tenant promotion as fulfilled while its accepted
+rollout criteria are still open or only partially implemented.
 
 ## Notes for publishing
 

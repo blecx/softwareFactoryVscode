@@ -4,7 +4,7 @@
 
 Proposed
 
-This document is a sequencing plan, not the normative source of architecture truth. Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, architecture synthesis documents may explain but not override them, and plans remain authoritative only for sequencing and hardening work. Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-009`, and `ADR-010`. Hybrid-tenancy promotion rules are currently proposed in `ADR-008`; they do not become accepted architecture or production rollout criteria until that ADR is accepted and the code satisfies it. `MULTI-WORKSPACE-MCP-ARCHITECTURE.md` is a maintained architecture synthesis that explains how those decisions fit together and maps them onto the current codebase. When this plan or that synthesis lags, the accepted ADRs and verified code are the source of truth.
+This document is a sequencing plan, not the normative source of architecture truth. Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, architecture synthesis documents may explain but not override them, and plans remain authoritative only for sequencing and hardening work. Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, and `ADR-010`. `ADR-008` is now accepted and defines the hybrid-tenancy guardrails; this plan sequences the remaining rollout work required before shared-service promotion can be described as fulfilled in releases or operator guidance. `MULTI-WORKSPACE-MCP-ARCHITECTURE.md` is a maintained architecture synthesis that explains how those decisions fit together and maps them onto the current codebase. When this plan or that synthesis lags, the accepted ADRs and verified code are the source of truth.
 
 For terminology and guardrails, this plan references the architecture rather than redefining it. In particular, the meaning of `installed`, `running`, and `active` comes from `ADR-009`; this plan is the source of truth for sequencing and hardening the implementation around those concepts.
 
@@ -23,7 +23,7 @@ Continue hardening a runtime and configuration model that allows multiple `softw
 
 - This stabilization plan MUST follow the suggested order of attack defined in `## Immediate Stabilization Rework Order` unless a failing dependency requires an earlier prerequisite fix.
 - This plan MUST NOT introduce new architecture decisions or redefine accepted architecture; accepted ADRs remain authoritative per `ADR-013`.
-- Proposed ADRs (including `ADR-008`) MUST NOT be treated as accepted rollout criteria until they are formally accepted.
+- Accepted `ADR-008` now governs hybrid-tenancy guardrails, but this plan MUST keep rollout status honest until the required implementation and verification gates are complete.
 - This rework MUST preserve the current runtime feature surface while fixing defects. Existing lifecycle commands, generated runtime artifacts, install/update/bootstrap flows, and throwaway validation flows must continue to work unless an accepted ADR already defines the current behavior as incorrect.
 - This stabilization phase MUST NOT remove existing runtime features as a shortcut. Changes must be bug fixes, consistency fixes, or ADR-aligned clarifications backed by regression coverage.
 
@@ -72,40 +72,40 @@ This section answers two review questions explicitly:
 
 - **Status:** Not promoted in this rework.
 - **Current mitigation:** keep the current runtime feature surface intact and do not treat these services as a production-ready shared control plane.
-- **Reason:** `ADR-008` is still `Proposed`, and the accepted architecture hierarchy in `ADR-013` does not allow a proposed ADR to become production truth merely because some groundwork exists in code.
-- **Required before promotion:** accepted ADR status, explicit tenant identity end to end, partitioned storage/logs/audit paths, cross-tenant regression coverage, and operator-visible diagnostics.
+- **Reason:** `ADR-008` is accepted, but the accepted guardrails are still only partially implemented. Groundwork in code is not enough to claim rollout completion.
+- **Required before promotion:** explicit tenant identity end to end, partitioned storage/logs/audit paths, cross-tenant regression coverage, shared-mode runtime verification, and operator-visible diagnostics.
 
-## Proposed ADR to Production Promotion Path
+## Accepted ADR to Production Rollout Path
 
-For this codebase, a proposed ADR does not jump directly to production behavior.
+For this codebase, an accepted ADR does not jump directly to fulfilled rollout status.
 
-1. A `Proposed` ADR defines candidate rules and review intent, not production rollout authority.
-2. Code may add non-breaking groundwork while preserving the current runtime feature surface and keeping existing behavior stable.
-3. Required migration, regression, and runtime validation must prove that the implementation satisfies the proposed rules without breaking fresh install, update-in-place, or throwaway validation flows.
-4. The ADR must then move from `Proposed` to `Accepted` through explicit document review and update.
-5. Only after that acceptance step may the behavior be treated as production rollout criteria or as a production-ready shared-service capability.
+1. An accepted ADR defines the guardrails and target shape of the architecture.
+2. Code may continue to ship groundwork while preserving the current runtime feature surface and keeping existing behavior stable.
+3. Required migration, regression, and runtime validation must prove that the implementation satisfies the accepted rules without breaking fresh install, update-in-place, or throwaway validation flows.
+4. Release notes and operator docs must describe shared-service rollout status honestly as open, advanced, or fulfilled rather than assuming that ADR acceptance equals completion.
+5. Only after the rollout criteria are verified may the behavior be treated as a production-ready shared-service capability.
 
-## Practical delivery split while shared-service promotion remains blocked
+## Practical delivery split while shared-service rollout remains open
 
 The current execution goal is a practical working per-workspace system for real
-repositories. Shared multi-tenant promotion remains blocked as a later
+repositories. Shared multi-tenant promotion remains an open rollout track as a later
 optimization and rollout step; it is not the current prerequisite for making
 new installs, updates, lifecycle commands, and verification trustworthy.
 
-| Scope | Status | Priority now | Why it matters |
-| --- | --- | --- | --- |
-| Practical per-workspace system for real repos | In scope now | P0 | New repositories must install, update, start, activate, verify, and recover cleanly on the isolated per-workspace path. |
-| Shared multi-tenant promotion (`mcp-memory`, `mcp-agent-bus`, and `approval-gate`) | Blocked for now | Deferred / last major promotion step | This is mainly a later efficiency and shared-control-plane optimization, and it remains gated by `ADR-008`, end-to-end tenant identity, partitioned storage and audit paths, cross-tenant proof, and operator-visible diagnostics. |
-| Whole roadmap | Still open | After the practical baseline | The roadmap remains broader than the current isolated-path milestone because it still includes lifecycle polish, operator-facing docs and verification, and any later approved shared-service promotion. |
+| Scope                                                                              | Status       | Priority now                         | Why it matters                                                                                                                                                                                                                                        |
+| ---------------------------------------------------------------------------------- | ------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Practical per-workspace system for real repos                                      | In scope now | P0                                   | New repositories must install, update, start, activate, verify, and recover cleanly on the isolated per-workspace path.                                                                                                                               |
+| Shared multi-tenant promotion (`mcp-memory`, `mcp-agent-bus`, and `approval-gate`) | Rollout open | Deferred / last major promotion step | This is mainly a later efficiency and shared-control-plane optimization, and it remains gated by the accepted `ADR-008` rules, end-to-end tenant identity, partitioned storage and audit paths, cross-tenant proof, and operator-visible diagnostics. |
+| Whole roadmap                                                                      | Still open   | After the practical baseline         | The roadmap remains broader than the current isolated-path milestone because it still includes lifecycle polish, operator-facing docs and verification, and any later approved shared-service promotion.                                              |
 
-### Execution rules for the blocked shared-service phase
+### Execution rules for the shared-service rollout program
 
 - Do the practical per-workspace priorities first.
 - Do not schedule shared multi-tenant promotion ahead of the practical baseline
-   unless a non-breaking prerequisite bug fix is required to keep the current
-   per-workspace runtime correct.
-- Treat shared-service promotion as blocked until the practical execution plan
-   below is substantially complete and `ADR-008` has moved to `Accepted`.
+  unless a non-breaking prerequisite bug fix is required to keep the current
+  per-workspace runtime correct.
+- Do not mark shared-service promotion as fulfilled until the practical execution plan
+  below is substantially complete and the `ADR-008` rollout quality gates pass.
 
 ## Practical execution plan for a working system
 
@@ -115,50 +115,50 @@ sequencing for the next implementation stretch.
 ### Priority 0: New repo onboarding, install, and update safety
 
 - improve install flows so a fresh target repo gets the correct namespaced
-   install, runtime metadata, generated workspace settings, and repo-local `.tmp`
-   guardrails on first run;
+  install, runtime metadata, generated workspace settings, and repo-local `.tmp`
+  guardrails on first run;
 - improve update and upgrade flows so existing installs preserve
-   `runtime_state`, `active_workspace`, `.factory.env`, lock metadata, and
-   generated runtime artifacts;
+  `runtime_state`, `active_workspace`, `.factory.env`, lock metadata, and
+  generated runtime artifacts;
 - harden registry refresh and recovery paths used during install, update, and
-   bootstrap;
+  bootstrap;
 - keep throwaway validation and source-checkout companion flows aligned with the
-   same contract.
+  same contract.
 
 #### Priority 0 definition of done
 
 - a brand-new repo can install the factory and reach a verified per-workspace
-   runtime without manual repair;
+  runtime without manual repair;
 - update-in-place and bootstrap refresh behave idempotently and preserve
-   operator-visible state;
+  operator-visible state;
 - registry rebuild and reconciliation can recover from missing or stale host
-   metadata without guessing wrong ownership.
+  metadata without guessing wrong ownership.
 
 #### Priority 0 validation
 
 - focused `tests/test_factory_install.py` cases for install, update, bootstrap,
-   and registry behavior;
+  and registry behavior;
 - throwaway validation covering fresh install and update-in-place;
 - repo-local `.tmp` guardrail regressions.
 
 ### Priority 1: Lifecycle truth, activation behavior, and per-workspace verification
 
 - harden lifecycle commands (`list`, `status`, `start`, `stop`, `activate`,
-   `deactivate`, `cleanup`) so they report `installed`, `running`, and `active`
-   truthfully;
+  `deactivate`, `cleanup`) so they report `installed`, `running`, and `active`
+  truthfully;
 - make workspace activation regenerate current endpoint maps and managed
-   settings deterministically;
+  settings deterministically;
 - strengthen per-workspace verification and preflight diagnostics around
-   effective ports, generated MCP URLs, and runtime reachability;
+  effective ports, generated MCP URLs, and runtime reachability;
 - keep operator-facing documentation aligned with the actual lifecycle surface.
 
 #### Priority 1 definition of done
 
 - operators can start, stop, activate, inspect, and verify one workspace
-   without corrupting another workspace's state;
+  without corrupting another workspace's state;
 - activation refresh is deterministic and survives restarts;
 - verification failures point to the actual effective endpoint mismatch rather
-   than generic localhost assumptions.
+  than generic localhost assumptions.
 
 #### Priority 1 validation
 
@@ -169,41 +169,173 @@ sequencing for the next implementation stretch.
 ### Priority 2: Docs, regression coverage, and day-two operator confidence
 
 - expand docs and regression coverage around install, update, lifecycle,
-   verification, and new-repo onboarding;
+  verification, and new-repo onboarding;
 - keep runtime guidance, handouts, and release-status communication aligned with
-   the current supported baseline;
+  the current supported baseline;
 - make recovery, cleanup, and operator troubleshooting flows explicit enough for
-   repeatable day-two use.
+  repeatable day-two use.
 
 #### Priority 2 definition of done
 
 - the practical per-workspace path is described clearly enough that a new repo
-   owner can onboard and recover without reverse-engineering chat history;
+  owner can onboard and recover without reverse-engineering chat history;
 - the regression suite protects the key install, update, lifecycle, and
-   verification contracts from silent drift.
+  verification contracts from silent drift.
 
 #### Priority 2 validation
 
 - `tests/test_regression.py` plus the shell integration regression;
 - focused documentation regressions for plan, release-note, and onboarding
-   contracts;
+  contracts;
 - fresh-install and update-in-place reruns when lifecycle or verification docs
-   change.
+  change.
 
-### Deferred phase: Shared multi-tenant promotion remains blocked
+### Shared multi-tenant rollout remains open
 
-- do not treat shared multi-tenant promotion as the current delivery target;
+- do not treat shared multi-tenant promotion as already fulfilled in the current delivery target;
 - revisit it only after Priorities 0 through 2 are stable enough for real repo
-   onboarding and per-workspace operations;
-- require accepted ADR status, explicit tenant identity end to end, partitioned
-   storage and audit paths, cross-tenant regression coverage, and operator
-   diagnostics before unblocking it.
+  onboarding and per-workspace operations;
+- require explicit tenant identity end to end, partitioned
+  storage and audit paths, cross-tenant regression coverage, and operator
+  diagnostics before marking rollout complete.
 
 ## Current Baseline
 
 - The host-scoped workspace registry, per-workspace port allocation, generated runtime manifest, and generated workspace MCP URLs already exist in the codebase.
 - Lifecycle commands already exist through `scripts/factory_stack.py` (`list`, `status`, `start`, `stop`, `activate`, `deactivate`, `cleanup`).
 - The remaining purpose of this plan is to sequence hardening, documentation cleanup, and future tenancy work rather than to re-decide namespace placement.
+
+## ADR-008 rollout mitigation program
+
+Accepting `ADR-008` makes the hybrid-tenancy rules normative architecture. It does **not** by itself complete the shared-service rollout. The open rollout tracks below define the remaining work required before release notes or operator docs can describe shared multi-tenant promotion as fulfilled.
+
+### Track 1: Promotion boundary and shared-mode contract
+
+- define exactly what counts as candidate-shared groundwork, shared-mode rollout in progress, and fulfilled shared-service promotion;
+- document the runtime topology and compatibility boundary between the current per-workspace path and any promoted shared mode.
+
+#### Track 1 definition of done
+
+- architecture, plan, install, and release docs describe shared-service status using the same vocabulary;
+- candidate-shared groundwork is clearly distinguished from fulfilled shared-mode rollout;
+- release status tables can state whether the rollout is open, advanced, or fulfilled without ambiguity.
+
+#### Track 1 quality checks
+
+- `tests/test_regression.py` locks the shared-service rollout wording across ADR, plan, install, tests README, and release template;
+- manual doc review confirms no operator-facing file claims rollout completion prematurely.
+
+### Track 2: Strict tenant identity enforcement
+
+- require explicit tenant identity for promoted shared mode across `mcp-memory`, `mcp-agent-bus`, and `approval-gate`;
+- retain compatibility fallback behavior only where the per-workspace runtime explicitly depends on it;
+- reject ambiguous or mismatched tenant requests in promoted shared mode.
+
+#### Track 2 definition of done
+
+- the shared-service request contract distinguishes per-workspace compatibility mode from promoted shared mode;
+- promoted shared mode rejects missing tenant identity rather than silently falling back;
+- tenant identity is propagated end to end through clients and services.
+
+#### Track 2 quality checks
+
+- add unit/integration tests for missing-header rejection, mismatched-header rejection, and successful explicit-header flows;
+- add regression coverage for shared MCP client propagation of `X-Workspace-ID` across all promoted services.
+
+### Track 3: Explicit shared-service topology and lifecycle
+
+- define how shared services are launched, discovered, and reported when they are no longer treated as merely candidate-shared;
+- ensure lifecycle helpers and runtime metadata expose whether services are per-workspace or shared.
+
+#### Track 3 definition of done
+
+- compose/runtime metadata defines whether memory, agent bus, and approval gate are running in shared or per-workspace mode;
+- `preflight`, `status`, and runtime verification report the topology truthfully;
+- promoted shared services are not accidentally duplicated per workspace in shared mode.
+
+#### Track 3 quality checks
+
+- targeted lifecycle tests confirm truthful status reporting for shared versus per-workspace topology;
+- Docker-backed validation confirms that shared services and workspace-scoped services are launched as intended.
+
+### Track 4: Partitioned storage, logs, and audit paths
+
+- ensure all persistent reads/writes, logs, metrics, and audit trails are partitioned or labeled by tenant identity;
+- keep destructive admin actions tenant-safe.
+
+#### Track 4 definition of done
+
+- every persistent read/write path in memory and agent bus is scoped by tenant identity;
+- audit/log surfaces for promoted shared services either store data per tenant path or attach tenant identity to each record;
+- purge or admin actions cannot remove another tenant's data.
+
+#### Track 4 quality checks
+
+- expand store/bus tests to cover tenant-scoped purge and wrong-tenant rejection paths;
+- add service-level checks or diagnostics proving tenant-labeled audit/log behavior.
+
+### Track 5: Operator-visible diagnostics and runtime verification
+
+- expose enough runtime truth that an operator can tell whether shared mode is healthy, misconfigured, or leaking tenant context;
+- extend verification helpers to probe shared-mode expectations.
+
+#### Track 5 definition of done
+
+- `verify_factory_install.py` and `factory_stack.py preflight/status` surface tenant-identity and shared-mode drift clearly;
+- operator docs explain how to diagnose missing tenant identity, mismatched tenants, and shared-mode rollout state;
+- runtime smoke prompts cover shared-mode checks when applicable.
+
+#### Track 5 quality checks
+
+- add regression tests for shared-mode verification and preflight output;
+- run runtime verification against a non-default/shared configuration and confirm actionable error messages.
+
+### Track 6: Cross-tenant end-to-end isolation proof
+
+- prove that promoted shared services do not leak memory, bus state, approval state, or diagnostics across tenants;
+- prove that approval flows remain tenant-safe.
+
+#### Track 6 definition of done
+
+- end-to-end tests show that two tenants cannot read or mutate each other's memory, bus runs, pending approvals, or plan cards;
+- approval and rejection operations fail explicitly for the wrong tenant;
+- at least one Docker-backed scenario exercises more than one tenant/workspace against the rollout path.
+
+#### Track 6 quality checks
+
+- extend `tests/test_multi_tenant.py` with service-boundary scenarios;
+- add targeted approval-gate integration coverage;
+- run `RUN_DOCKER_E2E=1 pytest tests/test_throwaway_runtime_docker.py -v -s` or equivalent shared-mode validation.
+
+### Track 7: Release, operator docs, and regression promotion
+
+- move operator docs and release communications from “blocked ADR” wording to “accepted architecture, rollout open” wording now;
+- keep them honest until the rollout is truly fulfilled.
+
+#### Track 7 definition of done
+
+- release template, install guide, tests README, handout, cheat sheet, and architecture docs all reflect that `ADR-008` is accepted while rollout remains open;
+- regression tests fail if docs slip back into either “still proposed” or “already fulfilled” language.
+
+#### Track 7 quality checks
+
+- `tests/test_regression.py` covers the wording shift and the accepted/open distinction;
+- release note dry runs use the updated template language successfully.
+
+### Track 8: Final promotion gate
+
+- mark shared-service rollout as fulfilled only when the prior tracks are complete and the rollout can be defended in code, tests, and release notes.
+
+#### Track 8 definition of done
+
+- all prior rollout tracks are complete;
+- release notes can honestly mark shared multi-tenant promotion as fulfilled without contradicting code or diagnostics;
+- operator guidance for shared mode is complete enough for repeatable day-two use.
+
+#### Track 8 quality checks
+
+- run the mandatory regression suite for docs, tenancy, lifecycle, and Docker-backed validation;
+- perform a final architecture/documentation review before any release claims fulfilled shared-service promotion.
 
 ## Success Criteria
 
@@ -300,16 +432,17 @@ sequencing for the next implementation stretch.
 
 ## Workstream 4: Hybrid Tenancy Classification
 
-**Execution status:** blocked for the current delivery cycle. Revisit only
-after the practical per-workspace execution plan above is complete enough to
-support real repo onboarding, install and update safety, lifecycle truth, and
-per-workspace verification.
+**Execution status:** active gated rollout track. Complete only after the
+practical per-workspace execution plan above is stable enough to support real
+repo onboarding, install and update safety, lifecycle truth, and per-workspace
+verification.
 
 ### Workstream 4 Deliverables
 
 - service classification matrix,
 - shared-service tenant contract,
-- migration plan for candidate shared services.
+- migration plan for candidate shared services,
+- rollout gates tracked through the ADR-008 mitigation program.
 
 ### Workstream 4 Detailed Steps
 
@@ -320,11 +453,14 @@ per-workspace verification.
 3. Define shared-service request contract using explicit tenant identity in headers or equivalent transport metadata.
 4. Define storage partition rules for shared services.
 5. Add cross-tenant regression tests before any shared-service rollout.
+6. Align runtime diagnostics and verification with the chosen shared-mode topology.
+7. Update operator/release docs only after the rollout gates for this workstream are satisfied.
 
 ### Workstream 4 Robustness Checks
 
 - no shared service can read or write data without a tenant identity,
 - no tenant can observe another tenant’s logs or records by default.
+- runtime diagnostics must surface shared-mode drift and tenant mismatches clearly.
 
 ## Workstream 5: Documentation and Verification
 
@@ -378,7 +514,7 @@ per-workspace verification.
 - isolation tests and operator diagnostics.
 
 Phase D remains blocked until the practical per-workspace execution priorities
-are substantially complete and `ADR-008` has moved to `Accepted`.
+are substantially complete and the `ADR-008` rollout quality gates are satisfied.
 
 ## Recommended Order of Implementation
 
@@ -386,9 +522,9 @@ are substantially complete and `ADR-008` has moved to `Accepted`.
 2. port allocation and generated settings,
 3. verification and lifecycle commands,
 4. throwaway/runtime workflow integration,
-5. multi-tenant shared-service promotion (blocked until the practical
-   per-workspace priorities above are substantially complete and `ADR-008` is
-   accepted).
+5. multi-tenant shared-service rollout (only after the practical
+   per-workspace priorities above are substantially complete and the `ADR-008`
+   rollout quality gates are ready to prove).
 
 ## Immediate Stabilization Rework Order
 
@@ -415,7 +551,7 @@ The current codebase now needs a focused stabilization pass before any further s
 
 - Pass `X-Workspace-ID` from orchestrator/MCP client calls when a workspace identity is known.
 - Normalize service fallback behavior so per-workspace runtimes use `PROJECT_WORKSPACE_ID` consistently when explicit headers are absent.
-- Keep shared-service promotion blocked until explicit tenant identity is proven end to end.
+- Do not mark shared-service rollout fulfilled until explicit tenant identity is proven end to end.
 
 #### Workspace identity definition of done
 

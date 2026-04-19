@@ -21,7 +21,7 @@ This guide documents the current practical per-workspace baseline:
 - per-workspace verification against generated effective endpoints
 - generated `software-factory.code-workspace` as the operator entrypoint
 
-This guide does **not** claim that candidate shared services are already promoted to a production shared multi-tenant control plane. Shared multi-tenant promotion remains blocked until its ADR and rollout criteria are explicitly satisfied.
+This guide does **not** claim that candidate shared services are already rolled out as a fulfilled production shared multi-tenant control plane. `ADR-008` is accepted as the governing architecture for that promotion, but rollout remains open until its implementation, isolation-proof, and operator-diagnostic criteria are explicitly satisfied.
 
 ## Prerequisites
 
