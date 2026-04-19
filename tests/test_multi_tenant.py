@@ -58,6 +58,110 @@ class _FakeWebSocket:
         self.query_params = query_params or {}
 
 
+class _ApprovalGateBusAdapter:
+    def __init__(self, bus: AgentBus) -> None:
+        self._bus = bus
+
+    async def list_pending(
+        self, project_id: str = "default"
+    ) -> list[dict[str, object]]:
+        return self._bus.list_pending_approval(project_id=project_id)
+
+    async def read_context_packet(
+        self, run_id: str, project_id: str = "default"
+    ) -> dict[str, object]:
+        return self._bus.read_context_packet(run_id, project_id=project_id)
+
+    async def approve_run(
+        self, run_id: str, feedback: str = "", project_id: str = "default"
+    ) -> None:
+        self._bus.approve_run(run_id, feedback=feedback, project_id=project_id)
+
+    async def reject_run(
+        self, run_id: str, feedback: str = "", project_id: str = "default"
+    ) -> None:
+        _ = feedback
+        self._bus.set_status(run_id, "failed", project_id=project_id)
+
+
+def _seed_pending_run(
+    bus: AgentBus,
+    *,
+    issue_number: int,
+    repo: str,
+    project_id: str,
+    goal: str,
+) -> str:
+    run_id = bus.create_run(
+        issue_number=issue_number,
+        repo=repo,
+        project_id=project_id,
+    )
+    bus.set_status(run_id, "routing", project_id=project_id)
+    bus.set_status(run_id, "planning", project_id=project_id)
+    bus.write_plan(
+        run_id,
+        goal=goal,
+        files=["src/example.py"],
+        acceptance_criteria=["criterion"],
+        validation_cmds=["pytest tests/test_multi_tenant.py"],
+        project_id=project_id,
+    )
+    bus.set_status(run_id, "awaiting_approval", project_id=project_id)
+    return run_id
+
+
+def _patch_bus_client_transport(
+    monkeypatch, transport: httpx.AsyncBaseTransport
+) -> None:
+    from factory_runtime.apps.approval_gate import (
+        bus_client as approval_gate_bus_client,
+    )
+
+    real_async_client = httpx.AsyncClient
+
+    def _client_factory(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(
+        approval_gate_bus_client.httpx,
+        "AsyncClient",
+        _client_factory,
+    )
+
+
+def _mock_bus_transport(tools_call_payload: dict[str, object]) -> httpx.MockTransport:
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content.decode("utf-8"))
+        method = payload.get("method")
+
+        if method == "initialize":
+            return httpx.Response(
+                200,
+                headers={"mcp-session-id": "session-1"},
+                json={
+                    "jsonrpc": "2.0",
+                    "id": payload["id"],
+                    "result": {
+                        "protocolVersion": "2025-03-26",
+                        "capabilities": {},
+                        "serverInfo": {"name": "mock-bus", "version": "1.0"},
+                    },
+                },
+            )
+
+        if method == "notifications/initialized":
+            return httpx.Response(202, text="")
+
+        if method == "tools/call":
+            return httpx.Response(200, json=tools_call_payload)
+
+        raise AssertionError(f"Unexpected MCP method: {method}")
+
+    return httpx.MockTransport(handler)
+
+
 def test_agent_bus_multi_tenant_isolation():
     """Test that two different workspaces inside AgentBus cannot see each other's data and are perfectly isolated."""
     # Use memory database for isolated testing
@@ -216,6 +320,279 @@ def test_shared_service_extractors_reject_mismatched_explicit_selectors(
 
     with pytest.raises(TenantIdentityError, match="Tenant identity mismatch"):
         approval_gate_main.websocket_project_id(websocket)
+
+
+def test_memory_mcp_server_keeps_lessons_tenant_scoped_at_tool_boundary(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("FACTORY_TENANCY_MODE", "shared")
+    monkeypatch.setenv("PROJECT_WORKSPACE_ID", "compat-workspace")
+
+    memory_mcp_server = _memory_mcp_server()
+    store = MemoryStore(db_path=":memory:")
+    monkeypatch.setattr(memory_mcp_server, "_store", store)
+
+    try:
+        tenant_a_ctx = _FakeMCPContext(headers={"X-Workspace-ID": "tenant-A"})
+        tenant_b_ctx = _FakeMCPContext(headers={"X-Workspace-ID": "tenant-B"})
+
+        memory_mcp_server.memory_store_lesson(
+            issue_number=701,
+            outcome="success",
+            summary="Tenant A lesson",
+            learnings=["tenant A learning"],
+            ctx=tenant_a_ctx,
+            repo="org/tenant-a",
+        )
+        memory_mcp_server.memory_store_lesson(
+            issue_number=702,
+            outcome="success",
+            summary="Tenant B lesson",
+            learnings=["tenant B learning"],
+            ctx=tenant_b_ctx,
+            repo="org/tenant-b",
+        )
+
+        lessons_a = memory_mcp_server.memory_get_recent(ctx=tenant_a_ctx, limit=10)[
+            "lessons"
+        ]
+        lessons_b = memory_mcp_server.memory_get_recent(ctx=tenant_b_ctx, limit=10)[
+            "lessons"
+        ]
+
+        assert [lesson["summary"] for lesson in lessons_a] == ["Tenant A lesson"]
+        assert [lesson["summary"] for lesson in lessons_b] == ["Tenant B lesson"]
+    finally:
+        store.close()
+
+
+def test_agent_bus_mcp_server_keeps_pending_and_plan_cards_tenant_scoped(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("FACTORY_TENANCY_MODE", "shared")
+    monkeypatch.setenv("PROJECT_WORKSPACE_ID", "compat-workspace")
+
+    agent_bus_mcp_server = _agent_bus_mcp_server()
+    bus = AgentBus(db_path=":memory:")
+    monkeypatch.setattr(agent_bus_mcp_server, "_bus", bus)
+
+    try:
+        tenant_a_ctx = _FakeMCPContext(headers={"X-Workspace-ID": "tenant-A"})
+        tenant_b_ctx = _FakeMCPContext(headers={"X-Workspace-ID": "tenant-B"})
+
+        run_a = _seed_pending_run(
+            bus,
+            issue_number=801,
+            repo="org/tenant-a",
+            project_id="tenant-A",
+            goal="Tenant A plan",
+        )
+        run_b = _seed_pending_run(
+            bus,
+            issue_number=802,
+            repo="org/tenant-b",
+            project_id="tenant-B",
+            goal="Tenant B plan",
+        )
+
+        pending_a = agent_bus_mcp_server.bus_list_pending_approval(ctx=tenant_a_ctx)[
+            "runs"
+        ]
+        pending_b = agent_bus_mcp_server.bus_list_pending_approval(ctx=tenant_b_ctx)[
+            "runs"
+        ]
+
+        assert [run["run_id"] for run in pending_a] == [run_a]
+        assert [run["run_id"] for run in pending_b] == [run_b]
+
+        packet_a = agent_bus_mcp_server.bus_read_context_packet(
+            run_a,
+            ctx=tenant_a_ctx,
+        )
+
+        assert packet_a["run"]["run_id"] == run_a
+        assert packet_a["plan"]["goal"] == "Tenant A plan"
+
+        with pytest.raises(ValueError, match="Run not found for project"):
+            agent_bus_mcp_server.bus_read_context_packet(run_a, ctx=tenant_b_ctx)
+
+        with pytest.raises(ValueError, match="Run not found for project"):
+            agent_bus_mcp_server.bus_approve_run(run_a, ctx=tenant_b_ctx)
+    finally:
+        bus.close()
+
+
+def test_approval_gate_bus_client_prefers_structured_content(monkeypatch) -> None:
+    from factory_runtime.apps.approval_gate import (
+        bus_client as approval_gate_bus_client,
+    )
+
+    transport = _mock_bus_transport(
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+                "structuredContent": {
+                    "runs": [
+                        {
+                            "run_id": "run-1",
+                            "issue_number": 901,
+                            "repo": "org/tenant-a",
+                            "created_ts": "2026-01-01T00:00:00Z",
+                        }
+                    ]
+                }
+            },
+        }
+    )
+    _patch_bus_client_transport(monkeypatch, transport)
+
+    client = approval_gate_bus_client.BusClient(base_url="http://agent-bus")
+
+    assert asyncio.run(client.list_pending(project_id="tenant-A")) == [
+        {
+            "run_id": "run-1",
+            "issue_number": 901,
+            "repo": "org/tenant-a",
+            "created_ts": "2026-01-01T00:00:00Z",
+        }
+    ]
+
+
+def test_approval_gate_bus_client_raises_for_mcp_tool_error_payload(
+    monkeypatch,
+) -> None:
+    from factory_runtime.apps.approval_gate import (
+        bus_client as approval_gate_bus_client,
+    )
+
+    transport = _mock_bus_transport(
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Run not found for project. Confirm the tenant identity matches the target run.",
+                    }
+                ],
+                "isError": True,
+            },
+        }
+    )
+    _patch_bus_client_transport(monkeypatch, transport)
+
+    client = approval_gate_bus_client.BusClient(base_url="http://agent-bus")
+
+    with pytest.raises(
+        approval_gate_bus_client.BusClientError,
+        match="Run not found for project",
+    ):
+        asyncio.run(client.read_context_packet("run-1", project_id="tenant-B"))
+
+
+def test_approval_gate_routes_keep_pending_plan_and_decisions_tenant_scoped(
+    monkeypatch,
+) -> None:
+    pytest.importorskip("fastapi")
+
+    approval_gate_main = _approval_gate_main()
+
+    monkeypatch.setenv("FACTORY_TENANCY_MODE", "shared")
+    monkeypatch.setenv("PROJECT_WORKSPACE_ID", "compat-workspace")
+
+    bus = AgentBus(db_path=":memory:")
+    monkeypatch.setattr(
+        approval_gate_main,
+        "_bus",
+        _ApprovalGateBusAdapter(bus),
+    )
+
+    try:
+        run_a = _seed_pending_run(
+            bus,
+            issue_number=1001,
+            repo="org/tenant-a",
+            project_id="tenant-A",
+            goal="Tenant A pending plan",
+        )
+        run_b = _seed_pending_run(
+            bus,
+            issue_number=1002,
+            repo="org/tenant-b",
+            project_id="tenant-B",
+            goal="Tenant B pending plan",
+        )
+
+        async def run_test() -> None:
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app=approval_gate_main.app),
+                base_url="http://approval-gate",
+            ) as client:
+                pending_a = await client.get(
+                    "/pending",
+                    headers={"X-Workspace-ID": "tenant-A"},
+                )
+                pending_b = await client.get(
+                    "/pending",
+                    headers={"X-Workspace-ID": "tenant-B"},
+                )
+
+                assert pending_a.status_code == 200
+                assert pending_b.status_code == 200
+                assert [run["run_id"] for run in pending_a.json()] == [run_a]
+                assert [run["run_id"] for run in pending_b.json()] == [run_b]
+
+                plan_a = await client.get(
+                    f"/plan/{run_a}",
+                    headers={"X-Workspace-ID": "tenant-A"},
+                )
+                wrong_plan = await client.get(
+                    f"/plan/{run_a}",
+                    headers={"X-Workspace-ID": "tenant-B"},
+                )
+
+                assert plan_a.status_code == 200
+                assert plan_a.json()["goal"] == "Tenant A pending plan"
+                assert wrong_plan.status_code == 404
+                assert "Run not found for project" in wrong_plan.json()["detail"]
+
+                wrong_approve = await client.post(
+                    f"/approve/{run_a}",
+                    headers={"X-Workspace-ID": "tenant-B"},
+                    json={"approved": True, "feedback": "wrong tenant"},
+                )
+                wrong_reject = await client.post(
+                    f"/approve/{run_b}",
+                    headers={"X-Workspace-ID": "tenant-A"},
+                    json={"approved": False, "feedback": "wrong tenant"},
+                )
+
+                assert wrong_approve.status_code == 400
+                assert wrong_reject.status_code == 400
+                assert "Run not found for project" in wrong_approve.json()["detail"]
+                assert "Run not found for project" in wrong_reject.json()["detail"]
+
+                approve_a = await client.post(
+                    f"/approve/{run_a}",
+                    headers={"X-Workspace-ID": "tenant-A"},
+                    json={"approved": True, "feedback": "looks good"},
+                )
+                reject_b = await client.post(
+                    f"/approve/{run_b}",
+                    headers={"X-Workspace-ID": "tenant-B"},
+                    json={"approved": False, "feedback": "needs work"},
+                )
+
+                assert approve_a.status_code == 200
+                assert reject_b.status_code == 200
+
+        asyncio.run(run_test())
+        assert bus.get_run(run_a, project_id="tenant-A")["status"] == "approved"
+        assert bus.get_run(run_b, project_id="tenant-B")["status"] == "failed"
+    finally:
+        bus.close()
 
 
 def test_agent_bus_server_resolves_db_path_from_factory_data_dir(monkeypatch):

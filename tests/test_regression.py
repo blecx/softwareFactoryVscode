@@ -394,6 +394,8 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
         "`tests/run-integration-test.sh`" in tests_readme
     )
     assert "accepted-but-still-open shared multi-tenant rollout program" in tests_readme
+    assert "service-boundary isolation assertions" in tests_readme
+    assert "`tests/test_throwaway_runtime_docker.py`" in tests_readme
 
 
 def test_tests_readme_documents_python_env_repair_path():
