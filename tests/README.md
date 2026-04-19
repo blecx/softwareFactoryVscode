@@ -58,6 +58,8 @@ The practical per-workspace baseline is protected by a mix of functional and doc
 
 The baseline intentionally distinguishes current per-workspace support from the accepted-but-still-open shared multi-tenant rollout program.
 
+Open `ADR-008` rollout proof beyond that baseline is covered by the service-boundary isolation assertions in `tests/test_multi_tenant.py` and the optional Docker-backed strict-tenant scenario in `tests/test_throwaway_runtime_docker.py`.
+
 Default throwaway install/runtime validation should stay inside the source repository's gitignored `.tmp/` tree (for example `.tmp/throwaway-targets/`) unless a test explicitly opts into an external target. This keeps disposable targets in-workspace and avoids accidentally tainting unrelated repositories or non-repository paths.
 
 ---
