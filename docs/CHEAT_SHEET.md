@@ -99,7 +99,7 @@ The updater refreshes:
 
 - **Port conflicts or stale state**: run `python3 scripts/factory_stack.py list` first to reconcile obvious stale registry entries, then use `preflight` to see whether the issue is `needs-ramp-up`, `config-drift`, or `degraded`.
 - **Config drift**: rerun bootstrap/update or use `activate` to refresh generated runtime artifacts for the selected workspace.
-- **Tenant-aware services**: `mcp-memory`, `mcp-agent-bus`, and `approval-gate` follow accepted `ADR-008` guardrails, but rollout remains open and they are still candidate shared services rather than a fulfilled shared control plane.
+- **Tenant-aware services**: `mcp-memory`, `mcp-agent-bus`, and `approval-gate` now satisfy the fulfilled `ADR-008` promotion gate for shared mode, while the default supported operator path remains the practical per-workspace baseline.
 - **Topology truth**: `preflight` and `status` now emit `topology_mode`. The default is `per-workspace`; if you opt into `FACTORY_SHARED_SERVICE_MODE=shared`, you must also provide `FACTORY_SHARED_MEMORY_URL`, `FACTORY_SHARED_AGENT_BUS_URL`, and `FACTORY_SHARED_APPROVAL_GATE_URL` so the workspace can discover the promoted shared services without owning duplicate local containers.
 - **Shared-mode tenant diagnostics**: when `FACTORY_SHARED_SERVICE_MODE=shared`, `preflight`, `status`, and runtime verification now report `shared_mode_status`, whether explicit `X-Workspace-ID` tenant identity is required, and the expected tenant identity from `PROJECT_WORKSPACE_ID`.
 - **Tenant mismatch remediation**: if shared mode reports missing or mismatched tenant selectors, send `X-Workspace-ID=<PROJECT_WORKSPACE_ID>` from workspace clients and align any `project_id` selector to that same value before treating the rollout checks as satisfied.
@@ -108,4 +108,4 @@ The updater refreshes:
 
 - `open` — one or more ADR-008 rollout tracks still block shared promotion
 - `advanced groundwork` — meaningful rollout slices landed, but the final gate is still open
-- `fulfilled` — only after code, tests, diagnostics, and operator guidance all support the claim and a final architecture/documentation review confirms it
+- `fulfilled` — the current default branch now meets this threshold for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`, while shared mode remains deliberate and opt-in

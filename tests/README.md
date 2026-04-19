@@ -56,9 +56,14 @@ The practical per-workspace baseline is protected by a mix of functional and doc
 - **Host-isolation boundaries and subsystem mount safety:** `tests/run-integration-test.sh`
 - **Todo-app throwaway regression contract:** `.copilot/skills/todo-app-regression/SKILL.md`, `scripts/todo_app_regression.py`, and `tests/test_todo_regression_contract.py`
 
-The baseline intentionally distinguishes current per-workspace support from the accepted-but-still-open shared multi-tenant rollout program.
+The baseline intentionally distinguishes the default practical per-workspace
+support path from the now-fulfilled ADR-008 shared multi-tenant promotion for
+`mcp-memory`, `mcp-agent-bus`, and `approval-gate`.
 
-Open `ADR-008` rollout proof beyond that baseline is covered by the service-boundary isolation assertions in `tests/test_multi_tenant.py` and the optional Docker-backed strict-tenant scenario in `tests/test_throwaway_runtime_docker.py`.
+Fulfilled ADR-008 promotion evidence beyond that baseline is covered by the
+service-boundary isolation assertions in `tests/test_multi_tenant.py`, the
+operator/runtime wording locks in `tests/test_regression.py`, and the optional
+Docker-backed strict-tenant scenario in `tests/test_throwaway_runtime_docker.py`.
 
 Default throwaway install/runtime validation should stay inside the source repository's gitignored `.tmp/` tree (for example `.tmp/throwaway-targets/`) unless a test explicitly opts into an external target. This keeps disposable targets in-workspace and avoids accidentally tainting unrelated repositories or non-repository paths.
 
