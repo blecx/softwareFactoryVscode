@@ -56,7 +56,7 @@ The practical per-workspace baseline is protected by a mix of functional and doc
 - **Host-isolation boundaries and subsystem mount safety:** `tests/run-integration-test.sh`
 - **Todo-app throwaway regression contract:** `.copilot/skills/todo-app-regression/SKILL.md`, `scripts/todo_app_regression.py`, and `tests/test_todo_regression_contract.py`
 
-The baseline intentionally distinguishes current per-workspace support from the still-blocked shared multi-tenant promotion phase.
+The baseline intentionally distinguishes current per-workspace support from the accepted-but-still-open shared multi-tenant rollout program.
 
 Default throwaway install/runtime validation should stay inside the source repository's gitignored `.tmp/` tree (for example `.tmp/throwaway-targets/`) unless a test explicitly opts into an external target. This keeps disposable targets in-workspace and avoids accidentally tainting unrelated repositories or non-repository paths.
 

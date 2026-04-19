@@ -1,6 +1,7 @@
 import asyncio
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -372,7 +373,8 @@ def test_install_doc_locks_practical_per_workspace_baseline():
         "verify_factory_install.py --target . --runtime --check-vscode-mcp"
         in install_doc
     )
-    assert "Shared multi-tenant promotion remains blocked" in install_doc
+    assert "`ADR-008` is accepted as the governing architecture" in install_doc
+    assert "rollout remains open" in install_doc
 
 
 def test_tests_readme_maps_practical_baseline_coverage_surfaces():
@@ -391,7 +393,7 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
         "**Host-isolation boundaries and subsystem mount safety:** "
         "`tests/run-integration-test.sh`" in tests_readme
     )
-    assert "still-blocked shared multi-tenant promotion phase" in tests_readme
+    assert "accepted-but-still-open shared multi-tenant rollout program" in tests_readme
 
 
 def test_tests_readme_documents_python_env_repair_path():
@@ -423,18 +425,23 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "stale registry data" not in cheat_sheet
 
 
-def test_release_template_distinguishes_practical_vs_blocked_scope():
+def test_release_template_distinguishes_practical_vs_open_rollout_scope():
     repo_root = Path(__file__).parent.parent
     release_template = (repo_root / ".github" / "releases" / "TEMPLATE.md").read_text(
         encoding="utf-8"
     )
 
     assert "## Delivery status snapshot" in release_template
-    assert "| Scope | Status | Why it matters |" in release_template
+    assert re.search(
+        r"\|\s*Scope\s*\|\s*Status\s*\|\s*Why it matters\s*\|",
+        release_template,
+    )
     assert "Practical per-workspace baseline" in release_template
-    assert "Shared multi-tenant promotion (still blocked)" in release_template
+    assert (
+        "Shared multi-tenant promotion (ADR-008 accepted, rollout open)"
+        in release_template
+    )
     assert "Do not mark shared multi-tenant promotion as fulfilled" in release_template
-    assert "ADR-008" in release_template
 
 
 def test_multi_workspace_architecture_docs_capture_current_authority():
@@ -484,7 +491,8 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
     assert "activate` refreshes generated runtime artifacts" in architecture_doc
 
     assert (
-        "Hybrid-tenancy promotion rules are currently proposed in `ADR-008`" in plan_doc
+        "Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, and `ADR-010`."
+        in plan_doc
     )
     assert "maintained architecture synthesis" in plan_doc
     assert "Per `ADR-013`" in plan_doc
@@ -516,13 +524,16 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
     assert "## Immediate Stabilization Rework Order" in plan_doc
     assert "## Execution Guardrails for This Rework" in plan_doc
     assert "## Mitigation Map and Current Resolution Status" in plan_doc
-    assert "## Proposed ADR to Production Promotion Path" in plan_doc
+    assert "## Accepted ADR to Production Rollout Path" in plan_doc
     assert (
-        "## Practical delivery split while shared-service promotion remains blocked"
+        "## Practical delivery split while shared-service rollout remains open"
         in plan_doc
     )
-    assert "| Scope | Status | Priority now | Why it matters |" in plan_doc
-    assert "Blocked for now" in plan_doc
+    assert re.search(
+        r"\|\s*Scope\s*\|\s*Status\s*\|\s*Priority now\s*\|\s*Why it matters\s*\|",
+        plan_doc,
+    )
+    assert "Rollout open" in plan_doc
     assert "## Practical execution plan for a working system" in plan_doc
     assert "### Priority 0: New repo onboarding, install, and update safety" in plan_doc
     assert (
@@ -533,9 +544,7 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
         "### Priority 2: Docs, regression coverage, and day-two operator confidence"
         in plan_doc
     )
-    assert (
-        "### Deferred phase: Shared multi-tenant promotion remains blocked" in plan_doc
-    )
+    assert "### Shared multi-tenant rollout remains open" in plan_doc
     assert "## Program-level definition of done" in plan_doc
     assert "## Mandatory quality gates for this rework" in plan_doc
     assert "## Transition, update, and upgrade safety rules" in plan_doc
@@ -550,10 +559,10 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
         in plan_doc
     )
     assert "Not promoted in this rework" in plan_doc
-    assert (
-        "Only after that acceptance step may the behavior be treated as production rollout criteria"
-        in plan_doc
-    )
+    assert "## ADR-008 rollout mitigation program" in plan_doc
+    assert "### Track 1: Promotion boundary and shared-mode contract" in plan_doc
+    assert "### Track 8: Final promotion gate" in plan_doc
+    assert "Only after the rollout criteria are verified" in plan_doc
 
 
 def test_bash_gateway_default_policy_matches_profile_schema():
