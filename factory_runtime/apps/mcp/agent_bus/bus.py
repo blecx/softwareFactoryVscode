@@ -52,6 +52,11 @@ def _normalize_project_id(project_id: str) -> str:
     return normalized
 
 
+RUN_NOT_FOUND_FOR_PROJECT_ERROR = (
+    "Run not found for project. Confirm the tenant identity matches the target run."
+)
+
+
 class InvalidStatusTransitionError(ValueError):
     pass
 
@@ -289,7 +294,7 @@ class AgentBus:
         project_id = _normalize_project_id(project_id)
         run = self.get_run(run_id, project_id=project_id)
         if run is None:
-            raise ValueError(f"Unknown run_id: {run_id}")
+            raise ValueError(RUN_NOT_FOUND_FOR_PROJECT_ERROR)
         current = run["status"]
         allowed = _VALID_TRANSITIONS.get(current, set())
         if status not in allowed:
@@ -337,7 +342,7 @@ class AgentBus:
         """Write (or replace) the implementation plan for a run."""
         project_id = _normalize_project_id(project_id)
         if self.get_run(run_id, project_id=project_id) is None:
-            raise ValueError("Run not found for project.")
+            raise ValueError(RUN_NOT_FOUND_FOR_PROJECT_ERROR)
         self._conn.execute(
             """
             INSERT INTO plans (
@@ -390,7 +395,7 @@ class AgentBus:
         project_id = _normalize_project_id(project_id)
         # In sqlite we can't easily JOIN an UPDATE, so let's check permission first.
         if not self.get_run(run_id, project_id=project_id):
-            raise ValueError("Run not found for project.")
+            raise ValueError(RUN_NOT_FOUND_FOR_PROJECT_ERROR)
         self._conn.execute(
             "UPDATE plans SET approved = 1, feedback = ? WHERE run_id = ? AND project_id = ?",
             (feedback, run_id, project_id),
@@ -440,7 +445,7 @@ class AgentBus:
         """Record before/after content for a file modified during a run."""
         project_id = _normalize_project_id(project_id)
         if self.get_run(run_id, project_id=project_id) is None:
-            raise ValueError("Run not found for project.")
+            raise ValueError(RUN_NOT_FOUND_FOR_PROJECT_ERROR)
         self._conn.execute(
             """
             INSERT INTO file_snapshots (run_id, project_id, filepath, content_before, content_after, ts)
@@ -486,7 +491,7 @@ class AgentBus:
         """Record the result of a validation command (test/lint run)."""
         project_id = _normalize_project_id(project_id)
         if self.get_run(run_id, project_id=project_id) is None:
-            raise ValueError("Run not found for project.")
+            raise ValueError(RUN_NOT_FOUND_FOR_PROJECT_ERROR)
         self._conn.execute(
             """
             INSERT INTO validation_results (run_id, project_id, command, stdout, stderr, exit_code, passed, ts)
@@ -548,7 +553,7 @@ class AgentBus:
         """Record a named milestone checkpoint within a run."""
         project_id = _normalize_project_id(project_id)
         if self.get_run(run_id, project_id=project_id) is None:
-            raise ValueError("Run not found for project.")
+            raise ValueError(RUN_NOT_FOUND_FOR_PROJECT_ERROR)
         self._conn.execute(
             """
             INSERT INTO checkpoints (run_id, project_id, label, metadata, ts)
@@ -610,7 +615,7 @@ class AgentBus:
         """
         run = self.get_run(run_id, project_id=project_id)
         if run is None:
-            raise ValueError(f"Unknown run_id: {run_id}")
+            raise ValueError(RUN_NOT_FOUND_FOR_PROJECT_ERROR)
         return {
             "run": run,
             "plan": self.get_plan(run_id, project_id=project_id),
