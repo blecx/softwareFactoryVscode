@@ -186,10 +186,13 @@ def load_workspace_server_urls(
 def build_expected_service_ports(
     config: factory_workspace.WorkspaceRuntimeConfig,
 ) -> dict[str, int]:
+    workspace_owned_runtime_services = (
+        factory_workspace.workspace_owned_runtime_services(config)
+    )
     expected_ports = {
         service_name: config.ports[metadata["port_key"]]
         for service_name, metadata in factory_workspace.RUNTIME_SERVICE_CONTRACT.items()
-        if metadata.get("port_key")
+        if metadata.get("port_key") and service_name in workspace_owned_runtime_services
     }
     expected_ports.update(
         {
@@ -214,6 +217,7 @@ def build_preflight_report(
         repo_root, env_file=resolved_env_file, persist=False
     )
     runtime_manifest = factory_workspace.load_json(config.runtime_manifest_path)
+    runtime_topology = factory_workspace.build_runtime_topology(config)
     workspace_urls = load_workspace_server_urls(config.target_dir, workspace_file)
     manifest_server_urls = {
         name: str(data.get("url", ""))
@@ -227,7 +231,9 @@ def build_preflight_report(
     }
 
     expected_workspace_urls = config.mcp_server_urls
-    expected_health_urls = factory_workspace.build_health_urls(config.ports)
+    expected_health_urls = factory_workspace.build_runtime_health_urls_for_topology(
+        config
+    )
     expected_service_ports = build_expected_service_ports(config)
 
     alignment_issues: list[str] = []
@@ -269,8 +275,10 @@ def build_preflight_report(
                 "config": config,
                 "workspace_urls": workspace_urls,
                 "manifest_server_urls": manifest_server_urls,
+                "manifest_health_urls": manifest_health_urls,
                 "service_inventory": service_inventory,
                 "expected_service_ports": expected_service_ports,
+                "runtime_topology": runtime_topology,
             }
     else:
         return {
@@ -280,18 +288,30 @@ def build_preflight_report(
             "config": config,
             "workspace_urls": workspace_urls,
             "manifest_server_urls": manifest_server_urls,
+            "manifest_health_urls": manifest_health_urls,
             "service_inventory": service_inventory,
             "expected_service_ports": expected_service_ports,
+            "runtime_topology": runtime_topology,
         }
 
+    topology_issues = factory_workspace.validate_runtime_topology(config)
     service_issues: list[str] = []
     port_issues: list[str] = []
     running_service_count = 0
     all_expected_services = [
-        *factory_workspace.RUNTIME_SERVICE_CONTRACT.keys(),
+        *factory_workspace.workspace_owned_runtime_services(config),
         *WORKSPACE_SERVICE_PORT_KEYS.keys(),
     ]
     all_expected_service_names = sorted(set(all_expected_services))
+
+    if runtime_topology.get("mode") == factory_workspace.SHARED_TOPOLOGY_MODE:
+        for service_name in sorted(factory_workspace.PROMOTABLE_SHARED_SERVICES):
+            if service_inventory.get(service_name):
+                topology_issues.append(
+                    "Shared-service topology drift detected: promoted shared service "
+                    f"`{service_name}` is still instantiated inside workspace compose "
+                    f"project `{config.compose_project_name}`."
+                )
 
     for service_name in all_expected_service_names:
         service_entry = service_inventory.get(service_name)
@@ -330,10 +350,14 @@ def build_preflight_report(
                 f"`{expected_port}` (found `{published_ports or 'none'}`)."
             )
 
-    if alignment_issues or port_issues:
+    if alignment_issues or port_issues or topology_issues:
         status = "config-drift"
-        recommended_action = "re-bootstrap"
-        issues = [*alignment_issues, *port_issues]
+        recommended_action = (
+            "inspect-shared-topology"
+            if topology_issues and not alignment_issues and not port_issues
+            else "re-bootstrap"
+        )
+        issues = [*alignment_issues, *port_issues, *topology_issues]
     elif running_service_count == 0:
         status = "needs-ramp-up"
         recommended_action = "start"
@@ -360,18 +384,41 @@ def build_preflight_report(
         "manifest_health_urls": manifest_health_urls,
         "expected_service_ports": expected_service_ports,
         "service_inventory": service_inventory,
+        "runtime_topology": runtime_topology,
     }
 
 
 def print_preflight_report(report: dict[str, Any]) -> None:
     config = report["config"]
+    runtime_topology = report.get("runtime_topology", {})
     print(f"workspace_id={config.project_workspace_id}")
     print(f"instance_id={config.factory_instance_id}")
     print(f"target={config.target_dir}")
     print(f"compose_project={config.compose_project_name}")
+    print(
+        "topology_mode="
+        f"{runtime_topology.get('mode', factory_workspace.PER_WORKSPACE_TOPOLOGY_MODE)}"
+    )
     print(f"preflight_status={report['status']}")
     print(f"recommended_action={report['recommended_action']}")
     print(f"issue_count={len(report['issues'])}")
+
+    for service_name, service_topology in sorted(
+        runtime_topology.get("services", {}).items()
+    ):
+        print(
+            f"service.{service_name}.topology_mode={service_topology.get('topology_mode', '')}"
+        )
+        print(
+            "service."
+            f"{service_name}.workspace_owned={str(bool(service_topology.get('workspace_owned'))).lower()}"
+        )
+        print(
+            f"service.{service_name}.launch_scope={service_topology.get('launch_scope', '')}"
+        )
+        print(
+            f"service.{service_name}.discovery_url={service_topology.get('discovery_url', '')}"
+        )
 
     for service_name in sorted(report["expected_service_ports"].keys()):
         service_entry = report["service_inventory"].get(service_name, {})
@@ -410,12 +457,21 @@ def preflight_workspace(
     return 0 if report["status"] == "ready" else 1
 
 
-def infer_runtime_state_from_services(running_services: dict[str, str]) -> str:
+def infer_runtime_state_from_services(
+    running_services: dict[str, str],
+    *,
+    expected_runtime_services: set[str] | None = None,
+) -> str:
     """Infer effective runtime state from observed Docker service statuses."""
     if not running_services:
         return "stopped"
 
-    required_services = factory_workspace.RUNTIME_SERVICE_CONTRACT
+    required_services = {
+        service_name: metadata
+        for service_name, metadata in factory_workspace.RUNTIME_SERVICE_CONTRACT.items()
+        if expected_runtime_services is None
+        or service_name in expected_runtime_services
+    }
     degraded = False
 
     for service_name, metadata in required_services.items():
@@ -574,6 +630,12 @@ def start_stack(
 ) -> Path:
     resolved_env_file = resolve_env_file(repo_root, env_file)
     config = sync_workspace_runtime(repo_root, env_file=resolved_env_file)
+    topology_issues = factory_workspace.validate_runtime_topology(config)
+    if topology_issues:
+        details = "\n- ".join(topology_issues)
+        raise RuntimeError(
+            "Shared-service topology configuration is incomplete:\n- " f"{details}"
+        )
     ensure_data_dirs_ready(config)
     ensure_ports_ready(config)
     if foreground:
@@ -586,6 +648,9 @@ def start_stack(
             action.append("--build")
         if wait:
             action.extend(["--wait", "--wait-timeout", str(wait_timeout)])
+    if config.shared_service_mode == factory_workspace.SHARED_TOPOLOGY_MODE:
+        for service_name in sorted(factory_workspace.PROMOTABLE_SHARED_SERVICES):
+            action.extend(["--scale", f"{service_name}=0"])
     factory_workspace.update_runtime_state(config.factory_instance_id, "starting")
     if foreground:
         final_state = "stopped"
@@ -622,7 +687,12 @@ def start_stack(
             running_services = collect_running_services(config.compose_project_name)
         except subprocess.CalledProcessError:
             running_services = {}
-        inferred_state = infer_runtime_state_from_services(running_services)
+        inferred_state = infer_runtime_state_from_services(
+            running_services,
+            expected_runtime_services=factory_workspace.workspace_owned_runtime_services(
+                config
+            ),
+        )
         if inferred_state == "stopped":
             inferred_state = "running"
         factory_workspace.update_runtime_state(
@@ -821,7 +891,12 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
             "Preserving persisted runtime_state."
         )
 
-    inferred_state = infer_runtime_state_from_services(running_services)
+    inferred_state = infer_runtime_state_from_services(
+        running_services,
+        expected_runtime_services=factory_workspace.workspace_owned_runtime_services(
+            config
+        ),
+    )
     persisted_state = str(record.get("runtime_state", "installed"))
     runtime_state = resolve_status_runtime_state(
         persisted_state,
@@ -856,6 +931,7 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"instance_id={config.factory_instance_id}")
     print(f"target={config.target_dir}")
     print(f"compose_project={config.compose_project_name}")
+    print(f"topology_mode={config.shared_service_mode}")
     print(f"runtime_state={runtime_state}")
     print(f"active={str(active).lower()}")
     print(f"port_index={config.port_index}")
@@ -877,6 +953,12 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
         return 1
     print(f"preflight_status={preflight['status']}")
     print(f"recommended_action={preflight['recommended_action']}")
+    preflight_topology = preflight.get("runtime_topology", {})
+    if isinstance(preflight_topology, dict):
+        print(
+            "preflight_topology_mode="
+            f"{preflight_topology.get('mode', config.shared_service_mode)}"
+        )
     for name, url in sorted(config.mcp_server_urls.items()):
         print(f"mcp.{name}={url}")
     return 0

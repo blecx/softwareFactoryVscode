@@ -57,6 +57,7 @@ services:
     restart: unless-stopped
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      FACTORY_SHARED_SERVICE_MODE: "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"
       FACTORY_TENANCY_MODE: "${FACTORY_TENANCY_MODE:-compatibility}"
       MEMORY_DB_PATH: "/data/memory.db"
     volumes:
@@ -89,6 +90,7 @@ services:
     restart: unless-stopped
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      FACTORY_SHARED_SERVICE_MODE: "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"
       FACTORY_TENANCY_MODE: "${FACTORY_TENANCY_MODE:-compatibility}"
       AGENT_BUS_DB_PATH: "/data/agent_bus.db"
     volumes:
@@ -119,13 +121,12 @@ services:
       dockerfile: docker/approval-gate/Dockerfile
     image: factory/approval-gate:latest
     restart: unless-stopped
-    depends_on:
-      mcp-agent-bus:
-        condition: service_healthy
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      FACTORY_SHARED_SERVICE_MODE: "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"
       FACTORY_TENANCY_MODE: "${FACTORY_TENANCY_MODE:-compatibility}"
-      AGENT_BUS_URL: "http://mcp-agent-bus:3031"
+      FACTORY_SHARED_AGENT_BUS_URL: "${FACTORY_SHARED_AGENT_BUS_URL:-}"
+      AGENT_BUS_URL: "${FACTORY_SHARED_AGENT_BUS_URL:-http://mcp-agent-bus:3031}"
     ports:
       - "${APPROVAL_GATE_PORT:-8001}:8001"
     networks:
@@ -152,19 +153,16 @@ services:
       dockerfile: docker/agent-worker/Dockerfile
     image: factory/agent-worker:latest
     restart: unless-stopped
-    depends_on:
-      mcp-memory:
-        condition: service_healthy
-      mcp-agent-bus:
-        condition: service_healthy
-      approval-gate:
-        condition: service_healthy
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
+      FACTORY_SHARED_SERVICE_MODE: "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"
       GITHUB_TOKEN: "${GITHUB_TOKEN}"
-      MEMORY_MCP_URL: "http://mcp-memory:3030"
-      AGENT_BUS_URL: "http://mcp-agent-bus:3031"
-      APPROVAL_GATE_URL: "http://approval-gate:8001"
+      FACTORY_SHARED_MEMORY_URL: "${FACTORY_SHARED_MEMORY_URL:-}"
+      FACTORY_SHARED_AGENT_BUS_URL: "${FACTORY_SHARED_AGENT_BUS_URL:-}"
+      FACTORY_SHARED_APPROVAL_GATE_URL: "${FACTORY_SHARED_APPROVAL_GATE_URL:-}"
+      MEMORY_MCP_URL: "${FACTORY_SHARED_MEMORY_URL:-http://mcp-memory:3030}"
+      AGENT_BUS_URL: "${FACTORY_SHARED_AGENT_BUS_URL:-http://mcp-agent-bus:3031}"
+      APPROVAL_GATE_URL: "${FACTORY_SHARED_APPROVAL_GATE_URL:-http://approval-gate:8001}"
       AGENT_REPO: "${AGENT_REPO:-.}"
       AGENT_WORKSPACE: "/target"
     volumes:

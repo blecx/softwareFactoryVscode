@@ -288,6 +288,18 @@ def build_effective_runtime_ports(
     return ports
 
 
+def build_probe_url(url: str, health_path: str) -> str:
+    normalized_url = url.strip().rstrip("/")
+    if not normalized_url:
+        return ""
+    normalized_path = health_path.strip()
+    if not normalized_path:
+        return normalized_url
+    if normalized_url.endswith(normalized_path):
+        return normalized_url
+    return f"{normalized_url}{normalized_path}"
+
+
 def check_factory_tree(target_dir: Path, violations: list[str]) -> Path | None:
     factory_dir = target_dir / bootstrap_host.FACTORY_DIRNAME
     if not factory_dir.is_dir():
@@ -641,6 +653,12 @@ def verify_runtime(
         return ["COMPOSE_PROJECT_NAME is missing or empty in .factory.env"]
 
     ports = build_effective_runtime_ports(preflight, runtime_manifest, env_values)
+    runtime_topology = preflight.get("runtime_topology", {})
+    topology_services = (
+        runtime_topology.get("services", {})
+        if isinstance(runtime_topology, dict)
+        else {}
+    )
 
     running_services = {
         service_name: str(data.get("status", ""))
@@ -648,6 +666,42 @@ def verify_runtime(
     }
 
     for service_name, metadata in RUNTIME_SERVICES.items():
+        service_topology = (
+            topology_services.get(service_name, {})
+            if isinstance(topology_services, dict)
+            else {}
+        )
+        workspace_owned = bool(service_topology.get("workspace_owned", True))
+        if not workspace_owned:
+            if service_name in running_services:
+                violations.append(
+                    "Shared-service topology drift detected: promoted shared service "
+                    f"`{service_name}` is still running inside workspace compose project "
+                    f"`{compose_project_name}`."
+                )
+                continue
+
+            discovery_url = str(service_topology.get("discovery_url", "")).strip()
+            if not discovery_url:
+                violations.append(
+                    "Shared-service topology is missing discovery for "
+                    f"`{service_name}`. Run `factory_stack.py preflight` to inspect the configured shared-service URLs."
+                )
+                continue
+
+            probe_url = build_probe_url(discovery_url, str(metadata["health_path"]))
+            error = probe_http_url(
+                probe_url,
+                timeout=timeout,
+                allow_http_error=bool(metadata.get("allow_http_error", False)),
+            )
+            if error:
+                violations.append(
+                    "Shared runtime endpoint probe failed for service "
+                    f"`{service_name}` at {probe_url}: {error}"
+                )
+            continue
+
         status = running_services.get(service_name)
         if not status:
             violations.append(
