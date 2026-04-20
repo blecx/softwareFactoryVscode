@@ -92,6 +92,153 @@ class MCPRuntimeManager:
 
         return candidates[0]
 
+    def candidate_runtime_manifest_paths(self, workspace_root: Path) -> list[Path]:
+        resolved_root = workspace_root.resolve()
+        candidates = [
+            (
+                resolved_root
+                / factory_workspace.TMP_SUBPATH
+                / factory_workspace.RUNTIME_MANIFEST_FILENAME
+            ).resolve()
+        ]
+        if len(resolved_root.parents) > 1:
+            companion_manifest = (
+                resolved_root.parents[1]
+                / factory_workspace.TMP_SUBPATH
+                / factory_workspace.RUNTIME_MANIFEST_FILENAME
+            ).resolve()
+            if companion_manifest not in candidates:
+                candidates.append(companion_manifest)
+        return candidates
+
+    def candidate_runtime_env_paths(self, workspace_root: Path) -> list[Path]:
+        resolved_root = workspace_root.resolve()
+        candidates = [
+            (
+                resolved_root / factory_workspace.FACTORY_DIRNAME / ".factory.env"
+            ).resolve()
+        ]
+        if len(resolved_root.parents) > 1:
+            companion_env = (
+                resolved_root.parents[1]
+                / factory_workspace.FACTORY_DIRNAME
+                / ".factory.env"
+            ).resolve()
+            if companion_env not in candidates:
+                candidates.append(companion_env)
+        return candidates
+
+    def resolve_factory_repo_root(self, workspace_root: Path) -> Path:
+        target_factory = (workspace_root / factory_workspace.FACTORY_DIRNAME).resolve()
+        if (target_factory / "scripts" / "factory_stack.py").exists():
+            return target_factory
+
+        source_factory = workspace_root.resolve()
+        if (source_factory / "scripts" / "factory_stack.py").exists():
+            return source_factory
+
+        raise FileNotFoundError(
+            "Unable to locate the canonical Software Factory repo from "
+            f"workspace root `{workspace_root}`."
+        )
+
+    def resolve_workspace_env_file(
+        self,
+        workspace_root: Path,
+        factory_repo_root: Path | None = None,
+    ) -> Path:
+        for candidate in self.candidate_runtime_env_paths(workspace_root):
+            if candidate.exists():
+                return candidate
+
+        resolved_factory_repo_root = factory_repo_root
+        if resolved_factory_repo_root is None:
+            resolved_factory_repo_root = self.resolve_factory_repo_root(workspace_root)
+
+        return self.resolve_env_file(resolved_factory_repo_root)
+
+    def build_workspace_snapshot(
+        self,
+        workspace_root: Path,
+        *,
+        workspace_file: str | None = None,
+        selected_profiles: Iterable[RuntimeProfileName | str] | None = None,
+    ) -> RuntimeSnapshot:
+        factory_repo_root = self.resolve_factory_repo_root(workspace_root)
+        env_file = self.resolve_workspace_env_file(
+            workspace_root,
+            factory_repo_root,
+        )
+        return self.build_snapshot(
+            factory_repo_root,
+            env_file=env_file,
+            workspace_file=workspace_file,
+            selected_profiles=selected_profiles,
+        )
+
+    def load_workspace_id(self, workspace_root: Path) -> str | None:
+        try:
+            snapshot = self.build_workspace_snapshot(
+                workspace_root,
+                selected_profiles=(RuntimeProfileName.HARNESS_DEFAULT,),
+            )
+        except Exception:  # noqa: BLE001
+            snapshot = None
+
+        if snapshot is not None and snapshot.workspace_id.strip():
+            return snapshot.workspace_id
+
+        for manifest_path in self.candidate_runtime_manifest_paths(workspace_root):
+            if not manifest_path.exists():
+                continue
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            project_workspace_id = str(manifest.get("project_workspace_id", "")).strip()
+            if project_workspace_id:
+                return project_workspace_id
+
+        for env_path in self.candidate_runtime_env_paths(workspace_root):
+            values = factory_workspace.parse_env_file(env_path)
+            project_workspace_id = values.get("PROJECT_WORKSPACE_ID", "").strip()
+            if project_workspace_id:
+                return project_workspace_id
+
+        return None
+
+    def load_named_urls_from_workspace(
+        self,
+        workspace_root: Path,
+        mappings: dict[str, tuple[str, str]],
+        *,
+        selected_profiles: Iterable[RuntimeProfileName | str] | None = None,
+    ) -> dict[str, str]:
+        try:
+            snapshot = self.build_workspace_snapshot(
+                workspace_root,
+                selected_profiles=selected_profiles,
+            )
+        except Exception:  # noqa: BLE001
+            snapshot = None
+        else:
+            snapshot_urls = self._extract_named_urls_from_snapshot(snapshot, mappings)
+            if snapshot_urls:
+                return snapshot_urls
+
+        for manifest_path in self.candidate_runtime_manifest_paths(workspace_root):
+            if not manifest_path.exists():
+                continue
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            manifest_urls = self._extract_named_urls_from_manifest(manifest, mappings)
+            if manifest_urls:
+                return manifest_urls
+
+        return {}
+
     def build_snapshot(
         self,
         repo_root: Path,
@@ -589,6 +736,46 @@ class MCPRuntimeManager:
             for name, data in manifest.get("runtime_health", {}).items()
             if isinstance(data, dict)
         }
+
+    def _extract_named_urls_from_snapshot(
+        self,
+        snapshot: RuntimeSnapshot,
+        mappings: dict[str, tuple[str, str]],
+    ) -> dict[str, str]:
+        urls: dict[str, str] = {}
+        for server_name, (section_name, runtime_name) in mappings.items():
+            normalized_section_name = {
+                "runtime_health": "manifest_health_urls",
+                "mcp_servers": "manifest_server_urls",
+            }.get(section_name, section_name)
+            section = getattr(snapshot, normalized_section_name, {})
+            url = (
+                str(section.get(runtime_name, "")).strip()
+                if isinstance(section, dict)
+                else ""
+            )
+            if url:
+                urls[server_name] = url
+        return urls
+
+    def _extract_named_urls_from_manifest(
+        self,
+        manifest: dict[str, Any],
+        mappings: dict[str, tuple[str, str]],
+    ) -> dict[str, str]:
+        urls: dict[str, str] = {}
+        for server_name, (section_name, runtime_name) in mappings.items():
+            normalized_section_name = {
+                "manifest_health_urls": "runtime_health",
+                "manifest_server_urls": "mcp_servers",
+            }.get(section_name, section_name)
+            section = manifest.get(normalized_section_name, {})
+            entry = section.get(runtime_name, {}) if isinstance(section, dict) else {}
+            if isinstance(entry, dict):
+                url = str(entry.get("url", "")).strip()
+                if url:
+                    urls[server_name] = url
+        return urls
 
     def _build_expected_service_ports(
         self,
