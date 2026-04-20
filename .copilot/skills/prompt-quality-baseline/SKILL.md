@@ -7,15 +7,19 @@
 ## Objective
 
 ## When to Use
+
 - Use this when working on tasks related to prompt quality baseline.
 
 ## When Not to Use
+
 - Do not use this when the current task does not involve prompt quality baseline.
 
 ## When to Use
+
 - Use this when working on tasks related to prompt quality baseline.
 
 ## Objective
+
 Provides context and instructions for the `prompt-quality-baseline` skill module.
 
 ## Required Sections
@@ -38,10 +42,10 @@ Each operational prompt (non-README) should include:
 
 ## MCP Tool Arbitration Hard Rules
 
-When more than one MCP server could complete a task, prompts must enforce this
+When more than one MCP server or generic execution path could complete a task, prompts must enforce this
 precedence and usage model:
 
-1. Prefer the most specialized domain MCP server over generic servers.
+1. Prefer the most specialized domain MCP server over generic servers and terminal/shell execution.
 2. Use `git` MCP for repository history/state operations (`status`, `diff`,
    `log`, `show`, `blame`, branch tasks).
 3. Use `search` MCP for codebase content discovery and text matching before
@@ -53,7 +57,8 @@ precedence and usage model:
 6. Use `testRunner` MCP for lint/build/test execution profiles before any
    fallback.
 7. Use `bashGateway` MCP only for allowlisted script workflows or when a
-   required domain action has no dedicated MCP capability.
+   required domain action has no dedicated MCP capability; it is not the
+   default executor for arbitrary commands.
 8. For external API/library docs, use Context7 when online; when offline, use
    `offlineDocs` MCP for indexed local docs; use `search` MCP only when
    `offlineDocs` does not cover required content.
@@ -62,6 +67,10 @@ precedence and usage model:
    index/search/read; use `filesystem` read only for exact-path excerpts.
 10. Keep `offlineDocs` index lifecycle change-driven: refresh after `docs/` or
     `templates/` source changes; do not require boot-time rebuilds.
+11. Treat generic terminal execution as a last-resort fallback only when no
+    suitable MCP server or tool can satisfy the task. Broad terminal approval
+    or auto-approve settings must not be treated as a reason to bypass MCP
+    routing.
 
 Prompts must treat these as hard rules, not preferences.
 
@@ -87,5 +96,5 @@ Prompts must treat these as hard rules, not preferences.
 ## Instructions
 
 - Follow domain guidelines.
-</file>
-</skill>
+  </file>
+  </skill>

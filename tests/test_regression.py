@@ -432,6 +432,47 @@ def test_execution_surface_routing_contract_is_documented() -> None:
     assert "generated `software-factory.code-workspace` surface" in instructions
 
 
+def test_mcp_first_tool_routing_guidance_is_documented() -> None:
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    prompt_skill = (
+        repo_root / ".copilot" / "skills" / "prompt-quality-baseline" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## 3. MCP-First Tool Routing" in instructions
+    assert (
+        "Broad terminal auto-approval settings do **not** change tool routing priority."
+        in instructions
+    )
+    assert (
+        "prefer the most specialized MCP server before generic terminal execution"
+        in instructions
+    )
+    assert "Use the bash gateway only for allowlisted script workflows" in instructions
+    assert "Treat generic terminal execution as a fallback-only path" in instructions
+
+    assert (
+        "When more than one MCP server or generic execution path could complete a task"
+        in prompt_skill
+    )
+    assert (
+        "Prefer the most specialized domain MCP server over generic servers and terminal/shell execution."
+        in prompt_skill
+    )
+    assert "it is not the" in prompt_skill
+    assert "default executor for arbitrary commands." in prompt_skill
+    assert (
+        "Treat generic terminal execution as a last-resort fallback only when no"
+        in prompt_skill
+    )
+    assert (
+        "auto-approve settings must not be treated as a reason to bypass MCP"
+        in prompt_skill
+    )
+
+
 def test_noninteractive_terminal_guidance_is_documented() -> None:
     repo_root = Path(__file__).parent.parent
     workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(

@@ -18,12 +18,19 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Explicitly check `docs/architecture/` before mutating or refactoring installation paths, namespaces (e.g., `.copilot` vs root rules), communication protocols, or directory boundaries.
 - Treat boundaries like the `.copilot` subsystem directory and workspace environmental constraints (`.tmp`, `.factory.env`) as immutable mature structures that the code must defensively adapt to, not things you can discard when convenient.
 
-## 3. Defensive and Resilient Coding
+## 3. MCP-First Tool Routing
+
+- Broad terminal auto-approval settings do **not** change tool routing priority.
+- When an available MCP server can satisfy the task, prefer the most specialized MCP server before generic terminal execution.
+- Use the bash gateway only for allowlisted script workflows or when no dedicated MCP capability exists; it is not the default executor for arbitrary commands.
+- Treat generic terminal execution as a fallback-only path when no suitable MCP tool can satisfy the task, not as a convenience shortcut.
+
+## 4. Defensive and Resilient Coding
 
 - Mature components expect hostile environments. Do not assume folders (like `.tmp`) haven't been deleted or that environment variables won't behave unexpectedly.
 - Write defensive code that seamlessly recovers from transient state loss (e.g., `mkdir -p` before acting) rather than failing the toolchain when things aren't "perfect".
 
-## 4. Release Bump Discipline
+## 5. Release Bump Discipline
 
 - Treat `VERSION` as the canonical release marker.
 - If you change `VERSION`, you must also update `CHANGELOG.md`, create or update the matching GitHub release notes file at `.github/releases/v<version>.md`, and refresh `manifests/release-manifest.json`.
