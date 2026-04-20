@@ -462,6 +462,28 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "heredoc-based Python command" in resolve_skill
 
 
+def test_chat_session_troubleshooting_report_records_program_closeout() -> None:
+    repo_root = Path(__file__).parent.parent
+    report = (repo_root / "docs" / "CHAT-SESSION-TROUBLESHOOTING-REPORT.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "# Chat session troubleshooting report" in report
+    assert "umbrella issue `#61`" in report
+    assert "Workflow drift and premature completion claims" in report
+    assert "Interruption recovery gaps" in report
+    assert "Wrong execution-surface choices" in report
+    assert "Non-interactive terminal and GitHub CLI traps" in report
+    assert "#62" in report
+    assert "#63" in report
+    assert "#64" in report
+    assert "#65" in report
+    assert "Final environment recheck on 2026-04-19" in report
+    assert "210 passed, 2 skipped" in report
+    assert "./.tmp/issue61_surface.out" in report
+    assert "scripts/noninteractive_gh.py" in report
+
+
 def test_setup_repo_doc_matches_current_ci_checks():
     repo_root = Path(__file__).parent.parent
     setup_doc = (repo_root / "docs" / "setup-github-repository.md").read_text(
