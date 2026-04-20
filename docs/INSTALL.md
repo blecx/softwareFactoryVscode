@@ -76,7 +76,19 @@ Before installation, verify you have the following installed on your local host:
 - `git`
 - `python3` (v3.10+ recommended)
 - `docker` and `docker compose`
-- VS Code (with the MCP/Copilot extensions if using the AI suite)
+- VS Code
+
+### VS Code AI setup by version
+
+For the AI-assisted workflow described in this repository:
+
+- **VS Code `1.116+`** — GitHub Copilot is built in, so no separate marketplace install is required for chat, inline suggestions, or agents.
+- **Older VS Code releases** — install the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) before using AI features.
+- **All versions** — sign in with a GitHub account that has Copilot access (paid plan or Copilot Free) before following the Copilot-driven workflow steps.
+- **GitHub Pull Requests and Issues** is optional. Install it only if you want GitHub PR/issue UI inside VS Code; it is not required for Copilot chat, inline suggestions, agents, or the generated workspace/runtime contract.
+- If `chat.disableAIFeatures` is enabled in VS Code, re-enable AI features before following the AI-driven workflow steps in this guide.
+
+These expectations follow the official [VS Code 1.116 release notes](https://code.visualstudio.com/updates/v1_116) and the [Set up GitHub Copilot in VS Code](https://code.visualstudio.com/docs/copilot/setup) documentation.
 
 ---
 

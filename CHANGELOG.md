@@ -9,7 +9,101 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Unreleased Summary
 
-No unreleased changes recorded yet after `2.4`.
+No unreleased changes recorded yet after `2.5`.
+
+## [2.5] — 2026-04-20
+
+### Summary for 2.5
+
+Release 2.5 closes the `ADR-008` shared-service promotion gate on `main`,
+hardens the day-two operator workflow, and refreshes the user-facing
+documentation for modern VS Code. The repository can now honestly describe
+`mcp-memory`, `mcp-agent-bus`, and `approval-gate` as fulfilled shared
+multi-tenant control-plane services on the default branch, while the practical
+per-workspace runtime remains the default supported operator path. The release
+also aligns README/operator docs with VS Code `1.116+`, where GitHub Copilot
+ships built in, and clarifies that older releases still need the GitHub
+Copilot extension while GitHub Pull Requests and Issues remains optional.
+
+### Added in 2.5
+
+- **Ordered issue queue guardrail** — `.github/hooks/github-issue-queue-guard.json`
+  and `scripts/github_issue_queue_guard.py` now require GitHub-truth
+  checkpoints in `.tmp/github-issue-queue-state.md` before unsafe
+  continue/merge/close flows.
+- **Interruption recovery workflow** — `scripts/capture_recovery_snapshot.py`,
+  `.github/prompts/resume-after-interruption.prompt.md`, and the matching skill
+  now create `.tmp/interruption-recovery-snapshot.md` with optional runtime
+  status.
+- **Execution-surface guard** — `scripts/workspace_surface_guard.py` and
+  updated VS Code tasks now route workspace-sensitive verify/update/runtime
+  flows through the generated-workspace contract instead of inventing a second
+  source-checkout runtime surface.
+- **Non-interactive GitHub helper** — `scripts/noninteractive_gh.py` plus
+  updated workflow docs and skills now provide safe issue/PR listing and
+  PR-check handling without hanging interactive terminals.
+- **Version-aware VS Code onboarding guidance** — `README.md`, `docs/INSTALL.md`,
+  `docs/HANDOUT.md`, and `docs/CHEAT_SHEET.md` now distinguish VS Code
+  `1.116+` built-in Copilot from older releases that still require the
+  extension, and they mark GitHub Pull Requests and Issues as optional.
+- **Todo-app regression contract** — `scripts/todo_app_regression.py` and new
+  tests add a reusable throwaway runtime regression surface for end-to-end
+  checks.
+
+### Fixed in 2.5
+
+- **Shared-mode tenant identity enforcement** — `mcp-memory`, `mcp-agent-bus`,
+  and `approval-gate` now reject ambiguous or mismatched tenant requests in
+  promoted shared mode while keeping explicit per-workspace compatibility paths
+  honest.
+- **Shared-service topology truth** — `scripts/factory_stack.py`,
+  `scripts/verify_factory_install.py`, and `scripts/factory_workspace.py` now
+  report shared versus per-workspace ownership and effective discovery URLs
+  truthfully through `preflight`, `status`, activation, and verification.
+- **Tenant-partitioned persistence and audit scope** — memory and agent-bus
+  storage now persist tenant identity on shared rows, label audit evidence by
+  tenant, and keep destructive admin/purge paths tenant-safe.
+- **Docker service-name FastMCP handshake** — shared FastMCP services now pass
+  the bind host into the constructor so Docker service-name `Host` headers are
+  no longer rejected by localhost-only validation.
+- **Local CI parity reporting** — `scripts/local_ci_parity.py` now reports
+  actionable findings and improvement plans instead of collapsing multiple
+  precheck failures into opaque output.
+
+### Changed in 2.5
+
+- **`ADR-008` rollout status language** — operator docs, architecture docs,
+  tests, and the release template now treat shared multi-tenant promotion as
+  fulfilled on `main` while keeping the practical per-workspace baseline as the
+  default supported operator path.
+- **Workflow hardening program closeout** — `docs/WORK-ISSUE-WORKFLOW.md`,
+  `docs/CHAT-SESSION-TROUBLESHOOTING-REPORT.md`, prompts, skills, and tasks now
+  align around ordered issue checkpoints, interruption recovery,
+  non-interactive GitHub flows, and execution-surface discipline.
+- **Editor onboarding contract** — repo docs now tie Copilot setup expectations
+  to VS Code version, GitHub sign-in, and optional PR tooling instead of
+  treating the Copilot extension as universally required.
+- **Regression depth** — expanded multi-tenant, install/runtime, workflow, and
+  documentation tests now lock the promoted shared-service contract and the
+  operator guardrails that support it.
+
+### Operational Notes for 2.5
+
+- The default supported operator path remains the namespace-first,
+  per-workspace runtime opened via `software-factory.code-workspace`.
+- Shared multi-tenant promotion is now fulfilled on the default branch for
+  `mcp-memory`, `mcp-agent-bus`, and `approval-gate`; future hardening can
+  continue without pretending the rollout is still open.
+- VS Code `1.116+` no longer needs a manual GitHub Copilot extension install
+  for the documented AI workflow, but older VS Code releases still do.
+- GitHub Pull Requests and Issues remains optional operator tooling rather than
+  a prerequisite for Copilot chat, inline suggestions, or agents.
+- Ordered issue progression, interruption recovery, and wrong-surface
+  prevention are now first-class workflow guardrails rather than informal chat
+  habits.
+- Release validation for 2.5 passed in the current repo state: Black, Flake8,
+  isort, `pytest tests/` (`211 passed, 2 skipped`),
+  `./tests/run-integration-test.sh`, and release-manifest parity.
 
 ## [2.4] — 2026-04-13
 

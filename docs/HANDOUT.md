@@ -19,6 +19,13 @@ The runtime contract behind that workspace is generated from:
 - `.copilot/softwareFactoryVscode/lock.json`
 - `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`
 
+## 🤖 AI feature setup by VS Code version
+
+- **VS Code `1.116+`** ships GitHub Copilot built in. Use the Copilot status item or Accounts menu to sign in and enable AI features.
+- **Older VS Code releases** still need the GitHub Copilot extension installed before the AI workflow in this handout will work.
+- **All versions** still require a GitHub account with Copilot access (paid plan or Copilot Free) for the default AI experience.
+- The **GitHub Pull Requests and Issues** extension is optional. Install it only if you want GitHub PR/issue UI inside VS Code; it is not required for Copilot chat, inline suggestions, or agents.
+
 ## 🛠 Golden path
 
 ### 1. Open the generated workspace
