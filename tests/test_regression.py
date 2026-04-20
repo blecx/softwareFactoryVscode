@@ -835,7 +835,9 @@ def test_mcp_runtime_manager_plan_is_explicitly_non_normative():
         in plan_doc
     )
     assert "#### Phase 4 tasks" in plan_doc
-    assert "## Recommended execution order for the next implementation stretch" in plan_doc
+    assert (
+        "## Recommended execution order for the next implementation stretch" in plan_doc
+    )
     assert "## Quality gates" in plan_doc
     assert "## First slice recommendation" in plan_doc
 
