@@ -369,6 +369,36 @@ def format_shared_mode_probe_failure(
     )
 
 
+def summarize_preflight_violations(
+    preflight_status: str,
+    preflight_recommended_action: str,
+    issues: list[str],
+) -> list[str]:
+    if preflight_recommended_action:
+        summary = (
+            "Runtime preflight reported "
+            f"`{preflight_status}` (recommended_action="
+            f"`{preflight_recommended_action}`)."
+        )
+    else:
+        summary = f"Runtime preflight reported `{preflight_status}`."
+    return [summary, *issues] if issues else [summary]
+
+
+def extract_preflight_contract(
+    preflight: dict[str, Any],
+) -> tuple[Any | None, Any | None]:
+    snapshot = preflight.get("snapshot")
+    readiness = preflight.get("readiness")
+    if readiness is None and snapshot is not None:
+        readiness = getattr(snapshot, "readiness", None)
+    return snapshot, readiness
+
+
+def normalize_contract_enum(value: Any) -> str:
+    return str(getattr(value, "value", value) or "")
+
+
 def check_factory_tree(target_dir: Path, violations: list[str]) -> Path | None:
     factory_dir = target_dir / bootstrap_host.FACTORY_DIRNAME
     if not factory_dir.is_dir():
@@ -694,19 +724,160 @@ def verify_runtime(
         env_file=env_path,
         workspace_file=workspace_file,
     )
-    preflight_status = str(preflight.get("status", "unknown"))
-    preflight_recommended_action = str(preflight.get("recommended_action", ""))
-    if preflight_status != "ready":
+    snapshot, readiness = extract_preflight_contract(preflight)
+    if readiness is not None:
+        preflight_status = normalize_contract_enum(getattr(readiness, "status", ""))
+        preflight_recommended_action = normalize_contract_enum(
+            getattr(readiness, "recommended_action", "")
+        )
+        issues = [
+            str(issue) for issue in getattr(readiness, "issues", ()) if str(issue)
+        ]
+    else:
+        preflight_status = str(preflight.get("status", "unknown"))
+        preflight_recommended_action = str(preflight.get("recommended_action", ""))
         issues = [str(issue) for issue in preflight.get("issues", []) if str(issue)]
-        if preflight_recommended_action:
-            summary = (
-                "Runtime preflight reported "
-                f"`{preflight_status}` (recommended_action="
-                f"`{preflight_recommended_action}`)."
+
+    if preflight_status != "ready":
+        return summarize_preflight_violations(
+            preflight_status,
+            preflight_recommended_action,
+            issues,
+        )
+
+    if snapshot is not None:
+        compose_project_name = str(getattr(snapshot, "compose_project_name", ""))
+        if not compose_project_name:
+            compose_project_name = env_values.get("COMPOSE_PROJECT_NAME", "")
+        if not compose_project_name:
+            return ["COMPOSE_PROJECT_NAME is missing or empty in .factory.env"]
+
+        shared_mode_diagnostics = (
+            dict(getattr(snapshot, "shared_mode_diagnostics", {}) or {})
+            if snapshot is not None
+            else {}
+        )
+        violations.extend(
+            build_shared_mode_expectation_violations(shared_mode_diagnostics)
+        )
+
+        snapshot_services = dict(getattr(snapshot, "services", {}) or {})
+
+        for service_name, metadata in RUNTIME_SERVICES.items():
+            service_record = snapshot_services.get(service_name)
+            if service_record is None:
+                violations.append(
+                    "Runtime snapshot is missing service record for "
+                    f"`{service_name}`."
+                )
+                continue
+
+            workspace_owned = bool(getattr(service_record, "workspace_owned", True))
+            probe_url = str(getattr(service_record, "probe_url", "")).strip()
+            if not workspace_owned:
+                if not probe_url:
+                    violations.append(
+                        "Shared-service topology is missing discovery for "
+                        f"`{service_name}`. Run `factory_stack.py preflight` "
+                        "to inspect the configured shared-service URLs."
+                    )
+                    continue
+
+                error = probe_http_url(
+                    probe_url,
+                    timeout=timeout,
+                    allow_http_error=bool(metadata.get("allow_http_error", False)),
+                )
+                if error:
+                    violations.append(
+                        format_shared_mode_probe_failure(
+                            service_name,
+                            error,
+                            shared_mode_diagnostics,
+                        )
+                    )
+                continue
+
+            service_status = normalize_contract_enum(
+                getattr(service_record, "status", "")
             )
-        else:
-            summary = f"Runtime preflight reported `{preflight_status}`."
-        return [summary, *issues] if issues else [summary]
+            docker_status = str(getattr(service_record, "docker_status", ""))
+            if service_status != "running":
+                details = [
+                    str(detail) for detail in getattr(service_record, "details", ())
+                ]
+                if details:
+                    violations.extend(details)
+                elif not docker_status:
+                    violations.append(
+                        "Required runtime service "
+                        f"`{service_name}` is not running for compose project "
+                        f"`{compose_project_name}`."
+                    )
+                elif (
+                    metadata["require_healthy_status"]
+                    and "healthy" not in docker_status.lower()
+                ):
+                    violations.append(
+                        "Runtime service "
+                        f"`{service_name}` is not healthy "
+                        f"(docker status: `{docker_status}`)."
+                    )
+                else:
+                    violations.append(
+                        "Runtime service "
+                        f"`{service_name}` is not reported as running "
+                        f"(docker status: `{docker_status}`)."
+                    )
+                continue
+
+            if probe_url:
+                error = probe_http_url(
+                    probe_url,
+                    timeout=timeout,
+                    allow_http_error=bool(metadata.get("allow_http_error", False)),
+                )
+                if error:
+                    violations.append(
+                        "Runtime endpoint probe failed for service "
+                        f"`{service_name}` at {probe_url}: {error}"
+                    )
+
+        if check_vscode_mcp:
+            expected_server_urls = {
+                name: str(url)
+                for name, url in getattr(
+                    snapshot, "expected_workspace_urls", {}
+                ).items()
+            }
+            server_urls = dict(getattr(snapshot, "workspace_urls", {}) or {})
+            if not server_urls:
+                server_urls = load_vscode_mcp_server_urls(target_dir, workspace_file)
+            if not server_urls:
+                violations.append(
+                    "Could not load VS Code MCP server URLs from "
+                    "the generated workspace file or canonical VS Code MCP config."
+                )
+            for server_name, url in server_urls.items():
+                expected_url = expected_server_urls.get(server_name)
+                if expected_url and expected_url != url:
+                    violations.append(
+                        "VS Code MCP endpoint drift detected for "
+                        f"`{server_name}` (expected `{expected_url}`, found `{url}`)."
+                    )
+
+                if not url.startswith("http://127.0.0.1") and not url.startswith(
+                    "http://localhost"
+                ):
+                    continue
+                error = probe_http_url(url, timeout=timeout, allow_http_error=True)
+                if error:
+                    violations.append(
+                        "VS Code MCP endpoint "
+                        f"`{server_name}` is not reachable at {url}: {error}"
+                    )
+
+        return violations
 
     runtime_manifest = load_runtime_manifest(target_dir)
     preflight_config = preflight.get("config")

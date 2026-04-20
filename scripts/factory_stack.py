@@ -16,8 +16,13 @@ from typing import Any, Sequence
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import factory_workspace
+
+from factory_runtime.mcp_runtime import MCPRuntimeManager, RuntimeLifecycleState
 
 DEFAULT_WAIT_TIMEOUT = 300
 DEFAULT_WORKSPACE_FILENAME = factory_workspace.DEFAULT_WORKSPACE_FILENAME
@@ -206,6 +211,77 @@ def build_expected_service_ports(
     return expected_ports
 
 
+def build_runtime_manager(
+    *,
+    workspace_file: str = DEFAULT_WORKSPACE_FILENAME,
+) -> MCPRuntimeManager:
+    return MCPRuntimeManager(
+        default_workspace_file=workspace_file,
+        docker_available_checker=lambda: shutil.which("docker") is not None,
+        service_inventory_loader=collect_service_inventory,
+    )
+
+
+def build_service_inventory_report(
+    snapshot: Any,
+) -> dict[str, dict[str, Any]]:
+    inventory: dict[str, dict[str, Any]] = {}
+    for service_name, service_record in snapshot.services.items():
+        inventory[service_name] = {
+            "status": service_record.docker_status,
+            "image": "",
+            "ports_text": "",
+            "published_ports": list(service_record.published_ports),
+        }
+    return inventory
+
+
+def build_preflight_report_from_snapshot(
+    config: factory_workspace.WorkspaceRuntimeConfig,
+    snapshot: Any,
+) -> dict[str, Any]:
+    readiness = snapshot.readiness
+    if readiness is None:
+        raise RuntimeError("Runtime snapshot did not include a readiness result.")
+
+    return {
+        "status": readiness.status.value,
+        "recommended_action": readiness.recommended_action.value,
+        "reason_codes": [code.value for code in readiness.reason_codes],
+        "issues": list(readiness.issues),
+        "blocking_services": list(readiness.blocking_services),
+        "config": config,
+        "workspace_urls": dict(snapshot.workspace_urls),
+        "manifest_server_urls": dict(snapshot.manifest_server_urls),
+        "manifest_health_urls": dict(snapshot.manifest_health_urls),
+        "expected_service_ports": dict(snapshot.expected_service_ports),
+        "service_inventory": build_service_inventory_report(snapshot),
+        "runtime_topology": dict(snapshot.runtime_topology),
+        "shared_mode_diagnostics": dict(snapshot.shared_mode_diagnostics),
+        "snapshot": snapshot,
+        "readiness": readiness,
+    }
+
+
+def resolve_status_runtime_state_from_snapshot(snapshot: Any) -> str:
+    persisted_state = snapshot.persisted_runtime_state.strip() or "installed"
+
+    if not snapshot.docker_available or snapshot.inventory_error:
+        return persisted_state
+
+    if snapshot.lifecycle_state == RuntimeLifecycleState.STARTING:
+        return "starting"
+    if snapshot.lifecycle_state == RuntimeLifecycleState.RUNNING:
+        return "running"
+    if snapshot.lifecycle_state == RuntimeLifecycleState.DEGRADED:
+        return "degraded"
+    if snapshot.lifecycle_state == RuntimeLifecycleState.STOPPED:
+        if persisted_state in {"installed", "failed"}:
+            return persisted_state
+        return "stopped"
+    return persisted_state
+
+
 def build_preflight_report(
     repo_root: Path,
     *,
@@ -216,186 +292,13 @@ def build_preflight_report(
     config = sync_workspace_runtime(
         repo_root, env_file=resolved_env_file, persist=False
     )
-    runtime_manifest = factory_workspace.load_json(config.runtime_manifest_path)
-    runtime_topology = factory_workspace.build_runtime_topology(config)
-    shared_mode_diagnostics = factory_workspace.build_shared_mode_diagnostics(config)
-    workspace_urls = load_workspace_server_urls(config.target_dir, workspace_file)
-    manifest_server_urls = {
-        name: str(data.get("url", ""))
-        for name, data in runtime_manifest.get("mcp_servers", {}).items()
-        if isinstance(data, dict)
-    }
-    manifest_health_urls = {
-        name: str(data.get("url", ""))
-        for name, data in runtime_manifest.get("runtime_health", {}).items()
-        if isinstance(data, dict)
-    }
-
-    expected_workspace_urls = config.mcp_server_urls
-    expected_health_urls = factory_workspace.build_runtime_health_urls_for_topology(
-        config
+    manager = build_runtime_manager(workspace_file=workspace_file)
+    snapshot = manager.build_snapshot(
+        repo_root,
+        env_file=resolved_env_file,
+        workspace_file=workspace_file,
     )
-    expected_service_ports = build_expected_service_ports(config)
-
-    alignment_issues: list[str] = []
-    for server_name, expected_url in sorted(expected_workspace_urls.items()):
-        workspace_url = workspace_urls.get(server_name, "")
-        if workspace_url != expected_url:
-            alignment_issues.append(
-                "Generated workspace MCP URL drift detected for "
-                f"`{server_name}` (expected `{expected_url}`, found `{workspace_url or 'missing'}`)."
-            )
-        manifest_url = manifest_server_urls.get(server_name, "")
-        if manifest_url != expected_url:
-            alignment_issues.append(
-                "Runtime manifest MCP URL drift detected for "
-                f"`{server_name}` (expected `{expected_url}`, found `{manifest_url or 'missing'}`)."
-            )
-
-    for service_name, expected_url in sorted(expected_health_urls.items()):
-        manifest_url = manifest_health_urls.get(service_name, "")
-        if manifest_url != expected_url:
-            alignment_issues.append(
-                "Runtime manifest health URL drift detected for "
-                f"`{service_name}` (expected `{expected_url}`, found `{manifest_url or 'missing'}`)."
-            )
-
-    docker_available = shutil.which("docker") is not None
-    service_inventory: dict[str, dict[str, Any]] = {}
-    if docker_available:
-        try:
-            service_inventory = collect_service_inventory(config.compose_project_name)
-        except subprocess.CalledProcessError as exc:
-            return {
-                "status": "docker-error",
-                "recommended_action": "inspect-docker",
-                "issues": [
-                    "Unable to inspect Docker runtime state for compose project "
-                    f"`{config.compose_project_name}`: {exc}`"
-                ],
-                "config": config,
-                "workspace_urls": workspace_urls,
-                "manifest_server_urls": manifest_server_urls,
-                "manifest_health_urls": manifest_health_urls,
-                "service_inventory": service_inventory,
-                "expected_service_ports": expected_service_ports,
-                "runtime_topology": runtime_topology,
-            }
-    else:
-        return {
-            "status": "docker-unavailable",
-            "recommended_action": "install-docker",
-            "issues": ["Docker CLI is not available on PATH."],
-            "config": config,
-            "workspace_urls": workspace_urls,
-            "manifest_server_urls": manifest_server_urls,
-            "manifest_health_urls": manifest_health_urls,
-            "service_inventory": service_inventory,
-            "expected_service_ports": expected_service_ports,
-            "runtime_topology": runtime_topology,
-        }
-
-    topology_issues = factory_workspace.validate_runtime_topology(config)
-    shared_mode_issues = factory_workspace.build_shared_mode_diagnostic_issues(config)
-    service_issues: list[str] = []
-    port_issues: list[str] = []
-    running_service_count = 0
-    all_expected_services = [
-        *factory_workspace.workspace_owned_runtime_services(config),
-        *WORKSPACE_SERVICE_PORT_KEYS.keys(),
-    ]
-    all_expected_service_names = sorted(set(all_expected_services))
-
-    if runtime_topology.get("mode") == factory_workspace.SHARED_TOPOLOGY_MODE:
-        for service_name in sorted(factory_workspace.PROMOTABLE_SHARED_SERVICES):
-            if service_inventory.get(service_name):
-                topology_issues.append(
-                    "Shared-service topology drift detected: promoted shared service "
-                    f"`{service_name}` is still instantiated inside workspace compose "
-                    f"project `{config.compose_project_name}`."
-                )
-
-    for service_name in all_expected_service_names:
-        service_entry = service_inventory.get(service_name)
-        if not service_entry:
-            service_issues.append(
-                "Expected runtime service is missing for compose project "
-                f"`{config.compose_project_name}`: `{service_name}`."
-            )
-            continue
-
-        status = str(service_entry.get("status", "")).strip().lower()
-        if "up" in status:
-            running_service_count += 1
-
-        metadata = factory_workspace.RUNTIME_SERVICE_CONTRACT.get(service_name)
-        requires_health = bool(metadata["require_healthy_status"] if metadata else True)
-        if "up" not in status:
-            service_issues.append(
-                "Runtime service "
-                f"`{service_name}` is not currently running "
-                f"(docker status: `{service_entry.get('status', '')}`)."
-            )
-        elif requires_health and "healthy" not in status:
-            service_issues.append(
-                "Runtime service "
-                f"`{service_name}` is running without a healthy status "
-                f"(docker status: `{service_entry.get('status', '')}`)."
-            )
-
-        expected_port = expected_service_ports.get(service_name)
-        published_ports = service_entry.get("published_ports", [])
-        if expected_port is not None and expected_port not in published_ports:
-            port_issues.append(
-                "Runtime service "
-                f"`{service_name}` is not published on expected host port "
-                f"`{expected_port}` (found `{published_ports or 'none'}`)."
-            )
-
-    if alignment_issues or port_issues or topology_issues or shared_mode_issues:
-        status = "config-drift"
-        recommended_action = (
-            "inspect-shared-topology"
-            if (topology_issues or shared_mode_issues)
-            and not alignment_issues
-            and not port_issues
-            else "re-bootstrap"
-        )
-        issues = [
-            *alignment_issues,
-            *port_issues,
-            *topology_issues,
-            *shared_mode_issues,
-        ]
-    elif running_service_count == 0:
-        status = "needs-ramp-up"
-        recommended_action = "start"
-        issues = [
-            "Runtime preflight detected no running containers for compose project "
-            f"`{config.compose_project_name}`. Infrastructure needs ramp-up via `factory_stack.py start`."
-        ]
-    elif service_issues:
-        status = "degraded"
-        recommended_action = "inspect"
-        issues = service_issues
-    else:
-        status = "ready"
-        recommended_action = "none"
-        issues = []
-
-    return {
-        "status": status,
-        "recommended_action": recommended_action,
-        "issues": issues,
-        "config": config,
-        "workspace_urls": workspace_urls,
-        "manifest_server_urls": manifest_server_urls,
-        "manifest_health_urls": manifest_health_urls,
-        "expected_service_ports": expected_service_ports,
-        "service_inventory": service_inventory,
-        "runtime_topology": runtime_topology,
-        "shared_mode_diagnostics": shared_mode_diagnostics,
-    }
+    return build_preflight_report_from_snapshot(config, snapshot)
 
 
 def print_preflight_report(report: dict[str, Any]) -> None:
@@ -445,6 +348,7 @@ def print_preflight_report(report: dict[str, Any]) -> None:
         )
     print(f"preflight_status={report['status']}")
     print(f"recommended_action={report['recommended_action']}")
+    print("reason_codes=" + ",".join(report.get("reason_codes", [])))
     print(f"issue_count={len(report['issues'])}")
 
     for service_name, service_topology in sorted(
@@ -923,30 +827,47 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
                     f"{config.factory_instance_id}"
                 )
 
-    docker_state_available = True
+    persisted_state = str(record.get("runtime_state", "installed"))
+    preflight: dict[str, Any] | None = None
     try:
-        running_services = collect_running_services(config.compose_project_name)
-    except subprocess.CalledProcessError as exc:
-        running_services = {}
-        docker_state_available = False
-        print(
-            "⚠️ Unable to inspect Docker runtime state for compose project "
-            f"`{config.compose_project_name}`: {exc}. "
-            "Preserving persisted runtime_state."
+        preflight = build_preflight_report(repo_root, env_file=resolved_env_file)
+    except RuntimeError as exc:
+        print("preflight_status=error")
+        print("recommended_action=inspect-registry")
+        print("reason_codes=")
+        print(f"preflight_error={exc}")
+        for name, url in sorted(config.mcp_server_urls.items()):
+            print(f"mcp.{name}={url}")
+        return 1
+
+    snapshot = preflight.get("snapshot") if isinstance(preflight, dict) else None
+    if snapshot is not None:
+        runtime_state = resolve_status_runtime_state_from_snapshot(snapshot)
+    else:
+        docker_state_available = True
+        try:
+            running_services = collect_running_services(config.compose_project_name)
+        except subprocess.CalledProcessError as exc:
+            running_services = {}
+            docker_state_available = False
+            print(
+                "⚠️ Unable to inspect Docker runtime state for compose project "
+                f"`{config.compose_project_name}`: {exc}. "
+                "Preserving persisted runtime_state."
+            )
+
+        inferred_state = infer_runtime_state_from_services(
+            running_services,
+            expected_runtime_services=factory_workspace.workspace_owned_runtime_services(
+                config
+            ),
+        )
+        runtime_state = resolve_status_runtime_state(
+            persisted_state,
+            inferred_state,
+            docker_state_available=docker_state_available,
         )
 
-    inferred_state = infer_runtime_state_from_services(
-        running_services,
-        expected_runtime_services=factory_workspace.workspace_owned_runtime_services(
-            config
-        ),
-    )
-    persisted_state = str(record.get("runtime_state", "installed"))
-    runtime_state = resolve_status_runtime_state(
-        persisted_state,
-        inferred_state,
-        docker_state_available=docker_state_available,
-    )
     if runtime_state != persisted_state and record_persisted:
         try:
             factory_workspace.update_runtime_state(
@@ -986,17 +907,9 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"factory_commit={head_commit}")
     print(f"lock_commit={lock_commit}")
     print(f"needs_rebuild={str(needs_rebuild).lower()}")
-    try:
-        preflight = build_preflight_report(repo_root, env_file=resolved_env_file)
-    except RuntimeError as exc:
-        print("preflight_status=error")
-        print("recommended_action=inspect-registry")
-        print(f"preflight_error={exc}")
-        for name, url in sorted(config.mcp_server_urls.items()):
-            print(f"mcp.{name}={url}")
-        return 1
     print(f"preflight_status={preflight['status']}")
     print(f"recommended_action={preflight['recommended_action']}")
+    print("reason_codes=" + ",".join(preflight.get("reason_codes", [])))
     preflight_topology = preflight.get("runtime_topology", {})
     shared_mode_diagnostics = preflight.get("shared_mode_diagnostics", {})
     if isinstance(preflight_topology, dict):
@@ -1029,7 +942,12 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
             "tenant_identity_header="
             f"{shared_mode_diagnostics.get('tenant_identity_header', '')}"
         )
-    for name, url in sorted(config.mcp_server_urls.items()):
+    effective_workspace_urls = (
+        snapshot.expected_workspace_urls
+        if snapshot is not None and getattr(snapshot, "expected_workspace_urls", None)
+        else config.mcp_server_urls
+    )
+    for name, url in sorted(effective_workspace_urls.items()):
         print(f"mcp.{name}={url}")
     return 0
 
