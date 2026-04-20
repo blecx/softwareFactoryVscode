@@ -531,6 +531,25 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     assert "groundwork` when they describe earlier repository states." in install_doc
     assert "advanced groundwork" in install_doc
     assert "final architecture/documentation review" in install_doc
+    assert "VS Code `1.116+`" in install_doc
+    assert "GitHub Copilot is built in" in install_doc
+    assert "Older VS Code releases" in install_doc
+    assert "GitHub Pull Requests and Issues" in install_doc
+    assert "chat.disableAIFeatures" in install_doc
+
+
+def test_readme_tracks_version_aware_copilot_setup():
+    repo_root = Path(__file__).parent.parent
+    readme = (repo_root / "README.md").read_text(encoding="utf-8")
+
+    assert "**Latest release:** `2.5`" in readme
+    assert ".github/releases/v2.5.md" in readme
+    assert "VS Code `1.116+`" in readme
+    assert "GitHub Copilot is built in" in readme
+    assert "Older VS Code releases" in readme
+    assert "Copilot Free" in readme
+    assert "GitHub Pull Requests and Issues extension" in readme
+    assert "not required for Copilot chat, inline suggestions, or agents" in readme
 
 
 def test_tests_readme_maps_practical_baseline_coverage_surfaces():
@@ -580,6 +599,8 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "automatically start the background task" not in handout
     assert "advanced groundwork" in handout
     assert "current default branch now meets this threshold" in handout
+    assert "VS Code `1.116+`" in handout
+    assert "GitHub Pull Requests and Issues" in handout
 
     assert "factory_stack.py activate" in cheat_sheet
     assert "factory_stack.py preflight" in cheat_sheet
@@ -591,6 +612,8 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "stale registry data" not in cheat_sheet
     assert "advanced groundwork" in cheat_sheet
     assert "current default branch now meets this threshold" in cheat_sheet
+    assert "VS Code `1.116+`" in cheat_sheet
+    assert "GitHub Pull Requests and Issues" in cheat_sheet
 
 
 def test_release_template_distinguishes_practical_vs_open_rollout_scope():

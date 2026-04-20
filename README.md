@@ -4,8 +4,8 @@ Welcome to the **Software Factory for VS Code**, a local, AI-powered development
 
 ## Current Release
 
-- **Latest release:** `2.4`
-- **Release notes for GitHub:** [`.github/releases/v2.4.md`](.github/releases/v2.4.md)
+- **Latest release:** `2.5`
+- **Release notes for GitHub:** [`.github/releases/v2.5.md`](.github/releases/v2.5.md)
 - **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)
 - **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 
@@ -37,15 +37,19 @@ The Software Factory is deeply integrated into VS Code to provide a frictionless
 
 To use the Software Factory, you need the following:
 
-- **Visual Studio Code** (latest version).
-- **GitHub Copilot extension** installed.
-- An active **GitHub Copilot subscription** OR GitHub Copilot configured with a **Custom LLM**.
+- **Visual Studio Code**. For the default AI experience documented here, VS Code `1.116+` is recommended because GitHub Copilot is built in as of that release.
+- A **GitHub account with GitHub Copilot access** (paid plan or Copilot Free) if you want chat, inline suggestions, or agents enabled.
+- _(Optional)_ The **GitHub Pull Requests and Issues** extension if you want GitHub PR/issue UI inside VS Code. It is not required for Copilot chat, inline suggestions, or agents.
 
 **Configuring Copilot for the Factory:**
 
-1. Install the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) from the VS Code Marketplace.
-2. Sign in with a GitHub account that holds an active Copilot subscription.
-3. _(Optional for Custom LLMs)_ If you prefer using a custom LLM instead of the default Copilot models, configure your VS Code settings (e.g., editing `github.copilot.advanced` in `settings.json` or using a compatible proxy extension) to point Copilot towards your custom endpoint.
+1. **VS Code `1.116+`** — GitHub Copilot is built in. Open the Copilot status item, choose `Use AI Features`, and sign in.
+2. **Older VS Code releases** — install the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) first, then sign in.
+3. Sign in with a GitHub account that has Copilot access. If you do not already have a paid plan, eligible users can be enrolled in **Copilot Free** during setup.
+4. _(Optional for custom endpoint/model setups)_ If your environment layers a custom endpoint on top of Copilot, configure `github.copilot.advanced` in `settings.json` or use a compatible proxy setup after sign-in.
+5. _(Optional)_ Install the [GitHub Pull Requests and Issues extension](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-pull-request-github) only if you want GitHub PR/issue UI inside VS Code. It is separate from Copilot and not required for the Factory's core AI workflows.
+
+For the official editor-side guidance behind this version split, see the [VS Code 1.116 release notes](https://code.visualstudio.com/updates/v1_116) and the [Copilot setup guide](https://code.visualstudio.com/docs/copilot/setup).
 
 ### Installation
 

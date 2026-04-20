@@ -14,6 +14,13 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
 - `🩺 Verify: Runtime Compliance + MCP` — runtime validation plus VS Code MCP endpoint checks
 - `✅ Validate: Factory Quality` — run repository lint/format checks
 
+## 🤖 AI setup quick note
+
+- **VS Code `1.116+`** — GitHub Copilot is built in; sign in and choose `Use AI Features`.
+- **Older VS Code releases** — install the GitHub Copilot extension first.
+- **All versions** — a GitHub account with Copilot access (paid plan or Copilot Free) is still required.
+- **GitHub Pull Requests and Issues** is optional and only needed for PR/issues UI inside VS Code.
+
 ## 💻 Lifecycle commands
 
 From the source checkout, use `scripts/factory_stack.py`.
