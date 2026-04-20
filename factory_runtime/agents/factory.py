@@ -17,7 +17,6 @@ Implements: GitHub issue #715
 
 from __future__ import annotations
 
-import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -30,6 +29,7 @@ from factory_runtime.agents.coder_agent import CoderAgent, CoderResult
 from factory_runtime.agents.mcp_client import MCPMultiClient
 from factory_runtime.agents.planner_agent import PlannerAgent
 from factory_runtime.agents.router_agent import RouterAgent, RoutingDecision
+from factory_runtime.mcp_runtime import MCPRuntimeManager, RuntimeProfileName
 
 # ---------------------------------------------------------------------------
 # Default server URLs (overridden by env or constructor arg)
@@ -43,10 +43,6 @@ _DEFAULT_SERVERS = {
     "mcp-filesystem": "http://localhost:3014",
 }
 
-_RUNTIME_MANIFEST_RELATIVE_PATH = Path(
-    ".copilot/softwareFactoryVscode/.tmp/runtime-manifest.json"
-)
-_RUNTIME_ENV_RELATIVE_PATH = Path(".copilot/softwareFactoryVscode/.factory.env")
 _RUNTIME_MANIFEST_SERVER_MAPPING: dict[str, tuple[str, str]] = {
     "mcp-memory": ("runtime_health", "mcp-memory"),
     "mcp-agent-bus": ("runtime_health", "mcp-agent-bus"),
@@ -54,44 +50,17 @@ _RUNTIME_MANIFEST_SERVER_MAPPING: dict[str, tuple[str, str]] = {
     "mcp-search": ("mcp_servers", "search"),
     "mcp-filesystem": ("mcp_servers", "filesystem"),
 }
+_RUNTIME_SERVER_ENV_MAPPING = {
+    "mcp-memory": "FACTORY_MEMORY_URL",
+    "mcp-agent-bus": "FACTORY_BUS_URL",
+    "mcp-github-ops": "FACTORY_GITHUB_URL",
+    "mcp-search": "FACTORY_SEARCH_URL",
+    "mcp-filesystem": "FACTORY_FILESYSTEM_URL",
+}
 
 
-def _candidate_runtime_manifest_paths(workspace_root: Path) -> list[Path]:
-    resolved_root = workspace_root.resolve()
-    candidates = [(resolved_root / _RUNTIME_MANIFEST_RELATIVE_PATH).resolve()]
-    if len(resolved_root.parents) > 1:
-        companion_manifest = (
-            resolved_root.parents[1] / _RUNTIME_MANIFEST_RELATIVE_PATH
-        ).resolve()
-        if companion_manifest not in candidates:
-            candidates.append(companion_manifest)
-    return candidates
-
-
-def _candidate_runtime_env_paths(workspace_root: Path) -> list[Path]:
-    resolved_root = workspace_root.resolve()
-    candidates = [(resolved_root / _RUNTIME_ENV_RELATIVE_PATH).resolve()]
-    if len(resolved_root.parents) > 1:
-        companion_env = (
-            resolved_root.parents[1] / _RUNTIME_ENV_RELATIVE_PATH
-        ).resolve()
-        if companion_env not in candidates:
-            candidates.append(companion_env)
-    return candidates
-
-
-def _parse_env_file(path: Path) -> dict[str, str]:
-    if not path.exists():
-        return {}
-
-    values: dict[str, str] = {}
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        values[key] = value
-    return values
+def _build_runtime_manager() -> MCPRuntimeManager:
+    return MCPRuntimeManager()
 
 
 def _load_workspace_id(workspace_root: Path) -> str | None:
@@ -99,72 +68,28 @@ def _load_workspace_id(workspace_root: Path) -> str | None:
     if env_workspace_id:
         return env_workspace_id
 
-    for manifest_path in _candidate_runtime_manifest_paths(workspace_root):
-        if not manifest_path.exists():
-            continue
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        project_workspace_id = str(manifest.get("project_workspace_id", "")).strip()
-        if project_workspace_id:
-            return project_workspace_id
-
-    for env_path in _candidate_runtime_env_paths(workspace_root):
-        values = _parse_env_file(env_path)
-        project_workspace_id = values.get("PROJECT_WORKSPACE_ID", "").strip()
-        if project_workspace_id:
-            return project_workspace_id
-
-    return None
+    return _build_runtime_manager().load_workspace_id(workspace_root)
 
 
 def _load_server_urls_from_runtime_manifest(workspace_root: Path) -> dict[str, str]:
-    """Load FACTORY MCP endpoints from the generated runtime manifest when present.
+    """Load FACTORY MCP endpoints from the manager-backed runtime accessors.
 
-    When invoked from the source checkout, fall back to the companion
-    installed-workspace manifest so direct orchestrator callers follow the same
-    canonical runtime contract as the bootloader-backed CLI path.
+    The manager owns source-checkout companion-runtime resolution and the
+    manifest/env fallback shim when a full runtime snapshot is not available.
     """
-    for manifest_path in _candidate_runtime_manifest_paths(workspace_root):
-        if not manifest_path.exists():
-            continue
-
-        try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-
-        server_urls: dict[str, str] = {}
-        for server_name, (
-            section_name,
-            runtime_name,
-        ) in _RUNTIME_MANIFEST_SERVER_MAPPING.items():
-            section = manifest.get(section_name, {})
-            entry = section.get(runtime_name, {}) if isinstance(section, dict) else {}
-            if isinstance(entry, dict):
-                url = str(entry.get("url", "")).strip()
-                if url:
-                    server_urls[server_name] = url
-        if server_urls:
-            return server_urls
-
-    return {}
+    return _build_runtime_manager().load_named_urls_from_workspace(
+        workspace_root,
+        _RUNTIME_MANIFEST_SERVER_MAPPING,
+        selected_profiles=(RuntimeProfileName.HARNESS_DEFAULT,),
+    )
 
 
 def _load_server_urls(workspace_root: Path | None = None) -> dict[str, str]:
     """Build server URLs from env, then runtime manifest, then legacy defaults."""
     resolved_root = (workspace_root or Path.cwd()).resolve()
     runtime_manifest_urls = _load_server_urls_from_runtime_manifest(resolved_root)
-    mapping = {
-        "mcp-memory": "FACTORY_MEMORY_URL",
-        "mcp-agent-bus": "FACTORY_BUS_URL",
-        "mcp-github-ops": "FACTORY_GITHUB_URL",
-        "mcp-search": "FACTORY_SEARCH_URL",
-        "mcp-filesystem": "FACTORY_FILESYSTEM_URL",
-    }
     result: dict[str, str] = {}
-    for name, env_key in mapping.items():
+    for name, env_key in _RUNTIME_SERVER_ENV_MAPPING.items():
         result[name] = os.environ.get(
             env_key,
             runtime_manifest_urls.get(name, _DEFAULT_SERVERS[name]),
