@@ -5423,6 +5423,89 @@ def test_verify_runtime_services_contract_is_shared() -> None:
     assert agent_worker["require_healthy_status"] is True
 
 
+def test_factory_orchestrator_uses_manager_backed_runtime_accessors(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    workspace_root = tmp_path / "target"
+    workspace_root.mkdir(parents=True, exist_ok=True)
+
+    class FakeRuntimeManager:
+        def __init__(self) -> None:
+            self.calls: list[tuple[Any, ...]] = []
+
+        def load_workspace_id(self, workspace_root_arg: Path) -> str | None:
+            self.calls.append(("load_workspace_id", workspace_root_arg))
+            return "manager-workspace"
+
+        def load_named_urls_from_workspace(
+            self,
+            workspace_root_arg: Path,
+            mappings: dict[str, tuple[str, str]],
+            *,
+            selected_profiles=None,
+        ) -> dict[str, str]:
+            normalized_profiles = tuple(
+                getattr(profile, "value", str(profile))
+                for profile in (selected_profiles or ())
+            )
+            self.calls.append(
+                (
+                    "load_named_urls_from_workspace",
+                    workspace_root_arg,
+                    tuple(sorted(mappings.keys())),
+                    normalized_profiles,
+                )
+            )
+            return {
+                "mcp-memory": "http://manager.example/memory",
+                "mcp-agent-bus": "http://manager.example/bus",
+                "mcp-github-ops": "http://manager.example/github",
+                "mcp-search": "http://manager.example/search",
+                "mcp-filesystem": "http://manager.example/filesystem",
+            }
+
+    fake_manager = FakeRuntimeManager()
+    monkeypatch.delenv("PROJECT_WORKSPACE_ID", raising=False)
+    monkeypatch.delenv("FACTORY_MEMORY_URL", raising=False)
+    monkeypatch.delenv("FACTORY_BUS_URL", raising=False)
+    monkeypatch.delenv("FACTORY_GITHUB_URL", raising=False)
+    monkeypatch.delenv("FACTORY_SEARCH_URL", raising=False)
+    monkeypatch.delenv("FACTORY_FILESYSTEM_URL", raising=False)
+    monkeypatch.setattr(
+        factory_agents,
+        "_build_runtime_manager",
+        lambda: fake_manager,
+    )
+
+    workspace_id = factory_agents._load_workspace_id(workspace_root)
+    server_urls = factory_agents._load_server_urls(workspace_root)
+
+    assert workspace_id == "manager-workspace"
+    assert server_urls == {
+        "mcp-memory": "http://manager.example/memory",
+        "mcp-agent-bus": "http://manager.example/bus",
+        "mcp-github-ops": "http://manager.example/github",
+        "mcp-search": "http://manager.example/search",
+        "mcp-filesystem": "http://manager.example/filesystem",
+    }
+    assert fake_manager.calls == [
+        ("load_workspace_id", workspace_root),
+        (
+            "load_named_urls_from_workspace",
+            workspace_root,
+            (
+                "mcp-agent-bus",
+                "mcp-filesystem",
+                "mcp-github-ops",
+                "mcp-memory",
+                "mcp-search",
+            ),
+            ("harness-default",),
+        ),
+    ]
+
+
 def test_devops_docker_compose_image_installs_docker_compose_plugin_on_debian() -> None:
     dockerfile = REPO_ROOT / "docker" / "mcp-devops-docker-compose" / "Dockerfile"
 
@@ -5508,69 +5591,104 @@ def test_factory_orchestrator_loads_companion_runtime_manifest_for_source_checko
     }
 
 
-def test_mcp_bootloader_uses_companion_env_when_workspace_is_source_repo(
+def test_mcp_bootloader_uses_manager_backed_snapshot_when_workspace_is_source_repo(
     tmp_path: Path, monkeypatch
 ) -> None:
     source_repo = tmp_path / "work" / "softwareFactoryVscode"
-    (source_repo / "scripts").mkdir(parents=True, exist_ok=True)
-    (source_repo / "scripts" / "factory_stack.py").write_text(
-        "# placeholder\n",
-        encoding="utf-8",
-    )
+    source_repo.mkdir(parents=True, exist_ok=True)
     companion_env = tmp_path / ".copilot" / "softwareFactoryVscode" / ".factory.env"
     companion_env.parent.mkdir(parents=True, exist_ok=True)
     companion_env.write_text("TARGET_WORKSPACE_PATH=/tmp/demo\n", encoding="utf-8")
 
-    report = {
-        "status": "ready",
-        "issues": [],
-        "manifest_server_urls": {
+    readiness = SimpleNamespace(
+        ready=True,
+        status=SimpleNamespace(value="ready"),
+        issues=(),
+    )
+    snapshot = SimpleNamespace(
+        readiness=readiness,
+        manifest_server_urls={
             "githubOps": "http://127.0.0.1:21818/mcp",
             "search": "http://127.0.0.1:21813/mcp",
             "filesystem": "http://127.0.0.1:21814/mcp",
         },
-        "manifest_health_urls": {
+        manifest_health_urls={
             "mcp-memory": "http://127.0.0.1:21830/mcp",
             "mcp-agent-bus": "http://127.0.0.1:21831/mcp",
         },
-    }
+    )
 
-    class FakeFactoryStack:
+    class FakeRuntimeManager:
         def __init__(self) -> None:
             self.calls: list[tuple[Any, ...]] = []
 
-        def resolve_env_file(self, repo_root: Path) -> Path:
-            self.calls.append(("resolve_env_file", repo_root))
+        def resolve_factory_repo_root(self, workspace_root: Path) -> Path:
+            self.calls.append(("resolve_factory_repo_root", workspace_root))
+            return source_repo.resolve()
+
+        def resolve_workspace_env_file(
+            self,
+            workspace_root: Path,
+            factory_repo_root: Path | None = None,
+        ) -> Path:
+            self.calls.append(
+                (
+                    "resolve_workspace_env_file",
+                    workspace_root,
+                    factory_repo_root,
+                )
+            )
             return companion_env.resolve()
 
-        def build_preflight_report(
-            self, repo_root: Path, *, env_file: Path | None = None
-        ) -> dict[str, Any]:
-            self.calls.append(("build_preflight_report", repo_root, env_file))
-            return report
+        def build_workspace_snapshot(
+            self,
+            workspace_root: Path,
+            *,
+            workspace_file: str | None = None,
+            selected_profiles=None,
+        ) -> Any:
+            normalized_profiles = tuple(
+                getattr(profile, "value", str(profile))
+                for profile in (selected_profiles or ())
+            )
+            self.calls.append(
+                (
+                    "build_workspace_snapshot",
+                    workspace_root,
+                    workspace_file,
+                    normalized_profiles,
+                )
+            )
+            return snapshot
 
-        def start_stack(self, *args: Any, **kwargs: Any) -> None:
-            raise AssertionError("ready runtime should not trigger start_stack")
+        def start(self, *args: Any, **kwargs: Any) -> None:
+            raise AssertionError("ready runtime should not trigger manager.start")
 
-        def stop_stack(self, *args: Any, **kwargs: Any) -> None:
+        def stop(self, *args: Any, **kwargs: Any) -> None:
             raise AssertionError("teardown is not part of this regression test")
 
-    fake_stack = FakeFactoryStack()
+    fake_manager = FakeRuntimeManager()
     bootloader = mcp_lifecycle.MCPBootloader(source_repo)
     monkeypatch.setattr(
         bootloader,
-        "_load_factory_stack_module",
-        lambda factory_repo_root: fake_stack,
+        "_build_runtime_manager",
+        lambda: fake_manager,
     )
 
     asyncio.run(bootloader.initialize())
 
-    assert fake_stack.calls == [
-        ("resolve_env_file", source_repo.resolve()),
+    assert fake_manager.calls == [
+        ("resolve_factory_repo_root", source_repo),
         (
-            "build_preflight_report",
+            "resolve_workspace_env_file",
+            source_repo,
             source_repo.resolve(),
-            companion_env.resolve(),
+        ),
+        (
+            "build_workspace_snapshot",
+            source_repo,
+            None,
+            ("harness-default",),
         ),
     ]
     assert bootloader.server_urls == {
