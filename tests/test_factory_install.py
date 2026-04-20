@@ -184,6 +184,7 @@ def create_source_factory_repo(path: Path) -> None:
     (path / "scripts").mkdir(parents=True, exist_ok=True)
     (path / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
     (path / "configs").mkdir(parents=True, exist_ok=True)
+    (path / "factory_runtime" / "mcp_runtime").mkdir(parents=True, exist_ok=True)
     (path / "manifests").mkdir(parents=True, exist_ok=True)
     (path / ".gitignore").write_text(
         ROOT_GITIGNORE.read_text(encoding="utf-8"),
@@ -217,6 +218,13 @@ def create_source_factory_repo(path: Path) -> None:
         FACTORY_WORKSPACE_SCRIPT.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
+    for runtime_file in ("__init__.py", "catalog.py", "manager.py", "models.py"):
+        (path / "factory_runtime" / "mcp_runtime" / runtime_file).write_text(
+            (REPO_ROOT / "factory_runtime" / "mcp_runtime" / runtime_file).read_text(
+                encoding="utf-8"
+            ),
+            encoding="utf-8",
+        )
     (path / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
         (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
             encoding="utf-8"
@@ -3703,6 +3711,10 @@ def test_factory_stack_preflight_detects_workspace_port_drift(
 
     assert report["status"] == "config-drift"
     assert report["recommended_action"] == "re-bootstrap"
+    assert report["reason_codes"] == ["workspace-url-drift"]
+    assert [code.value for code in report["readiness"].reason_codes] == [
+        "workspace-url-drift"
+    ]
     assert any(
         "Generated workspace MCP URL drift detected" in issue
         for issue in report["issues"]
@@ -3750,6 +3762,84 @@ def test_factory_stack_status_does_not_rewrite_custom_env(
     assert (target_repo / ".copilot/softwareFactoryVscode/.factory.env").read_text(
         encoding="utf-8"
     ) == custom_env
+
+
+def test_factory_stack_status_uses_manager_snapshot_for_runtime_truth(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(
+        factory_stack,
+        "get_factory_head_commit",
+        lambda _path: "deadbeef",
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should derive runtime truth from the manager-backed snapshot"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_service_inventory",
+        lambda _name: build_full_service_inventory(config),
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "runtime_state=running" in output
+    assert "preflight_status=ready" in output
 
 
 def test_deactivate_workspace_does_not_clear_another_active_workspace(
@@ -4163,6 +4253,94 @@ def test_verify_runtime_prefers_preflight_effective_ports_when_env_is_stale(
         f"http://127.0.0.1:{config.ports['APPROVAL_GATE_PORT']}/health" in probed_urls
     )
     assert f"http://127.0.0.1:{config.ports['PORT_TUI']}/admin/mocks" in probed_urls
+
+
+def test_verify_runtime_prefers_manager_snapshot_probe_urls(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    target_repo = tmp_path / "target-project"
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    factory_dir.mkdir(parents=True, exist_ok=True)
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    env_path.write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                f"FACTORY_DIR={factory_dir}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                "PORT_CONTEXT7=3010",
+                "MEMORY_MCP_PORT=3030",
+                "AGENT_BUS_PORT=3031",
+                "APPROVAL_GATE_PORT=8001",
+                "PORT_TUI=9090",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    readiness = SimpleNamespace(
+        status=SimpleNamespace(value="ready"),
+        recommended_action=SimpleNamespace(value="none"),
+        issues=(),
+        reason_codes=(),
+    )
+    services = {}
+    for service_name, metadata in verify_factory_install.RUNTIME_SERVICES.items():
+        probe_url = ""
+        if metadata["health_path"]:
+            probe_url = f"http://snapshot.example/{service_name}"
+        services[service_name] = SimpleNamespace(
+            workspace_owned=True,
+            status=SimpleNamespace(value="running"),
+            docker_status="Up 10 seconds (healthy)",
+            probe_url=probe_url,
+            details=(),
+        )
+
+    snapshot = SimpleNamespace(
+        compose_project_name="factory_target-project",
+        shared_mode_diagnostics={},
+        services=services,
+        expected_workspace_urls={},
+        workspace_urls={},
+        readiness=readiness,
+    )
+    probed_urls: list[str] = []
+
+    monkeypatch.setattr(
+        verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "recommended_action": "none",
+            "snapshot": snapshot,
+            "readiness": readiness,
+        },
+    )
+    monkeypatch.setattr(
+        verify_factory_install,
+        "probe_http_url",
+        lambda url, timeout, allow_http_error: probed_urls.append(url) or None,
+    )
+
+    violations = verify_factory_install.verify_runtime(
+        target_repo,
+        workspace_file="software-factory.code-workspace",
+        timeout=1.0,
+        check_vscode_mcp=False,
+    )
+
+    assert violations == []
+    assert probed_urls
+    assert all(url.startswith("http://snapshot.example/") for url in probed_urls)
+    assert "http://127.0.0.1:3030/mcp" not in probed_urls
 
 
 def test_verify_runtime_reports_preflight_status_and_action_for_drift(
