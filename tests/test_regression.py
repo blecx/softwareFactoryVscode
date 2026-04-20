@@ -807,6 +807,39 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
     assert "Only after the rollout criteria are verified" in plan_doc
 
 
+def test_mcp_runtime_manager_plan_is_explicitly_non_normative():
+    repo_root = Path(__file__).parent.parent
+    plan_doc = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## Status" in plan_doc
+    assert "Proposed sequencing plan" in plan_doc
+    assert "implementation plan, not an ADR" in plan_doc
+    assert "Per `ADR-013`" in plan_doc
+    assert "Per `ADR-014`" in plan_doc
+    assert "MUST NOT be cited as a competing architecture source" in plan_doc
+    assert "## Execution guardrails" in plan_doc
+    assert "## Target module layout for the first implementation" in plan_doc
+    assert "### Phase 1: Establish the manager package and contract" in plan_doc
+    assert "#### Phase 1 tasks" in plan_doc
+    assert "### Phase 2: Move runtime truth behind the manager" in plan_doc
+    assert "#### Phase 2 tasks" in plan_doc
+    assert "### Phase 3: Remove runtime authority from the harness layer" in plan_doc
+    assert "#### Phase 3 tasks" in plan_doc
+    assert (
+        "### Phase 4: Land the bounded repair and cleanup/delete-runtime baseline"
+        in plan_doc
+    )
+    assert "#### Phase 4 tasks" in plan_doc
+    assert "## Recommended execution order for the next implementation stretch" in plan_doc
+    assert "## Quality gates" in plan_doc
+    assert "## First slice recommendation" in plan_doc
+
+
 def test_bash_gateway_default_policy_matches_profile_schema():
     repo_root = Path(__file__).parent.parent
     policy_path = repo_root / "configs" / "bash_gateway_policy.default.yml"
