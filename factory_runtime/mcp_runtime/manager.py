@@ -16,7 +16,7 @@ import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
@@ -59,9 +59,15 @@ class MCPRuntimeManager:
         *,
         registry_path: Path | None = None,
         default_workspace_file: str = factory_workspace.DEFAULT_WORKSPACE_FILENAME,
+        docker_available_checker: Callable[[], bool] | None = None,
+        service_inventory_loader: (
+            Callable[[str], dict[str, dict[str, Any]]] | None
+        ) = None,
     ) -> None:
         self._registry_path = registry_path
         self._default_workspace_file = default_workspace_file
+        self._docker_available_checker = docker_available_checker
+        self._service_inventory_loader = service_inventory_loader
 
     def load_catalog(self) -> RuntimeCatalog:
         return build_catalog()
@@ -330,10 +336,33 @@ class MCPRuntimeManager:
                 continue
             if service_record.status == ServiceInstanceStatus.EXTERNAL:
                 continue
-            if service_record.reason_codes:
+            config_drift_reason_codes = [
+                reason_code
+                for reason_code in service_record.reason_codes
+                if reason_code
+                in {
+                    ReasonCode.SHARED_MODE_WORKSPACE_DUPLICATE,
+                    ReasonCode.SERVICE_PORT_MISMATCH,
+                }
+            ]
+            service_reason_codes = [
+                reason_code
+                for reason_code in service_record.reason_codes
+                if reason_code not in config_drift_reason_codes
+            ]
+
+            if config_drift_reason_codes:
                 blocking_services.append(service_name)
-                service_codes.extend(service_record.reason_codes)
-            if service_record.details:
+                config_drift_codes.extend(config_drift_reason_codes)
+                if service_record.details:
+                    config_drift_issues.extend(service_record.details)
+
+            if service_reason_codes:
+                blocking_services.append(service_name)
+                service_codes.extend(service_reason_codes)
+                if service_record.details:
+                    service_issues.extend(service_record.details)
+            elif service_record.details and not config_drift_reason_codes:
                 service_issues.extend(service_record.details)
 
         config_issue_codes = set(config_drift_codes)
@@ -481,12 +510,17 @@ class MCPRuntimeManager:
         return repo_root.resolve()
 
     def _docker_available(self) -> bool:
+        if self._docker_available_checker is not None:
+            return bool(self._docker_available_checker())
         return shutil.which("docker") is not None
 
     def _collect_service_inventory(
         self,
         compose_project_name: str,
     ) -> dict[str, dict[str, Any]]:
+        if self._service_inventory_loader is not None:
+            return self._service_inventory_loader(compose_project_name)
+
         result = subprocess.run(
             [
                 "docker",
