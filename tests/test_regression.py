@@ -732,6 +732,7 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
         in architecture_doc
     )
     assert "activate` refreshes generated runtime artifacts" in architecture_doc
+    assert "clear stale selection-lease metadata" in architecture_doc
     assert (
         "satisfies those rules for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`"
         in architecture_doc

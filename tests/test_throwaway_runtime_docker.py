@@ -747,3 +747,219 @@ def test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks
                 text=True,
                 check=False,
             )
+
+
+@pytest.mark.docker
+@pytest.mark.skipif(
+    os.getenv("RUN_DOCKER_E2E", "0") != "1",
+    reason="Set RUN_DOCKER_E2E=1 to run Docker-enabled throwaway runtime E2E tests.",
+)
+def test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace(
+    tmp_path: Path,
+) -> None:
+    if not _docker_ready():
+        pytest.skip("Docker CLI is not available on PATH.")
+
+    target_repo_a = tmp_path / "throwaway-target-a"
+    target_repo_b = tmp_path / "throwaway-target-b"
+    registry_path = tmp_path / "registry.json"
+
+    env = os.environ.copy()
+    env["SOFTWARE_FACTORY_REGISTRY_PATH"] = str(registry_path)
+
+    repo_root_a = target_repo_a / ".copilot/softwareFactoryVscode"
+    repo_root_b = target_repo_b / ".copilot/softwareFactoryVscode"
+    env_path_a = repo_root_a / ".factory.env"
+    env_path_b = repo_root_b / ".factory.env"
+
+    try:
+        for target_repo in (target_repo_a, target_repo_b):
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(VALIDATE_THROWAWAY_SCRIPT),
+                    "--target",
+                    str(target_repo),
+                    "--skip-runtime",
+                    "--skip-source-stack-handoff",
+                    "--allow-external-target",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                text=True,
+                check=True,
+            )
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "activate",
+                "--repo-root",
+                str(repo_root_a),
+                "--env-file",
+                str(env_path_a),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "start",
+                "--repo-root",
+                str(repo_root_a),
+                "--env-file",
+                str(env_path_a),
+                "--build",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "activate",
+                "--repo-root",
+                str(repo_root_b),
+                "--env-file",
+                str(env_path_b),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "start",
+                "--repo-root",
+                str(repo_root_b),
+                "--env-file",
+                str(env_path_b),
+                "--build",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        manifest_a = json.loads(
+            (repo_root_a / ".tmp" / "runtime-manifest.json").read_text(encoding="utf-8")
+        )
+        manifest_b = json.loads(
+            (repo_root_b / ".tmp" / "runtime-manifest.json").read_text(encoding="utf-8")
+        )
+        context7_url_a = manifest_a["mcp_servers"]["context7"]["url"]
+        context7_url_b = manifest_b["mcp_servers"]["context7"]["url"]
+
+        assert _wait_until_reachable(context7_url_a)
+        assert _wait_until_reachable(context7_url_b)
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "activate",
+                "--repo-root",
+                str(repo_root_a),
+                "--env-file",
+                str(env_path_a),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        status_a = subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "status",
+                "--repo-root",
+                str(repo_root_a),
+                "--env-file",
+                str(env_path_a),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        status_b = subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "status",
+                "--repo-root",
+                str(repo_root_b),
+                "--env-file",
+                str(env_path_b),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        workspace_a = json.loads(
+            (target_repo_a / "software-factory.code-workspace").read_text(
+                encoding="utf-8"
+            )
+        )
+        workspace_b = json.loads(
+            (target_repo_b / "software-factory.code-workspace").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        assert registry["active_workspace"] == manifest_a["factory_instance_id"]
+        assert "active=true" in status_a.stdout
+        assert "active=false" in status_b.stdout
+        assert f"mcp.context7={context7_url_a}" in status_a.stdout
+        assert f"mcp.context7={context7_url_b}" in status_b.stdout
+        assert (
+            workspace_a["settings"]["mcp"]["servers"]["context7"]["url"]
+            == context7_url_a
+        )
+        assert (
+            workspace_b["settings"]["mcp"]["servers"]["context7"]["url"]
+            == context7_url_b
+        )
+        assert context7_url_a != context7_url_b
+    finally:
+        for repo_root, env_path in (
+            (repo_root_b, env_path_b),
+            (repo_root_a, env_path_a),
+        ):
+            if env_path.exists() and repo_root.exists():
+                subprocess.run(
+                    [
+                        sys.executable,
+                        str(FACTORY_STACK_SCRIPT),
+                        "stop",
+                        "--repo-root",
+                        str(repo_root),
+                        "--env-file",
+                        str(env_path),
+                        "--remove-volumes",
+                    ],
+                    cwd=REPO_ROOT,
+                    env=env,
+                    text=True,
+                    check=False,
+                )

@@ -711,6 +711,45 @@ def test_manager_build_snapshot_exposes_resume_unsafe_recovery_metadata(
     assert snapshot.recovery.repair_failure_count == 1
 
 
+def test_manager_build_snapshot_does_not_infer_activity_lease_from_history(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    registry["active_workspace"] = ""
+    registry["workspaces"][config.factory_instance_id][
+        "last_activated_at"
+    ] = "2026-04-21T09:00:00Z"
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+
+    assert snapshot.selection.active is False
+    assert snapshot.selection.activity_lease is not None
+    assert snapshot.selection.activity_lease.present is False
+    assert snapshot.selection.activity_lease.renewed_at == "2026-04-21T09:00:00Z"
+
+
 def test_manager_build_snapshot_surfaces_manual_recovery_requirement(
     tmp_path: Path,
     monkeypatch,
