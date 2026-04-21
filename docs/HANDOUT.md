@@ -71,6 +71,8 @@ After startup, you can run:
 - `python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target . --runtime`
 - `python3 .copilot/softwareFactoryVscode/scripts/verify_factory_install.py --target . --runtime --check-vscode-mcp`
 
+These verifier commands use the same manager-backed readiness vocabulary as `preflight` and `status`. Any extra endpoint probes are additive evidence only, so the verifier can deepen the diagnosis without inventing a second runtime-truth authority.
+
 ## 🧠 Service model in plain English
 
 The runtime currently uses a hybrid model:

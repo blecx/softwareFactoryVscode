@@ -182,6 +182,65 @@ def stub_runtime_manager_with_successful_probes(
     )
 
 
+def build_snapshot_service_record(
+    *,
+    workspace_owned: bool = True,
+    status: str = "running",
+    docker_status: str = "Up 10 seconds (healthy)",
+    probe_url: str = "",
+    details: tuple[str, ...] = (),
+) -> Any:
+    return SimpleNamespace(
+        workspace_owned=workspace_owned,
+        status=SimpleNamespace(value=status),
+        docker_status=docker_status,
+        probe_url=probe_url,
+        details=details,
+    )
+
+
+def build_runtime_snapshot_contract(
+    *,
+    lifecycle_state: Any | None = None,
+    persisted_runtime_state: str = "running",
+    readiness_status: str = "ready",
+    recommended_action: str = "none",
+    ready: bool = True,
+    reason_codes: tuple[str, ...] = (),
+    issues: tuple[str, ...] = (),
+    compose_project_name: str = "factory_target-project",
+    shared_mode_diagnostics: dict[str, Any] | None = None,
+    workspace_urls: dict[str, str] | None = None,
+    expected_workspace_urls: dict[str, str] | None = None,
+    manifest_server_urls: dict[str, str] | None = None,
+    manifest_health_urls: dict[str, str] | None = None,
+    services: dict[str, Any] | None = None,
+    docker_available: bool = True,
+    inventory_error: str | None = None,
+) -> Any:
+    readiness = SimpleNamespace(
+        ready=ready,
+        status=SimpleNamespace(value=readiness_status),
+        recommended_action=SimpleNamespace(value=recommended_action),
+        issues=tuple(issues),
+        reason_codes=tuple(reason_codes),
+    )
+    return SimpleNamespace(
+        readiness=readiness,
+        persisted_runtime_state=persisted_runtime_state,
+        docker_available=docker_available,
+        inventory_error=inventory_error,
+        lifecycle_state=lifecycle_state or factory_stack.RuntimeLifecycleState.RUNNING,
+        compose_project_name=compose_project_name,
+        shared_mode_diagnostics=shared_mode_diagnostics or {},
+        workspace_urls=workspace_urls or {},
+        expected_workspace_urls=expected_workspace_urls or {},
+        manifest_server_urls=manifest_server_urls or {},
+        manifest_health_urls=manifest_health_urls or {},
+        services=services or {},
+    )
+
+
 def init_git_repo(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     git("init", cwd=path)
@@ -2857,7 +2916,11 @@ def test_factory_stack_status_demotes_running_workspace_to_stopped_when_services
     monkeypatch.setattr(
         factory_stack,
         "collect_running_services",
-        lambda compose_project_name: {},
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should not re-infer runtime truth when preflight already provides a snapshot"
+            )
+        ),
     )
     monkeypatch.setattr(
         factory_stack,
@@ -2865,6 +2928,13 @@ def test_factory_stack_status_demotes_running_workspace_to_stopped_when_services
         lambda *_args, **_kwargs: {
             "status": "needs-ramp-up",
             "recommended_action": "start",
+            "snapshot": build_runtime_snapshot_contract(
+                lifecycle_state=factory_stack.RuntimeLifecycleState.STOPPED,
+                persisted_runtime_state="running",
+                readiness_status="needs-ramp-up",
+                recommended_action="start",
+                ready=False,
+            ),
         },
     )
 
@@ -2916,7 +2986,11 @@ def test_factory_stack_status_preserves_failed_state_when_services_missing(
     monkeypatch.setattr(
         factory_stack,
         "collect_running_services",
-        lambda compose_project_name: {},
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should not re-infer runtime truth when preflight already provides a snapshot"
+            )
+        ),
     )
     monkeypatch.setattr(
         factory_stack,
@@ -2924,6 +2998,13 @@ def test_factory_stack_status_preserves_failed_state_when_services_missing(
         lambda *_args, **_kwargs: {
             "status": "needs-ramp-up",
             "recommended_action": "start",
+            "snapshot": build_runtime_snapshot_contract(
+                lifecycle_state=factory_stack.RuntimeLifecycleState.STOPPED,
+                persisted_runtime_state="failed",
+                readiness_status="needs-ramp-up",
+                recommended_action="start",
+                ready=False,
+            ),
         },
     )
 
@@ -2978,7 +3059,11 @@ def test_factory_stack_status_recovers_missing_registry_record(
     monkeypatch.setattr(
         factory_stack,
         "collect_running_services",
-        lambda compose_project_name: {},
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should not re-infer runtime truth when preflight already provides a snapshot"
+            )
+        ),
     )
     monkeypatch.setattr(
         factory_stack,
@@ -2986,6 +3071,13 @@ def test_factory_stack_status_recovers_missing_registry_record(
         lambda *_args, **_kwargs: {
             "status": "needs-ramp-up",
             "recommended_action": "start",
+            "snapshot": build_runtime_snapshot_contract(
+                lifecycle_state=factory_stack.RuntimeLifecycleState.STOPPED,
+                persisted_runtime_state="installed",
+                readiness_status="needs-ramp-up",
+                recommended_action="start",
+                ready=False,
+            ),
         },
     )
 
@@ -3998,6 +4090,70 @@ def test_factory_stack_status_uses_manager_snapshot_for_runtime_truth(
     assert "preflight_status=ready" in output
 
 
+def test_factory_stack_status_fails_closed_without_manager_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "CONTEXT7_API_KEY=test-context7-key\n",
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should fail closed before trying a Docker-side fallback"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "recommended_action": "none",
+            "issues": [],
+        },
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 1
+    assert "preflight_status=error" in output
+    assert "manager-backed snapshot" in output
+
+
 def test_deactivate_workspace_does_not_clear_another_active_workspace(
     tmp_path: Path,
     monkeypatch,
@@ -4277,107 +4433,27 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
     assert "http://127.0.0.1:3211/mcp" in probed_urls
 
 
-def test_verify_runtime_prefers_preflight_effective_ports_when_env_is_stale(
+def test_verify_runtime_requires_manager_snapshot_contract_when_preflight_is_ready(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    registry_path = tmp_path / "registry.json"
-    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
-    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
-
     target_repo = tmp_path / "target-project"
     factory_dir = target_repo / ".copilot/softwareFactoryVscode"
     factory_dir.mkdir(parents=True, exist_ok=True)
-    (factory_dir / ".git").mkdir(parents=True, exist_ok=True)
-    (factory_dir / "scripts").mkdir(parents=True, exist_ok=True)
-    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
-    (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
-    for script_name in (
-        "factory_release.py",
-        "factory_update.py",
-        "install_factory.py",
-        "bootstrap_host.py",
-        "verify_factory_install.py",
-    ):
-        (factory_dir / "scripts" / script_name).write_text("# stub\n", encoding="utf-8")
-    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
-        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
-            encoding="utf-8"
-        ),
-        encoding="utf-8",
-    )
-    (factory_dir / "configs" / "bash_gateway_policy.default.yml").write_text(
-        (REPO_ROOT / "configs" / "bash_gateway_policy.default.yml").read_text(
-            encoding="utf-8"
-        ),
-        encoding="utf-8",
-    )
-
-    non_default_env = "\n".join(
-        [
-            f"TARGET_WORKSPACE_PATH={target_repo}",
-            f"PROJECT_WORKSPACE_ID={target_repo.name}",
-            f"COMPOSE_PROJECT_NAME=factory_{target_repo.name}",
-            f"FACTORY_DIR={factory_dir}",
-            "FACTORY_INSTANCE_ID=factory-custom",
-            "FACTORY_PORT_INDEX=2",
-            "PORT_CONTEXT7=3210",
-            "PORT_BASH=3211",
-            "PORT_FS=3212",
-            "PORT_GIT=3213",
-            "PORT_SEARCH=3214",
-            "PORT_TEST=3215",
-            "PORT_COMPOSE=3216",
-            "PORT_DOCS=3217",
-            "PORT_GITHUB=3218",
-            "MEMORY_MCP_PORT=3230",
-            "AGENT_BUS_PORT=3231",
-            "APPROVAL_GATE_PORT=8201",
-            "PORT_TUI=9290",
-            "CONTEXT7_API_KEY=",
-            "",
-        ]
-    )
     env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
-    env_path.write_text(non_default_env, encoding="utf-8")
-
-    config = factory_workspace.build_runtime_config(
-        target_repo, factory_dir=factory_dir
+    env_path.write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                f"FACTORY_DIR={factory_dir}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                "CONTEXT7_API_KEY=",
+                "",
+            ]
+        ),
+        encoding="utf-8",
     )
-    factory_workspace.sync_runtime_artifacts(
-        config,
-        runtime_state="running",
-        active=False,
-    )
-
-    stale_env = "\n".join(
-        [
-            f"TARGET_WORKSPACE_PATH={target_repo}",
-            f"PROJECT_WORKSPACE_ID={target_repo.name}",
-            f"COMPOSE_PROJECT_NAME=factory_{target_repo.name}",
-            f"FACTORY_DIR={factory_dir}",
-            f"FACTORY_INSTANCE_ID={config.factory_instance_id}",
-            "FACTORY_PORT_INDEX=0",
-            "PORT_CONTEXT7=3010",
-            "PORT_BASH=3011",
-            "PORT_FS=3012",
-            "PORT_GIT=3013",
-            "PORT_SEARCH=3014",
-            "PORT_TEST=3015",
-            "PORT_COMPOSE=3016",
-            "PORT_DOCS=3017",
-            "PORT_GITHUB=3018",
-            "MEMORY_MCP_PORT=3030",
-            "AGENT_BUS_PORT=3031",
-            "APPROVAL_GATE_PORT=8001",
-            "PORT_TUI=9090",
-            "CONTEXT7_API_KEY=",
-            "",
-        ]
-    )
-    env_path.write_text(stale_env, encoding="utf-8")
-
-    probed_urls: list[str] = []
 
     monkeypatch.setattr(
         verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
@@ -4389,15 +4465,16 @@ def test_verify_runtime_prefers_preflight_effective_ports_when_env_is_stale(
             "status": "ready",
             "recommended_action": "none",
             "issues": [],
-            "config": config,
-            "workspace_urls": config.mcp_server_urls,
-            "service_inventory": build_full_service_inventory(config),
         },
     )
     monkeypatch.setattr(
         verify_factory_install,
         "probe_http_url",
-        lambda url, timeout, allow_http_error: probed_urls.append(url) or None,
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError(
+                "verify_runtime should fail closed before running additive probes when the snapshot contract is missing"
+            )
+        ),
     )
 
     violations = verify_factory_install.verify_runtime(
@@ -4407,13 +4484,10 @@ def test_verify_runtime_prefers_preflight_effective_ports_when_env_is_stale(
         check_vscode_mcp=False,
     )
 
-    assert violations == []
-    assert f"http://127.0.0.1:{config.ports['MEMORY_MCP_PORT']}/mcp" in probed_urls
-    assert f"http://127.0.0.1:{config.ports['AGENT_BUS_PORT']}/mcp" in probed_urls
-    assert (
-        f"http://127.0.0.1:{config.ports['APPROVAL_GATE_PORT']}/health" in probed_urls
-    )
-    assert f"http://127.0.0.1:{config.ports['PORT_TUI']}/admin/mocks" in probed_urls
+    assert violations == [
+        "Runtime preflight reported `ready` but did not provide a manager-backed "
+        "snapshot, so runtime verification cannot continue authoritatively."
+    ]
 
 
 def test_verify_runtime_prefers_manager_snapshot_probe_urls(
@@ -4443,32 +4517,17 @@ def test_verify_runtime_prefers_manager_snapshot_probe_urls(
         encoding="utf-8",
     )
 
-    readiness = SimpleNamespace(
-        status=SimpleNamespace(value="ready"),
-        recommended_action=SimpleNamespace(value="none"),
-        issues=(),
-        reason_codes=(),
-    )
     services = {}
     for service_name, metadata in verify_factory_install.RUNTIME_SERVICES.items():
         probe_url = ""
         if metadata["health_path"]:
             probe_url = f"http://snapshot.example/{service_name}"
-        services[service_name] = SimpleNamespace(
-            workspace_owned=True,
-            status=SimpleNamespace(value="running"),
-            docker_status="Up 10 seconds (healthy)",
+        services[service_name] = build_snapshot_service_record(
             probe_url=probe_url,
-            details=(),
         )
 
-    snapshot = SimpleNamespace(
-        compose_project_name="factory_target-project",
-        shared_mode_diagnostics={},
+    snapshot = build_runtime_snapshot_contract(
         services=services,
-        expected_workspace_urls={},
-        workspace_urls={},
-        readiness=readiness,
     )
     probed_urls: list[str] = []
 
@@ -4482,7 +4541,7 @@ def test_verify_runtime_prefers_manager_snapshot_probe_urls(
             "status": "ready",
             "recommended_action": "none",
             "snapshot": snapshot,
-            "readiness": readiness,
+            "readiness": snapshot.readiness,
         },
     )
     monkeypatch.setattr(
@@ -4535,6 +4594,7 @@ def test_verify_runtime_reports_preflight_status_and_action_for_drift(
         lambda *_args, **_kwargs: {
             "status": "config-drift",
             "recommended_action": "re-bootstrap",
+            "reason_codes": ["workspace-url-drift"],
             "issues": [
                 (
                     "Generated workspace MCP URL drift detected for `context7` "
@@ -4555,8 +4615,8 @@ def test_verify_runtime_reports_preflight_status_and_action_for_drift(
     )
 
     assert (
-        violations[0]
-        == "Runtime preflight reported `config-drift` (recommended_action=`re-bootstrap`)."
+        violations[0] == "Runtime preflight reported `config-drift` "
+        "(recommended_action=`re-bootstrap`). reason_codes=`workspace-url-drift`."
     )
     assert any(
         "Generated workspace MCP URL drift detected" in violation
@@ -4568,10 +4628,6 @@ def test_verify_runtime_uses_shared_service_discovery_when_shared_mode_enabled(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    registry_path = tmp_path / "registry.json"
-    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
-    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
-
     target_repo = tmp_path / "target-project"
     factory_dir = target_repo / ".copilot/softwareFactoryVscode"
     factory_dir.mkdir(parents=True, exist_ok=True)
@@ -4595,13 +4651,30 @@ def test_verify_runtime_uses_shared_service_discovery_when_shared_mode_enabled(
         encoding="utf-8",
     )
 
-    config = factory_workspace.build_runtime_config(
-        target_repo, factory_dir=factory_dir
+    shared_service_probe_urls = {
+        "mcp-memory": "http://shared-memory.internal:3030/mcp",
+        "mcp-agent-bus": "http://shared-bus.internal:3031/mcp",
+        "approval-gate": "http://shared-approval.internal:8001/health",
+    }
+    services = {}
+    for service_name, metadata in verify_factory_install.RUNTIME_SERVICES.items():
+        probe_url = shared_service_probe_urls.get(service_name, "")
+        if not probe_url and metadata["health_path"]:
+            probe_url = f"http://snapshot.example/{service_name}"
+        services[service_name] = build_snapshot_service_record(
+            workspace_owned=service_name not in shared_service_probe_urls,
+            probe_url=probe_url,
+        )
+
+    snapshot = build_runtime_snapshot_contract(
+        shared_mode_diagnostics={
+            "shared_mode_configured": True,
+            "tenant_identity_required": True,
+            "expected_tenant_identity": "target-project",
+            "tenant_identity_header": "X-Workspace-ID",
+        },
+        services=services,
     )
-    topology = factory_workspace.build_runtime_topology(config)
-    inventory = build_full_service_inventory(config)
-    for service_name in ("mcp-memory", "mcp-agent-bus", "approval-gate"):
-        del inventory[service_name]
 
     probed_urls: list[str] = []
     monkeypatch.setattr(
@@ -4613,11 +4686,8 @@ def test_verify_runtime_uses_shared_service_discovery_when_shared_mode_enabled(
         lambda *_args, **_kwargs: {
             "status": "ready",
             "recommended_action": "none",
-            "issues": [],
-            "config": config,
-            "workspace_urls": config.mcp_server_urls,
-            "service_inventory": inventory,
-            "runtime_topology": topology,
+            "snapshot": snapshot,
+            "readiness": snapshot.readiness,
         },
     )
     monkeypatch.setattr(
@@ -4643,10 +4713,6 @@ def test_verify_runtime_reports_missing_tenant_identity_for_shared_probe(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    registry_path = tmp_path / "registry.json"
-    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
-    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
-
     target_repo = tmp_path / "target-project"
     factory_dir = target_repo / ".copilot/softwareFactoryVscode"
     factory_dir.mkdir(parents=True, exist_ok=True)
@@ -4670,13 +4736,31 @@ def test_verify_runtime_reports_missing_tenant_identity_for_shared_probe(
         encoding="utf-8",
     )
 
-    config = factory_workspace.build_runtime_config(
-        target_repo, factory_dir=factory_dir
+    shared_service_probe_urls = {
+        "mcp-memory": "http://shared-memory.internal:3030/mcp",
+        "mcp-agent-bus": "http://shared-bus.internal:3031/mcp",
+        "approval-gate": "http://shared-approval.internal:8001/health",
+    }
+    services = {}
+    for service_name, metadata in verify_factory_install.RUNTIME_SERVICES.items():
+        probe_url = shared_service_probe_urls.get(service_name, "")
+        if not probe_url and metadata["health_path"]:
+            probe_url = f"http://snapshot.example/{service_name}"
+        services[service_name] = build_snapshot_service_record(
+            workspace_owned=service_name not in shared_service_probe_urls,
+            probe_url=probe_url,
+        )
+
+    snapshot = build_runtime_snapshot_contract(
+        shared_mode_diagnostics={
+            "shared_mode_configured": True,
+            "tenant_identity_required": True,
+            "expected_tenant_identity": "target-project",
+            "tenant_identity_header": "X-Workspace-ID",
+            "missing_tenant_remediation": "Send X-Workspace-ID=target-project from workspace clients.",
+        },
+        services=services,
     )
-    topology = factory_workspace.build_runtime_topology(config)
-    inventory = build_full_service_inventory(config)
-    for service_name in ("mcp-memory", "mcp-agent-bus", "approval-gate"):
-        del inventory[service_name]
 
     monkeypatch.setattr(
         verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
@@ -4687,11 +4771,8 @@ def test_verify_runtime_reports_missing_tenant_identity_for_shared_probe(
         lambda *_args, **_kwargs: {
             "status": "ready",
             "recommended_action": "none",
-            "issues": [],
-            "config": config,
-            "workspace_urls": config.mcp_server_urls,
-            "service_inventory": inventory,
-            "runtime_topology": topology,
+            "snapshot": snapshot,
+            "readiness": snapshot.readiness,
         },
     )
     monkeypatch.setattr(
@@ -4725,10 +4806,6 @@ def test_verify_runtime_reports_tenant_mismatch_for_shared_probe(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    registry_path = tmp_path / "registry.json"
-    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
-    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
-
     target_repo = tmp_path / "target-project"
     factory_dir = target_repo / ".copilot/softwareFactoryVscode"
     factory_dir.mkdir(parents=True, exist_ok=True)
@@ -4752,13 +4829,31 @@ def test_verify_runtime_reports_tenant_mismatch_for_shared_probe(
         encoding="utf-8",
     )
 
-    config = factory_workspace.build_runtime_config(
-        target_repo, factory_dir=factory_dir
+    shared_service_probe_urls = {
+        "mcp-memory": "http://shared-memory.internal:3030/mcp",
+        "mcp-agent-bus": "http://shared-bus.internal:3031/mcp",
+        "approval-gate": "http://shared-approval.internal:8001/health",
+    }
+    services = {}
+    for service_name, metadata in verify_factory_install.RUNTIME_SERVICES.items():
+        probe_url = shared_service_probe_urls.get(service_name, "")
+        if not probe_url and metadata["health_path"]:
+            probe_url = f"http://snapshot.example/{service_name}"
+        services[service_name] = build_snapshot_service_record(
+            workspace_owned=service_name not in shared_service_probe_urls,
+            probe_url=probe_url,
+        )
+
+    snapshot = build_runtime_snapshot_contract(
+        shared_mode_diagnostics={
+            "shared_mode_configured": True,
+            "tenant_identity_required": True,
+            "expected_tenant_identity": "target-project",
+            "tenant_identity_header": "X-Workspace-ID",
+            "tenant_mismatch_remediation": "Align explicit selectors to target-project.",
+        },
+        services=services,
     )
-    topology = factory_workspace.build_runtime_topology(config)
-    inventory = build_full_service_inventory(config)
-    for service_name in ("mcp-memory", "mcp-agent-bus", "approval-gate"):
-        del inventory[service_name]
 
     monkeypatch.setattr(
         verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
@@ -4769,11 +4864,8 @@ def test_verify_runtime_reports_tenant_mismatch_for_shared_probe(
         lambda *_args, **_kwargs: {
             "status": "ready",
             "recommended_action": "none",
-            "issues": [],
-            "config": config,
-            "workspace_urls": config.mcp_server_urls,
-            "service_inventory": inventory,
-            "runtime_topology": topology,
+            "snapshot": snapshot,
+            "readiness": snapshot.readiness,
         },
     )
     monkeypatch.setattr(
@@ -5859,6 +5951,67 @@ def test_mcp_bootloader_uses_manager_backed_snapshot_when_workspace_is_source_re
         "mcp-search": "http://127.0.0.1:21813/mcp",
         "mcp-filesystem": "http://127.0.0.1:21814/mcp",
     }
+
+
+def test_mcp_bootloader_requires_snapshot_readiness_contract(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source_repo = tmp_path / "work" / "softwareFactoryVscode"
+    source_repo.mkdir(parents=True, exist_ok=True)
+    companion_env = tmp_path / ".copilot" / "softwareFactoryVscode" / ".factory.env"
+    companion_env.parent.mkdir(parents=True, exist_ok=True)
+    companion_env.write_text("TARGET_WORKSPACE_PATH=/tmp/demo\n", encoding="utf-8")
+
+    snapshot = SimpleNamespace(
+        readiness=None,
+        manifest_server_urls={
+            "githubOps": "http://127.0.0.1:21818/mcp",
+            "search": "http://127.0.0.1:21813/mcp",
+            "filesystem": "http://127.0.0.1:21814/mcp",
+        },
+        manifest_health_urls={
+            "mcp-memory": "http://127.0.0.1:21830/mcp",
+            "mcp-agent-bus": "http://127.0.0.1:21831/mcp",
+        },
+    )
+
+    class FakeRuntimeManager:
+        def resolve_factory_repo_root(self, workspace_root: Path) -> Path:
+            assert workspace_root == source_repo
+            return source_repo.resolve()
+
+        def resolve_workspace_env_file(
+            self,
+            workspace_root: Path,
+            factory_repo_root: Path | None = None,
+        ) -> Path:
+            assert workspace_root == source_repo
+            assert factory_repo_root == source_repo.resolve()
+            return companion_env.resolve()
+
+        def build_workspace_snapshot(
+            self,
+            workspace_root: Path,
+            *,
+            workspace_file: str | None = None,
+            selected_profiles=None,
+        ) -> Any:
+            assert workspace_root == source_repo
+            del workspace_file, selected_profiles
+            return snapshot
+
+        def start(self, *args: Any, **kwargs: Any) -> None:
+            raise AssertionError("invalid readiness contract should fail before start")
+
+    bootloader = mcp_lifecycle.MCPBootloader(source_repo)
+    monkeypatch.setattr(
+        bootloader,
+        "_build_runtime_manager",
+        lambda: FakeRuntimeManager(),
+    )
+
+    with pytest.raises(RuntimeError, match="readiness result"):
+        asyncio.run(bootloader.initialize())
 
 
 def test_cleanup_workspace(tmp_path: Path, monkeypatch):

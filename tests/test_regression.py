@@ -566,6 +566,8 @@ def test_install_doc_locks_practical_per_workspace_baseline():
         "verify_factory_install.py --target . --runtime --check-vscode-mcp"
         in install_doc
     )
+    assert "same manager-backed snapshot/readiness contract" in install_doc
+    assert "additive evidence only" in install_doc
     assert "now-fulfilled `ADR-008` promotion gate" in install_doc
     assert "Current default-branch status: `fulfilled`" in install_doc
     assert "Historical releases may still use `open` or `advanced" in install_doc
@@ -642,6 +644,8 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "current default branch now meets this threshold" in handout
     assert "VS Code `1.116+`" in handout
     assert "GitHub Pull Requests and Issues" in handout
+    assert "same manager-backed readiness vocabulary" in handout
+    assert "additive evidence only" in handout
 
     assert "factory_stack.py activate" in cheat_sheet
     assert "factory_stack.py preflight" in cheat_sheet
@@ -655,6 +659,8 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "current default branch now meets this threshold" in cheat_sheet
     assert "VS Code `1.116+`" in cheat_sheet
     assert "GitHub Pull Requests and Issues" in cheat_sheet
+    assert "same manager-backed readiness vocabulary" in cheat_sheet
+    assert "additive evidence only" in cheat_sheet
 
 
 def test_release_template_distinguishes_practical_vs_open_rollout_scope():
