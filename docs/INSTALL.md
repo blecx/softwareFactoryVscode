@@ -268,6 +268,11 @@ These commands distinguish:
 - **running** — the workspace currently owns Docker runtime resources
 - **active** — the workspace the current VS Code / Copilot CLI workflow is meant to act on, recorded explicitly in the host registry
 
+The current practical baseline does **not** support a user-facing `suspended`
+runtime state yet. Treat `suspended` as proposal-bound `ADR-014` vocabulary
+until a later suspend/resume slice lands explicit, test-backed lifecycle
+semantics.
+
 `activate` refreshes generated runtime artifacts from the canonical installed-workspace contract and then marks that workspace active in the host registry. It does **not** start the Docker runtime by itself.
 
 The `preflight` command is the recommended first check after opening or restoring a VS Code workspace.
