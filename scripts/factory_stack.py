@@ -219,6 +219,7 @@ def build_runtime_manager(
         default_workspace_file=workspace_file,
         docker_available_checker=lambda: shutil.which("docker") is not None,
         service_inventory_loader=collect_service_inventory,
+        stack_module_loader=lambda: sys.modules[__name__],
     )
 
 
@@ -685,75 +686,8 @@ def cleanup_workspace(
     *,
     env_file: Path | None = None,
 ) -> int:
-    import shutil
-
-    resolved_env_file = resolve_env_file(repo_root, env_file)
-    config: factory_workspace.WorkspaceRuntimeConfig | None = None
-    target_path = repo_root.parents[1]
-    try:
-        config = sync_workspace_runtime(
-            repo_root, env_file=resolved_env_file, persist=False
-        )
-        target_path_str = str(config.target_dir.absolute())
-        target_path = config.target_dir
-        instance_id = config.factory_instance_id
-        action = ["down", "-v", "--remove-orphans"]
-        run_compose_command(
-            repo_root,
-            build_compose_command(repo_root, resolved_env_file, action),
-        )
-        print(f"🧹 Removed Docker stack and volumes for {instance_id}")
-    except Exception as e:
-        print(f"⚠️ Could not completely remove docker stack (it may not exist): {e}")
-        target_path_str = str(repo_root.parents[1].absolute())
-
-    registry = factory_workspace.load_registry()
-    if "workspaces" in registry:
-        # Also clean up any that map to this directory
-        keys_to_delete = []
-        for key, record in registry["workspaces"].items():
-            if (
-                isinstance(record, dict)
-                and Path(record.get("target_workspace_path", "")).absolute()
-                == Path(target_path_str).absolute()
-            ):
-                keys_to_delete.append(key)
-        for key in keys_to_delete:
-            del registry["workspaces"][key]
-            if registry.get("active_workspace") == key:
-                registry["active_workspace"] = ""
-            print(f"🧹 Removed registry record {key}")
-        factory_workspace.save_registry(registry)
-
-    if resolved_env_file.exists():
-        resolved_env_file.unlink()
-        print(f"🧹 Deleted {resolved_env_file}")
-
-    manifest_path = (
-        target_path
-        / factory_workspace.TMP_SUBPATH
-        / factory_workspace.RUNTIME_MANIFEST_FILENAME
-    )
-    if manifest_path.exists():
-        manifest_path.unlink()
-        print(f"🧹 Deleted {manifest_path}")
-
-    # Remove configured data directories for this instance.
-    try:
-        if config is not None:
-            data_dir_str = str(config.env_values.get("FACTORY_DATA_DIR", "")).strip()
-            if data_dir_str:
-                data_dir = Path(data_dir_str).expanduser()
-                instance_memory_dir = data_dir / "memory" / instance_id
-                instance_bus_dir = data_dir / "bus" / instance_id
-                for instance_dir in (instance_memory_dir, instance_bus_dir):
-                    if instance_dir.exists() and instance_dir.is_dir():
-                        shutil.rmtree(instance_dir, ignore_errors=True)
-                        print(f"🧹 Erased data directory {instance_dir}")
-    except Exception as e:
-        print(f"⚠️ Could not fully erase configured data directories: {e}")
-
-    return 0
+    manager = build_runtime_manager()
+    return manager.cleanup(repo_root, env_file=env_file, trigger="cleanup")
 
 
 def list_workspaces() -> int:

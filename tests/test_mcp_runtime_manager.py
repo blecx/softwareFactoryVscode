@@ -7,12 +7,19 @@ from typing import Any
 import factory_runtime.mcp_runtime.manager as runtime_manager_module
 from factory_runtime.mcp_runtime import (
     MCPRuntimeManager,
+    ReadinessResult,
     ReadinessStatus,
     ReasonCode,
     RecommendedAction,
+    RecoveryClassification,
+    RepairStep,
+    RuntimeActionTrigger,
     RuntimeLifecycleState,
     RuntimeProfileName,
+    RuntimeSnapshot,
+    SelectionMetadata,
     ServiceInstanceStatus,
+    ServiceRuntimeRecord,
     ServiceScope,
 )
 
@@ -297,12 +304,288 @@ def test_manager_marks_promoted_shared_services_as_external(
     assert snapshot.shared_mode == "shared"
 
 
-def test_manager_repair_contract_is_reason_coded_placeholder() -> None:
-    manager = MCPRuntimeManager()
+def build_repairable_snapshot(
+    manager: MCPRuntimeManager,
+    config: Any,
+    *,
+    readiness: ReadinessResult,
+    lifecycle_state: RuntimeLifecycleState = RuntimeLifecycleState.DEGRADED,
+    service_name: str = "github-ops-mcp",
+) -> RuntimeSnapshot:
+    catalog = manager.load_catalog()
+    selection = SelectionMetadata(
+        installed=True,
+        active=False,
+        profiles=catalog.select_profiles((RuntimeProfileName.WORKSPACE_DEFAULT,)),
+    )
+    service_entry = catalog.services[service_name]
+    return RuntimeSnapshot(
+        workspace_id=config.project_workspace_id,
+        instance_id=config.factory_instance_id,
+        target_dir=config.target_dir,
+        factory_dir=config.factory_dir,
+        compose_project_name=config.compose_project_name,
+        lifecycle_state=lifecycle_state,
+        selection=selection,
+        persisted_runtime_state=lifecycle_state.value,
+        services={
+            service_name: ServiceRuntimeRecord(
+                service_name=service_name,
+                runtime_identity=service_entry.runtime_identity,
+                service_kind=service_entry.service_kind,
+                scope=service_entry.scope,
+                topology_mode="workspace",
+                workspace_owned=True,
+                status=ServiceInstanceStatus.DEGRADED,
+                reason_codes=readiness.reason_codes,
+            )
+        },
+        catalog=catalog,
+        readiness=readiness,
+    )
 
-    result = manager.repair()
 
-    assert result.attempted is False
+def test_manager_repair_trips_bounded_circuit_breaker(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    manager = MCPRuntimeManager(registry_path=registry_path, max_repair_failures=2)
+    readiness = ReadinessResult(
+        status=ReadinessStatus.DEGRADED,
+        recommended_action=RecommendedAction.REPAIR,
+        ready=False,
+        reason_codes=(ReasonCode.ENDPOINT_UNREACHABLE,),
+        blocking_services=("github-ops-mcp",),
+        issues=("github-ops-mcp endpoint is unreachable",),
+    )
+    snapshot = build_repairable_snapshot(manager, config, readiness=readiness)
+    compose_actions: list[tuple[str, ...]] = []
+
+    monkeypatch.setattr(manager, "build_snapshot", lambda *args, **kwargs: snapshot)
+    monkeypatch.setattr(
+        manager,
+        "_prepare_runtime_config_for_actions",
+        lambda *args, **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        manager,
+        "_run_compose_action",
+        lambda repo_root, env_file, action: compose_actions.append(tuple(action)),
+    )
+
+    first_result = manager.repair(repo_root, env_file=env_path)
+    second_result = manager.repair(repo_root, env_file=env_path)
+    third_result = manager.repair(repo_root, env_file=env_path)
+
+    assert first_result.attempted is True
+    assert first_result.success is False
+    assert first_result.attempted_steps == (
+        RepairStep.REPROBE,
+        RepairStep.RECREATE_SERVICE,
+        RepairStep.SURFACE_TERMINAL_FAILURE,
+    )
+    assert ReasonCode.REPAIR_CIRCUIT_BREAKER not in first_result.reason_codes
+
+    assert second_result.attempted is True
+    assert second_result.success is False
+    assert ReasonCode.REPAIR_CIRCUIT_BREAKER in second_result.reason_codes
+
+    assert third_result.attempted is False
+    assert third_result.success is False
+    assert third_result.attempted_steps == (RepairStep.SURFACE_TERMINAL_FAILURE,)
+    assert third_result.reason_codes == (
+        ReasonCode.REPAIR_CIRCUIT_BREAKER,
+        ReasonCode.TERMINAL_RUNTIME_FAILURE,
+    )
+    assert len(compose_actions) == 2
+
+    registry = factory_workspace.load_registry(registry_path)
+    record = registry["workspaces"][config.factory_instance_id]
+    assert record["repair_failure_count"] == 2
+    assert record["repair_circuit_breaker_tripped_at"]
+    assert record["last_runtime_action"] == RuntimeActionTrigger.REPAIR.value
+    assert record["last_runtime_action_reason_codes"] == [
+        ReasonCode.REPAIR_CIRCUIT_BREAKER.value,
+        ReasonCode.TERMINAL_RUNTIME_FAILURE.value,
+    ]
+
+
+def test_manager_repair_distinguishes_host_level_failures(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    manager = MCPRuntimeManager(registry_path=registry_path)
+    snapshot = build_repairable_snapshot(
+        manager,
+        config,
+        readiness=ReadinessResult(
+            status=ReadinessStatus.DOCKER_UNAVAILABLE,
+            recommended_action=RecommendedAction.INSTALL_DOCKER,
+            ready=False,
+            reason_codes=(ReasonCode.DOCKER_UNAVAILABLE,),
+            issues=("Docker CLI is not available on PATH.",),
+        ),
+        service_name="mcp-memory",
+    )
+
+    monkeypatch.setattr(manager, "build_snapshot", lambda *args, **kwargs: snapshot)
+    monkeypatch.setattr(
+        manager,
+        "_prepare_runtime_config_for_actions",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("host failures must not reach action prep")
+        ),
+    )
+    monkeypatch.setattr(
+        manager,
+        "_run_compose_action",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("host failures must not run compose actions")
+        ),
+    )
+
+    result = manager.repair(repo_root, env_file=env_path)
+
+    assert result.attempted is True
     assert result.success is False
-    assert result.attempted_steps == (runtime_manager_module.RepairStep.REPROBE,)
-    assert result.reason_codes == (ReasonCode.REPAIR_NOT_IMPLEMENTED,)
+    assert result.attempted_steps == (
+        RepairStep.REPROBE,
+        RepairStep.SURFACE_TERMINAL_FAILURE,
+    )
+    assert result.reason_codes == (
+        ReasonCode.REPAIR_REPROBE,
+        ReasonCode.HOST_DOCKER_UNAVAILABLE,
+        ReasonCode.TERMINAL_RUNTIME_FAILURE,
+    )
+
+
+def test_manager_build_snapshot_exposes_resume_unsafe_recovery_metadata(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    record = registry["workspaces"][config.factory_instance_id]
+    record.update(
+        {
+            "runtime_state": RuntimeLifecycleState.REPAIRING.value,
+            "execution_lease_present": True,
+            "execution_lease_holder": "agent-worker",
+            "execution_lease_renewed_at": "2026-04-21T10:00:00Z",
+            "last_runtime_action": RuntimeActionTrigger.REPAIR.value,
+            "last_runtime_action_at": "2026-04-21T10:00:00Z",
+            "last_runtime_action_reason_codes": [ReasonCode.REPAIR_REPROBE.value],
+            "last_completed_tool_call_boundary_at": None,
+            "repair_failure_count": 1,
+        }
+    )
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = MCPRuntimeManager(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+
+    assert snapshot.recovery is not None
+    assert snapshot.selection.execution_lease is not None
+    assert snapshot.selection.execution_lease.present is True
+    assert snapshot.selection.execution_lease.holder == "agent-worker"
+    assert snapshot.recovery.classification == RecoveryClassification.RESUME_UNSAFE
+    assert snapshot.recovery.completed_tool_call_boundary is False
+    assert snapshot.recovery.last_trigger == RuntimeActionTrigger.REPAIR
+    assert snapshot.recovery.repair_failure_count == 1
+
+
+def test_manager_build_snapshot_surfaces_manual_recovery_requirement(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    record = registry["workspaces"][config.factory_instance_id]
+    record.update(
+        {
+            "runtime_state": RuntimeLifecycleState.DEGRADED.value,
+            "last_runtime_action": RuntimeActionTrigger.REPAIR.value,
+            "last_runtime_action_at": "2026-04-21T11:00:00Z",
+            "last_runtime_action_reason_codes": [
+                ReasonCode.REPAIR_CIRCUIT_BREAKER.value,
+                ReasonCode.TERMINAL_RUNTIME_FAILURE.value,
+            ],
+            "last_completed_tool_call_boundary_at": "2026-04-21T11:00:05Z",
+            "repair_failure_count": 2,
+            "repair_circuit_breaker_tripped_at": "2026-04-21T11:00:05Z",
+        }
+    )
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = MCPRuntimeManager(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+
+    assert snapshot.recovery is not None
+    assert snapshot.recovery.classification == (
+        RecoveryClassification.MANUAL_RECOVERY_REQUIRED
+    )
+    assert snapshot.recovery.completed_tool_call_boundary is True
+    assert snapshot.recovery.circuit_breaker_tripped is True
+    assert snapshot.recovery.circuit_breaker_tripped_at == "2026-04-21T11:00:05Z"
+    assert snapshot.recovery.last_reason_codes == (
+        ReasonCode.REPAIR_CIRCUIT_BREAKER,
+        ReasonCode.TERMINAL_RUNTIME_FAILURE,
+    )
