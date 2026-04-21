@@ -4203,6 +4203,168 @@ def test_deactivate_workspace_does_not_clear_another_active_workspace(
     assert registry["active_workspace"] == config_a.factory_instance_id
 
 
+def test_activate_workspace_switch_back_clears_stale_selection_leases(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    def prepare_workspace(
+        target_repo: Path,
+    ) -> tuple[Path, Any]:
+        repo_root = target_repo / ".copilot/softwareFactoryVscode"
+        repo_root.mkdir(parents=True)
+        (repo_root / ".copilot" / "config").mkdir(parents=True)
+        (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+            (
+                REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json"
+            ).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        config = factory_workspace.build_runtime_config(
+            target_repo, factory_dir=repo_root
+        )
+        factory_workspace.sync_runtime_artifacts(
+            config,
+            runtime_state="installed",
+            active=False,
+        )
+        return repo_root, config
+
+    def seed_stale_selection_leases(instance_id: str, holder: str) -> None:
+        registry = factory_workspace.load_registry(registry_path)
+        registry["workspaces"][instance_id].update(
+            {
+                "activity_lease_present": True,
+                "activity_lease_holder": holder,
+                "activity_lease_renewed_at": "2026-04-21T10:00:00Z",
+                "activity_lease_expires_at": "2026-04-21T10:05:00Z",
+                "execution_lease_present": True,
+                "execution_lease_holder": f"{holder}-exec",
+                "execution_lease_renewed_at": "2026-04-21T10:00:30Z",
+                "execution_lease_expires_at": "2026-04-21T10:05:30Z",
+            }
+        )
+        factory_workspace.save_registry(registry, registry_path)
+
+    lease_keys = (
+        "activity_lease_present",
+        "activity_lease_holder",
+        "activity_lease_renewed_at",
+        "activity_lease_expires_at",
+        "execution_lease_present",
+        "execution_lease_holder",
+        "execution_lease_renewed_at",
+        "execution_lease_expires_at",
+    )
+
+    repo_a, config_a = prepare_workspace(tmp_path / "project-a")
+    repo_b, config_b = prepare_workspace(tmp_path / "project-b")
+    env_a = config_a.target_dir / ".copilot/softwareFactoryVscode/.factory.env"
+    env_b = config_b.target_dir / ".copilot/softwareFactoryVscode/.factory.env"
+
+    seed_stale_selection_leases(config_a.factory_instance_id, "stale-a")
+    factory_stack.activate_workspace(repo_a, env_file=env_a)
+
+    seed_stale_selection_leases(config_a.factory_instance_id, "stale-a-return")
+    seed_stale_selection_leases(config_b.factory_instance_id, "stale-b")
+    factory_stack.activate_workspace(repo_b, env_file=env_b)
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert registry["active_workspace"] == config_b.factory_instance_id
+    for instance_id in (config_a.factory_instance_id, config_b.factory_instance_id):
+        for key in lease_keys:
+            assert key not in registry["workspaces"][instance_id]
+
+    seed_stale_selection_leases(config_a.factory_instance_id, "stale-a-final")
+    seed_stale_selection_leases(config_b.factory_instance_id, "stale-b-final")
+    factory_stack.activate_workspace(repo_a, env_file=env_a)
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert registry["active_workspace"] == config_a.factory_instance_id
+    for instance_id in (config_a.factory_instance_id, config_b.factory_instance_id):
+        for key in lease_keys:
+            assert key not in registry["workspaces"][instance_id]
+
+    workspace_a = json.loads(
+        (config_a.target_dir / "software-factory.code-workspace").read_text(
+            encoding="utf-8"
+        )
+    )
+    workspace_b = json.loads(
+        (config_b.target_dir / "software-factory.code-workspace").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert (
+        workspace_a["settings"]["mcp"]["servers"]["context7"]["url"]
+        == config_a.mcp_server_urls["context7"]
+    )
+    assert (
+        workspace_b["settings"]["mcp"]["servers"]["context7"]["url"]
+        == config_b.mcp_server_urls["context7"]
+    )
+    assert config_a.mcp_server_urls["context7"] != config_b.mcp_server_urls["context7"]
+
+
+def test_deactivate_workspace_clears_target_selection_leases(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "project-a"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="installed",
+        active=False,
+    )
+    env_path = config.target_dir / ".copilot/softwareFactoryVscode/.factory.env"
+
+    factory_stack.activate_workspace(repo_root, env_file=env_path)
+    registry = factory_workspace.load_registry(registry_path)
+    registry["workspaces"][config.factory_instance_id].update(
+        {
+            "activity_lease_present": True,
+            "activity_lease_holder": "stale-holder",
+            "execution_lease_present": True,
+            "execution_lease_holder": "stale-exec",
+        }
+    )
+    factory_workspace.save_registry(registry, registry_path)
+
+    factory_stack.deactivate_workspace(repo_root, env_file=env_path)
+
+    registry = factory_workspace.load_registry(registry_path)
+    record = registry["workspaces"][config.factory_instance_id]
+    assert registry["active_workspace"] == ""
+    assert "activity_lease_present" not in record
+    assert "activity_lease_holder" not in record
+    assert "execution_lease_present" not in record
+    assert "execution_lease_holder" not in record
+    assert record["last_activated_at"] is not None
+
+
 def test_starting_one_workspace_does_not_change_another_workspace_state(
     tmp_path: Path,
     monkeypatch,

@@ -156,6 +156,17 @@ MANAGED_ENV_KEYS = [
     *PORT_LAYOUT.keys(),
 ]
 
+SELECTION_LEASE_METADATA_KEYS = (
+    "activity_lease_present",
+    "activity_lease_holder",
+    "activity_lease_renewed_at",
+    "activity_lease_expires_at",
+    "execution_lease_present",
+    "execution_lease_holder",
+    "execution_lease_renewed_at",
+    "execution_lease_expires_at",
+)
+
 
 @dataclass(frozen=True)
 class WorkspaceRuntimeConfig:
@@ -1225,10 +1236,21 @@ def set_active_workspace(
     registry_path: Path | None = None,
 ) -> Path:
     registry = load_registry(registry_path)
+    workspaces = registry.get("workspaces", {})
+    refreshed_at = utc_now_iso()
+
+    if isinstance(workspaces, dict):
+        for record in workspaces.values():
+            if not isinstance(record, dict):
+                continue
+            for key in SELECTION_LEASE_METADATA_KEYS:
+                record.pop(key, None)
+            record["updated_at"] = refreshed_at
+
     registry["active_workspace"] = instance_id or ""
     if instance_id and instance_id in registry.get("workspaces", {}):
-        registry["workspaces"][instance_id]["last_activated_at"] = utc_now_iso()
-        registry["workspaces"][instance_id]["updated_at"] = utc_now_iso()
+        registry["workspaces"][instance_id]["last_activated_at"] = refreshed_at
+        registry["workspaces"][instance_id]["updated_at"] = refreshed_at
     return save_registry(registry, registry_path)
 
 
@@ -1238,6 +1260,11 @@ def clear_active_workspace(
     registry_path: Path | None = None,
 ) -> Path:
     registry = load_registry(registry_path)
+    record = registry.get("workspaces", {}).get(instance_id)
+    if isinstance(record, dict):
+        for key in SELECTION_LEASE_METADATA_KEYS:
+            record.pop(key, None)
+        record["updated_at"] = utc_now_iso()
     if registry.get("active_workspace") == instance_id:
         registry["active_workspace"] = ""
     return save_registry(registry, registry_path)
