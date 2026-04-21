@@ -80,6 +80,8 @@ python3 scripts/verify_factory_install.py --target ../my-target-project
 python3 scripts/verify_factory_install.py --target ../my-target-project --runtime --check-vscode-mcp
 ```
 
+`verify_factory_install.py --runtime` reuses the same manager-backed readiness vocabulary as `preflight` and `status`; any extra endpoint probes are additive evidence only.
+
 ## ⬆️ Updating an installed target workspace
 
 From the **target repository root**:

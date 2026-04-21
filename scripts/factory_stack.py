@@ -302,6 +302,27 @@ def build_preflight_report(
     return build_preflight_report_from_snapshot(config, snapshot)
 
 
+def require_preflight_snapshot(report: dict[str, Any]) -> Any:
+    snapshot = report.get("snapshot") if isinstance(report, dict) else None
+    if snapshot is None:
+        raise RuntimeError(
+            "Runtime preflight did not return a manager-backed snapshot."
+        )
+    return snapshot
+
+
+def print_status_preflight_error(
+    config: factory_workspace.WorkspaceRuntimeConfig,
+    exc: Exception,
+) -> None:
+    print("preflight_status=error")
+    print("recommended_action=inspect-registry")
+    print("reason_codes=")
+    print(f"preflight_error={exc}")
+    for name, url in sorted(config.mcp_server_urls.items()):
+        print(f"mcp.{name}={url}")
+
+
 def print_preflight_report(report: dict[str, Any]) -> None:
     config = report["config"]
     runtime_topology = report.get("runtime_topology", {})
@@ -762,45 +783,14 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
                 )
 
     persisted_state = str(record.get("runtime_state", "installed"))
-    preflight: dict[str, Any] | None = None
     try:
         preflight = build_preflight_report(repo_root, env_file=resolved_env_file)
+        snapshot = require_preflight_snapshot(preflight)
     except RuntimeError as exc:
-        print("preflight_status=error")
-        print("recommended_action=inspect-registry")
-        print("reason_codes=")
-        print(f"preflight_error={exc}")
-        for name, url in sorted(config.mcp_server_urls.items()):
-            print(f"mcp.{name}={url}")
+        print_status_preflight_error(config, exc)
         return 1
 
-    snapshot = preflight.get("snapshot") if isinstance(preflight, dict) else None
-    if snapshot is not None:
-        runtime_state = resolve_status_runtime_state_from_snapshot(snapshot)
-    else:
-        docker_state_available = True
-        try:
-            running_services = collect_running_services(config.compose_project_name)
-        except subprocess.CalledProcessError as exc:
-            running_services = {}
-            docker_state_available = False
-            print(
-                "⚠️ Unable to inspect Docker runtime state for compose project "
-                f"`{config.compose_project_name}`: {exc}. "
-                "Preserving persisted runtime_state."
-            )
-
-        inferred_state = infer_runtime_state_from_services(
-            running_services,
-            expected_runtime_services=factory_workspace.workspace_owned_runtime_services(
-                config
-            ),
-        )
-        runtime_state = resolve_status_runtime_state(
-            persisted_state,
-            inferred_state,
-            docker_state_available=docker_state_available,
-        )
+    runtime_state = resolve_status_runtime_state_from_snapshot(snapshot)
 
     if runtime_state != persisted_state and record_persisted:
         try:

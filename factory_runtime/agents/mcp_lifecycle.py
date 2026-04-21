@@ -79,9 +79,7 @@ class MCPBootloader:
             self.workspace_root,
             selected_profiles=(RuntimeProfileName.HARNESS_DEFAULT,),
         )
-        readiness = snapshot.readiness or self._runtime_manager.evaluate_readiness(
-            snapshot
-        )
+        readiness = self._require_snapshot_readiness(snapshot)
 
         if self.force_rebuild_mcps:
             logger.info(
@@ -114,9 +112,7 @@ class MCPBootloader:
                 self.workspace_root,
                 selected_profiles=(RuntimeProfileName.HARNESS_DEFAULT,),
             )
-            readiness = snapshot.readiness or self._runtime_manager.evaluate_readiness(
-                snapshot
-            )
+            readiness = self._require_snapshot_readiness(snapshot)
 
         if not readiness.ready:
             raise RuntimeError(self._format_preflight_failure(readiness))
@@ -126,6 +122,12 @@ class MCPBootloader:
 
     def _build_runtime_manager(self) -> MCPRuntimeManager:
         return MCPRuntimeManager()
+
+    def _require_snapshot_readiness(self, snapshot: Any) -> Any:
+        readiness = getattr(snapshot, "readiness", None)
+        if readiness is None:
+            raise RuntimeError("Runtime snapshot did not include a readiness result.")
+        return readiness
 
     def _extract_server_urls(self, snapshot: Any) -> dict[str, str]:
         server_urls: dict[str, str] = {}
