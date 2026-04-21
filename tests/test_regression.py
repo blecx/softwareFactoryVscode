@@ -579,6 +579,8 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     assert "Older VS Code releases" in install_doc
     assert "GitHub Pull Requests and Issues" in install_doc
     assert "chat.disableAIFeatures" in install_doc
+    assert "does **not** support a user-facing `suspended`" in install_doc
+    assert "proposal-bound `ADR-014` vocabulary" in install_doc
 
 
 def test_readme_tracks_version_aware_copilot_setup():
@@ -661,6 +663,22 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "GitHub Pull Requests and Issues" in cheat_sheet
     assert "same manager-backed readiness vocabulary" in cheat_sheet
     assert "additive evidence only" in cheat_sheet
+    assert "does **not** support a user-facing `suspended`" in cheat_sheet
+    assert "proposal-bound `ADR-014` vocabulary" in cheat_sheet
+
+
+def test_adr_014_clarifies_current_suspend_boundary() -> None:
+    repo_root = Path(__file__).parent.parent
+    adr_014 = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md"
+    ).read_text(encoding="utf-8")
+
+    assert "`suspended` remains" in adr_014
+    assert "proposal-bound vocabulary only" in adr_014
+    assert "MUST NOT present suspend as a supported lifecycle state" in adr_014
 
 
 def test_release_template_distinguishes_practical_vs_open_rollout_scope():

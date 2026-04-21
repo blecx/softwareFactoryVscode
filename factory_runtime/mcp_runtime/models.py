@@ -48,6 +48,10 @@ class RuntimeLifecycleState(StrEnum):
 
     This enum deliberately excludes `installed` and `active`. Those remain
     separate architectural facts per `ADR-009`.
+
+    `SUSPENDED` remains reserved for future bounded suspend/resume work. The
+    current practical operator baseline must not surface it as a supported
+    lifecycle state until explicit semantics land.
     """
 
     STARTING = "starting"

@@ -326,7 +326,7 @@ class MCPRuntimeManager:
         raw_record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
         record = raw_record if isinstance(raw_record, dict) else {}
         installed = factory_workspace.has_managed_workspace_contract(target_dir)
-        persisted_runtime_state = (
+        persisted_runtime_state = self._normalize_supported_runtime_state(
             self._coerce_optional_text(record.get("runtime_state")) or "installed"
         )
         active = registry.get("active_workspace", "") == config.factory_instance_id
@@ -2341,6 +2341,19 @@ class MCPRuntimeManager:
         if normalized_endpoint.endswith("/mcp"):
             return normalized_endpoint
         return f"{normalized_endpoint}/mcp"
+
+    def _normalize_supported_runtime_state(
+        self,
+        persisted_runtime_state: str,
+    ) -> str:
+        normalized = persisted_runtime_state.strip()
+        if normalized == RuntimeLifecycleState.SUSPENDED.value:
+            # `suspended` stays proposal-bound until a later slice lands
+            # explicit, test-backed suspend/resume semantics. Treat stale
+            # persisted values as a stopped practical baseline instead of
+            # surfacing unsupported operator-facing lifecycle claims.
+            return RuntimeLifecycleState.STOPPED.value
+        return normalized
 
     def _infer_lifecycle_state(
         self,

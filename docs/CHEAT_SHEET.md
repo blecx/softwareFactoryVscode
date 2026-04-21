@@ -67,6 +67,13 @@ It refreshes generated runtime artifacts from the canonical installed-workspace 
 
 It removes runtime ownership for the current workspace, including registry ownership, generated runtime artifacts, and workspace-scoped runtime data, while leaving the installed `.copilot/softwareFactoryVscode/` baseline in place.
 
+### What `suspended` means right now
+
+The current practical baseline does **not** support a user-facing `suspended`
+runtime state yet. Treat `suspended` as proposal-bound `ADR-014` vocabulary
+until a later suspend/resume slice lands explicit, test-backed lifecycle
+semantics.
+
 ## 🧪 Validation
 
 ```bash
