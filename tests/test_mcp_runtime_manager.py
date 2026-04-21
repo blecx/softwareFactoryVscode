@@ -27,6 +27,19 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 factory_workspace = runtime_manager_module.factory_workspace
 
 
+def build_manager_with_successful_probes(
+    *,
+    registry_path: Path | None = None,
+    **kwargs: Any,
+) -> MCPRuntimeManager:
+    return MCPRuntimeManager(
+        registry_path=registry_path,
+        http_probe_func=lambda url, timeout, allow_http_error: None,
+        mcp_initialize_probe=lambda url, timeout, workspace_id: None,
+        **kwargs,
+    )
+
+
 def build_full_service_inventory(
     config: Any,
     *,
@@ -123,8 +136,8 @@ def prepare_workspace(
         encoding="utf-8",
     )
 
+    env_path = repo_root / ".factory.env"
     if shared_mode:
-        env_path = repo_root / ".factory.env"
         env_path.write_text(
             "\n".join(
                 [
@@ -137,12 +150,14 @@ def prepare_workspace(
                     "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
                     "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
                     "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
-                    "CONTEXT7_API_KEY=",
+                    "CONTEXT7_API_KEY=test-context7-key",
                     "",
                 ]
             ),
             encoding="utf-8",
         )
+    else:
+        env_path.write_text("CONTEXT7_API_KEY=test-context7-key\n", encoding="utf-8")
 
     config = factory_workspace.build_runtime_config(
         target_repo,
@@ -194,7 +209,7 @@ def test_manager_builds_canonical_snapshot_for_workspace_identity(
         tmp_path,
         registry_path=registry_path,
     )
-    manager = MCPRuntimeManager(registry_path=registry_path)
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
     monkeypatch.setattr(manager, "_docker_available", lambda: True)
     monkeypatch.setattr(
         manager,
@@ -243,7 +258,7 @@ def test_manager_normalizes_workspace_url_drift_reason_codes(
         encoding="utf-8",
     )
 
-    manager = MCPRuntimeManager(registry_path=registry_path)
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
     monkeypatch.setattr(manager, "_docker_available", lambda: True)
     monkeypatch.setattr(
         manager,
@@ -262,6 +277,168 @@ def test_manager_normalizes_workspace_url_drift_reason_codes(
         "Generated workspace MCP URL drift detected" in issue
         for issue in readiness.issues
     )
+
+
+def test_manager_blocks_snapshot_when_required_secret_is_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8").replace(
+            "CONTEXT7_API_KEY=test-context7-key",
+            "CONTEXT7_API_KEY=",
+        ),
+        encoding="utf-8",
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+    assert readiness is not None
+
+    assert readiness.status == ReadinessStatus.CONFIG_DRIFT
+    assert ReasonCode.MISSING_SECRET in readiness.reason_codes
+    assert any("CONTEXT7_API_KEY" in issue for issue in readiness.issues)
+
+
+def test_manager_blocks_snapshot_when_required_mount_is_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    missing_mount = (
+        Path(config.env_values["FACTORY_DATA_DIR"])
+        / "memory"
+        / config.factory_instance_id
+    )
+    if missing_mount.exists():
+        missing_mount.rmdir()
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+    assert readiness is not None
+
+    assert readiness.status == ReadinessStatus.CONFIG_DRIFT
+    assert ReasonCode.MISSING_MOUNT in readiness.reason_codes
+    assert any("mount/resource path" in issue for issue in readiness.issues)
+
+
+def test_manager_reports_degraded_when_endpoint_probe_fails_for_running_service(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    manager = MCPRuntimeManager(
+        registry_path=registry_path,
+        http_probe_func=lambda url, timeout, allow_http_error: (
+            "connection refused"
+            if f":{config.ports['PORT_CONTEXT7']}/mcp" in url
+            else None
+        ),
+        mcp_initialize_probe=lambda url, timeout, workspace_id: None,
+    )
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+    assert readiness is not None
+
+    assert readiness.status == ReadinessStatus.DEGRADED
+    assert ReasonCode.ENDPOINT_UNREACHABLE in readiness.reason_codes
+    assert any("context7" in issue for issue in readiness.issues)
+
+
+def test_manager_reports_degraded_when_mcp_initialize_fails_for_running_service(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    manager = MCPRuntimeManager(
+        registry_path=registry_path,
+        http_probe_func=lambda url, timeout, allow_http_error: None,
+        mcp_initialize_probe=lambda url, timeout, workspace_id: (
+            "initialize rejected by server"
+            if f":{config.ports['PORT_GITHUB']}/mcp" in url
+            else None
+        ),
+    )
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+    assert readiness is not None
+
+    assert readiness.status == ReadinessStatus.DEGRADED
+    assert ReasonCode.MCP_INITIALIZE_FAILED in readiness.reason_codes
+    assert any("github-ops-mcp" in issue for issue in readiness.issues)
 
 
 def test_manager_marks_promoted_shared_services_as_external(
@@ -285,7 +462,7 @@ def test_manager_marks_promoted_shared_services_as_external(
     for service_name in ("mcp-memory", "mcp-agent-bus", "approval-gate"):
         del inventory[service_name]
 
-    manager = MCPRuntimeManager(registry_path=registry_path)
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
     monkeypatch.setattr(manager, "_docker_available", lambda: True)
     monkeypatch.setattr(
         manager,
@@ -436,7 +613,7 @@ def test_manager_repair_distinguishes_host_level_failures(
         tmp_path,
         registry_path=registry_path,
     )
-    manager = MCPRuntimeManager(registry_path=registry_path)
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
     snapshot = build_repairable_snapshot(
         manager,
         config,
@@ -514,7 +691,7 @@ def test_manager_build_snapshot_exposes_resume_unsafe_recovery_metadata(
     )
     factory_workspace.save_registry(registry, registry_path)
 
-    manager = MCPRuntimeManager(registry_path=registry_path)
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
     monkeypatch.setattr(manager, "_docker_available", lambda: True)
     monkeypatch.setattr(
         manager,
