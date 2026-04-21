@@ -349,6 +349,8 @@ The verifier checks the harness namespace installation contract, host runtime fi
 
 Runtime compliance is a second phase you can run after starting services. It checks the core compose services for the factory runtime and, optionally, the localhost MCP endpoints used by VS Code.
 
+Runtime compliance starts from the same manager-backed snapshot/readiness contract used by `factory_stack.py preflight` and `factory_stack.py status`. Any deeper HTTP or MCP reachability probes are additive evidence only; they do not redefine readiness behind the manager.
+
 When a workspace is assigned a non-default port block, runtime verification follows the generated effective endpoints from the runtime manifest and generated workspace settings instead of assuming only the historical default localhost ports.
 
 To prove the installation works and the target mounts are successfully connected to your host project:
