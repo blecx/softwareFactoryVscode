@@ -90,6 +90,7 @@ class ReasonCode(StrEnum):
 
     MISSING_CONFIG = "missing-config"
     MISSING_SECRET = "missing-secret"
+    MISSING_MOUNT = "missing-mount"
     DEPENDENCY_UNHEALTHY = "dependency-unhealthy"
     IDENTITY_MISMATCH = "identity-mismatch"
     ENDPOINT_UNREACHABLE = "endpoint-unreachable"

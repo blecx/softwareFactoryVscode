@@ -161,6 +161,27 @@ def build_full_service_inventory(
     }
 
 
+def stub_runtime_manager_with_successful_probes(
+    monkeypatch,
+    stack_module: Any,
+    *,
+    registry_path: Path | None = None,
+) -> None:
+    monkeypatch.setattr(
+        stack_module,
+        "build_runtime_manager",
+        lambda workspace_file=stack_module.DEFAULT_WORKSPACE_FILENAME: stack_module.MCPRuntimeManager(
+            registry_path=registry_path,
+            default_workspace_file=workspace_file,
+            docker_available_checker=lambda: True,
+            service_inventory_loader=stack_module.collect_service_inventory,
+            stack_module_loader=lambda: stack_module,
+            http_probe_func=lambda url, timeout, allow_http_error: None,
+            mcp_initialize_probe=lambda url, timeout, workspace_id: None,
+        ),
+    )
+
+
 def init_git_repo(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     git("init", cwd=path)
@@ -1727,7 +1748,7 @@ def test_verify_factory_runtime_passes_with_mocked_services(
                 f"TARGET_WORKSPACE_PATH={target_repo}",
                 f"PROJECT_WORKSPACE_ID={target_repo.name}",
                 f"COMPOSE_PROJECT_NAME=factory_{target_repo.name}",
-                "CONTEXT7_API_KEY=",
+                "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
         ),
@@ -1804,6 +1825,11 @@ def test_verify_factory_runtime_passes_with_mocked_services(
         verify_factory_install.factory_stack,
         "collect_service_inventory",
         lambda _name: build_full_service_inventory(runtime_config),
+    )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        verify_factory_install.factory_stack,
+        registry_path=registry_path,
     )
     monkeypatch.setattr(
         verify_factory_install,
@@ -2721,6 +2747,11 @@ def test_factory_stack_status_reports_degraded_when_required_service_restarts(
     monkeypatch.setattr(
         factory_stack.factory_workspace, "ports_available", lambda ports: True
     )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
 
     target_repo = tmp_path / "target-project"
     repo_root = target_repo / ".copilot/softwareFactoryVscode"
@@ -2730,6 +2761,10 @@ def test_factory_stack_status_reports_degraded_when_required_service_restarts(
         (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
             encoding="utf-8"
         ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "CONTEXT7_API_KEY=test-context7-key\n",
         encoding="utf-8",
     )
 
@@ -3142,6 +3177,10 @@ def test_factory_stack_preflight_reports_needs_ramp_up_for_installed_workspace(
         ),
         encoding="utf-8",
     )
+    (repo_root / ".factory.env").write_text(
+        "CONTEXT7_API_KEY=test-context7-key\n",
+        encoding="utf-8",
+    )
 
     config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
     factory_workspace.sync_runtime_artifacts(
@@ -3164,6 +3203,11 @@ def test_factory_stack_preflight_reports_needs_ramp_up_for_installed_workspace(
         )
         + "\n",
         encoding="utf-8",
+    )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
     )
 
     report = factory_stack.build_preflight_report(
@@ -3245,6 +3289,11 @@ def test_factory_stack_preflight_treats_promoted_shared_services_as_external(
     monkeypatch.setattr(
         factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
     )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
 
     target_repo = tmp_path / "target-project"
     repo_root = target_repo / ".copilot/softwareFactoryVscode"
@@ -3268,7 +3317,7 @@ def test_factory_stack_preflight_treats_promoted_shared_services_as_external(
                 "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
                 "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
                 "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
-                "CONTEXT7_API_KEY=",
+                "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
         ),
@@ -3336,6 +3385,11 @@ def test_factory_stack_preflight_flags_missing_shared_tenant_enforcement(
     monkeypatch.setattr(
         factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
     )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
 
     target_repo = tmp_path / "target-project"
     repo_root = target_repo / ".copilot/softwareFactoryVscode"
@@ -3358,7 +3412,7 @@ def test_factory_stack_preflight_flags_missing_shared_tenant_enforcement(
                 "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
                 "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
                 "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
-                "CONTEXT7_API_KEY=",
+                "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
         ),
@@ -3429,6 +3483,11 @@ def test_factory_stack_status_reports_shared_mode_tenant_diagnostics(
     monkeypatch.setattr(
         factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
     )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
 
     target_repo = tmp_path / "target-project"
     repo_root = target_repo / ".copilot/softwareFactoryVscode"
@@ -3453,7 +3512,7 @@ def test_factory_stack_status_reports_shared_mode_tenant_diagnostics(
                 "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
                 "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
                 "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
-                "CONTEXT7_API_KEY=",
+                "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
         ),
@@ -3508,6 +3567,11 @@ def test_factory_stack_preflight_flags_workspace_owned_duplicates_in_shared_mode
     monkeypatch.setattr(
         factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
     )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
 
     target_repo = tmp_path / "target-project"
     repo_root = target_repo / ".copilot/softwareFactoryVscode"
@@ -3531,7 +3595,7 @@ def test_factory_stack_preflight_flags_workspace_owned_duplicates_in_shared_mode
                 "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
                 "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
                 "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
-                "CONTEXT7_API_KEY=",
+                "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
         ),
@@ -3613,7 +3677,7 @@ def test_factory_stack_start_scales_promoted_shared_services_to_zero(
                 "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
                 "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
                 "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
-                "CONTEXT7_API_KEY=",
+                "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
         ),
@@ -3660,6 +3724,11 @@ def test_factory_stack_preflight_detects_workspace_port_drift(
     monkeypatch.setattr(
         factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
     )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
 
     target_repo = tmp_path / "target-project"
     repo_root = target_repo / ".copilot/softwareFactoryVscode"
@@ -3669,6 +3738,10 @@ def test_factory_stack_preflight_detects_workspace_port_drift(
         (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
             encoding="utf-8"
         ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "CONTEXT7_API_KEY=test-context7-key\n",
         encoding="utf-8",
     )
 
@@ -3719,6 +3792,80 @@ def test_factory_stack_preflight_detects_workspace_port_drift(
         "Generated workspace MCP URL drift detected" in issue
         for issue in report["issues"]
     )
+
+
+def test_factory_stack_preflight_reports_missing_required_secret_from_manager(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(
+        factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
+    )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "CONTEXT7_API_KEY=\n",
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_service_inventory",
+        lambda _name: build_full_service_inventory(config),
+    )
+
+    report = factory_stack.build_preflight_report(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+
+    assert report["status"] == "config-drift"
+    assert "missing-secret" in report["reason_codes"]
+    assert any("CONTEXT7_API_KEY" in issue for issue in report["issues"])
 
 
 def test_factory_stack_status_does_not_rewrite_custom_env(
@@ -3781,6 +3928,11 @@ def test_factory_stack_status_uses_manager_snapshot_for_runtime_truth(
         "get_factory_head_commit",
         lambda _path: "deadbeef",
     )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
 
     target_repo = tmp_path / "target-project"
     repo_root = target_repo / ".copilot/softwareFactoryVscode"
@@ -3790,6 +3942,10 @@ def test_factory_stack_status_uses_manager_snapshot_for_runtime_truth(
         (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
             encoding="utf-8"
         ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "CONTEXT7_API_KEY=test-context7-key\n",
         encoding="utf-8",
     )
 
@@ -4011,7 +4167,7 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
             "AGENT_BUS_PORT=3231",
             "APPROVAL_GATE_PORT=8201",
             "PORT_TUI=9290",
-            "CONTEXT7_API_KEY=",
+            "CONTEXT7_API_KEY=test-context7-key",
             "",
         ]
     )
@@ -4081,6 +4237,11 @@ def test_verify_runtime_uses_generated_workspace_endpoint_settings(
         verify_factory_install.factory_stack,
         "get_factory_head_commit",
         lambda _path: "deadbeef",
+    )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        verify_factory_install.factory_stack,
+        registry_path=registry_path,
     )
     monkeypatch.setattr(
         verify_factory_install,
