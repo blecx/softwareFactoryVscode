@@ -2953,6 +2953,76 @@ def test_factory_stack_status_demotes_running_workspace_to_stopped_when_services
     )
 
 
+def test_factory_stack_status_hides_proposal_bound_suspended_state(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state=factory_stack.RuntimeLifecycleState.SUSPENDED.value,
+        active=False,
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should not re-infer runtime truth when preflight already provides a snapshot"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "needs-ramp-up",
+            "recommended_action": "start",
+            "snapshot": build_runtime_snapshot_contract(
+                lifecycle_state=factory_stack.RuntimeLifecycleState.STOPPED,
+                persisted_runtime_state=factory_stack.RuntimeLifecycleState.SUSPENDED.value,
+                readiness_status="needs-ramp-up",
+                recommended_action="start",
+                ready=False,
+            ),
+        },
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root, env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "runtime_state=stopped" in output
+    assert "runtime_state=suspended" not in output
+
+    registry = factory_workspace.load_registry(registry_path)
+    assert (
+        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "stopped"
+    )
+
+
 def test_factory_stack_status_preserves_failed_state_when_services_missing(
     tmp_path: Path,
     monkeypatch,

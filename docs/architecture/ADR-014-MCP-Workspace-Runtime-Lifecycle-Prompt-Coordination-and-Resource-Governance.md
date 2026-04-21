@@ -138,6 +138,10 @@ workflows to redefine the accepted meanings from earlier ADRs.
   - `repairing`
   - `degraded`
   - `runtime-deleted`
+- **Rule:** In the current practical baseline, `suspended` remains
+  proposal-bound vocabulary only. Operator-facing status, output, and derived
+  docs MUST NOT present suspend as a supported lifecycle state until explicit,
+  test-backed suspend/resume semantics land in a later implementation slice.
 - **Rule:** The accepted `installed` and `active` meanings from `ADR-009` are
   not redefined here.
 - **Rule:** `installed` remains an architectural fact about the installed
