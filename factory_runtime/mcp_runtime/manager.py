@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence
@@ -27,12 +28,17 @@ import factory_workspace
 
 from factory_runtime.mcp_runtime.catalog import build_catalog
 from factory_runtime.mcp_runtime.models import (
+    LeaseKind,
+    LeaseMetadata,
     ReadinessResult,
     ReadinessStatus,
     ReasonCode,
     RecommendedAction,
+    RecoveryClassification,
+    RecoveryMetadata,
     RepairResult,
     RepairStep,
+    RuntimeActionTrigger,
     RuntimeCatalog,
     RuntimeLifecycleState,
     RuntimeProfileName,
@@ -44,6 +50,27 @@ from factory_runtime.mcp_runtime.models import (
 )
 
 _PORT_MAPPING_PATTERN = re.compile(r"(?P<host>\d+)->(?P<container>\d+)/(?:tcp|udp)")
+_METADATA_DRIFT_REASON_CODES = {
+    ReasonCode.WORKSPACE_URL_DRIFT,
+    ReasonCode.MANIFEST_SERVER_URL_DRIFT,
+    ReasonCode.MANIFEST_HEALTH_URL_DRIFT,
+    ReasonCode.SHARED_SERVICE_DISCOVERY_MISSING,
+    ReasonCode.SHARED_MODE_TENANT_ENFORCEMENT_MISSING,
+    ReasonCode.SHARED_MODE_WORKSPACE_DUPLICATE,
+    ReasonCode.REGISTRY_RECORD_MISSING,
+    ReasonCode.MISSING_RUNTIME_METADATA,
+}
+_RESTART_REASON_CODES = {
+    ReasonCode.NO_RUNNING_SERVICES,
+    ReasonCode.SERVICE_NOT_RUNNING,
+    ReasonCode.SERVICE_UNHEALTHY,
+}
+_RECREATE_REASON_CODES = {
+    ReasonCode.SERVICE_MISSING,
+    ReasonCode.SERVICE_PORT_MISMATCH,
+    ReasonCode.ENDPOINT_UNREACHABLE,
+    ReasonCode.MCP_INITIALIZE_FAILED,
+}
 
 
 class MCPRuntimeManager:
@@ -63,11 +90,19 @@ class MCPRuntimeManager:
         service_inventory_loader: (
             Callable[[str], dict[str, dict[str, Any]]] | None
         ) = None,
+        stack_module_loader: Callable[[], Any] | None = None,
+        repair_backoff_seconds: Sequence[float] = (0.0,),
+        sleep_func: Callable[[float], None] | None = None,
+        max_repair_failures: int = 3,
     ) -> None:
         self._registry_path = registry_path
         self._default_workspace_file = default_workspace_file
         self._docker_available_checker = docker_available_checker
         self._service_inventory_loader = service_inventory_loader
+        self._stack_module_loader = stack_module_loader
+        self._repair_backoff_seconds = tuple(repair_backoff_seconds) or (0.0,)
+        self._sleep_func = sleep_func or time.sleep
+        self._max_repair_failures = max(1, int(max_repair_failures))
 
     def load_catalog(self) -> RuntimeCatalog:
         return build_catalog()
@@ -269,9 +304,14 @@ class MCPRuntimeManager:
         raw_record = registry.get("workspaces", {}).get(config.factory_instance_id, {})
         record = raw_record if isinstance(raw_record, dict) else {}
         installed = factory_workspace.has_managed_workspace_contract(target_dir)
-        selection = SelectionMetadata(
+        persisted_runtime_state = (
+            self._coerce_optional_text(record.get("runtime_state")) or "installed"
+        )
+        active = registry.get("active_workspace", "") == config.factory_instance_id
+        selection = self._build_selection_metadata(
+            record,
             installed=installed,
-            active=registry.get("active_workspace", "") == config.factory_instance_id,
+            active=active,
             profiles=profile_selection,
         )
 
@@ -317,16 +357,27 @@ class MCPRuntimeManager:
             expected_service_ports,
         )
         lifecycle_state = self._infer_lifecycle_state(
-            persisted_runtime_state=str(
-                record.get("runtime_state", "installed")
-            ).strip()
-            or "installed",
+            persisted_runtime_state=persisted_runtime_state,
             services=services,
             docker_available=docker_available,
             installed=installed,
         )
+        last_transition_at = self._coerce_optional_text(
+            record.get("updated_at") or record.get("installed_at")
+        )
         last_transition_reason_codes = self._tuple_unique(
-            [ReasonCode.REGISTRY_RECORD_MISSING] if not record and installed else []
+            [
+                *self._extract_record_transition_reason_codes(
+                    record,
+                    persisted_runtime_state=persisted_runtime_state,
+                    last_transition_at=last_transition_at,
+                ),
+                *(
+                    [ReasonCode.REGISTRY_RECORD_MISSING]
+                    if not record and installed
+                    else []
+                ),
+            ]
         )
 
         snapshot = RuntimeSnapshot(
@@ -337,14 +388,8 @@ class MCPRuntimeManager:
             compose_project_name=config.compose_project_name,
             lifecycle_state=lifecycle_state,
             selection=selection,
-            persisted_runtime_state=str(
-                record.get("runtime_state", "installed")
-            ).strip()
-            or "installed",
-            last_transition_at=str(
-                record.get("updated_at") or record.get("installed_at") or ""
-            ).strip()
-            or None,
+            persisted_runtime_state=persisted_runtime_state,
+            last_transition_at=last_transition_at,
             last_transition_reason_codes=last_transition_reason_codes,
             shared_mode=config.shared_service_mode,
             shared_mode_status=str(
@@ -364,9 +409,11 @@ class MCPRuntimeManager:
             inventory_error=inventory_error,
         )
         readiness = self.evaluate_readiness(snapshot)
+        recovery = self._build_recovery_metadata(snapshot, record, readiness)
         return replace(
             snapshot,
             readiness=readiness,
+            recovery=recovery,
             last_transition_reason_codes=self._tuple_unique(
                 [*snapshot.last_transition_reason_codes, *readiness.reason_codes]
             ),
@@ -613,11 +660,75 @@ class MCPRuntimeManager:
         repo_root: Path,
         *,
         env_file: Path | None = None,
-        trigger: str = "cleanup",
+        trigger: RuntimeActionTrigger | str = "cleanup",
+        reason_codes: Iterable[ReasonCode | str] | None = None,
     ) -> int:
-        del trigger
         stack = self._load_factory_stack_module()
-        return int(stack.cleanup_workspace(repo_root, env_file=env_file))
+        normalized_trigger = self._normalize_runtime_action_trigger(trigger)
+        normalized_reason_codes = self._coerce_reason_codes(reason_codes)
+        resolved_env_file = stack.resolve_env_file(repo_root, env_file)
+        config: factory_workspace.WorkspaceRuntimeConfig | None = None
+        target_path = self._resolve_target_dir_from_env(repo_root, resolved_env_file)
+
+        try:
+            config = stack.sync_workspace_runtime(
+                repo_root,
+                env_file=resolved_env_file,
+                persist=False,
+            )
+            target_path = config.target_dir
+            action = ["down", "-v", "--remove-orphans"]
+            stack.run_compose_command(
+                repo_root,
+                stack.build_compose_command(repo_root, resolved_env_file, action),
+            )
+            print(
+                f"🧹 Removed Docker stack and volumes for {config.factory_instance_id}"
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(
+                "⚠️ Could not completely remove docker stack (it may not exist): "
+                f"{exc}"
+            )
+            if config is None:
+                config = self._build_runtime_config_for_target(target_path, repo_root)
+
+        if resolved_env_file.exists():
+            resolved_env_file.unlink()
+            print(f"🧹 Deleted {resolved_env_file}")
+
+        manifest_path = (
+            target_path
+            / factory_workspace.TMP_SUBPATH
+            / factory_workspace.RUNTIME_MANIFEST_FILENAME
+        )
+        if manifest_path.exists():
+            manifest_path.unlink()
+            print(f"🧹 Deleted {manifest_path}")
+
+        self._remove_runtime_data_dirs(config)
+        self._persist_runtime_deleted_record(
+            target_path=target_path,
+            factory_dir=repo_root,
+            config=config,
+            trigger=normalized_trigger,
+            reason_codes=normalized_reason_codes,
+        )
+        return 0
+
+    def delete_runtime(
+        self,
+        repo_root: Path,
+        *,
+        env_file: Path | None = None,
+        reason_codes: Iterable[ReasonCode | str] | None = None,
+    ) -> int:
+        return self.cleanup(
+            repo_root,
+            env_file=env_file,
+            trigger=RuntimeActionTrigger.DELETE_RUNTIME,
+            reason_codes=reason_codes,
+        )
 
     def repair(
         self,
@@ -626,26 +737,1010 @@ class MCPRuntimeManager:
         env_file: Path | None = None,
         selected_profiles: Iterable[RuntimeProfileName | str] | None = None,
     ) -> RepairResult:
-        del env_file, selected_profiles
-        final_state = None
-        if repo_root is not None:
-            try:
-                snapshot = self.build_snapshot(repo_root)
-            except Exception:
-                final_state = None
-            else:
-                final_state = snapshot.lifecycle_state
-        return RepairResult(
-            attempted=False,
-            success=False,
-            attempted_steps=(RepairStep.REPROBE,),
-            reason_codes=(ReasonCode.REPAIR_NOT_IMPLEMENTED,),
-            details=(
-                "Phase 1 establishes the repair contract surface only; bounded "
-                "repair semantics land in the later cleanup/repair rollout slice.",
-            ),
-            final_state=final_state,
+        if repo_root is None:
+            return RepairResult(
+                attempted=False,
+                success=False,
+                reason_codes=(ReasonCode.MISSING_RUNTIME_METADATA,),
+                details=(
+                    "Repair requires the canonical factory repo root so the runtime "
+                    "manager can assemble a snapshot and mutate runtime state.",
+                ),
+            )
+
+        resolved_env_file = self.resolve_env_file(repo_root, env_file)
+        try:
+            snapshot = self.build_snapshot(
+                repo_root,
+                env_file=resolved_env_file,
+                selected_profiles=selected_profiles,
+            )
+        except Exception as exc:  # noqa: BLE001
+            return RepairResult(
+                attempted=False,
+                success=False,
+                reason_codes=(ReasonCode.UNEXPECTED_ERROR,),
+                details=(
+                    "Unable to assemble a canonical runtime snapshot before repair: "
+                    f"{exc}",
+                ),
+            )
+
+        _, existing_record, _ = self._load_runtime_registry_entry(
+            snapshot.instance_id,
+            snapshot.target_dir,
         )
+        existing_failure_count = self._coerce_int(
+            (existing_record or {}).get("repair_failure_count"),
+            default=0,
+        )
+
+        if existing_failure_count >= self._max_repair_failures:
+            result = RepairResult(
+                attempted=False,
+                success=False,
+                attempted_steps=(RepairStep.SURFACE_TERMINAL_FAILURE,),
+                reason_codes=(
+                    ReasonCode.REPAIR_CIRCUIT_BREAKER,
+                    ReasonCode.TERMINAL_RUNTIME_FAILURE,
+                ),
+                details=(
+                    "Bounded repair circuit-breaker is already tripped for this "
+                    f"runtime after {existing_failure_count} failed repair attempt(s).",
+                ),
+                final_state=snapshot.lifecycle_state,
+            )
+            return self._finalize_repair_outcome(
+                snapshot,
+                result,
+                existing_failure_count=existing_failure_count,
+            )
+
+        attempted_steps: list[RepairStep] = [RepairStep.REPROBE]
+        reason_codes: list[ReasonCode] = [ReasonCode.REPAIR_REPROBE]
+        details: list[str] = []
+
+        readiness = snapshot.readiness
+        if readiness is None:
+            result = RepairResult(
+                attempted=True,
+                success=False,
+                attempted_steps=tuple(attempted_steps),
+                reason_codes=(ReasonCode.UNEXPECTED_ERROR,),
+                details=("Runtime snapshot did not include a readiness result.",),
+                final_state=snapshot.lifecycle_state,
+            )
+            return self._finalize_repair_outcome(
+                snapshot,
+                result,
+                existing_failure_count=existing_failure_count,
+            )
+
+        if readiness.ready:
+            result = RepairResult(
+                attempted=True,
+                success=True,
+                attempted_steps=tuple(attempted_steps),
+                reason_codes=tuple(reason_codes),
+                details=(
+                    "Runtime readiness succeeded during the initial re-probe; no "
+                    "mutating repair step was necessary.",
+                ),
+                final_state=snapshot.lifecycle_state,
+            )
+            return self._finalize_repair_outcome(
+                snapshot,
+                result,
+                existing_failure_count=existing_failure_count,
+            )
+
+        host_reason_code = self._classify_host_failure(snapshot)
+        if host_reason_code is not None:
+            result = RepairResult(
+                attempted=True,
+                success=False,
+                attempted_steps=(
+                    RepairStep.REPROBE,
+                    RepairStep.SURFACE_TERMINAL_FAILURE,
+                ),
+                reason_codes=self._tuple_unique(
+                    [
+                        *reason_codes,
+                        host_reason_code,
+                        ReasonCode.TERMINAL_RUNTIME_FAILURE,
+                    ]
+                ),
+                details=(
+                    "Repair is blocked by a host-level runtime failure that must be "
+                    "resolved outside the service-local repair ladder.",
+                ),
+                final_state=snapshot.lifecycle_state,
+            )
+            return self._finalize_repair_outcome(
+                snapshot,
+                result,
+                existing_failure_count=existing_failure_count,
+            )
+
+        current_snapshot = snapshot
+
+        if self._needs_restart(current_snapshot):
+            targets = self._select_workspace_owned_targets(current_snapshot)
+            attempted_steps.append(RepairStep.RESTART_SERVICE)
+            reason_codes.append(ReasonCode.REPAIR_RESTART)
+            details.append(
+                "Attempting bounded service restart for: "
+                f"{', '.join(targets) if targets else 'none'}"
+            )
+            next_snapshot, terminal_result = self._attempt_compose_repair_step(
+                step=RepairStep.RESTART_SERVICE,
+                action=["up", "-d", *targets],
+                repo_root=repo_root,
+                env_file=resolved_env_file,
+                selected_profiles=selected_profiles,
+                current_snapshot=current_snapshot,
+                attempted_steps=attempted_steps,
+                reason_codes=reason_codes,
+                details=details,
+            )
+            if terminal_result is not None:
+                return self._finalize_repair_outcome(
+                    current_snapshot,
+                    terminal_result,
+                    existing_failure_count=existing_failure_count,
+                )
+            if next_snapshot is not None:
+                current_snapshot = next_snapshot
+                if current_snapshot.readiness and current_snapshot.readiness.ready:
+                    result = RepairResult(
+                        attempted=True,
+                        success=True,
+                        attempted_steps=tuple(attempted_steps),
+                        reason_codes=self._tuple_unique(reason_codes),
+                        details=tuple(details),
+                        final_state=current_snapshot.lifecycle_state,
+                    )
+                    return self._finalize_repair_outcome(
+                        current_snapshot,
+                        result,
+                        existing_failure_count=existing_failure_count,
+                    )
+
+        if self._needs_recreate(current_snapshot):
+            targets = self._select_workspace_owned_targets(current_snapshot)
+            attempted_steps.append(RepairStep.RECREATE_SERVICE)
+            reason_codes.append(ReasonCode.REPAIR_RECREATE)
+            details.append(
+                "Attempting bounded service recreation for: "
+                f"{', '.join(targets) if targets else 'none'}"
+            )
+            next_snapshot, terminal_result = self._attempt_compose_repair_step(
+                step=RepairStep.RECREATE_SERVICE,
+                action=["up", "-d", "--force-recreate", "--no-deps", *targets],
+                repo_root=repo_root,
+                env_file=resolved_env_file,
+                selected_profiles=selected_profiles,
+                current_snapshot=current_snapshot,
+                attempted_steps=attempted_steps,
+                reason_codes=reason_codes,
+                details=details,
+            )
+            if terminal_result is not None:
+                return self._finalize_repair_outcome(
+                    current_snapshot,
+                    terminal_result,
+                    existing_failure_count=existing_failure_count,
+                )
+            if next_snapshot is not None:
+                current_snapshot = next_snapshot
+                if current_snapshot.readiness and current_snapshot.readiness.ready:
+                    result = RepairResult(
+                        attempted=True,
+                        success=True,
+                        attempted_steps=tuple(attempted_steps),
+                        reason_codes=self._tuple_unique(reason_codes),
+                        details=tuple(details),
+                        final_state=current_snapshot.lifecycle_state,
+                    )
+                    return self._finalize_repair_outcome(
+                        current_snapshot,
+                        result,
+                        existing_failure_count=existing_failure_count,
+                    )
+
+        if self._needs_dependency_repair(current_snapshot):
+            dependencies = self._collect_dependency_targets(current_snapshot)
+            if dependencies:
+                attempted_steps.append(RepairStep.REPAIR_DEPENDENCY)
+                reason_codes.append(ReasonCode.REPAIR_DEPENDENCY)
+                details.append(
+                    "Attempting dependency repair for: " f"{', '.join(dependencies)}"
+                )
+                next_snapshot, terminal_result = self._attempt_compose_repair_step(
+                    step=RepairStep.REPAIR_DEPENDENCY,
+                    action=["up", "-d", *dependencies],
+                    repo_root=repo_root,
+                    env_file=resolved_env_file,
+                    selected_profiles=selected_profiles,
+                    current_snapshot=current_snapshot,
+                    attempted_steps=attempted_steps,
+                    reason_codes=reason_codes,
+                    details=details,
+                )
+                if terminal_result is not None:
+                    return self._finalize_repair_outcome(
+                        current_snapshot,
+                        terminal_result,
+                        existing_failure_count=existing_failure_count,
+                    )
+                if next_snapshot is not None:
+                    current_snapshot = next_snapshot
+                    if current_snapshot.readiness and current_snapshot.readiness.ready:
+                        result = RepairResult(
+                            attempted=True,
+                            success=True,
+                            attempted_steps=tuple(attempted_steps),
+                            reason_codes=self._tuple_unique(reason_codes),
+                            details=tuple(details),
+                            final_state=current_snapshot.lifecycle_state,
+                        )
+                        return self._finalize_repair_outcome(
+                            current_snapshot,
+                            result,
+                            existing_failure_count=existing_failure_count,
+                        )
+
+        if self._needs_metadata_reconcile(current_snapshot):
+            attempted_steps.append(RepairStep.RECONCILE_METADATA)
+            reason_codes.append(ReasonCode.REPAIR_RECONCILE_METADATA)
+            details.append(
+                "Reconciling runtime metadata/state drift through the authoritative "
+                "workspace artifact sync path."
+            )
+            try:
+                config = self._prepare_runtime_config_for_actions(
+                    repo_root,
+                    resolved_env_file,
+                    current_snapshot,
+                )
+                factory_workspace.sync_runtime_artifacts(
+                    config,
+                    registry_path=self._registry_path,
+                    runtime_state=current_snapshot.persisted_runtime_state,
+                    active=current_snapshot.selection.active,
+                )
+            except Exception as exc:  # noqa: BLE001
+                result = RepairResult(
+                    attempted=True,
+                    success=False,
+                    attempted_steps=tuple(
+                        [*attempted_steps, RepairStep.SURFACE_TERMINAL_FAILURE]
+                    ),
+                    reason_codes=self._tuple_unique(
+                        [
+                            *reason_codes,
+                            self._classify_exception_reason_code(exc),
+                            ReasonCode.TERMINAL_RUNTIME_FAILURE,
+                        ]
+                    ),
+                    details=tuple(
+                        [
+                            *details,
+                            "Runtime metadata reconciliation failed: " f"{exc}",
+                        ]
+                    ),
+                    final_state=current_snapshot.lifecycle_state,
+                )
+                return self._finalize_repair_outcome(
+                    current_snapshot,
+                    result,
+                    existing_failure_count=existing_failure_count,
+                )
+
+            current_snapshot = self.build_snapshot(
+                repo_root,
+                env_file=resolved_env_file,
+                selected_profiles=selected_profiles,
+            )
+            if current_snapshot.readiness and current_snapshot.readiness.ready:
+                result = RepairResult(
+                    attempted=True,
+                    success=True,
+                    attempted_steps=tuple(attempted_steps),
+                    reason_codes=self._tuple_unique(reason_codes),
+                    details=tuple(details),
+                    final_state=current_snapshot.lifecycle_state,
+                )
+                return self._finalize_repair_outcome(
+                    current_snapshot,
+                    result,
+                    existing_failure_count=existing_failure_count,
+                )
+
+        result = RepairResult(
+            attempted=True,
+            success=False,
+            attempted_steps=tuple(
+                [*attempted_steps, RepairStep.SURFACE_TERMINAL_FAILURE]
+            ),
+            reason_codes=self._tuple_unique(
+                [
+                    *reason_codes,
+                    *(
+                        current_snapshot.readiness.reason_codes
+                        if current_snapshot.readiness
+                        else ()
+                    ),
+                    ReasonCode.TERMINAL_RUNTIME_FAILURE,
+                ]
+            ),
+            details=tuple(
+                [
+                    *details,
+                    "Bounded repair exhausted the minimal ladder without restoring "
+                    "runtime readiness.",
+                ]
+            ),
+            final_state=current_snapshot.lifecycle_state,
+        )
+        return self._finalize_repair_outcome(
+            current_snapshot,
+            result,
+            existing_failure_count=existing_failure_count,
+        )
+
+    def _build_selection_metadata(
+        self,
+        record: dict[str, Any],
+        *,
+        installed: bool,
+        active: bool,
+        profiles: Any,
+    ) -> SelectionMetadata:
+        return SelectionMetadata(
+            installed=installed,
+            active=active,
+            profiles=profiles,
+            activity_lease=self._build_lease_metadata(
+                record,
+                prefix="activity",
+                kind=LeaseKind.ACTIVITY,
+                default_present=active or bool(record.get("last_activated_at")),
+                default_renewed_at=self._coerce_optional_text(
+                    record.get("last_activated_at")
+                ),
+            ),
+            execution_lease=self._build_lease_metadata(
+                record,
+                prefix="execution",
+                kind=LeaseKind.EXECUTION,
+            ),
+        )
+
+    def _build_lease_metadata(
+        self,
+        record: dict[str, Any],
+        *,
+        prefix: str,
+        kind: LeaseKind,
+        default_present: bool = False,
+        default_renewed_at: str | None = None,
+    ) -> LeaseMetadata:
+        present = self._coerce_bool(
+            record.get(f"{prefix}_lease_present"), default_present
+        )
+        holder = self._coerce_optional_text(record.get(f"{prefix}_lease_holder")) or ""
+        renewed_at = (
+            self._coerce_optional_text(record.get(f"{prefix}_lease_renewed_at"))
+            or default_renewed_at
+        )
+        expires_at = self._coerce_optional_text(
+            record.get(f"{prefix}_lease_expires_at")
+        )
+        return LeaseMetadata(
+            kind=kind,
+            present=present,
+            holder=holder,
+            renewed_at=renewed_at,
+            expires_at=expires_at,
+        )
+
+    def _build_recovery_metadata(
+        self,
+        snapshot: RuntimeSnapshot,
+        record: dict[str, Any],
+        readiness: ReadinessResult,
+    ) -> RecoveryMetadata:
+        last_trigger_raw = (
+            self._coerce_optional_text(record.get("last_runtime_action")) or ""
+        )
+        last_trigger = None
+        if last_trigger_raw:
+            try:
+                last_trigger = RuntimeActionTrigger(last_trigger_raw)
+            except ValueError:
+                last_trigger = None
+
+        last_trigger_at = self._coerce_optional_text(
+            record.get("last_runtime_action_at")
+        )
+        last_completed_tool_call_at = self._coerce_optional_text(
+            record.get("last_completed_tool_call_boundary_at")
+        )
+        last_reason_codes = self._coerce_reason_codes(
+            record.get("last_runtime_action_reason_codes", ())
+        )
+        repair_failure_count = self._coerce_int(
+            record.get("repair_failure_count"),
+            default=0,
+        )
+        circuit_breaker_tripped_at = self._coerce_optional_text(
+            record.get("repair_circuit_breaker_tripped_at")
+        )
+        classification = RecoveryClassification.RESUME_SAFE
+
+        if circuit_breaker_tripped_at or any(
+            code
+            in {
+                ReasonCode.TERMINAL_RUNTIME_FAILURE,
+                ReasonCode.REPAIR_CIRCUIT_BREAKER,
+                ReasonCode.HOST_DOCKER_UNAVAILABLE,
+                ReasonCode.HOST_NETWORK_UNAVAILABLE,
+                ReasonCode.HOST_DISK_EXHAUSTED,
+            }
+            for code in last_reason_codes
+        ):
+            classification = RecoveryClassification.MANUAL_RECOVERY_REQUIRED
+        elif snapshot.lifecycle_state in {
+            RuntimeLifecycleState.STARTING,
+            RuntimeLifecycleState.REPAIRING,
+        } and (
+            snapshot.selection.execution_lease
+            and snapshot.selection.execution_lease.present
+        ):
+            classification = RecoveryClassification.RESUME_UNSAFE
+        elif (
+            not last_completed_tool_call_at
+            and snapshot.selection.execution_lease
+            and snapshot.selection.execution_lease.present
+            and not readiness.ready
+        ):
+            classification = RecoveryClassification.RESUME_UNSAFE
+
+        return RecoveryMetadata(
+            classification=classification,
+            completed_tool_call_boundary=bool(last_completed_tool_call_at),
+            last_completed_tool_call_at=last_completed_tool_call_at,
+            last_trigger=last_trigger,
+            last_trigger_at=last_trigger_at,
+            last_reason_codes=last_reason_codes,
+            repair_failure_count=repair_failure_count,
+            circuit_breaker_tripped=bool(circuit_breaker_tripped_at),
+            circuit_breaker_tripped_at=circuit_breaker_tripped_at,
+        )
+
+    def _extract_record_transition_reason_codes(
+        self,
+        record: dict[str, Any],
+        *,
+        persisted_runtime_state: str,
+        last_transition_at: str | None,
+    ) -> tuple[ReasonCode, ...]:
+        if not record:
+            return ()
+        last_action_at = self._coerce_optional_text(
+            record.get("last_runtime_action_at")
+        )
+        if persisted_runtime_state == RuntimeLifecycleState.RUNTIME_DELETED.value:
+            return self._coerce_reason_codes(
+                record.get("last_runtime_action_reason_codes", ())
+            )
+        if last_action_at and last_action_at == last_transition_at:
+            return self._coerce_reason_codes(
+                record.get("last_runtime_action_reason_codes", ())
+            )
+        return ()
+
+    def _normalize_runtime_action_trigger(
+        self,
+        trigger: RuntimeActionTrigger | str,
+    ) -> RuntimeActionTrigger:
+        if isinstance(trigger, RuntimeActionTrigger):
+            return trigger
+        return RuntimeActionTrigger(str(trigger).strip())
+
+    def _coerce_reason_codes(
+        self,
+        raw_values: Iterable[ReasonCode | str] | Any,
+    ) -> tuple[ReasonCode, ...]:
+        if raw_values is None:
+            return ()
+        if isinstance(raw_values, (str, ReasonCode)):
+            candidates: Iterable[ReasonCode | str] = (raw_values,)
+        else:
+            candidates = raw_values
+        normalized: list[ReasonCode] = []
+        for value in candidates:
+            try:
+                code = (
+                    value
+                    if isinstance(value, ReasonCode)
+                    else ReasonCode(str(value).strip())
+                )
+            except ValueError:
+                continue
+            if code not in normalized:
+                normalized.append(code)
+        return tuple(normalized)
+
+    def _coerce_bool(self, value: Any, default: bool = False) -> bool:
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on"}:
+                return True
+            if normalized in {"0", "false", "no", "off", ""}:
+                return False
+        return bool(value)
+
+    def _coerce_int(self, value: Any, *, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    def _coerce_optional_text(self, value: Any) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text or text.lower() in {"none", "null"}:
+            return None
+        return text
+
+    def _build_runtime_config_for_target(
+        self,
+        target_path: Path,
+        factory_dir: Path,
+    ) -> factory_workspace.WorkspaceRuntimeConfig | None:
+        try:
+            return factory_workspace.build_runtime_config(
+                target_path,
+                factory_dir=factory_dir,
+                registry_path=self._registry_path,
+                reconcile_registry_before_allocating=False,
+            )
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _remove_runtime_data_dirs(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig | None,
+    ) -> None:
+        if config is None:
+            return
+        try:
+            data_dir_str = str(config.env_values.get("FACTORY_DATA_DIR", "")).strip()
+            if not data_dir_str:
+                return
+            data_dir = Path(data_dir_str).expanduser()
+            instance_memory_dir = data_dir / "memory" / config.factory_instance_id
+            instance_bus_dir = data_dir / "bus" / config.factory_instance_id
+            for instance_dir in (instance_memory_dir, instance_bus_dir):
+                if instance_dir.exists() and instance_dir.is_dir():
+                    shutil.rmtree(instance_dir, ignore_errors=True)
+                    print(f"🧹 Erased data directory {instance_dir}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"⚠️ Could not fully erase configured data directories: {exc}")
+
+    def _load_runtime_registry_entry(
+        self,
+        instance_id: str,
+        target_path: Path,
+    ) -> tuple[str | None, dict[str, Any] | None, dict[str, Any]]:
+        registry = factory_workspace.load_registry(self._registry_path)
+        workspaces = registry.get("workspaces", {})
+        if not isinstance(workspaces, dict):
+            workspaces = {}
+            registry["workspaces"] = workspaces
+
+        if instance_id:
+            record = workspaces.get(instance_id)
+            if isinstance(record, dict):
+                return instance_id, record, registry
+
+        resolved_target = target_path.expanduser().resolve()
+        for candidate_id, record in workspaces.items():
+            if not isinstance(record, dict):
+                continue
+            raw_target = (
+                self._coerce_optional_text(record.get("target_workspace_path")) or ""
+            )
+            if not raw_target:
+                continue
+            try:
+                candidate_target = Path(raw_target).expanduser().resolve()
+            except Exception:  # noqa: BLE001
+                continue
+            if candidate_target == resolved_target:
+                return str(candidate_id), record, registry
+        return None, None, registry
+
+    def _persist_runtime_deleted_record(
+        self,
+        *,
+        target_path: Path,
+        factory_dir: Path,
+        config: factory_workspace.WorkspaceRuntimeConfig | None,
+        trigger: RuntimeActionTrigger,
+        reason_codes: tuple[ReasonCode, ...],
+    ) -> None:
+        effective_config = config or self._build_runtime_config_for_target(
+            target_path,
+            factory_dir,
+        )
+        instance_id = (
+            effective_config.factory_instance_id if effective_config is not None else ""
+        )
+        matched_instance_id, existing_record, registry = (
+            self._load_runtime_registry_entry(
+                instance_id,
+                target_path,
+            )
+        )
+        action_at = factory_workspace.utc_now_iso()
+
+        if effective_config is not None:
+            manifest = factory_workspace.build_runtime_manifest(effective_config)
+            record = factory_workspace.build_registry_record_from_manifest(
+                manifest,
+                runtime_state=RuntimeLifecycleState.RUNTIME_DELETED.value,
+                existing_record=existing_record,
+            )
+            instance_id = effective_config.factory_instance_id
+        elif existing_record is not None:
+            record = dict(existing_record)
+            instance_id = (
+                matched_instance_id
+                or str(record.get("factory_instance_id", "")).strip()
+            )
+        else:
+            return
+
+        record["runtime_state"] = RuntimeLifecycleState.RUNTIME_DELETED.value
+        record["updated_at"] = action_at
+        record["last_runtime_action"] = trigger.value
+        record["last_runtime_action_at"] = action_at
+        record["last_runtime_action_reason_codes"] = [
+            code.value for code in reason_codes
+        ]
+        record["last_completed_tool_call_boundary_at"] = action_at
+        record["repair_failure_count"] = 0
+        record["repair_circuit_breaker_tripped_at"] = None
+        registry.setdefault("workspaces", {})[instance_id] = record
+        if registry.get("active_workspace") == instance_id:
+            registry["active_workspace"] = ""
+
+        duplicate_ids = []
+        resolved_target = target_path.expanduser().resolve()
+        for candidate_id, candidate_record in registry["workspaces"].items():
+            if candidate_id == instance_id or not isinstance(candidate_record, dict):
+                continue
+            raw_target = (
+                self._coerce_optional_text(
+                    candidate_record.get("target_workspace_path")
+                )
+                or ""
+            )
+            if not raw_target:
+                continue
+            try:
+                candidate_target = Path(raw_target).expanduser().resolve()
+            except Exception:  # noqa: BLE001
+                continue
+            if candidate_target == resolved_target:
+                duplicate_ids.append(candidate_id)
+        for duplicate_id in duplicate_ids:
+            del registry["workspaces"][duplicate_id]
+
+        factory_workspace.save_registry(registry, self._registry_path)
+
+    def _prepare_runtime_config_for_actions(
+        self,
+        repo_root: Path,
+        env_file: Path,
+        snapshot: RuntimeSnapshot,
+    ) -> factory_workspace.WorkspaceRuntimeConfig:
+        stack = self._load_factory_stack_module()
+        try:
+            return stack.sync_workspace_runtime(
+                repo_root,
+                env_file=env_file,
+                persist=False,
+            )
+        except Exception:  # noqa: BLE001
+            config = self._build_runtime_config_for_target(
+                snapshot.target_dir,
+                snapshot.factory_dir,
+            )
+            if config is None:
+                raise RuntimeError(
+                    "Unable to prepare runtime configuration for bounded repair."
+                )
+            return config
+
+    def _needs_restart(self, snapshot: RuntimeSnapshot) -> bool:
+        readiness = snapshot.readiness
+        if readiness is None:
+            return False
+        return bool(set(readiness.reason_codes) & _RESTART_REASON_CODES)
+
+    def _needs_recreate(self, snapshot: RuntimeSnapshot) -> bool:
+        readiness = snapshot.readiness
+        if readiness is None:
+            return False
+        return bool(set(readiness.reason_codes) & _RECREATE_REASON_CODES)
+
+    def _needs_dependency_repair(self, snapshot: RuntimeSnapshot) -> bool:
+        readiness = snapshot.readiness
+        if readiness is None:
+            return False
+        return ReasonCode.DEPENDENCY_UNHEALTHY in readiness.reason_codes
+
+    def _needs_metadata_reconcile(self, snapshot: RuntimeSnapshot) -> bool:
+        readiness = snapshot.readiness
+        if readiness is None:
+            return False
+        return bool(set(readiness.reason_codes) & _METADATA_DRIFT_REASON_CODES)
+
+    def _select_workspace_owned_targets(self, snapshot: RuntimeSnapshot) -> list[str]:
+        readiness = snapshot.readiness
+        blocking = list(readiness.blocking_services if readiness is not None else ())
+        targets = [
+            service_name
+            for service_name in blocking
+            if service_name in snapshot.services
+            and snapshot.services[service_name].workspace_owned
+        ]
+        if targets:
+            return targets
+        return [
+            service_name
+            for service_name, record in snapshot.services.items()
+            if record.workspace_owned
+            and record.status
+            in {
+                ServiceInstanceStatus.DEGRADED,
+                ServiceInstanceStatus.MISSING,
+                ServiceInstanceStatus.STOPPED,
+            }
+        ]
+
+    def _collect_dependency_targets(self, snapshot: RuntimeSnapshot) -> list[str]:
+        catalog = snapshot.catalog or self.load_catalog()
+        dependencies: list[str] = []
+        for service_name in self._select_workspace_owned_targets(snapshot):
+            entry = catalog.services.get(service_name)
+            if entry is None:
+                continue
+            for dependency_name in entry.dependencies:
+                record = snapshot.services.get(dependency_name)
+                if record is not None and not record.workspace_owned:
+                    continue
+                if dependency_name not in dependencies:
+                    dependencies.append(dependency_name)
+        return dependencies
+
+    def _attempt_compose_repair_step(
+        self,
+        *,
+        step: RepairStep,
+        action: list[str],
+        repo_root: Path,
+        env_file: Path,
+        selected_profiles: Iterable[RuntimeProfileName | str] | None,
+        current_snapshot: RuntimeSnapshot,
+        attempted_steps: list[RepairStep],
+        reason_codes: list[ReasonCode],
+        details: list[str],
+    ) -> tuple[RuntimeSnapshot | None, RepairResult | None]:
+        if not action or len(action) <= 2:
+            return current_snapshot, None
+
+        try:
+            self._run_compose_action(repo_root, env_file, action)
+        except Exception as exc:  # noqa: BLE001
+            terminal_reason = self._classify_exception_reason_code(exc)
+            return None, RepairResult(
+                attempted=True,
+                success=False,
+                attempted_steps=tuple(
+                    [*attempted_steps, RepairStep.SURFACE_TERMINAL_FAILURE]
+                ),
+                reason_codes=self._tuple_unique(
+                    [
+                        *reason_codes,
+                        terminal_reason,
+                        ReasonCode.TERMINAL_RUNTIME_FAILURE,
+                    ]
+                ),
+                details=tuple([*details, f"Repair step `{step.value}` failed: {exc}"]),
+                final_state=current_snapshot.lifecycle_state,
+            )
+
+        self._sleep_with_backoff(step)
+        try:
+            next_snapshot = self.build_snapshot(
+                repo_root,
+                env_file=env_file,
+                selected_profiles=selected_profiles,
+            )
+        except Exception as exc:  # noqa: BLE001
+            terminal_reason = self._classify_exception_reason_code(exc)
+            return None, RepairResult(
+                attempted=True,
+                success=False,
+                attempted_steps=tuple(
+                    [*attempted_steps, RepairStep.SURFACE_TERMINAL_FAILURE]
+                ),
+                reason_codes=self._tuple_unique(
+                    [
+                        *reason_codes,
+                        terminal_reason,
+                        ReasonCode.TERMINAL_RUNTIME_FAILURE,
+                    ]
+                ),
+                details=tuple([*details, f"Post-repair re-probe failed: {exc}"]),
+                final_state=current_snapshot.lifecycle_state,
+            )
+        return next_snapshot, None
+
+    def _run_compose_action(
+        self,
+        repo_root: Path,
+        env_file: Path,
+        action: Sequence[str],
+    ) -> None:
+        stack = self._load_factory_stack_module()
+        stack.run_compose_command(
+            repo_root,
+            stack.build_compose_command(repo_root, env_file, action),
+        )
+
+    def _sleep_with_backoff(self, step: RepairStep) -> None:
+        del step
+        delay = self._repair_backoff_seconds[0] if self._repair_backoff_seconds else 0.0
+        if delay > 0:
+            self._sleep_func(delay)
+
+    def _classify_host_failure(
+        self,
+        snapshot: RuntimeSnapshot,
+    ) -> ReasonCode | None:
+        readiness = snapshot.readiness
+        if readiness is None:
+            return None
+        if readiness.status == ReadinessStatus.DOCKER_UNAVAILABLE:
+            return ReasonCode.HOST_DOCKER_UNAVAILABLE
+        if readiness.status == ReadinessStatus.DOCKER_ERROR:
+            return self._classify_exception_reason_code(snapshot.inventory_error or "")
+        return None
+
+    def _classify_exception_reason_code(self, exc: Any) -> ReasonCode:
+        text = str(exc).lower()
+        if "docker" in text and (
+            "daemon" in text or "not found" in text or "no such file" in text
+        ):
+            return ReasonCode.HOST_DOCKER_UNAVAILABLE
+        if "network" in text:
+            return ReasonCode.HOST_NETWORK_UNAVAILABLE
+        if "no space" in text or "disk" in text:
+            return ReasonCode.HOST_DISK_EXHAUSTED
+        return ReasonCode.UNEXPECTED_ERROR
+
+    def _finalize_repair_outcome(
+        self,
+        snapshot: RuntimeSnapshot,
+        result: RepairResult,
+        *,
+        existing_failure_count: int,
+    ) -> RepairResult:
+        if (
+            not result.success
+            and ReasonCode.REPAIR_CIRCUIT_BREAKER not in result.reason_codes
+            and existing_failure_count + (1 if result.attempted else 0)
+            >= self._max_repair_failures
+        ):
+            result = replace(
+                result,
+                reason_codes=self._tuple_unique(
+                    [*result.reason_codes, ReasonCode.REPAIR_CIRCUIT_BREAKER]
+                ),
+                details=tuple(
+                    [
+                        *result.details,
+                        "Bounded repair circuit-breaker tripped after "
+                        f"{existing_failure_count + 1} failed repair attempt(s).",
+                    ]
+                ),
+            )
+        self._persist_repair_outcome(
+            snapshot,
+            result,
+            existing_failure_count=existing_failure_count,
+        )
+        return result
+
+    def _persist_repair_outcome(
+        self,
+        snapshot: RuntimeSnapshot,
+        result: RepairResult,
+        *,
+        existing_failure_count: int,
+    ) -> None:
+        effective_state = result.final_state or snapshot.lifecycle_state
+        matched_instance_id, existing_record, registry = (
+            self._load_runtime_registry_entry(
+                snapshot.instance_id,
+                snapshot.target_dir,
+            )
+        )
+        effective_config = self._build_runtime_config_for_target(
+            snapshot.target_dir,
+            snapshot.factory_dir,
+        )
+        action_at = factory_workspace.utc_now_iso()
+
+        if effective_config is not None:
+            manifest = factory_workspace.build_runtime_manifest(effective_config)
+            record = factory_workspace.build_registry_record_from_manifest(
+                manifest,
+                runtime_state=effective_state.value,
+                existing_record=existing_record,
+            )
+            instance_id = effective_config.factory_instance_id
+        elif existing_record is not None:
+            record = dict(existing_record)
+            instance_id = matched_instance_id or snapshot.instance_id
+        else:
+            return
+
+        existing_circuit_breaker_tripped_at = self._coerce_optional_text(
+            record.get("repair_circuit_breaker_tripped_at")
+        )
+        if result.success:
+            repair_failure_count = 0
+        elif (
+            ReasonCode.REPAIR_CIRCUIT_BREAKER in result.reason_codes
+            and not result.attempted
+        ):
+            repair_failure_count = existing_failure_count
+        else:
+            repair_failure_count = existing_failure_count + 1
+
+        circuit_breaker_tripped_at = None
+        if (
+            ReasonCode.REPAIR_CIRCUIT_BREAKER in result.reason_codes
+            or repair_failure_count >= self._max_repair_failures
+        ):
+            circuit_breaker_tripped_at = (
+                existing_circuit_breaker_tripped_at or action_at
+            )
+
+        record["runtime_state"] = effective_state.value
+        record["updated_at"] = action_at
+        record["last_runtime_action"] = RuntimeActionTrigger.REPAIR.value
+        record["last_runtime_action_at"] = action_at
+        record["last_runtime_action_reason_codes"] = [
+            code.value for code in result.reason_codes
+        ]
+        record["last_completed_tool_call_boundary_at"] = action_at
+        record["repair_failure_count"] = repair_failure_count
+        record["repair_circuit_breaker_tripped_at"] = circuit_breaker_tripped_at
+        registry.setdefault("workspaces", {})[instance_id] = record
+        factory_workspace.save_registry(registry, self._registry_path)
 
     def _resolve_target_dir_from_env(self, repo_root: Path, env_file: Path) -> Path:
         env_values = factory_workspace.parse_env_file(env_file)
@@ -930,8 +2025,14 @@ class MCPRuntimeManager:
     ) -> RuntimeLifecycleState:
         if not installed:
             return RuntimeLifecycleState.RUNTIME_DELETED
+        if persisted_runtime_state == RuntimeLifecycleState.RUNTIME_DELETED.value:
+            return RuntimeLifecycleState.RUNTIME_DELETED
         if persisted_runtime_state == "starting":
             return RuntimeLifecycleState.STARTING
+        if persisted_runtime_state == RuntimeLifecycleState.REPAIRING.value:
+            return RuntimeLifecycleState.REPAIRING
+        if persisted_runtime_state == RuntimeLifecycleState.SUSPENDED.value:
+            return RuntimeLifecycleState.SUSPENDED
         if persisted_runtime_state in {"failed", "degraded"}:
             return RuntimeLifecycleState.DEGRADED
         if not docker_available:
@@ -978,6 +2079,8 @@ class MCPRuntimeManager:
         )
 
     def _load_factory_stack_module(self) -> Any:
+        if self._stack_module_loader is not None:
+            return self._stack_module_loader()
         return importlib.import_module("factory_stack")
 
     def _tuple_unique(
