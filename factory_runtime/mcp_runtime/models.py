@@ -117,6 +117,7 @@ class ReasonCode(StrEnum):
     REPAIR_RECREATE = "repair-recreate"
     REPAIR_DEPENDENCY = "repair-dependency"
     REPAIR_RECONCILE_METADATA = "repair-reconcile-metadata"
+    REPAIR_CIRCUIT_BREAKER = "repair-circuit-breaker"
     HOST_DOCKER_UNAVAILABLE = "host-docker-unavailable"
     HOST_NETWORK_UNAVAILABLE = "host-network-unavailable"
     HOST_DISK_EXHAUSTED = "host-disk-exhausted"
@@ -150,6 +151,22 @@ class RepairStep(StrEnum):
     REPAIR_DEPENDENCY = "repair-dependency"
     RECONCILE_METADATA = "reconcile-metadata"
     SURFACE_TERMINAL_FAILURE = "surface-terminal-failure"
+
+
+class RuntimeActionTrigger(StrEnum):
+    """Normalized trigger vocabulary for manager-owned runtime actions."""
+
+    CLEANUP = "cleanup"
+    DELETE_RUNTIME = "delete-runtime"
+    REPAIR = "repair"
+
+
+class RecoveryClassification(StrEnum):
+    """Minimal recovery/resume classification at completed tool-call boundaries."""
+
+    RESUME_SAFE = "resume-safe"
+    RESUME_UNSAFE = "resume-unsafe"
+    MANUAL_RECOVERY_REQUIRED = "manual-recovery-required"
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,6 +314,21 @@ class ReadinessResult:
 
 
 @dataclass(frozen=True, slots=True)
+class RecoveryMetadata:
+    """Minimal recovery metadata surfaced through the canonical snapshot."""
+
+    classification: RecoveryClassification
+    completed_tool_call_boundary: bool
+    last_completed_tool_call_at: str | None = None
+    last_trigger: RuntimeActionTrigger | None = None
+    last_trigger_at: str | None = None
+    last_reason_codes: tuple[ReasonCode, ...] = ()
+    repair_failure_count: int = 0
+    circuit_breaker_tripped: bool = False
+    circuit_breaker_tripped_at: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class RepairResult:
     """Repair entrypoint result for the manager contract."""
 
@@ -335,6 +367,7 @@ class RuntimeSnapshot:
     services: dict[str, ServiceRuntimeRecord] = field(default_factory=dict)
     catalog: RuntimeCatalog | None = None
     readiness: ReadinessResult | None = None
+    recovery: RecoveryMetadata | None = None
     docker_available: bool = True
     inventory_error: str | None = None
 

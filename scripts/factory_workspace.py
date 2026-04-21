@@ -1039,8 +1039,24 @@ def build_registry_record_from_manifest(
         if isinstance(manifest.get("factory_release"), dict)
         else {}
     )
+    retained_metadata_keys = (
+        "activity_lease_present",
+        "activity_lease_holder",
+        "activity_lease_renewed_at",
+        "activity_lease_expires_at",
+        "execution_lease_present",
+        "execution_lease_holder",
+        "execution_lease_renewed_at",
+        "execution_lease_expires_at",
+        "last_runtime_action",
+        "last_runtime_action_at",
+        "last_runtime_action_reason_codes",
+        "last_completed_tool_call_boundary_at",
+        "repair_failure_count",
+        "repair_circuit_breaker_tripped_at",
+    )
 
-    return {
+    record = {
         "factory_instance_id": str(manifest.get("factory_instance_id", "")),
         "project_workspace_id": str(manifest.get("project_workspace_id", "")),
         "target_workspace_path": str(manifest.get("target_workspace_path", "")),
@@ -1057,6 +1073,10 @@ def build_registry_record_from_manifest(
         "last_activated_at": existing.get("last_activated_at"),
         "updated_at": utc_now_iso(),
     }
+    for key in retained_metadata_keys:
+        if key in existing:
+            record[key] = existing[key]
+    return record
 
 
 def normalize_record_ports(record: dict[str, Any]) -> dict[str, int]:

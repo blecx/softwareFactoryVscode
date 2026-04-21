@@ -5700,7 +5700,9 @@ def test_mcp_bootloader_uses_manager_backed_snapshot_when_workspace_is_source_re
     }
 
 
-def test_cleanup_workspace(tmp_path: Path):
+def test_cleanup_workspace(tmp_path: Path, monkeypatch):
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
     target = tmp_path / "target"
     target.mkdir(parents=True, exist_ok=True)
     factory_dir = target / ".copilot/softwareFactoryVscode"
@@ -5753,8 +5755,131 @@ def test_cleanup_workspace(tmp_path: Path):
     assert not (data_root / "memory" / config.factory_instance_id).exists()
     assert not (data_root / "bus" / config.factory_instance_id).exists()
 
-    reg = factory_workspace.load_registry()
-    assert config.factory_instance_id not in reg.get("workspaces", {})
+    reg = factory_workspace.load_registry(registry_path)
+    assert config.factory_instance_id in reg.get("workspaces", {})
+    record = reg["workspaces"][config.factory_instance_id]
+    assert record["runtime_state"] == "runtime-deleted"
+    assert record["last_runtime_action"] == "cleanup"
+    assert record["last_completed_tool_call_boundary_at"]
+
+
+def test_delete_runtime_matches_cleanup_artifact_effects_with_distinct_trigger_metadata(
+    tmp_path: Path,
+    monkeypatch,
+):
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+
+    def _prepare_runtime(workspace_name: str) -> tuple[Path, Path, Path, Any]:
+        target = tmp_path / workspace_name
+        target.mkdir(parents=True, exist_ok=True)
+        factory_dir = target / ".copilot/softwareFactoryVscode"
+        factory_dir.mkdir(parents=True, exist_ok=True)
+        (factory_dir / ".copilot" / "config").mkdir(parents=True)
+        (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+            (
+                REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json"
+            ).read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        data_root = tmp_path / f"factory-data-{workspace_name}"
+        env_path = factory_dir / ".factory.env"
+        env_path.write_text(
+            "\n".join(
+                [
+                    f"TARGET_WORKSPACE_PATH={target}",
+                    f"PROJECT_WORKSPACE_ID={workspace_name}",
+                    f"COMPOSE_PROJECT_NAME=factory_{workspace_name}",
+                    f"FACTORY_DIR={factory_dir}",
+                    f"FACTORY_DATA_DIR={data_root}",
+                    "CONTEXT7_API_KEY=",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        config = factory_workspace.build_runtime_config(
+            target,
+            factory_dir=factory_dir,
+            registry_path=registry_path,
+        )
+        factory_workspace.sync_runtime_artifacts(config, registry_path=registry_path)
+        return target, factory_dir, data_root, config
+
+    def _lookup_record_by_target(
+        registry: dict[str, Any],
+        target: Path,
+    ) -> dict[str, Any]:
+        target_str = str(target.resolve())
+        for record in registry.get("workspaces", {}).values():
+            if not isinstance(record, dict):
+                continue
+            if str(record.get("target_workspace_path", "")).strip() == target_str:
+                return record
+        raise AssertionError(f"No registry record found for target {target_str}")
+
+    cleanup_target, cleanup_factory_dir, cleanup_data_root, cleanup_config = (
+        _prepare_runtime("cleanup-target")
+    )
+
+    factory_stack.cleanup_workspace(
+        cleanup_factory_dir,
+        env_file=cleanup_factory_dir / ".factory.env",
+    )
+
+    assert not (cleanup_target / ".copilot/softwareFactoryVscode/.factory.env").exists()
+    assert not (
+        cleanup_target / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
+    ).exists()
+    assert not (
+        cleanup_data_root / "memory" / cleanup_config.factory_instance_id
+    ).exists()
+    assert not (cleanup_data_root / "bus" / cleanup_config.factory_instance_id).exists()
+
+    reg = factory_workspace.load_registry(registry_path)
+    cleanup_record = _lookup_record_by_target(reg, cleanup_target)
+    assert cleanup_record["runtime_state"] == "runtime-deleted"
+    assert cleanup_record["last_runtime_action"] == "cleanup"
+    assert cleanup_record["last_runtime_action_reason_codes"] == []
+
+    factory_workspace.save_registry(
+        {
+            "version": 1,
+            "active_workspace": "",
+            "workspaces": {},
+            "updated_at": factory_workspace.utc_now_iso(),
+        },
+        registry_path,
+    )
+
+    delete_target, delete_factory_dir, delete_data_root, delete_config = (
+        _prepare_runtime("delete-target")
+    )
+
+    manager = factory_stack.build_runtime_manager()
+    manager.delete_runtime(
+        delete_factory_dir,
+        env_file=delete_factory_dir / ".factory.env",
+        reason_codes=("missing-runtime-metadata",),
+    )
+
+    assert not (delete_target / ".copilot/softwareFactoryVscode/.factory.env").exists()
+    assert not (
+        delete_target / ".copilot/softwareFactoryVscode/.tmp" / "runtime-manifest.json"
+    ).exists()
+    assert not (
+        delete_data_root / "memory" / delete_config.factory_instance_id
+    ).exists()
+    assert not (delete_data_root / "bus" / delete_config.factory_instance_id).exists()
+
+    reg = factory_workspace.load_registry(registry_path)
+    delete_record = _lookup_record_by_target(reg, delete_target)
+
+    assert delete_record["runtime_state"] == "runtime-deleted"
+    assert delete_record["last_runtime_action"] == "delete-runtime"
+    assert delete_record["last_runtime_action_reason_codes"] == [
+        "missing-runtime-metadata"
+    ]
 
 
 def test_cleanup_workspace_still_cleans_contract_when_runtime_sync_fails(
