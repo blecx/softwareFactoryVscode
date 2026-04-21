@@ -176,6 +176,7 @@ Important current behavior:
 - active is an operator/session concept rather than proof of port ownership,
 - in practice, the current implementation records that selection explicitly through `factory_stack.py activate` rather than by automatically detecting editor/window focus,
 - `activate` refreshes generated runtime artifacts from the canonical installed-workspace contract and then marks the workspace active,
+- switching `A -> B -> A` is treated as a fresh explicit selection each time, so activate/deactivate flows clear stale selection-lease metadata rather than reusing old lease holders or timestamps from a previously active workspace,
 - `deactivate` clears active selection without implicitly stopping containers.
 
 ### 7. Cleanup and reconciliation semantics

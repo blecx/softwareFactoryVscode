@@ -1262,7 +1262,7 @@ class MCPRuntimeManager:
                 record,
                 prefix="activity",
                 kind=LeaseKind.ACTIVITY,
-                default_present=active or bool(record.get("last_activated_at")),
+                default_present=active,
                 default_renewed_at=self._coerce_optional_text(
                     record.get("last_activated_at")
                 ),
