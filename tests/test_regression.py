@@ -630,6 +630,14 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
     assert (
         "operator/runtime wording locks in `tests/test_regression.py`" in tests_readme
     )
+    assert "## Lifecycle proof matrix (practical baseline)" in tests_readme
+    assert "A → B → A activation / switch-back" in tests_readme
+    assert "Stop → status" in tests_readme
+    assert "Stop → verify" in tests_readme
+    assert "Cleanup / `runtime-deleted`" in tests_readme
+    assert "Reload / reopen recovery" in tests_readme
+    assert "RUN_DOCKER_E2E=1" in tests_readme
+    assert "not silently upgraded into the default local-CI-parity" in tests_readme
 
 
 def test_tests_readme_documents_python_env_repair_path():
