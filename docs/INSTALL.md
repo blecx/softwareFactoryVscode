@@ -259,6 +259,8 @@ python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py status
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py preflight
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py activate
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py deactivate
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py suspend --completed-tool-call-boundary
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py resume
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py cleanup
 ```
 
@@ -268,10 +270,14 @@ These commands distinguish:
 - **running** — the workspace currently owns Docker runtime resources
 - **active** — the workspace the current VS Code / Copilot CLI workflow is meant to act on, recorded explicitly in the host registry
 
-The current practical baseline does **not** support a user-facing `suspended`
-runtime state yet. Treat `suspended` as proposal-bound `ADR-014` vocabulary
-until a later suspend/resume slice lands explicit, test-backed lifecycle
-semantics.
+The current practical baseline now supports a bounded user-facing `suspended`
+runtime state. Enter it through `factory_stack.py suspend`, and use
+`factory_stack.py resume` to re-hydrate the same workspace runtime.
+
+When a workspace is `suspended`, `status` and `preflight` surface recovery
+metadata such as `recovery_classification`,
+`completed_tool_call_boundary`, and `last_runtime_action` so operators can tell
+whether resume is safe, unsafe, or manual.
 
 `activate` refreshes generated runtime artifacts from the canonical installed-workspace contract and then marks that workspace active in the host registry. It does **not** start the Docker runtime by itself.
 

@@ -49,9 +49,10 @@ class RuntimeLifecycleState(StrEnum):
     This enum deliberately excludes `installed` and `active`. Those remain
     separate architectural facts per `ADR-009`.
 
-    `SUSPENDED` remains reserved for future bounded suspend/resume work. The
-    current practical operator baseline must not surface it as a supported
-    lifecycle state until explicit semantics land.
+    `SUSPENDED` is a supported, bounded lifecycle state once the authoritative
+    runtime manager enters it explicitly. Operator-facing surfaces must also
+    publish the recovery metadata needed to classify resume as safe, unsafe, or
+    manual.
     """
 
     STARTING = "starting"
@@ -80,6 +81,7 @@ class RecommendedAction(StrEnum):
 
     NONE = "none"
     START = "start"
+    RESUME = "resume"
     INSPECT = "inspect"
     REBOOTSTRAP = "re-bootstrap"
     INSPECT_SHARED_TOPOLOGY = "inspect-shared-topology"
@@ -123,6 +125,10 @@ class ReasonCode(StrEnum):
     REPAIR_DEPENDENCY = "repair-dependency"
     REPAIR_RECONCILE_METADATA = "repair-reconcile-metadata"
     REPAIR_CIRCUIT_BREAKER = "repair-circuit-breaker"
+    SUSPEND_REQUESTED = "suspend-requested"
+    SUSPEND_REQUIRES_READY_RUNTIME = "suspend-requires-ready-runtime"
+    RESUME_REQUESTED = "resume-requested"
+    RESUME_REPAIR_ATTEMPTED = "resume-repair-attempted"
     HOST_DOCKER_UNAVAILABLE = "host-docker-unavailable"
     HOST_NETWORK_UNAVAILABLE = "host-network-unavailable"
     HOST_DISK_EXHAUSTED = "host-disk-exhausted"
@@ -164,6 +170,8 @@ class RuntimeActionTrigger(StrEnum):
     CLEANUP = "cleanup"
     DELETE_RUNTIME = "delete-runtime"
     REPAIR = "repair"
+    SUSPEND = "suspend"
+    RESUME = "resume"
 
 
 class RecoveryClassification(StrEnum):

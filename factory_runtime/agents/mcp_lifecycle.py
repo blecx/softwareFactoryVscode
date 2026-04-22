@@ -4,7 +4,12 @@ import signal
 from pathlib import Path
 from typing import Any
 
-from factory_runtime.mcp_runtime import MCPRuntimeManager, RuntimeProfileName
+from factory_runtime.mcp_runtime import (
+    MCPRuntimeManager,
+    RecommendedAction,
+    RuntimeLifecycleState,
+    RuntimeProfileName,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +102,23 @@ class MCPBootloader:
                     exc,
                 )
 
-        if self.force_rebuild_mcps or not readiness.ready:
+        if snapshot.lifecycle_state == RuntimeLifecycleState.SUSPENDED:
+            logger.info(
+                "Canonical runtime is `suspended`; resuming bounded runtime state for `%s`.",
+                self._factory_repo_root,
+            )
+            snapshot = self._runtime_manager.resume(
+                self._factory_repo_root,
+                env_file=self._env_file,
+                selected_profiles=(RuntimeProfileName.HARNESS_DEFAULT,),
+            )
+            readiness = self._require_snapshot_readiness(snapshot)
+
+        if self.force_rebuild_mcps or (
+            not readiness.ready
+            and getattr(readiness, "recommended_action", RecommendedAction.NONE)
+            != RecommendedAction.RESUME
+        ):
             logger.info(
                 "Canonical runtime preflight status is `%s`; reconciling with factory_stack.py start.",
                 readiness.status.value,
