@@ -296,6 +296,8 @@ def test_interruption_recovery_assets_and_docs_exist():
     assert "factory_stack.py status" in workflow_doc
     assert "factory_stack.py status" in recovery_prompt
     assert "factory_stack.py status" in recovery_skill
+    assert "window close/reopen" in workflow_doc
+    assert "foreground task exit" in workflow_doc
 
 
 def test_new_adrs_capture_template_and_local_ci_contracts():
@@ -584,6 +586,8 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     assert "`factory_stack.py resume`" in install_doc
     assert "`recovery_classification`" in install_doc
     assert "`completed_tool_call_boundary`" in install_doc
+    assert "closing the window, or reopening later does not silently" in install_doc
+    assert "reconcile/idempotent action" in install_doc
 
 
 def test_readme_tracks_version_aware_copilot_setup():
@@ -651,6 +655,10 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "GitHub Pull Requests and Issues" in handout
     assert "same manager-backed readiness vocabulary" in handout
     assert "additive evidence only" in handout
+    assert "does **not** automatically stop the runtime" in handout
+    assert "does **not** auto-start the runtime either" in handout
+    assert "foreground task exits while Docker containers keep running" in handout
+    assert "reconcile/idempotent action" in handout
 
     assert "factory_stack.py activate" in cheat_sheet
     assert "factory_stack.py preflight" in cheat_sheet
@@ -671,6 +679,10 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "`factory_stack.py resume`" in cheat_sheet
     assert "`recovery_classification`" in cheat_sheet
     assert "resume-safe" in cheat_sheet
+    assert "does **not** automatically stop the runtime" in cheat_sheet
+    assert "does **not** auto-start the runtime" in cheat_sheet
+    assert "foreground task exits while containers still exist" in cheat_sheet
+    assert "reconcile/idempotent action" in cheat_sheet
 
 
 def test_adr_014_clarifies_current_suspend_boundary() -> None:
