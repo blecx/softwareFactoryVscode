@@ -142,6 +142,30 @@ Routing rule:
   `--include-docker-build` when you need full container-build parity pre-push.
 - Keep the remote repository protections aligned with `docs/setup-github-repository.md` so required status checks and PR-before-merge rules backstop the local workflow.
 
+## Readiness closeout evidence discipline
+
+When an issue is a readiness closeout or documentation/evidence-alignment
+slice, the closing note must make the evidence bundle reproducible and bounded:
+
+- run the focused tests for the surfaces changed by the issue;
+- run `./.venv/bin/python ./scripts/local_ci_parity.py` before calling the
+  slice complete;
+- add targeted Docker-backed validation when the claim depends on real
+  container, image, shared-mode, or cleanup truth; and
+- name the deferred items that remain out of scope after the slice instead of
+  implying that the whole readiness program is now universally complete.
+
+For the current MCP harness readiness baseline, the minimum reproducible
+evidence bundle is:
+
+```text
+./.venv/bin/pytest tests/test_regression.py -v
+./.venv/bin/python ./scripts/local_ci_parity.py
+```
+
+Add the targeted `RUN_DOCKER_E2E=1` lifecycle proofs from `tests/README.md`
+whenever the slice depends on real container/image state.
+
 These are not optional style notes; they are the historical guardrails defined by `docs/architecture/ADR-001-AI-Workflow-Guardrails.md`, reinforced by `docs/architecture/ADR-005-Strong-Templating-Enforcement.md` and `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md`, plus `.copilot/skills/a2a-communication/SKILL.md`, `.github/workflows/ci.yml`, and the remote protection guidance in `docs/setup-github-repository.md`.
 
 ## Legacy path status

@@ -115,6 +115,29 @@ python3 scripts/verify_factory_install.py --target ../my-target-project --runtim
 
 `verify_factory_install.py --runtime` reuses the same manager-backed readiness vocabulary as `preflight` and `status`; any extra endpoint probes are additive evidence only.
 
+## ✅ Readiness closeout evidence
+
+Use this bundle when a closeout note needs reproducible proof for the current
+baseline:
+
+```bash
+./.venv/bin/pytest tests/test_regression.py -v
+./.venv/bin/python ./scripts/local_ci_parity.py
+RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace or stop_cleanup_retains_images_and_supports_restart" -v
+```
+
+This evidence bundle proves the practical baseline plus the targeted
+Docker-backed lifecycle paths where real container/image truth matters. It does
+**not** silently promote every future runtime-management idea into the
+supported baseline.
+
+Still deferred after this readiness pass:
+
+- dynamic profile expansion during a running prompt
+- image pull/upgrade policy automation
+- broader orchestration/event/UI work beyond the accepted ADR baseline
+- blanket claims that every service is globally shared by default
+
 ## ⬆️ Updating an installed target workspace
 
 From the **target repository root**:

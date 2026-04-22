@@ -69,6 +69,38 @@ Current default-branch status: `fulfilled` for `mcp-memory`, `mcp-agent-bus`,
 and `approval-gate`. Historical releases may still use `open` or `advanced
 groundwork` when they describe earlier repository states.
 
+## Readiness closeout snapshot (what is done vs deferred)
+
+The current default branch closes the MCP harness readiness baseline for the
+supported operator story documented in this guide:
+
+- namespace-first install/update under `.copilot/softwareFactoryVscode/`
+- explicit lifecycle plus manager-backed `preflight`, `status`, and runtime
+  verification vocabulary
+- bounded `suspended` / `resume` behavior with recovery metadata at completed
+  tool-call boundaries
+- practical per-workspace lifecycle proof coverage, with targeted Docker-backed
+  evidence where real container/image truth matters
+- deliberate shared-mode promotion fulfilled for `mcp-memory`,
+  `mcp-agent-bus`, and `approval-gate`
+
+Reproducible closeout evidence for this baseline is:
+
+```text
+./.venv/bin/pytest tests/test_regression.py -v
+./.venv/bin/python ./scripts/local_ci_parity.py
+RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace or stop_cleanup_retains_images_and_supports_restart" -v
+```
+
+Still deferred after this readiness pass:
+
+- no release/version bump is implied by these documentation updates alone;
+- no claim that every MCP service is globally shared or that shared mode is the
+  default operator path; and
+- no claim that dynamic profile expansion, image pull/upgrade policy
+  automation, or broader orchestration/UI work is already part of the
+  supported baseline.
+
 ## Prerequisites
 
 Before installation, verify you have the following installed on your local host:

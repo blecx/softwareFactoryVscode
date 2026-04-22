@@ -83,6 +83,28 @@ Docker-backed lifecycle proofs remain **targeted and opt-in** via
 matters, but they are not silently upgraded into the default local-CI-parity
 gate unless that policy is explicitly documented and reviewed.
 
+## Readiness closeout evidence bundle
+
+The reproducible evidence bundle for the current MCP harness readiness baseline
+is:
+
+```bash
+./.venv/bin/pytest tests/test_regression.py -v
+./.venv/bin/python ./scripts/local_ci_parity.py
+RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace or stop_cleanup_retains_images_and_supports_restart" -v
+```
+
+Use the Docker-backed command when the claim depends on real container/image
+truth; otherwise the first two commands cover the operator-doc and local-CI
+closeout surfaces.
+
+Still deferred after this readiness pass:
+
+- dynamic profile expansion during a running prompt
+- image pull/upgrade policy automation
+- broader orchestration/event/UI work beyond the accepted ADR baseline
+- blanket claims that every service is globally shared by default
+
 Default throwaway install/runtime validation should stay inside the source repository's gitignored `.tmp/` tree (for example `.tmp/throwaway-targets/`) unless a test explicitly opts into an external target. This keeps disposable targets in-workspace and avoids accidentally tainting unrelated repositories or non-repository paths.
 
 ---
