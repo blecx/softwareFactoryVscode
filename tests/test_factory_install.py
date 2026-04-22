@@ -217,6 +217,11 @@ def build_runtime_snapshot_contract(
     services: dict[str, Any] | None = None,
     docker_available: bool = True,
     inventory_error: str | None = None,
+    recovery_classification: str | None = None,
+    completed_tool_call_boundary: bool = False,
+    last_runtime_action: str | None = None,
+    activity_lease_present: bool | None = None,
+    execution_lease_present: bool | None = None,
 ) -> Any:
     readiness = SimpleNamespace(
         ready=ready,
@@ -225,6 +230,37 @@ def build_runtime_snapshot_contract(
         issues=tuple(issues),
         reason_codes=tuple(reason_codes),
     )
+    recovery = None
+    if (
+        recovery_classification is not None
+        or completed_tool_call_boundary
+        or last_runtime_action is not None
+    ):
+        recovery = SimpleNamespace(
+            classification=SimpleNamespace(
+                value=recovery_classification or "resume-safe"
+            ),
+            completed_tool_call_boundary=completed_tool_call_boundary,
+            last_trigger=(
+                SimpleNamespace(value=last_runtime_action)
+                if last_runtime_action is not None
+                else None
+            ),
+        )
+    selection = None
+    if activity_lease_present is not None or execution_lease_present is not None:
+        selection = SimpleNamespace(
+            activity_lease=(
+                SimpleNamespace(present=bool(activity_lease_present))
+                if activity_lease_present is not None
+                else None
+            ),
+            execution_lease=(
+                SimpleNamespace(present=bool(execution_lease_present))
+                if execution_lease_present is not None
+                else None
+            ),
+        )
     return SimpleNamespace(
         readiness=readiness,
         persisted_runtime_state=persisted_runtime_state,
@@ -238,6 +274,8 @@ def build_runtime_snapshot_contract(
         manifest_server_urls=manifest_server_urls or {},
         manifest_health_urls=manifest_health_urls or {},
         services=services or {},
+        recovery=recovery,
+        selection=selection,
     )
 
 
@@ -2953,7 +2991,7 @@ def test_factory_stack_status_demotes_running_workspace_to_stopped_when_services
     )
 
 
-def test_factory_stack_status_hides_proposal_bound_suspended_state(
+def test_factory_stack_status_surfaces_bounded_suspended_state(
     tmp_path: Path,
     monkeypatch,
     capsys,
@@ -2997,13 +3035,18 @@ def test_factory_stack_status_hides_proposal_bound_suspended_state(
         "build_preflight_report",
         lambda *_args, **_kwargs: {
             "status": "needs-ramp-up",
-            "recommended_action": "start",
+            "recommended_action": "resume",
             "snapshot": build_runtime_snapshot_contract(
-                lifecycle_state=factory_stack.RuntimeLifecycleState.STOPPED,
+                lifecycle_state=factory_stack.RuntimeLifecycleState.SUSPENDED,
                 persisted_runtime_state=factory_stack.RuntimeLifecycleState.SUSPENDED.value,
                 readiness_status="needs-ramp-up",
-                recommended_action="start",
+                recommended_action="resume",
                 ready=False,
+                recovery_classification="resume-safe",
+                completed_tool_call_boundary=True,
+                last_runtime_action="suspend",
+                activity_lease_present=True,
+                execution_lease_present=True,
             ),
         },
     )
@@ -3014,13 +3057,124 @@ def test_factory_stack_status_hides_proposal_bound_suspended_state(
     output = capsys.readouterr().out
 
     assert exit_code == 0
-    assert "runtime_state=stopped" in output
-    assert "runtime_state=suspended" not in output
+    assert "runtime_state=suspended" in output
+    assert "recommended_action=resume" in output
+    assert "recovery_classification=resume-safe" in output
+    assert "completed_tool_call_boundary=true" in output
+    assert "last_runtime_action=suspend" in output
+    assert "activity_lease_present=true" in output
+    assert "execution_lease_present=true" in output
 
     registry = factory_workspace.load_registry(registry_path)
     assert (
-        registry["workspaces"][config.factory_instance_id]["runtime_state"] == "stopped"
+        registry["workspaces"][config.factory_instance_id]["runtime_state"]
+        == "suspended"
     )
+
+
+def test_factory_stack_suspend_workspace_reports_recovery_metadata(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    env_path = tmp_path / ".factory.env"
+    env_path.write_text("", encoding="utf-8")
+    calls: list[tuple[Path, Path | None, bool]] = []
+
+    snapshot = SimpleNamespace(
+        workspace_id="target-project",
+        instance_id="factory-target-project",
+        lifecycle_state=factory_stack.RuntimeLifecycleState.SUSPENDED,
+        recovery=SimpleNamespace(
+            classification=SimpleNamespace(value="resume-safe"),
+            completed_tool_call_boundary=True,
+        ),
+    )
+
+    class FakeRuntimeManager:
+        def suspend(
+            self,
+            repo_root: Path,
+            *,
+            env_file: Path | None = None,
+            completed_tool_call_boundary: bool = False,
+        ) -> Any:
+            calls.append((repo_root, env_file, completed_tool_call_boundary))
+            return snapshot
+
+    monkeypatch.setattr(
+        factory_stack,
+        "build_runtime_manager",
+        lambda: FakeRuntimeManager(),
+    )
+
+    exit_code = factory_stack.suspend_workspace(
+        tmp_path,
+        env_file=env_path,
+        completed_tool_call_boundary=True,
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert calls == [(tmp_path, env_path, True)]
+    assert "workspace_id=target-project" in output
+    assert "instance_id=factory-target-project" in output
+    assert "runtime_state=suspended" in output
+    assert "recovery_classification=resume-safe" in output
+    assert "completed_tool_call_boundary=true" in output
+
+
+def test_factory_stack_resume_workspace_reports_readiness_and_recovery(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    env_path = tmp_path / ".factory.env"
+    env_path.write_text("", encoding="utf-8")
+    calls: list[tuple[Path, Path | None]] = []
+
+    snapshot = SimpleNamespace(
+        workspace_id="target-project",
+        instance_id="factory-target-project",
+        lifecycle_state=factory_stack.RuntimeLifecycleState.RUNNING,
+        readiness=SimpleNamespace(
+            status=SimpleNamespace(value="ready"),
+            recommended_action=SimpleNamespace(value="none"),
+        ),
+        recovery=SimpleNamespace(
+            classification=SimpleNamespace(value="resume-safe"),
+            completed_tool_call_boundary=True,
+        ),
+    )
+
+    class FakeRuntimeManager:
+        def resume(
+            self,
+            repo_root: Path,
+            *,
+            env_file: Path | None = None,
+        ) -> Any:
+            calls.append((repo_root, env_file))
+            return snapshot
+
+    monkeypatch.setattr(
+        factory_stack,
+        "build_runtime_manager",
+        lambda: FakeRuntimeManager(),
+    )
+
+    exit_code = factory_stack.resume_workspace(tmp_path, env_file=env_path)
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert calls == [(tmp_path, env_path)]
+    assert "workspace_id=target-project" in output
+    assert "instance_id=factory-target-project" in output
+    assert "runtime_state=running" in output
+    assert "preflight_status=ready" in output
+    assert "recommended_action=none" in output
+    assert "recovery_classification=resume-safe" in output
+    assert "completed_tool_call_boundary=true" in output
 
 
 def test_factory_stack_status_preserves_failed_state_when_services_missing(
@@ -6088,9 +6242,11 @@ def test_mcp_bootloader_uses_manager_backed_snapshot_when_workspace_is_source_re
     readiness = SimpleNamespace(
         ready=True,
         status=SimpleNamespace(value="ready"),
+        recommended_action=mcp_lifecycle.RecommendedAction.NONE,
         issues=(),
     )
     snapshot = SimpleNamespace(
+        lifecycle_state=mcp_lifecycle.RuntimeLifecycleState.RUNNING,
         readiness=readiness,
         manifest_server_urls={
             "githubOps": "http://127.0.0.1:21818/mcp",
@@ -6182,6 +6338,154 @@ def test_mcp_bootloader_uses_manager_backed_snapshot_when_workspace_is_source_re
         "mcp-github-ops": "http://127.0.0.1:21818/mcp",
         "mcp-search": "http://127.0.0.1:21813/mcp",
         "mcp-filesystem": "http://127.0.0.1:21814/mcp",
+    }
+
+
+def test_mcp_bootloader_resumes_bounded_suspended_runtime(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source_repo = tmp_path / "work" / "softwareFactoryVscode"
+    source_repo.mkdir(parents=True, exist_ok=True)
+    companion_env = tmp_path / ".copilot" / "softwareFactoryVscode" / ".factory.env"
+    companion_env.parent.mkdir(parents=True, exist_ok=True)
+    companion_env.write_text("TARGET_WORKSPACE_PATH=/tmp/demo\n", encoding="utf-8")
+
+    suspended_snapshot = SimpleNamespace(
+        lifecycle_state=mcp_lifecycle.RuntimeLifecycleState.SUSPENDED,
+        readiness=SimpleNamespace(
+            ready=False,
+            status=SimpleNamespace(value="needs-ramp-up"),
+            recommended_action=mcp_lifecycle.RecommendedAction.RESUME,
+            issues=(),
+        ),
+        manifest_server_urls={
+            "githubOps": "http://127.0.0.1:29618/mcp",
+            "search": "http://127.0.0.1:29613/mcp",
+            "filesystem": "http://127.0.0.1:29614/mcp",
+        },
+        manifest_health_urls={
+            "mcp-memory": "http://127.0.0.1:29630/mcp",
+            "mcp-agent-bus": "http://127.0.0.1:29631/mcp",
+        },
+    )
+    resumed_snapshot = SimpleNamespace(
+        lifecycle_state=mcp_lifecycle.RuntimeLifecycleState.RUNNING,
+        readiness=SimpleNamespace(
+            ready=True,
+            status=SimpleNamespace(value="ready"),
+            recommended_action=mcp_lifecycle.RecommendedAction.NONE,
+            issues=(),
+        ),
+        manifest_server_urls={
+            "githubOps": "http://127.0.0.1:29618/mcp",
+            "search": "http://127.0.0.1:29613/mcp",
+            "filesystem": "http://127.0.0.1:29614/mcp",
+        },
+        manifest_health_urls={
+            "mcp-memory": "http://127.0.0.1:29630/mcp",
+            "mcp-agent-bus": "http://127.0.0.1:29631/mcp",
+        },
+    )
+
+    class FakeRuntimeManager:
+        def __init__(self) -> None:
+            self.calls: list[tuple[Any, ...]] = []
+
+        def resolve_factory_repo_root(self, workspace_root: Path) -> Path:
+            self.calls.append(("resolve_factory_repo_root", workspace_root))
+            return source_repo.resolve()
+
+        def resolve_workspace_env_file(
+            self,
+            workspace_root: Path,
+            factory_repo_root: Path | None = None,
+        ) -> Path:
+            self.calls.append(
+                (
+                    "resolve_workspace_env_file",
+                    workspace_root,
+                    factory_repo_root,
+                )
+            )
+            return companion_env.resolve()
+
+        def build_workspace_snapshot(
+            self,
+            workspace_root: Path,
+            *,
+            workspace_file: str | None = None,
+            selected_profiles=None,
+        ) -> Any:
+            normalized_profiles = tuple(
+                getattr(profile, "value", str(profile))
+                for profile in (selected_profiles or ())
+            )
+            self.calls.append(
+                (
+                    "build_workspace_snapshot",
+                    workspace_root,
+                    workspace_file,
+                    normalized_profiles,
+                )
+            )
+            return suspended_snapshot
+
+        def resume(
+            self,
+            repo_root: Path,
+            *,
+            env_file: Path | None = None,
+            selected_profiles=None,
+        ) -> Any:
+            normalized_profiles = tuple(
+                getattr(profile, "value", str(profile))
+                for profile in (selected_profiles or ())
+            )
+            self.calls.append(("resume", repo_root, env_file, normalized_profiles))
+            return resumed_snapshot
+
+        def start(self, *args: Any, **kwargs: Any) -> None:
+            raise AssertionError("suspended runtime should call manager.resume")
+
+        def stop(self, *args: Any, **kwargs: Any) -> None:
+            raise AssertionError("teardown is not part of this regression test")
+
+    fake_manager = FakeRuntimeManager()
+    bootloader = mcp_lifecycle.MCPBootloader(source_repo)
+    monkeypatch.setattr(
+        bootloader,
+        "_build_runtime_manager",
+        lambda: fake_manager,
+    )
+
+    asyncio.run(bootloader.initialize())
+
+    assert fake_manager.calls == [
+        ("resolve_factory_repo_root", source_repo),
+        (
+            "resolve_workspace_env_file",
+            source_repo,
+            source_repo.resolve(),
+        ),
+        (
+            "build_workspace_snapshot",
+            source_repo,
+            None,
+            ("harness-default",),
+        ),
+        (
+            "resume",
+            source_repo.resolve(),
+            companion_env.resolve(),
+            ("harness-default",),
+        ),
+    ]
+    assert bootloader.server_urls == {
+        "mcp-memory": "http://127.0.0.1:29630/mcp",
+        "mcp-agent-bus": "http://127.0.0.1:29631/mcp",
+        "mcp-github-ops": "http://127.0.0.1:29618/mcp",
+        "mcp-search": "http://127.0.0.1:29613/mcp",
+        "mcp-filesystem": "http://127.0.0.1:29614/mcp",
     }
 
 
