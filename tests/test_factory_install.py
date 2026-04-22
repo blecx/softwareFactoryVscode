@@ -3367,6 +3367,72 @@ def test_factory_stack_stop_marks_failed_state_when_compose_down_fails(
     )
 
 
+def test_factory_stack_stop_reports_hygiene_semantics(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+
+    commands: list[list[str]] = []
+
+    def _record_stop(_repo_root: Path, command: list[str]) -> None:
+        commands.append(command)
+
+    monkeypatch.setattr(factory_stack, "run_compose_command", _record_stop)
+
+    factory_stack.stop_stack(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+    first_output = capsys.readouterr().out
+
+    assert "Removed containers and retained named volumes" in first_output
+    assert (
+        "retained generated runtime metadata and marked the workspace `stopped`"
+        in first_output
+    )
+    assert "retained Docker images" in first_output
+    assert "-v" not in commands[0]
+
+    factory_workspace.update_runtime_state(config.factory_instance_id, "running")
+    factory_stack.stop_stack(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+        remove_volumes=True,
+        preserve_runtime_state=True,
+    )
+    second_output = capsys.readouterr().out
+
+    assert "Removed containers and named volumes" in second_output
+    assert "preserved existing runtime-state metadata" in second_output
+    assert "retained Docker images" in second_output
+    assert "-v" in commands[1]
+
+
 def test_factory_stack_list_reports_registry_reconciliation_conflicts(
     monkeypatch,
     capsys,
@@ -6671,7 +6737,7 @@ def test_mcp_bootloader_teardown_stops_runtime_only_when_requested(
     assert stop_calls == [(source_repo, env_file)]
 
 
-def test_cleanup_workspace(tmp_path: Path, monkeypatch):
+def test_cleanup_workspace(tmp_path: Path, monkeypatch, capsys):
     registry_path = tmp_path / "registry.json"
     monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
     target = tmp_path / "target"
@@ -6718,6 +6784,7 @@ def test_cleanup_workspace(tmp_path: Path, monkeypatch):
     factory_stack.cleanup_workspace(
         factory_dir, env_file=(target / ".copilot/softwareFactoryVscode/.factory.env")
     )
+    output = capsys.readouterr().out
 
     assert not (target / ".copilot/softwareFactoryVscode/.factory.env").exists()
     assert not (
@@ -6732,11 +6799,17 @@ def test_cleanup_workspace(tmp_path: Path, monkeypatch):
     assert record["runtime_state"] == "runtime-deleted"
     assert record["last_runtime_action"] == "cleanup"
     assert record["last_completed_tool_call_boundary_at"]
+    assert (
+        "`cleanup` removed workspace containers and named volumes when present"
+        in output
+    )
+    assert "Docker images were retained" in output
 
 
 def test_delete_runtime_matches_cleanup_artifact_effects_with_distinct_trigger_metadata(
     tmp_path: Path,
     monkeypatch,
+    capsys,
 ):
     registry_path = tmp_path / "registry.json"
     monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
@@ -6833,6 +6906,7 @@ def test_delete_runtime_matches_cleanup_artifact_effects_with_distinct_trigger_m
         env_file=delete_factory_dir / ".factory.env",
         reason_codes=("missing-runtime-metadata",),
     )
+    output = capsys.readouterr().out
 
     assert not (delete_target / ".copilot/softwareFactoryVscode/.factory.env").exists()
     assert not (
@@ -6851,6 +6925,11 @@ def test_delete_runtime_matches_cleanup_artifact_effects_with_distinct_trigger_m
     assert delete_record["last_runtime_action_reason_codes"] == [
         "missing-runtime-metadata"
     ]
+    assert (
+        "`delete-runtime` removed workspace containers and named volumes when present"
+        in output
+    )
+    assert "Docker images were retained" in output
 
 
 def test_cleanup_workspace_still_cleans_contract_when_runtime_sync_fails(

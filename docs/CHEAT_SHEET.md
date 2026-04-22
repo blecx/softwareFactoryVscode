@@ -33,10 +33,10 @@ python3 scripts/factory_stack.py preflight
 # Start the runtime explicitly
 python3 scripts/factory_stack.py start --build
 
-# Stop the runtime without removing workspace runtime data
+# Stop the runtime containers and retain runtime metadata, volumes, and images
 python3 scripts/factory_stack.py stop
 
-# Stop and remove runtime volumes for the current workspace
+# Stop the runtime containers and remove named volumes; images still remain
 python3 scripts/factory_stack.py stop --remove-volumes
 
 # Show registered workspaces and active selection
@@ -51,7 +51,7 @@ python3 scripts/factory_stack.py activate
 # Clear only active selection for the current workspace
 python3 scripts/factory_stack.py deactivate
 
-# Remove runtime state for the current workspace (destructive)
+# Remove runtime state for the current workspace (destructive to metadata/data, not images)
 python3 scripts/factory_stack.py cleanup
 ```
 
@@ -66,6 +66,18 @@ It refreshes generated runtime artifacts from the canonical installed-workspace 
 `cleanup` is deeper than a status refresh.
 
 It removes runtime ownership for the current workspace, including registry ownership, generated runtime artifacts, and workspace-scoped runtime data, while leaving the installed `.copilot/softwareFactoryVscode/` baseline in place.
+
+It also removes workspace containers and named volumes best-effort, but it does
+**not** prune Docker images.
+
+### Cleanup / image retention semantics
+
+- `start --build` builds images; a later `start` without `--build` reuses retained local images when available.
+- `stop` removes workspace containers only and retains named volumes, runtime metadata, and Docker images.
+- `stop --remove-volumes` removes containers and named volumes, but still retains runtime metadata and Docker images.
+- `cleanup` removes live runtime ownership, generated runtime metadata, and workspace-scoped runtime data while preserving the installed baseline and retaining Docker images.
+- `delete-runtime` is the policy-driven trigger with the same artifact effects as `cleanup`; it is not a hidden image-prune path.
+- Retained images after `stop` or `cleanup` are expected build cache/state, not leaked runtime ownership.
 
 ### What `suspended` means now
 

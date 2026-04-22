@@ -259,6 +259,7 @@ python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py status
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py preflight
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py activate
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py deactivate
+python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py stop --remove-volumes
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py suspend --completed-tool-call-boundary
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py resume
 python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py cleanup
@@ -312,6 +313,29 @@ shared tables.
 
 Important: workspaces do **not** start Docker services automatically when they are installed.
 Only an explicit `start` command should create running containers.
+
+### Cleanup, metadata, and image-retention semantics
+
+- `factory_stack.py start --build` builds images and starts the workspace containers.
+  A later `factory_stack.py start` without `--build` reuses retained local images
+  when they are already present.
+- `factory_stack.py stop` removes workspace containers only. It retains named
+  volumes, generated runtime metadata such as `.factory.env` and the runtime
+  manifest, workspace-scoped runtime data, the installed baseline, and Docker images.
+- `factory_stack.py stop --remove-volumes` removes workspace containers and named
+  volumes, but it still retains generated runtime metadata, the installed baseline,
+  and Docker images.
+- `factory_stack.py cleanup` removes workspace containers/volumes best-effort,
+  registry ownership, generated runtime metadata, and workspace-scoped runtime data,
+  while preserving the installed `.copilot/softwareFactoryVscode/` baseline and
+  retaining Docker images.
+- `delete-runtime` is the policy-driven trigger that shares the same artifact
+  effects as `cleanup`; it is not a hidden image-prune path or a separate normal
+  operator command.
+- If `docker image ls` still shows factory images after `stop` or `cleanup`, that
+  is retained build state rather than leaked runtime ownership. Image pruning is a
+  separate Docker operator action and is never a hidden side effect of the supported
+  lifecycle commands.
 
 After starting the stack, you can run runtime compliance verification:
 
