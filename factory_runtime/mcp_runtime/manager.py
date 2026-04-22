@@ -962,13 +962,18 @@ class MCPRuntimeManager:
                 ]
             )
         )
+        completed_tool_call_boundary_at = (
+            snapshot.recovery.last_completed_tool_call_at
+            if snapshot.recovery is not None
+            else None
+        )
         self._persist_runtime_action_metadata(
             snapshot=resumed_snapshot,
             runtime_state=resumed_snapshot.lifecycle_state,
             trigger=RuntimeActionTrigger.RESUME,
             action_at=action_at,
             reason_codes=merged_reason_codes,
-            completed_tool_call_boundary_at=action_at,
+            completed_tool_call_boundary_at=completed_tool_call_boundary_at,
             clear_repair_failure_state=(
                 resumed_snapshot.readiness is not None
                 and resumed_snapshot.readiness.ready
