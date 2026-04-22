@@ -97,6 +97,26 @@ Release notes and operator docs use the same ADR-008 promotion vocabulary:
 - `advanced groundwork` — important rollout slices have landed, but the final promotion gate is still not satisfied
 - `fulfilled` — the current default branch now meets this threshold for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`; shared mode remains deliberate and opt-in rather than mandatory for every workspace
 
+## ✅ Readiness closeout boundaries
+
+This handout documents the current default-branch readiness baseline. It does
+not turn every future runtime-manager idea into a supported promise.
+
+For reproducible closeout evidence, pair the operator guidance here with:
+
+- `./.venv/bin/pytest tests/test_regression.py -v`
+- `./.venv/bin/python ./scripts/local_ci_parity.py`
+- targeted `RUN_DOCKER_E2E=1` lifecycle proofs when real container/image truth
+  matters
+
+Still deferred after this readiness pass:
+
+- dynamic profile expansion during a running prompt;
+- image pull/upgrade policy automation and broader orchestration/event/UI work;
+- any claim of shared-service maturity beyond the explicit `mcp-memory`,
+  `mcp-agent-bus`, and `approval-gate` proofs already called out in repository
+  docs.
+
 ## 🏢 Working with multiple workspaces
 
 You can run multiple installed workspaces on the same host.

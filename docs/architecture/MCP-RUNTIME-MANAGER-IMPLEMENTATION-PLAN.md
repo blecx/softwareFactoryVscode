@@ -2,7 +2,45 @@
 
 ## Status
 
-Proposed sequencing plan
+Historical sequencing plan with the practical baseline delivered on default
+branch
+
+The practical baseline sequenced here is no longer hypothetical. The current
+default branch already has:
+
+- `factory_runtime/mcp_runtime/` as the dedicated runtime-manager package;
+- manager-backed `preflight`, `status`, and runtime verification surfaces;
+- harness/runtime consumers that read manager-backed lifecycle truth;
+- cleanup/delete-runtime artifact parity plus bounded recovery metadata; and
+- practical-baseline lifecycle proof coverage, with targeted Docker-backed
+   evidence where real container/image truth matters.
+
+Read the phase breakdown below as sequencing history plus bounded future-work
+markers, not as permission to describe the whole runtime-manager program as
+still unlanded.
+
+## Still deferred after this readiness pass
+
+The following remain explicitly out of scope for the supported readiness
+baseline unless a later ADR or verified implementation says otherwise:
+
+- dynamic profile expansion during a running prompt;
+- image pull/upgrade policy automation;
+- a full signal/event transport design or new UI surface for runtime state;
+- broader orchestration changes not needed for the accepted practical
+   baseline; and
+- blanket claims of shared-service maturity beyond the explicit proofs for
+   `mcp-memory`, `mcp-agent-bus`, and `approval-gate`.
+
+## Readiness closeout evidence for this plan
+
+Use `tests/README.md` as the reproducible evidence index for this delivered
+baseline. At minimum, rerun:
+
+- `./.venv/bin/pytest tests/test_regression.py -v`
+- `./.venv/bin/python ./scripts/local_ci_parity.py`
+- targeted `RUN_DOCKER_E2E=1` lifecycle proofs when the claim depends on real
+   container/image truth.
 
 This document is an implementation plan, not an ADR.
 
@@ -68,7 +106,7 @@ The current implementation already has the raw pieces the new manager should sta
 - Apply shared-service rules only when a service is actually operating in shared mode under `ADR-008`.
 - Keep `cleanup` and `delete-runtime` on one artifact-effect path; only the trigger/reason differs.
 - Treat completed tool-call boundaries as the only allowed automatic resume boundary in this baseline.
-- Do not widen scope to dynamic profiles, image policy, or broad orchestration while the manager baseline is still landing.
+- Do not widen scope to dynamic profiles, image policy, or broad orchestration when extending the manager beyond the delivered baseline.
 
 ## Target module layout for the first implementation
 

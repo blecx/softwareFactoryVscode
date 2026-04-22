@@ -408,6 +408,21 @@ def test_workflow_doc_links_remote_protection_guide():
     assert "docs/setup-github-repository.md" in workflow_doc
 
 
+def test_workflow_doc_requires_reproducible_readiness_closeout_evidence() -> None:
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "## Readiness closeout evidence discipline" in workflow_doc
+    assert "documentation/evidence-alignment" in workflow_doc
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py" in workflow_doc
+    assert "tests/test_regression.py -v" in workflow_doc
+    assert "targeted Docker-backed validation" in workflow_doc
+    assert "deferred items that remain out of scope" in workflow_doc
+    assert "tests/README.md" in workflow_doc
+
+
 def test_execution_surface_routing_contract_is_documented() -> None:
     repo_root = Path(__file__).parent.parent
     workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
@@ -574,6 +589,14 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     assert "Current default-branch status: `fulfilled`" in install_doc
     assert "Historical releases may still use `open` or `advanced" in install_doc
     assert "groundwork` when they describe earlier repository states." in install_doc
+    assert "## Readiness closeout snapshot (what is done vs deferred)" in install_doc
+    assert "closes the MCP harness readiness baseline" in install_doc
+    assert "Reproducible closeout evidence for this baseline is:" in install_doc
+    assert "./.venv/bin/pytest tests/test_regression.py -v" in install_doc
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py" in install_doc
+    assert "Still deferred after this readiness pass:" in install_doc
+    assert "no release/version bump is implied" in install_doc
+    assert "dynamic profile expansion" in install_doc
     assert "advanced groundwork" in install_doc
     assert "final architecture/documentation review" in install_doc
     assert "VS Code `1.116+`" in install_doc
@@ -638,6 +661,16 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
     assert "Reload / reopen recovery" in tests_readme
     assert "RUN_DOCKER_E2E=1" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
+    assert "## Readiness closeout evidence bundle" in tests_readme
+    assert "./.venv/bin/pytest tests/test_regression.py -v" in tests_readme
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py" in tests_readme
+    assert "activate_switch_back_keeps_one_active_workspace" in tests_readme
+    assert "stop_cleanup_retains_images_and_supports_restart" in tests_readme
+    assert "Still deferred after this readiness pass:" in tests_readme
+    assert (
+        "blanket claims that every service is globally shared by default"
+        in tests_readme
+    )
 
 
 def test_tests_readme_documents_python_env_repair_path():
@@ -671,6 +704,11 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "does **not** auto-start the runtime either" in handout
     assert "foreground task exits while Docker containers keep running" in handout
     assert "reconcile/idempotent action" in handout
+    assert "## ✅ Readiness closeout boundaries" in handout
+    assert "current default-branch readiness baseline" in handout
+    assert "./.venv/bin/pytest tests/test_regression.py -v" in handout
+    assert "Still deferred after this readiness pass:" in handout
+    assert "dynamic profile expansion during a running prompt" in handout
 
     assert "factory_stack.py activate" in cheat_sheet
     assert "factory_stack.py preflight" in cheat_sheet
@@ -699,6 +737,45 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "destructive to metadata/data, not images" in cheat_sheet
     assert "`delete-runtime` is the policy-driven trigger" in cheat_sheet
     assert "Retained images after `stop` or `cleanup` are expected" in cheat_sheet
+    assert "## ✅ Readiness closeout evidence" in cheat_sheet
+    assert "./.venv/bin/pytest tests/test_regression.py -v" in cheat_sheet
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py" in cheat_sheet
+    assert "supported baseline" in cheat_sheet
+    assert "Still deferred after this readiness pass:" in cheat_sheet
+    assert (
+        "blanket claims that every service is globally shared by default" in cheat_sheet
+    )
+
+
+def test_runtime_manager_plan_marks_delivered_baseline_and_deferred_scope() -> None:
+    repo_root = Path(__file__).parent.parent
+    plan_doc = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "Historical sequencing plan with the practical baseline delivered" in plan_doc
+    )
+    assert "## Still deferred after this readiness pass" in plan_doc
+    assert (
+        "`factory_runtime/mcp_runtime/` as the dedicated runtime-manager package"
+        in plan_doc
+    )
+    assert (
+        "manager-backed `preflight`, `status`, and runtime verification surfaces"
+        in plan_doc
+    )
+    assert "## Readiness closeout evidence for this plan" in plan_doc
+    assert "./.venv/bin/pytest tests/test_regression.py -v" in plan_doc
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py" in plan_doc
+    assert "dynamic profile expansion during a running prompt" in plan_doc
+    assert (
+        "blanket claims of shared-service maturity beyond the explicit proofs"
+        in plan_doc
+    )
 
 
 def test_adr_014_clarifies_current_suspend_boundary() -> None:
@@ -876,7 +953,10 @@ def test_mcp_runtime_manager_plan_is_explicitly_non_normative():
     ).read_text(encoding="utf-8")
 
     assert "## Status" in plan_doc
-    assert "Proposed sequencing plan" in plan_doc
+    assert (
+        "Historical sequencing plan with the practical baseline delivered" in plan_doc
+    )
+    assert "Read the phase breakdown below as sequencing history" in plan_doc
     assert "implementation plan, not an ADR" in plan_doc
     assert "Per `ADR-013`" in plan_doc
     assert "Per `ADR-014`" in plan_doc
