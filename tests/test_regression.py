@@ -588,6 +588,10 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     assert "`completed_tool_call_boundary`" in install_doc
     assert "closing the window, or reopening later does not silently" in install_doc
     assert "reconcile/idempotent action" in install_doc
+    assert "stop --remove-volumes" in install_doc
+    assert "`delete-runtime` is the policy-driven trigger" in install_doc
+    assert "retained build state rather than leaked runtime ownership" in install_doc
+    assert "separate Docker operator action" in install_doc
 
 
 def test_readme_tracks_version_aware_copilot_setup():
@@ -683,6 +687,10 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "does **not** auto-start the runtime" in cheat_sheet
     assert "foreground task exits while containers still exist" in cheat_sheet
     assert "reconcile/idempotent action" in cheat_sheet
+    assert "retain runtime metadata, volumes, and images" in cheat_sheet
+    assert "destructive to metadata/data, not images" in cheat_sheet
+    assert "`delete-runtime` is the policy-driven trigger" in cheat_sheet
+    assert "Retained images after `stop` or `cleanup` are expected" in cheat_sheet
 
 
 def test_adr_014_clarifies_current_suspend_boundary() -> None:

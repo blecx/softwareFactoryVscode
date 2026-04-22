@@ -703,6 +703,21 @@ def stop_stack(
         raise
     if not preserve_runtime_state:
         factory_workspace.update_runtime_state(config.factory_instance_id, "stopped")
+    removal_effect = (
+        "Removed containers and named volumes"
+        if remove_volumes
+        else "Removed containers and retained named volumes"
+    )
+    metadata_effect = (
+        "preserved existing runtime-state metadata"
+        if preserve_runtime_state
+        else "retained generated runtime metadata and marked the workspace `stopped`"
+    )
+    print(
+        "🛑 Stopped workspace "
+        f"`{config.project_workspace_id}` [{config.factory_instance_id}]. "
+        f"{removal_effect}, {metadata_effect}, and retained Docker images."
+    )
     return resolved_env_file
 
 
@@ -995,7 +1010,11 @@ def deactivate_workspace(repo_root: Path, *, env_file: Path | None = None) -> in
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Canonical Software Factory runtime start/stop helper."
+        description=(
+            "Canonical Software Factory runtime lifecycle helper. Supported stop "
+            "and cleanup paths remove containers/runtime artifacts as documented, "
+            "but do not prune Docker images."
+        )
     )
     parser.add_argument(
         "command",
@@ -1039,7 +1058,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--build",
         action="store_true",
-        help="Build images while starting the stack.",
+        help=(
+            "Build images while starting the stack (otherwise reuse existing "
+            "retained images when available)."
+        ),
     )
     parser.add_argument(
         "--no-wait",
@@ -1055,7 +1077,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--remove-volumes",
         action="store_true",
-        help="Also remove named volumes while stopping the stack.",
+        help=(
+            "Also remove named volumes while stopping the stack; Docker images "
+            "are still retained."
+        ),
     )
     parser.add_argument(
         "--preserve-runtime-state",
