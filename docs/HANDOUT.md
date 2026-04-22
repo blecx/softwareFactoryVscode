@@ -64,6 +64,13 @@ Use one of:
 
 Activation does **not** start containers by itself.
 
+### 4.5 Reload, close, and reopen do not invent a second lifecycle
+
+- Reloading VS Code or closing the window does **not** automatically stop the runtime.
+- Reopening the workspace later does **not** auto-start the runtime either.
+- If the foreground task exits while Docker containers keep running, use `factory_stack.py status` or `factory_stack.py preflight` as the source of runtime truth.
+- Running `factory_stack.py start` again while the runtime is already healthy is a reconcile/idempotent action, not a second workspace runtime.
+
 ### 5. Verify the runtime when you need stronger proof
 
 After startup, you can run:

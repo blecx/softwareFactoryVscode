@@ -228,14 +228,20 @@ def render_resume_checklist(
             "4. If no PR exists yet, continue only with implementation/validation "
             "steps for the active issue."
         )
+    lines.append(
+        "5. If VS Code reloaded, the window closed/reopened, or the foreground "
+        "task exited, do not assume the runtime stopped; compare against "
+        "`factory_stack.py status` or the runtime snapshot before deciding "
+        "whether start/stop/recovery is needed."
+    )
     if include_runtime_status:
         lines.append(
-            "5. Use the runtime snapshot section above to decide whether "
+            "6. Use the runtime snapshot section above to decide whether "
             "infrastructure recovery is required before resuming the task."
         )
     else:
         lines.append(
-            "5. Re-run this helper with `--include-runtime-status` if the "
+            "6. Re-run this helper with `--include-runtime-status` if the "
             "interrupted task touched runtime or MCP services."
         )
     lines.append("")

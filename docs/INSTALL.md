@@ -279,6 +279,17 @@ metadata such as `recovery_classification`,
 `completed_tool_call_boundary`, and `last_runtime_action` so operators can tell
 whether resume is safe, unsafe, or manual.
 
+Reloading VS Code, closing the window, or reopening later does not silently
+stop or start the runtime. Containers continue to exist until an explicit
+`stop`/`cleanup` path (or an exit mode that deliberately opts into kill-on-exit
+behavior) tears them down.
+
+If the foreground task exits while containers are still present, treat
+`status`/`preflight` as the source of runtime truth rather than assuming the
+terminal session owned the lifecycle. Running `start` again while the runtime is
+already healthy is a reconcile/idempotent action, not a request to create a
+second workspace runtime.
+
 `activate` refreshes generated runtime artifacts from the canonical installed-workspace contract and then marks that workspace active in the host registry. It does **not** start the Docker runtime by itself.
 
 The `preflight` command is the recommended first check after opening or restoring a VS Code workspace.
