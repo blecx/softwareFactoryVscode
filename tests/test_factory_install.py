@@ -2095,6 +2095,158 @@ def test_verify_factory_runtime_fails_when_required_service_missing(
     assert exit_code == 1
 
 
+def test_verify_factory_runtime_reports_needs_ramp_up_after_stop(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    target_repo.mkdir(parents=True, exist_ok=True)
+    factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+    (factory_dir / ".git").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "scripts").mkdir(parents=True, exist_ok=True)
+    for script_name in (
+        "factory_release.py",
+        "factory_update.py",
+        "install_factory.py",
+        "bootstrap_host.py",
+        "verify_factory_install.py",
+    ):
+        (factory_dir / "scripts" / script_name).write_text("# stub\n", encoding="utf-8")
+    (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+    (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (factory_dir / "configs").mkdir(parents=True, exist_ok=True)
+    (factory_dir / "configs" / "bash_gateway_policy.default.yml").write_text(
+        (REPO_ROOT / "configs" / "bash_gateway_policy.default.yml").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
+    env_path.write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                f"PROJECT_WORKSPACE_ID={target_repo.name}",
+                f"COMPOSE_PROJECT_NAME=factory_{target_repo.name}",
+                "CONTEXT7_API_KEY=test-context7-key",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (target_repo / ".gitignore").write_text(
+        "# Factory Isolation\n.copilot/softwareFactoryVscode/.tmp/\n.copilot/softwareFactoryVscode/.factory.env\n",
+        encoding="utf-8",
+    )
+    runtime_config = factory_workspace.build_runtime_config(
+        target_repo,
+        factory_dir=factory_dir,
+    )
+    factory_workspace.sync_runtime_artifacts(
+        runtime_config,
+        runtime_state="running",
+        active=False,
+    )
+    (target_repo / ".copilot/softwareFactoryVscode/lock.json").write_text(
+        json.dumps(
+            {
+                "version": "main",
+                "installed_at": "2026-03-21T00:00:00Z",
+                "updated_at": "2026-03-21T00:00:00Z",
+                "factory": {
+                    "repo_url": "https://example.invalid/factory.git",
+                    "install_path": ".copilot/softwareFactoryVscode",
+                    "workspace_file": "software-factory.code-workspace",
+                    "commit": "deadbeef",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": runtime_config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        verify_factory_install.shutil, "which", lambda name: "/usr/bin/docker"
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack.shutil,
+        "which",
+        lambda name: "/usr/bin/docker",
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "run_compose_command",
+        lambda _repo_root, _command: None,
+    )
+    factory_stack.stop_stack(factory_dir, env_file=env_path, remove_volumes=True)
+    capsys.readouterr()
+
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "collect_running_services",
+        lambda _compose_name: (_ for _ in ()).throw(
+            AssertionError(
+                "runtime verification should stop at manager-backed preflight when "
+                "the runtime is explicitly stopped"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        verify_factory_install.factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "needs-ramp-up",
+            "recommended_action": "start",
+            "reason_codes": ["no-running-services"],
+            "issues": [],
+            "snapshot": build_runtime_snapshot_contract(
+                lifecycle_state=factory_stack.RuntimeLifecycleState.STOPPED,
+                persisted_runtime_state="stopped",
+                readiness_status="needs-ramp-up",
+                recommended_action="start",
+                ready=False,
+            ),
+        },
+    )
+
+    exit_code = verify_factory_install.main(["--target", str(target_repo), "--runtime"])
+    output = capsys.readouterr().out
+
+    assert exit_code == 1
+    assert "Runtime compliance failed" in output
+    assert "needs-ramp-up" in output
+    assert "recommended_action=`start`" in output
+
+
 def test_factory_stack_builds_full_compose_command(tmp_path: Path) -> None:
     repo_root = tmp_path / ".copilot/softwareFactoryVscode"
     repo_root.mkdir(parents=True, exist_ok=True)
@@ -3431,6 +3583,87 @@ def test_factory_stack_stop_reports_hygiene_semantics(
     assert "preserved existing runtime-state metadata" in second_output
     assert "retained Docker images" in second_output
     assert "-v" in commands[1]
+
+
+def test_factory_stack_stop_followed_by_status_reports_needs_ramp_up(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "run_compose_command",
+        lambda _repo_root, _command: None,
+    )
+    factory_stack.stop_stack(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+    capsys.readouterr()
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should rely on the manager-backed preflight "
+                "snapshot after an explicit stop"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "needs-ramp-up",
+            "recommended_action": "start",
+            "reason_codes": ["no-running-services"],
+            "issues": [],
+            "snapshot": build_runtime_snapshot_contract(
+                lifecycle_state=factory_stack.RuntimeLifecycleState.STOPPED,
+                persisted_runtime_state="stopped",
+                readiness_status="needs-ramp-up",
+                recommended_action="start",
+                ready=False,
+            ),
+        },
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "runtime_state=stopped" in output
+    assert "preflight_status=needs-ramp-up" in output
+    assert "recommended_action=start" in output
 
 
 def test_factory_stack_list_reports_registry_reconciliation_conflicts(
