@@ -12,6 +12,7 @@ from factory_runtime.mcp_runtime import (
     ReasonCode,
     RecommendedAction,
     RecoveryClassification,
+    RepairResult,
     RepairStep,
     RuntimeActionTrigger,
     RuntimeLifecycleState,
@@ -750,7 +751,7 @@ def test_manager_build_snapshot_does_not_infer_activity_lease_from_history(
     assert snapshot.selection.activity_lease.renewed_at == "2026-04-21T09:00:00Z"
 
 
-def test_manager_build_snapshot_treats_proposal_bound_suspended_state_as_stopped(
+def test_manager_build_snapshot_preserves_bounded_suspended_state(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -778,10 +779,305 @@ def test_manager_build_snapshot_treats_proposal_bound_suspended_state_as_stopped
 
     snapshot = manager.build_snapshot(repo_root, env_file=env_path)
 
-    assert snapshot.persisted_runtime_state == RuntimeLifecycleState.STOPPED.value
-    assert snapshot.lifecycle_state == RuntimeLifecycleState.STOPPED
+    assert snapshot.persisted_runtime_state == RuntimeLifecycleState.SUSPENDED.value
+    assert snapshot.lifecycle_state == RuntimeLifecycleState.SUSPENDED
     assert snapshot.readiness is not None
     assert snapshot.readiness.status == ReadinessStatus.NEEDS_RAMP_UP
+    assert snapshot.readiness.recommended_action == RecommendedAction.RESUME
+    assert snapshot.recovery is not None
+    assert snapshot.recovery.classification == RecoveryClassification.RESUME_SAFE
+
+
+def test_manager_suspend_records_safe_resume_boundary(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+
+    inventory_state = {"mode": "running"}
+
+    def fake_collect_service_inventory(
+        _compose_name: str,
+    ) -> dict[str, dict[str, object]]:
+        if inventory_state["mode"] == "running":
+            return build_full_service_inventory(config)
+        return {}
+
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        fake_collect_service_inventory,
+    )
+
+    stop_calls: list[tuple[Path, Path | None, bool, bool]] = []
+
+    class FakeStackModule:
+        def stop_stack(
+            self,
+            repo_root_arg: Path,
+            *,
+            env_file: Path | None = None,
+            remove_volumes: bool = False,
+            preserve_runtime_state: bool = False,
+        ) -> Path | None:
+            stop_calls.append(
+                (repo_root_arg, env_file, remove_volumes, preserve_runtime_state)
+            )
+            inventory_state["mode"] = "stopped"
+            return env_file
+
+    monkeypatch.setattr(
+        manager,
+        "_load_factory_stack_module",
+        lambda: FakeStackModule(),
+    )
+
+    snapshot = manager.suspend(
+        repo_root,
+        env_file=env_path,
+        completed_tool_call_boundary=True,
+    )
+
+    assert stop_calls == [(repo_root, env_path, False, True)]
+    assert snapshot.lifecycle_state == RuntimeLifecycleState.SUSPENDED
+    assert snapshot.readiness is not None
+    assert snapshot.readiness.recommended_action == RecommendedAction.RESUME
+    assert snapshot.recovery is not None
+    assert snapshot.recovery.classification == RecoveryClassification.RESUME_SAFE
+    assert snapshot.recovery.completed_tool_call_boundary is True
+    assert snapshot.recovery.last_trigger == RuntimeActionTrigger.SUSPEND
+    assert ReasonCode.SUSPEND_REQUESTED in snapshot.recovery.last_reason_codes
+
+    registry = factory_workspace.load_registry(registry_path)
+    record = registry["workspaces"][config.factory_instance_id]
+    assert record["runtime_state"] == RuntimeLifecycleState.SUSPENDED.value
+    assert record["last_runtime_action"] == RuntimeActionTrigger.SUSPEND.value
+    assert (
+        ReasonCode.SUSPEND_REQUESTED.value in record["last_runtime_action_reason_codes"]
+    )
+    assert record["last_completed_tool_call_boundary_at"]
+
+
+def test_manager_suspend_with_execution_lease_marks_resume_unsafe(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "runtime.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    registry["workspaces"][config.factory_instance_id]["execution_lease_present"] = True
+    registry["workspaces"][config.factory_instance_id][
+        "execution_lease_holder"
+    ] = "copilot-session"
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+
+    inventory_state = {"mode": "running"}
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: (
+            build_full_service_inventory(config)
+            if inventory_state["mode"] == "running"
+            else {}
+        ),
+    )
+
+    class FakeStackModule:
+        def stop_stack(
+            self,
+            repo_root_arg: Path,
+            *,
+            env_file: Path | None = None,
+            remove_volumes: bool = False,
+            preserve_runtime_state: bool = False,
+        ) -> Path | None:
+            assert repo_root_arg == repo_root
+            assert env_file == env_path
+            assert remove_volumes is False
+            assert preserve_runtime_state is True
+            inventory_state["mode"] = "stopped"
+            return env_file
+
+    monkeypatch.setattr(
+        manager,
+        "_load_factory_stack_module",
+        lambda: FakeStackModule(),
+    )
+
+    snapshot = manager.suspend(repo_root, env_file=env_path)
+
+    assert snapshot.lifecycle_state == RuntimeLifecycleState.SUSPENDED
+    assert snapshot.recovery is not None
+    assert snapshot.recovery.classification == RecoveryClassification.RESUME_UNSAFE
+    assert snapshot.recovery.completed_tool_call_boundary is False
+
+    registry = factory_workspace.load_registry(registry_path)
+    record = registry["workspaces"][config.factory_instance_id]
+    assert record["last_completed_tool_call_boundary_at"] is None
+
+
+def test_manager_resume_repairs_unready_suspended_runtime(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "runtime.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    registry["workspaces"][config.factory_instance_id].update(
+        {
+            "runtime_state": RuntimeLifecycleState.SUSPENDED.value,
+            "last_runtime_action": RuntimeActionTrigger.SUSPEND.value,
+            "last_runtime_action_at": "2026-04-21T12:00:00Z",
+            "last_runtime_action_reason_codes": [ReasonCode.SUSPEND_REQUESTED.value],
+            "last_completed_tool_call_boundary_at": "2026-04-21T12:00:05Z",
+        }
+    )
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+
+    degraded_inventory = build_full_service_inventory(config)
+    degraded_inventory.pop("search-mcp")
+    inventory_state = {"mode": "suspended"}
+
+    def fake_collect_service_inventory(
+        _compose_name: str,
+    ) -> dict[str, dict[str, object]]:
+        if inventory_state["mode"] == "healthy":
+            return build_full_service_inventory(config)
+        if inventory_state["mode"] == "degraded":
+            return degraded_inventory
+        return {}
+
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        fake_collect_service_inventory,
+    )
+
+    start_calls: list[tuple[Path, Path | None, bool, bool, int, bool]] = []
+
+    class FakeStackModule:
+        def start_stack(
+            self,
+            repo_root_arg: Path,
+            *,
+            env_file: Path | None = None,
+            build: bool = True,
+            wait: bool = True,
+            wait_timeout: int = 300,
+            foreground: bool = False,
+        ) -> Path | None:
+            start_calls.append(
+                (repo_root_arg, env_file, build, wait, wait_timeout, foreground)
+            )
+            factory_workspace.update_runtime_state(
+                config.factory_instance_id,
+                RuntimeLifecycleState.RUNNING.value,
+                registry_path=registry_path,
+            )
+            inventory_state["mode"] = "degraded"
+            return env_file
+
+    monkeypatch.setattr(
+        manager,
+        "_load_factory_stack_module",
+        lambda: FakeStackModule(),
+    )
+
+    repair_calls: list[
+        tuple[Path, Path | None, tuple[RuntimeProfileName | str, ...] | None]
+    ] = []
+
+    def fake_repair(
+        repo_root_arg: Path,
+        *,
+        env_file: Path | None = None,
+        selected_profiles: tuple[RuntimeProfileName | str, ...] | None = None,
+    ) -> RepairResult:
+        repair_calls.append((repo_root_arg, env_file, selected_profiles))
+        inventory_state["mode"] = "healthy"
+        factory_workspace.update_runtime_state(
+            config.factory_instance_id,
+            RuntimeLifecycleState.RUNNING.value,
+            registry_path=registry_path,
+        )
+        return RepairResult(
+            attempted=True,
+            success=True,
+            attempted_steps=(RepairStep.RECREATE_SERVICE,),
+            reason_codes=(ReasonCode.REPAIR_RECREATE,),
+            details=("recreated missing service",),
+            final_state=RuntimeLifecycleState.RUNNING,
+        )
+
+    monkeypatch.setattr(manager, "repair", fake_repair)
+
+    snapshot = manager.resume(repo_root, env_file=env_path)
+
+    assert start_calls == [(repo_root, env_path, False, True, 300, False)]
+    assert repair_calls == [(repo_root, env_path, None)]
+    assert snapshot.lifecycle_state == RuntimeLifecycleState.RUNNING
+    assert snapshot.readiness is not None
+    assert snapshot.readiness.ready is True
+    assert snapshot.recovery is not None
+    assert snapshot.recovery.last_trigger == RuntimeActionTrigger.RESUME
+    assert snapshot.recovery.completed_tool_call_boundary is True
+    assert ReasonCode.RESUME_REQUESTED in snapshot.recovery.last_reason_codes
+    assert ReasonCode.RESUME_REPAIR_ATTEMPTED in snapshot.recovery.last_reason_codes
+    assert ReasonCode.REPAIR_RECREATE in snapshot.recovery.last_reason_codes
+
+    registry = factory_workspace.load_registry(registry_path)
+    record = registry["workspaces"][config.factory_instance_id]
+    assert record["runtime_state"] == RuntimeLifecycleState.RUNNING.value
+    assert record["last_runtime_action"] == RuntimeActionTrigger.RESUME.value
+    assert (
+        ReasonCode.RESUME_REQUESTED.value in record["last_runtime_action_reason_codes"]
+    )
+    assert (
+        ReasonCode.RESUME_REPAIR_ATTEMPTED.value
+        in record["last_runtime_action_reason_codes"]
+    )
+    assert (
+        ReasonCode.REPAIR_RECREATE.value in record["last_runtime_action_reason_codes"]
+    )
 
 
 def test_manager_build_snapshot_surfaces_manual_recovery_requirement(

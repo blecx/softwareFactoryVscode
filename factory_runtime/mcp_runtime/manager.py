@@ -748,16 +748,25 @@ class MCPRuntimeManager:
             )
 
         if running_service_count == 0:
+            recommended_action = RecommendedAction.START
+            issues = (
+                "Runtime preflight detected no running containers for compose "
+                f"project `{snapshot.compose_project_name}`. Infrastructure needs "
+                "ramp-up via `factory_stack.py start`.",
+            )
+            if snapshot.lifecycle_state == RuntimeLifecycleState.SUSPENDED:
+                recommended_action = RecommendedAction.RESUME
+                issues = (
+                    "Runtime preflight detected a bounded `suspended` runtime with no "
+                    "running containers. Resume it via `factory_stack.py resume` to "
+                    "re-hydrate services while preserving recovery metadata.",
+                )
             return ReadinessResult(
                 status=ReadinessStatus.NEEDS_RAMP_UP,
-                recommended_action=RecommendedAction.START,
+                recommended_action=recommended_action,
                 ready=False,
                 reason_codes=(ReasonCode.NO_RUNNING_SERVICES,),
-                issues=(
-                    "Runtime preflight detected no running containers for compose "
-                    f"project `{snapshot.compose_project_name}`. Infrastructure needs "
-                    "ramp-up via `factory_stack.py start`.",
-                ),
+                issues=issues,
             )
 
         if service_issues:
@@ -810,6 +819,165 @@ class MCPRuntimeManager:
             env_file=env_file,
             remove_volumes=remove_volumes,
             preserve_runtime_state=preserve_runtime_state,
+        )
+
+    def suspend(
+        self,
+        repo_root: Path,
+        *,
+        env_file: Path | None = None,
+        completed_tool_call_boundary: bool = False,
+        selected_profiles: Iterable[RuntimeProfileName | str] | None = None,
+        reason_codes: Iterable[ReasonCode | str] | None = None,
+    ) -> RuntimeSnapshot:
+        resolved_env_file = self.resolve_env_file(repo_root, env_file)
+        snapshot = self.build_snapshot(
+            repo_root,
+            env_file=resolved_env_file,
+            selected_profiles=selected_profiles,
+        )
+
+        if not snapshot.selection.installed:
+            raise RuntimeError(
+                "Cannot suspend a runtime that is not installed in the canonical registry."
+            )
+        if snapshot.lifecycle_state == RuntimeLifecycleState.RUNTIME_DELETED:
+            raise RuntimeError(
+                "Cannot suspend a runtime that has already been deleted."
+            )
+        if snapshot.lifecycle_state == RuntimeLifecycleState.SUSPENDED:
+            return snapshot
+        if snapshot.lifecycle_state != RuntimeLifecycleState.RUNNING:
+            raise RuntimeError(
+                "Suspend is only supported from the bounded `running` lifecycle state; "
+                f"current state is `{snapshot.lifecycle_state.value}`."
+            )
+        if snapshot.readiness is None or not snapshot.readiness.ready:
+            raise RuntimeError(
+                "Suspend requires a ready runtime. Repair or start the runtime until "
+                "readiness succeeds before entering `suspended`."
+            )
+
+        self.stop(
+            repo_root,
+            env_file=resolved_env_file,
+            preserve_runtime_state=True,
+        )
+        action_at = factory_workspace.utc_now_iso()
+        merged_reason_codes = self._tuple_unique(
+            [
+                ReasonCode.SUSPEND_REQUESTED,
+                *self._coerce_reason_codes(reason_codes),
+            ]
+        )
+        self._persist_runtime_action_metadata(
+            snapshot=snapshot,
+            runtime_state=RuntimeLifecycleState.SUSPENDED,
+            trigger=RuntimeActionTrigger.SUSPEND,
+            action_at=action_at,
+            reason_codes=merged_reason_codes,
+            completed_tool_call_boundary_at=(
+                action_at if completed_tool_call_boundary else None
+            ),
+            clear_repair_failure_state=True,
+        )
+        return self.build_snapshot(
+            repo_root,
+            env_file=resolved_env_file,
+            selected_profiles=selected_profiles,
+        )
+
+    def resume(
+        self,
+        repo_root: Path,
+        *,
+        env_file: Path | None = None,
+        selected_profiles: Iterable[RuntimeProfileName | str] | None = None,
+        wait: bool = True,
+        wait_timeout: int = 300,
+        reason_codes: Iterable[ReasonCode | str] | None = None,
+    ) -> RuntimeSnapshot:
+        resolved_env_file = self.resolve_env_file(repo_root, env_file)
+        snapshot = self.build_snapshot(
+            repo_root,
+            env_file=resolved_env_file,
+            selected_profiles=selected_profiles,
+        )
+
+        if snapshot.lifecycle_state != RuntimeLifecycleState.SUSPENDED:
+            raise RuntimeError(
+                "Resume is only supported from the bounded `suspended` lifecycle state; "
+                f"current state is `{snapshot.lifecycle_state.value}`."
+            )
+        if snapshot.recovery and (
+            snapshot.recovery.classification
+            == RecoveryClassification.MANUAL_RECOVERY_REQUIRED
+        ):
+            raise RuntimeError(
+                "Cannot resume a suspended runtime that requires manual recovery."
+            )
+
+        self.start(
+            repo_root,
+            env_file=resolved_env_file,
+            build=False,
+            wait=wait,
+            wait_timeout=wait_timeout,
+        )
+        resumed_snapshot = self.build_snapshot(
+            repo_root,
+            env_file=resolved_env_file,
+            selected_profiles=selected_profiles,
+        )
+
+        merged_reason_codes: list[ReasonCode] = [
+            ReasonCode.RESUME_REQUESTED,
+            *self._coerce_reason_codes(reason_codes),
+        ]
+        if resumed_snapshot.readiness and not resumed_snapshot.readiness.ready:
+            repair_result = self.repair(
+                repo_root,
+                env_file=resolved_env_file,
+                selected_profiles=selected_profiles,
+            )
+            if repair_result.attempted:
+                merged_reason_codes.append(ReasonCode.RESUME_REPAIR_ATTEMPTED)
+                merged_reason_codes.extend(repair_result.reason_codes)
+            resumed_snapshot = self.build_snapshot(
+                repo_root,
+                env_file=resolved_env_file,
+                selected_profiles=selected_profiles,
+            )
+
+        action_at = factory_workspace.utc_now_iso()
+        merged_reason_codes = list(
+            self._tuple_unique(
+                [
+                    *merged_reason_codes,
+                    *(
+                        resumed_snapshot.readiness.reason_codes
+                        if resumed_snapshot.readiness is not None
+                        else ()
+                    ),
+                ]
+            )
+        )
+        self._persist_runtime_action_metadata(
+            snapshot=resumed_snapshot,
+            runtime_state=resumed_snapshot.lifecycle_state,
+            trigger=RuntimeActionTrigger.RESUME,
+            action_at=action_at,
+            reason_codes=merged_reason_codes,
+            completed_tool_call_boundary_at=action_at,
+            clear_repair_failure_state=(
+                resumed_snapshot.readiness is not None
+                and resumed_snapshot.readiness.ready
+            ),
+        )
+        return self.build_snapshot(
+            repo_root,
+            env_file=resolved_env_file,
+            selected_profiles=selected_profiles,
         )
 
     def cleanup(
@@ -1301,6 +1469,61 @@ class MCPRuntimeManager:
             renewed_at=renewed_at,
             expires_at=expires_at,
         )
+
+    def _persist_runtime_action_metadata(
+        self,
+        *,
+        snapshot: RuntimeSnapshot,
+        runtime_state: RuntimeLifecycleState | str,
+        trigger: RuntimeActionTrigger,
+        action_at: str,
+        reason_codes: Iterable[ReasonCode | str] | None = None,
+        completed_tool_call_boundary_at: str | None = None,
+        clear_repair_failure_state: bool = False,
+    ) -> None:
+        effective_state = (
+            runtime_state.value
+            if isinstance(runtime_state, RuntimeLifecycleState)
+            else str(runtime_state).strip()
+        )
+        matched_instance_id, existing_record, registry = (
+            self._load_runtime_registry_entry(
+                snapshot.instance_id,
+                snapshot.target_dir,
+            )
+        )
+        effective_config = self._build_runtime_config_for_target(
+            snapshot.target_dir,
+            snapshot.factory_dir,
+        )
+        if effective_config is not None:
+            manifest = factory_workspace.build_runtime_manifest(effective_config)
+            record = factory_workspace.build_registry_record_from_manifest(
+                manifest,
+                runtime_state=effective_state,
+                existing_record=existing_record,
+            )
+            instance_id = effective_config.factory_instance_id
+        elif existing_record is not None:
+            record = dict(existing_record)
+            instance_id = matched_instance_id or snapshot.instance_id
+        else:
+            return
+
+        record["runtime_state"] = effective_state
+        record["updated_at"] = action_at
+        record["last_runtime_action"] = trigger.value
+        record["last_runtime_action_at"] = action_at
+        record["last_runtime_action_reason_codes"] = [
+            code.value for code in self._coerce_reason_codes(reason_codes)
+        ]
+        record["last_completed_tool_call_boundary_at"] = completed_tool_call_boundary_at
+        if clear_repair_failure_state:
+            record["repair_failure_count"] = 0
+            record["repair_circuit_breaker_tripped_at"] = None
+
+        registry.setdefault("workspaces", {})[instance_id] = record
+        factory_workspace.save_registry(registry, self._registry_path)
 
     def _build_recovery_metadata(
         self,
@@ -2346,14 +2569,7 @@ class MCPRuntimeManager:
         self,
         persisted_runtime_state: str,
     ) -> str:
-        normalized = persisted_runtime_state.strip()
-        if normalized == RuntimeLifecycleState.SUSPENDED.value:
-            # `suspended` stays proposal-bound until a later slice lands
-            # explicit, test-backed suspend/resume semantics. Treat stale
-            # persisted values as a stopped practical baseline instead of
-            # surfacing unsupported operator-facing lifecycle claims.
-            return RuntimeLifecycleState.STOPPED.value
-        return normalized
+        return persisted_runtime_state.strip()
 
     def _infer_lifecycle_state(
         self,

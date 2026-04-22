@@ -276,6 +276,8 @@ def resolve_status_runtime_state_from_snapshot(snapshot: Any) -> str:
         return "running"
     if snapshot.lifecycle_state == RuntimeLifecycleState.DEGRADED:
         return "degraded"
+    if snapshot.lifecycle_state == RuntimeLifecycleState.SUSPENDED:
+        return "suspended"
     if snapshot.lifecycle_state == RuntimeLifecycleState.STOPPED:
         if persisted_state in {"installed", "failed"}:
             return persisted_state
@@ -472,6 +474,8 @@ def resolve_status_runtime_state(
     normalized_persisted = persisted_state.strip() or "installed"
     if not docker_state_available:
         return normalized_persisted
+    if inferred_state == "suspended":
+        return "suspended"
     if inferred_state == "stopped":
         if normalized_persisted in {"installed", "failed"}:
             return normalized_persisted
@@ -702,6 +706,60 @@ def stop_stack(
     return resolved_env_file
 
 
+def suspend_workspace(
+    repo_root: Path,
+    *,
+    env_file: Path | None = None,
+    completed_tool_call_boundary: bool = False,
+) -> int:
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    manager = build_runtime_manager()
+    snapshot = manager.suspend(
+        repo_root,
+        env_file=resolved_env_file,
+        completed_tool_call_boundary=completed_tool_call_boundary,
+    )
+    recovery = getattr(snapshot, "recovery", None)
+    print(f"workspace_id={snapshot.workspace_id}")
+    print(f"instance_id={snapshot.instance_id}")
+    print(f"runtime_state={snapshot.lifecycle_state.value}")
+    if recovery is not None:
+        print(f"recovery_classification={recovery.classification.value}")
+        print(
+            "completed_tool_call_boundary="
+            f"{str(recovery.completed_tool_call_boundary).lower()}"
+        )
+    return 0
+
+
+def resume_workspace(
+    repo_root: Path,
+    *,
+    env_file: Path | None = None,
+) -> int:
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    manager = build_runtime_manager()
+    snapshot = manager.resume(
+        repo_root,
+        env_file=resolved_env_file,
+    )
+    readiness = getattr(snapshot, "readiness", None)
+    recovery = getattr(snapshot, "recovery", None)
+    print(f"workspace_id={snapshot.workspace_id}")
+    print(f"instance_id={snapshot.instance_id}")
+    print(f"runtime_state={snapshot.lifecycle_state.value}")
+    if readiness is not None:
+        print(f"preflight_status={readiness.status.value}")
+        print(f"recommended_action={readiness.recommended_action.value}")
+    if recovery is not None:
+        print(f"recovery_classification={recovery.classification.value}")
+        print(
+            "completed_tool_call_boundary="
+            f"{str(recovery.completed_tool_call_boundary).lower()}"
+        )
+    return 0
+
+
 def cleanup_workspace(
     repo_root: Path,
     *,
@@ -834,6 +892,29 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"preflight_status={preflight['status']}")
     print(f"recommended_action={preflight['recommended_action']}")
     print("reason_codes=" + ",".join(preflight.get("reason_codes", [])))
+    recovery = getattr(snapshot, "recovery", None)
+    if recovery is not None:
+        print(f"recovery_classification={recovery.classification.value}")
+        print(
+            "completed_tool_call_boundary="
+            f"{str(recovery.completed_tool_call_boundary).lower()}"
+        )
+        if recovery.last_trigger is not None:
+            print(f"last_runtime_action={recovery.last_trigger.value}")
+    selection = getattr(snapshot, "selection", None)
+    if selection is not None:
+        activity_lease = getattr(selection, "activity_lease", None)
+        execution_lease = getattr(selection, "execution_lease", None)
+        if activity_lease is not None:
+            print(
+                "activity_lease_present="
+                f"{str(bool(getattr(activity_lease, 'present', False))).lower()}"
+            )
+        if execution_lease is not None:
+            print(
+                "execution_lease_present="
+                f"{str(bool(getattr(execution_lease, 'present', False))).lower()}"
+            )
     preflight_topology = preflight.get("runtime_topology", {})
     shared_mode_diagnostics = preflight.get("shared_mode_diagnostics", {})
     if isinstance(preflight_topology, dict):
@@ -921,6 +1002,8 @@ def parse_args() -> argparse.Namespace:
         choices=[
             "start",
             "stop",
+            "suspend",
+            "resume",
             "list",
             "status",
             "preflight",
@@ -987,6 +1070,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Start attached in the foreground (without -d or --wait).",
     )
+    parser.add_argument(
+        "--completed-tool-call-boundary",
+        action="store_true",
+        help=(
+            "When suspending, record that the current prompt/session is paused on a "
+            "completed tool-call boundary so resume remains classified as safe."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1010,6 +1101,17 @@ def main() -> int:
             env_file=env_file,
             remove_volumes=args.remove_volumes,
             preserve_runtime_state=args.preserve_runtime_state,
+        )
+    elif args.command == "suspend":
+        return suspend_workspace(
+            repo_root,
+            env_file=env_file,
+            completed_tool_call_boundary=args.completed_tool_call_boundary,
+        )
+    elif args.command == "resume":
+        return resume_workspace(
+            repo_root,
+            env_file=env_file,
         )
     elif args.command == "cleanup":
         return cleanup_workspace(

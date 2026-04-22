@@ -67,12 +67,19 @@ It refreshes generated runtime artifacts from the canonical installed-workspace 
 
 It removes runtime ownership for the current workspace, including registry ownership, generated runtime artifacts, and workspace-scoped runtime data, while leaving the installed `.copilot/softwareFactoryVscode/` baseline in place.
 
-### What `suspended` means right now
+### What `suspended` means now
 
-The current practical baseline does **not** support a user-facing `suspended`
-runtime state yet. Treat `suspended` as proposal-bound `ADR-014` vocabulary
-until a later suspend/resume slice lands explicit, test-backed lifecycle
-semantics.
+The current practical baseline now supports a bounded user-facing `suspended`
+runtime state.
+
+Use `factory_stack.py suspend --completed-tool-call-boundary` when pausing on a
+completed tool-call boundary, and use `factory_stack.py resume` to re-hydrate
+the same runtime.
+
+`status` and `preflight` surface recovery metadata such as
+`recovery_classification`, `completed_tool_call_boundary`, and
+`last_runtime_action` so operators can distinguish resume-safe,
+resume-unsafe, and manual recovery cases.
 
 ## 🧪 Validation
 
