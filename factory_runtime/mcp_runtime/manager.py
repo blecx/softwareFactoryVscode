@@ -1044,6 +1044,13 @@ class MCPRuntimeManager:
             trigger=normalized_trigger,
             reason_codes=normalized_reason_codes,
         )
+        print(
+            "🧹 "
+            f"`{normalized_trigger.value}` removed workspace containers and named "
+            "volumes when present, generated runtime metadata, registry ownership, "
+            "and workspace-scoped runtime data. The installed baseline and Docker "
+            "images were retained."
+        )
         return 0
 
     def delete_runtime(

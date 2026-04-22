@@ -225,6 +225,55 @@ def _seed_pending_run_via_mcp(
     return run_id
 
 
+def _docker_compose_project_images(compose_project_name: str) -> list[str]:
+    result = subprocess.run(
+        [
+            "docker",
+            "ps",
+            "-a",
+            "--filter",
+            f"label=com.docker.compose.project={compose_project_name}",
+            "--format",
+            "{{.Image}}",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return sorted({line.strip() for line in result.stdout.splitlines() if line.strip()})
+
+
+def _docker_compose_project_container_ids(compose_project_name: str) -> list[str]:
+    result = subprocess.run(
+        [
+            "docker",
+            "ps",
+            "-a",
+            "--filter",
+            f"label=com.docker.compose.project={compose_project_name}",
+            "--format",
+            "{{.ID}}",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _docker_image_exists(image_name: str) -> bool:
+    result = subprocess.run(
+        ["docker", "image", "inspect", image_name],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def test_validate_throwaway_runtime_relocates_system_tmp_target() -> None:
     module = _load_validate_throwaway_module()
 
@@ -963,3 +1012,160 @@ def test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace(
                     text=True,
                     check=False,
                 )
+
+
+@pytest.mark.docker
+@pytest.mark.skipif(
+    os.getenv("RUN_DOCKER_E2E", "0") != "1",
+    reason="Set RUN_DOCKER_E2E=1 to run Docker-enabled throwaway runtime E2E tests.",
+)
+def test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart(
+    tmp_path: Path,
+) -> None:
+    if not _docker_ready():
+        pytest.skip("Docker CLI is not available on PATH.")
+
+    target_repo = tmp_path / "throwaway-target"
+    registry_path = tmp_path / "registry.json"
+
+    env = os.environ.copy()
+    env["SOFTWARE_FACTORY_REGISTRY_PATH"] = str(registry_path)
+
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    env_path = repo_root / ".factory.env"
+    manifest_path = repo_root / ".tmp" / "runtime-manifest.json"
+
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                str(VALIDATE_THROWAWAY_SCRIPT),
+                "--target",
+                str(target_repo),
+                "--skip-runtime",
+                "--skip-source-stack-handoff",
+                "--allow-external-target",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "start",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+                "--build",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        compose_project_name = str(manifest["compose_project_name"])
+        context7_url = str(manifest["mcp_servers"]["context7"]["url"])
+
+        assert _wait_until_reachable(context7_url)
+
+        images = _docker_compose_project_images(compose_project_name)
+        assert images
+        retained_image = next(
+            (image for image in images if "factory" in image.lower()),
+            images[0],
+        )
+
+        stop_result = subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "stop",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+                "--remove-volumes",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        assert "Removed containers and named volumes" in stop_result.stdout
+        assert "retained Docker images" in stop_result.stdout
+        assert env_path.exists()
+        assert manifest_path.exists()
+        assert _docker_compose_project_container_ids(compose_project_name) == []
+        assert _docker_image_exists(retained_image)
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "start",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        assert _wait_until_reachable(context7_url)
+
+        cleanup_result = subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "cleanup",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        assert (
+            "`cleanup` removed workspace containers and named volumes when present"
+            in cleanup_result.stdout
+        )
+        assert "Docker images were retained" in cleanup_result.stdout
+        assert not env_path.exists()
+        assert not manifest_path.exists()
+        assert _docker_compose_project_container_ids(compose_project_name) == []
+        assert _docker_image_exists(retained_image)
+    finally:
+        if env_path.exists() and repo_root.exists():
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(FACTORY_STACK_SCRIPT),
+                    "stop",
+                    "--repo-root",
+                    str(repo_root),
+                    "--env-file",
+                    str(env_path),
+                    "--remove-volumes",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                text=True,
+                check=False,
+            )
