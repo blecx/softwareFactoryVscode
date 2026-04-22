@@ -93,6 +93,10 @@ Routing rule:
   - active issue/PR GitHub truth when available
   - PR check output when available
   - optional `factory_stack.py status` output for runtime-sensitive work
+- Window reload, window close/reopen, or foreground task exit is not itself
+  runtime truth. Use `factory_stack.py status` or
+  `capture_recovery_snapshot.py --include-runtime-status` before assuming the
+  runtime stopped or needs a fresh `start`.
 - Review the recovery snapshot and update `.tmp/github-issue-queue-state.md` before resuming implementation, merge, cleanup, or queue selection.
 
 ## Required guardrails

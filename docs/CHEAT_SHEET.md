@@ -81,6 +81,13 @@ the same runtime.
 `last_runtime_action` so operators can distinguish resume-safe,
 resume-unsafe, and manual recovery cases.
 
+### Reload / close / reopen semantics
+
+- Reloading VS Code or closing the window does **not** automatically stop the runtime.
+- Reopening the workspace later does **not** auto-start the runtime.
+- If the foreground task exits while containers still exist, `status` and `preflight` remain the source of truth for runtime state.
+- Re-running `factory_stack.py start` while the runtime is already healthy is a reconcile/idempotent action, not a request for a second runtime.
+
 ## 🧪 Validation
 
 ```bash

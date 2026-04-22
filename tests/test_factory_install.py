@@ -4314,6 +4314,78 @@ def test_factory_stack_status_uses_manager_snapshot_for_runtime_truth(
     assert "preflight_status=ready" in output
 
 
+def test_factory_stack_status_keeps_running_truth_when_task_metadata_is_absent(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should derive runtime truth from the "
+                "manager-backed snapshot even when task metadata is absent"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "recommended_action": "none",
+            "reason_codes": [],
+            "issues": [],
+            "snapshot": build_runtime_snapshot_contract(
+                lifecycle_state=factory_stack.RuntimeLifecycleState.RUNNING,
+                persisted_runtime_state="running",
+                readiness_status="ready",
+                recommended_action="none",
+                ready=True,
+                activity_lease_present=False,
+                execution_lease_present=False,
+            ),
+        },
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "runtime_state=running" in output
+    assert "activity_lease_present=false" in output
+    assert "execution_lease_present=false" in output
+
+
 def test_factory_stack_status_fails_closed_without_manager_snapshot(
     tmp_path: Path,
     monkeypatch,
@@ -6548,6 +6620,55 @@ def test_mcp_bootloader_requires_snapshot_readiness_contract(
 
     with pytest.raises(RuntimeError, match="readiness result"):
         asyncio.run(bootloader.initialize())
+
+
+def test_mcp_bootloader_teardown_keeps_runtime_running_by_default(
+    tmp_path: Path,
+) -> None:
+    source_repo = tmp_path / "work" / "softwareFactoryVscode"
+    source_repo.mkdir(parents=True, exist_ok=True)
+    env_file = source_repo / ".factory.env"
+    stop_calls: list[tuple[Path, Path | None]] = []
+
+    class FakeRuntimeManager:
+        def stop(self, repo_root: Path, *, env_file: Path | None = None) -> None:
+            stop_calls.append((repo_root, env_file))
+
+    bootloader = mcp_lifecycle.MCPBootloader(source_repo)
+    bootloader._runtime_manager = FakeRuntimeManager()
+    bootloader._factory_repo_root = source_repo
+    bootloader._env_file = env_file
+
+    bootloader.teardown()
+    bootloader.teardown()
+
+    assert stop_calls == []
+
+
+def test_mcp_bootloader_teardown_stops_runtime_only_when_requested(
+    tmp_path: Path,
+) -> None:
+    source_repo = tmp_path / "work" / "softwareFactoryVscode"
+    source_repo.mkdir(parents=True, exist_ok=True)
+    env_file = source_repo / ".factory.env"
+    stop_calls: list[tuple[Path, Path | None]] = []
+
+    class FakeRuntimeManager:
+        def stop(self, repo_root: Path, *, env_file: Path | None = None) -> None:
+            stop_calls.append((repo_root, env_file))
+
+    bootloader = mcp_lifecycle.MCPBootloader(
+        source_repo,
+        kill_mcps_on_exit=True,
+    )
+    bootloader._runtime_manager = FakeRuntimeManager()
+    bootloader._factory_repo_root = source_repo
+    bootloader._env_file = env_file
+
+    bootloader.teardown()
+    bootloader.teardown()
+
+    assert stop_calls == [(source_repo, env_file)]
 
 
 def test_cleanup_workspace(tmp_path: Path, monkeypatch):

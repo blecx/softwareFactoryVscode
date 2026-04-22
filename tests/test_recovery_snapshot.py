@@ -113,3 +113,5 @@ def test_capture_recovery_snapshot_writes_required_sections(tmp_path):
     assert "## Runtime / service snapshot" in snapshot
     assert "factory_stack runtime status" in snapshot
     assert "## Next resume checklist" in snapshot
+    assert "do not assume the runtime stopped" in snapshot
+    assert "window closed/reopened" in snapshot
