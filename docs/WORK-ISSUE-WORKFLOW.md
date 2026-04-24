@@ -6,21 +6,46 @@ This repository's canonical issue workflow is **Copilot-native**.
 
 Use these Copilot agents in VS Code Chat:
 
-1. `@create-issue`
-   - draft or create a template-compliant issue
-2. `@resolve-issue`
-   - implement one scoped issue into one PR
-3. `@pr-merge`
-   - validate, merge, and close the linked issue
-4. `@queue-backend` or `@queue-phase-2`
-   - continue the repeatable one-issue-at-a-time loop with a manual checkpoint between iterations
+1. `@create-issue` — draft or create a template-compliant issue.
+1. `@resolve-issue` — implement one scoped issue into one PR.
+1. `@pr-merge` — validate, merge, and close the linked issue.
+1. `@queue-backend` or `@queue-phase-2` — continue the repeatable
+  one-issue-at-a-time loop with a manual checkpoint between iterations,
+  using the same `@resolve-issue` → `@pr-merge` slice path.
+1. `@execute-approved-plan` — execute a bounded approved GitHub-backed issue
+  plan end-to-end when the operator explicitly says things like
+  `execute the plan`, `continue the plan`, or `run the approved queue`, by
+  repeating the same `@resolve-issue` → `@pr-merge` slice path automatically
+  within the approved set.
 
 ## Loop rules
 
 - One issue = one PR = one merge.
 - Stop immediately on blocked PRs, CI failures, merge conflicts, or workflow errors.
-- Require explicit operator approval before continuing to the next issue.
+- Default queue agents (`@queue-backend`, `@queue-phase-2`) require explicit
+  operator approval before continuing to the next issue.
+- `@execute-approved-plan` is the bounded exception: when the operator has
+  explicitly approved a finite GitHub-backed issue set, it may continue
+  automatically within that set until completion or a true blocker.
 - Use `.tmp/`, never `/tmp`.
+
+## Single source of truth for issue execution
+
+The repository supports exactly one canonical issue-to-merge process:
+
+1. `@resolve-issue` owns implementation, branch selection, local validation,
+  PR-body preparation, and PR creation for one issue.
+2. `@pr-merge` owns PR readiness checks, CI polling, merge, issue close, and
+  post-merge cleanup.
+3. `@execute-approved-plan` is the bounded multi-issue wrapper that repeats the
+  same `@resolve-issue` → `@pr-merge` slice path for an explicit approved set.
+4. `@queue-backend` and `@queue-phase-2` are scoped/manual-checkpoint wrappers
+  over that same canonical slice path; they do **not** define a different
+  implementation, PR, or merge process.
+
+If a PR has CI errors or merge-readiness problems, return to `@resolve-issue`
+to fix the root cause on the active slice, rerun the local prechecks, and then
+re-enter `@pr-merge`. Do not invent a separate “fix the PR” workflow.
 
 ## Execution surfaces
 
@@ -51,9 +76,14 @@ Routing rule:
 - When transforming JSON in shell automation, pipe into `python -c '...'` or a dedicated script. Do **not** combine a pipe with a heredoc-based Python command such as `... | python - <<'PY'`, because the heredoc replaces stdin and the piped JSON never reaches `sys.stdin`.
 - Long-running Docker/test output is not itself evidence of an input prompt. Before sending terminal input, confirm that the terminal explicitly requests it (for example `Enter ...`, `[y/N]`, `Username:`, or a tool-level input-needed signal).
 
-## Deterministic queue checkpoint enforcement
+## Deterministic queue checkpoint contract
 
-- Ordered queue continuation, merge, and completion prompts are guarded by `.github/hooks/github-issue-queue-guard.json`, which runs `python3 ./scripts/github_issue_queue_guard.py`.
+- The queue checkpoint file `.tmp/github-issue-queue-state.md` is the shared
+  state contract for `@resolve-issue`, `@pr-merge`, `@execute-approved-plan`,
+  and interruption recovery.
+- This repository intentionally does **not** use a global `UserPromptSubmit`
+  hook for issue/PR/merge enforcement. Prompt-time hooks created a second
+  workflow path and are outside the supported contract.
 - Keep `.tmp/github-issue-queue-state.md` updated throughout the current issue. The minimum checkpoint fields are:
   - `active_issue`
   - `active_branch`
@@ -68,7 +98,9 @@ Routing rule:
   - `ci_state`
   - `cleanup_state`
   - `last_github_truth`
-- The hook blocks unsafe prompts such as “continue to the next issue”, “merge the PR”, or “close the issue” when the checkpoint is missing, incomplete, or lacks the required GitHub/cleanup evidence for the requested gate.
+- Canonical workflows must refuse unsafe continuation, merge, or completion
+  steps when the checkpoint is missing, incomplete, or lacks the required
+  GitHub/cleanup evidence, and they must explain exactly what is missing.
 
 ## Resume after interruption
 
@@ -190,3 +222,5 @@ For a new item:
 3. Use `@resolve-issue` with the created issue number.
 4. When the PR is ready, use `@pr-merge`.
 5. For ongoing queue work, switch to `@queue-backend` or `@queue-phase-2`.
+6. When the operator has already approved a finite GitHub-backed issue set and
+  wants continuous execution, use `@execute-approved-plan`.

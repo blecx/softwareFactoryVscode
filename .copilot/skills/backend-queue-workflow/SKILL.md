@@ -10,7 +10,7 @@ Provides context and instructions for the `backend-queue-workflow` skill module.
 
 ## Role Contract
 
-**backend queue orchestration authority** - Manages the iterative issue-to-PR-merge loop specifically for backend tasks. Contains NO domain logic, implementation rules, or coding standards; entirely delegates work execution to canonical core workflows.
+**backend queue scope wrapper** - Narrows queue selection to backend tasks and inserts a manual checkpoint between slices. It MUST use the same canonical `resolve-issue` → `pr-merge` process as every other workflow and MUST NOT define a second implementation or merge path.
 
 ## Selection Scope
 
@@ -19,6 +19,7 @@ Provides context and instructions for the `backend-queue-workflow` skill module.
 ## Required Sources
 
 - `.copilot/skills/a2a-communication/SKILL.md`
+- `.copilot/skills/approved-plan-execution-workflow/SKILL.md`
 - `.copilot/skills/resolve-issue-workflow/SKILL.md`
 - `.copilot/skills/pr-merge-workflow/SKILL.md`
 - `.github/workflows/ci.yml`
@@ -38,6 +39,7 @@ Provides context and instructions for the `backend-queue-workflow` skill module.
 
 - **Implementation**: MUST defer entirely to `.copilot/skills/resolve-issue-workflow/SKILL.md` to do the actual coding, validation, and PR creation.
 - **Merge**: MUST defer entirely to `.copilot/skills/pr-merge-workflow/SKILL.md` to handle the PR merge and workspace cleanup processes.
+- **Plan semantics**: MUST reuse the same slice contract documented in `.copilot/skills/approved-plan-execution-workflow/SKILL.md`; this skill only changes queue scope and the manual stop gate.
 - **UX/Domain Rules**: DO NOT evaluate or enforce domain constraints here. `resolve-issue-workflow` holds all requirements for handling the implementation details.
 
 ## Guardrails
@@ -62,6 +64,8 @@ Use this specific loop-reporting template before pausing for operator approval:
 
 ## Instructions
 
-- Follow domain guidelines.
+- Select the next backend-scoped issue.
+- Execute that slice only through the canonical `resolve-issue` → `pr-merge` path.
+- After the slice reaches a safe terminal state (`blocked`, `waiting-for-approval`, `ready-for-pr-merge`, or `merged-and-closed`), stop and wait for explicit operator approval before advancing to the next backend issue.
   </file>
   </skill>

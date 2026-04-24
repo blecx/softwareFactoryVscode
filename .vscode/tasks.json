@@ -94,7 +94,7 @@
       "command": "python3",
       "args": [
         "-c",
-        "import sys; print('Deprecated task: use @resolve-issue or @queue-backend/@queue-phase-2 in Copilot Chat. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
+        "import sys; print('Deprecated task: use @resolve-issue for one issue or @execute-approved-plan for an approved multi-issue set. Scoped manual queues remain @queue-backend/@queue-phase-2. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -170,7 +170,7 @@
       "command": "python3",
       "args": [
         "-c",
-        "import sys; print('Deprecated task: use @queue-backend or @queue-phase-2 in Copilot Chat. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
+        "import sys; print('Deprecated task: use @execute-approved-plan for bounded multi-issue execution or @queue-backend/@queue-phase-2 for manual queue checkpoints. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
       ],
       "options": {
         "cwd": "${workspaceFolder}"
@@ -190,7 +190,7 @@
       "command": "python3",
       "args": [
         "-c",
-        "import sys; print('Deprecated task: use @queue-backend or @queue-phase-2 in Copilot Chat with the desired issue context. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
+        "import sys; print('Deprecated task: use @execute-approved-plan for bounded multi-issue execution or @queue-backend/@queue-phase-2 with the desired issue scope for manual checkpoints. See docs/WORK-ISSUE-WORKFLOW.md.'); sys.exit(1)"
       ],
       "options": {
         "cwd": "${workspaceFolder}"

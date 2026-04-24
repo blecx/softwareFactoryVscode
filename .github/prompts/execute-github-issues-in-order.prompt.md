@@ -19,6 +19,10 @@ You cannot assume the session will remain uninterrupted. Instead, guarantee **de
 - The user wants interruption-safe queue work with clear stop gates.
 - The user allows subagents when they help preserve workflow discipline.
 
+This prompt is the manual ordered-queue variant. For a bounded approved issue
+set that should continue automatically within the set, use
+`@execute-approved-plan` instead.
+
 ## When Not to Use
 
 - The task is only to create a new issue.
@@ -72,8 +76,8 @@ You cannot assume the session will remain uninterrupted. Instead, guarantee **de
 12. Never claim an issue is complete until GitHub confirms the PR is merged and the linked issue state is correct.
 13. Subagents are allowed, but the parent workflow must remain accountable for order and continuity:
     - use read-only exploration subagents for discovery only
-    - use `resolve-issue` for implementation
-    - use `pr-merge` for merge validation and merge
+   - use `resolve-issue` for implementation
+   - use `pr-merge` for merge validation and merge
     - use `queue-backend` or `queue-phase-2` only after the current issue is fully merged or intentionally blocked
 14. Do not start the next issue automatically after a merge. Require an explicit operator checkpoint and approval.
 
@@ -97,6 +101,8 @@ You cannot assume the session will remain uninterrupted. Instead, guarantee **de
    ```
 
 5. Execute the current issue only.
+    - Use the same canonical `resolve-issue` → `pr-merge` slice path as every
+       other repository workflow.
 6. Before any handoff, interruption recovery, or completion claim, re-check GitHub truth.
    - If continuity was lost, capture `.tmp/interruption-recovery-snapshot.md` before resuming.
 7. End each iteration with one of these states only:

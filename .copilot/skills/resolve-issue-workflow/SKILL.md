@@ -8,10 +8,15 @@
 
 Provides context and instructions for the `resolve-issue-workflow` skill module.
 
+This is the canonical implementation and PR-preparation half of the repository's
+issue → PR → merge process.
+
 ## When to Use
 
 - A specific issue number is provided for implementation.
 - The user asks to pick the next issue and execute one issue-to-PR slice.
+- A PR or branch failed CI and needs implementation fixes before returning to
+   merge readiness.
 
 ## When Not to Use
 
@@ -35,11 +40,12 @@ Provides context and instructions for the `resolve-issue-workflow` skill module.
    - `./tests/run-integration-test.sh`
    - Maintain `.tmp/github-issue-queue-state.md` throughout the slice and record the latest validation command/result there.
 8. Commit with `Fixes #<issue>` and push.
-   - Before handing off to merge, update `.tmp/github-issue-queue-state.md` with `status: ready-for-pr-merge` plus `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; `.github/hooks/github-issue-queue-guard.json` and `scripts/github_issue_queue_guard.py` enforce that gate.
+   - Before handing off to merge, update `.tmp/github-issue-queue-state.md` with `status: ready-for-pr-merge` plus `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; that checkpoint is consumed by `pr-merge`, approved-plan execution, and interruption recovery.
 9. Create PR via GitHub CLI using the generated `.tmp` markdown file and `.github/pull_request_template.md` structure:
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`
 10. Run `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md` before creating or updating the PR.
 11. Address CI failures by root cause and re-validate.
+   - If merge work discovers failing CI or merge-readiness issues that require code changes, stay on the same issue/branch and continue using this workflow rather than inventing a separate PR-repair path.
 
 ## Required Planning Shape
 
