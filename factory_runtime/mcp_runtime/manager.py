@@ -44,6 +44,7 @@ from factory_runtime.mcp_runtime.models import (
     RuntimeActionTrigger,
     RuntimeCatalog,
     RuntimeLifecycleState,
+    RuntimeMode,
     RuntimeProfileName,
     RuntimeSnapshot,
     SelectionMetadata,
@@ -305,7 +306,6 @@ class MCPRuntimeManager:
         selected_profiles: Iterable[RuntimeProfileName | str] | None = None,
     ) -> RuntimeSnapshot:
         catalog = self.load_catalog()
-        profile_selection = catalog.select_profiles(selected_profiles)
         resolved_workspace_file = workspace_file or self._default_workspace_file
         resolved_env_file = self.resolve_env_file(repo_root, env_file)
         target_dir = self._resolve_target_dir_from_env(repo_root, resolved_env_file)
@@ -314,6 +314,13 @@ class MCPRuntimeManager:
             factory_dir=repo_root,
             workspace_file=resolved_workspace_file,
             registry_path=self._registry_path,
+        )
+        runtime_mode = self._resolve_runtime_mode(config)
+        profile_selection = catalog.select_profiles(
+            self._resolve_selected_profiles_for_runtime_mode(
+                runtime_mode,
+                selected_profiles,
+            )
         )
         manifest, _ = factory_workspace.load_or_rebuild_runtime_manifest(
             target_dir,
@@ -411,6 +418,7 @@ class MCPRuntimeManager:
             lifecycle_state=lifecycle_state,
             selection=selection,
             persisted_runtime_state=persisted_runtime_state,
+            runtime_mode=runtime_mode,
             last_transition_at=last_transition_at,
             last_transition_reason_codes=last_transition_reason_codes,
             shared_mode=config.shared_service_mode,
@@ -440,6 +448,27 @@ class MCPRuntimeManager:
                 [*snapshot.last_transition_reason_codes, *readiness.reason_codes]
             ),
         )
+
+    def _resolve_runtime_mode(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+    ) -> RuntimeMode:
+        normalized_mode = factory_workspace.normalize_runtime_mode(config.runtime_mode)
+        try:
+            return RuntimeMode(normalized_mode)
+        except ValueError:
+            return RuntimeMode.DEVELOPMENT
+
+    def _resolve_selected_profiles_for_runtime_mode(
+        self,
+        runtime_mode: RuntimeMode,
+        selected_profiles: Iterable[RuntimeProfileName | str] | None,
+    ) -> Iterable[RuntimeProfileName | str] | None:
+        if selected_profiles is not None:
+            return selected_profiles
+        if runtime_mode == RuntimeMode.PRODUCTION:
+            return (RuntimeProfileName.WORKSPACE_PRODUCTION,)
+        return None
 
     def evaluate_readiness(
         self,
@@ -2413,7 +2442,16 @@ class MCPRuntimeManager:
         entry: ServiceCatalogEntry,
     ) -> list[str]:
         missing_keys: list[str] = []
-        for config_key in entry.required_config_keys:
+        required_config_keys = list(entry.required_config_keys)
+        if (
+            factory_workspace.normalize_runtime_mode(config.runtime_mode)
+            == factory_workspace.PRODUCTION_RUNTIME_MODE
+            and entry.name == "agent-worker"
+            and "GITHUB_TOKEN" not in required_config_keys
+        ):
+            required_config_keys.append("GITHUB_TOKEN")
+
+        for config_key in required_config_keys:
             if str(config.env_values.get(config_key, "")).strip():
                 continue
             missing_keys.append(config_key)

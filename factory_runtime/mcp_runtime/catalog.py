@@ -73,6 +73,7 @@ def build_catalog() -> RuntimeCatalog:
             scope=ServiceScope.SHARED_CAPABLE,
             profiles=(
                 RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
                 RuntimeProfileName.HARNESS_DEFAULT,
             ),
             required_mounts=("FACTORY_DATA_DIR/memory/<factory_instance_id>",),
@@ -87,6 +88,7 @@ def build_catalog() -> RuntimeCatalog:
             scope=ServiceScope.SHARED_CAPABLE,
             profiles=(
                 RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
                 RuntimeProfileName.HARNESS_DEFAULT,
             ),
             required_mounts=("FACTORY_DATA_DIR/bus/<factory_instance_id>",),
@@ -99,7 +101,10 @@ def build_catalog() -> RuntimeCatalog:
             runtime_identity="approval-gate",
             service_kind=ServiceKind.SUPPORT_HTTP,
             scope=ServiceScope.SHARED_CAPABLE,
-            profiles=(RuntimeProfileName.WORKSPACE_DEFAULT,),
+            profiles=(
+                RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
+            ),
             readiness=_http_semantics("/health"),
             repair_policy_class=RepairPolicyClass.CORE,
             port_env_key="APPROVAL_GATE_PORT",
@@ -109,7 +114,10 @@ def build_catalog() -> RuntimeCatalog:
             runtime_identity="agent-worker",
             service_kind=ServiceKind.WORKER,
             scope=ServiceScope.WORKSPACE_SCOPED,
-            profiles=(RuntimeProfileName.WORKSPACE_DEFAULT,),
+            profiles=(
+                RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
+            ),
             readiness=_worker_semantics(),
             repair_policy_class=RepairPolicyClass.CORE,
         ),
@@ -118,7 +126,10 @@ def build_catalog() -> RuntimeCatalog:
             runtime_identity="context7",
             service_kind=ServiceKind.MCP,
             scope=ServiceScope.WORKSPACE_SCOPED,
-            profiles=(RuntimeProfileName.WORKSPACE_DEFAULT,),
+            profiles=(
+                RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
+            ),
             required_config_keys=("CONTEXT7_API_KEY",),
             readiness=_mcp_semantics(),
             repair_policy_class=RepairPolicyClass.CORE,
@@ -130,7 +141,10 @@ def build_catalog() -> RuntimeCatalog:
             runtime_identity="bash-gateway-mcp",
             service_kind=ServiceKind.MCP,
             scope=ServiceScope.WORKSPACE_SCOPED,
-            profiles=(RuntimeProfileName.WORKSPACE_DEFAULT,),
+            profiles=(
+                RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
+            ),
             readiness=_mcp_semantics(),
             repair_policy_class=RepairPolicyClass.CORE,
             workspace_server_name="bashGateway",
@@ -143,6 +157,7 @@ def build_catalog() -> RuntimeCatalog:
             scope=ServiceScope.WORKSPACE_SCOPED,
             profiles=(
                 RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
                 RuntimeProfileName.HARNESS_DEFAULT,
             ),
             readiness=_mcp_semantics(),
@@ -157,6 +172,7 @@ def build_catalog() -> RuntimeCatalog:
             scope=ServiceScope.WORKSPACE_SCOPED,
             profiles=(
                 RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
                 RuntimeProfileName.HARNESS_DEFAULT,
             ),
             readiness=_mcp_semantics(),
@@ -171,6 +187,7 @@ def build_catalog() -> RuntimeCatalog:
             scope=ServiceScope.WORKSPACE_SCOPED,
             profiles=(
                 RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
                 RuntimeProfileName.HARNESS_DEFAULT,
             ),
             readiness=_mcp_semantics(),
@@ -183,7 +200,10 @@ def build_catalog() -> RuntimeCatalog:
             runtime_identity="docker-compose-mcp",
             service_kind=ServiceKind.MCP,
             scope=ServiceScope.WORKSPACE_SCOPED,
-            profiles=(RuntimeProfileName.WORKSPACE_DEFAULT,),
+            profiles=(
+                RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
+            ),
             readiness=_mcp_semantics(),
             repair_policy_class=RepairPolicyClass.CORE,
             workspace_server_name="dockerCompose",
@@ -194,7 +214,10 @@ def build_catalog() -> RuntimeCatalog:
             runtime_identity="test-runner-mcp",
             service_kind=ServiceKind.MCP,
             scope=ServiceScope.WORKSPACE_SCOPED,
-            profiles=(RuntimeProfileName.WORKSPACE_DEFAULT,),
+            profiles=(
+                RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
+            ),
             readiness=_mcp_semantics(),
             repair_policy_class=RepairPolicyClass.CORE,
             workspace_server_name="testRunner",
@@ -205,7 +228,10 @@ def build_catalog() -> RuntimeCatalog:
             runtime_identity="offline-docs-mcp",
             service_kind=ServiceKind.MCP,
             scope=ServiceScope.WORKSPACE_SCOPED,
-            profiles=(RuntimeProfileName.WORKSPACE_DEFAULT,),
+            profiles=(
+                RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
+            ),
             readiness=_mcp_semantics(),
             repair_policy_class=RepairPolicyClass.CORE,
             workspace_server_name="offlineDocs",
@@ -218,6 +244,7 @@ def build_catalog() -> RuntimeCatalog:
             scope=ServiceScope.WORKSPACE_SCOPED,
             profiles=(
                 RuntimeProfileName.WORKSPACE_DEFAULT,
+                RuntimeProfileName.WORKSPACE_PRODUCTION,
                 RuntimeProfileName.HARNESS_DEFAULT,
             ),
             readiness=_mcp_semantics(),
@@ -236,6 +263,29 @@ def build_catalog() -> RuntimeCatalog:
             ),
             required_services=(
                 "mock-llm-gateway",
+                "mcp-memory",
+                "mcp-agent-bus",
+                "approval-gate",
+                "agent-worker",
+                "context7",
+                "bash-gateway-mcp",
+                "git-mcp",
+                "search-mcp",
+                "filesystem-mcp",
+                "docker-compose-mcp",
+                "test-runner-mcp",
+                "offline-docs-mcp",
+                "github-ops-mcp",
+            ),
+        ),
+        RuntimeProfileName.WORKSPACE_PRODUCTION: RuntimeProfile(
+            name=RuntimeProfileName.WORKSPACE_PRODUCTION,
+            description=(
+                "Workspace runtime profile for explicit internal-production mode, "
+                "which requires live configuration and excludes the mock LLM gateway "
+                "from default readiness."
+            ),
+            required_services=(
                 "mcp-memory",
                 "mcp-agent-bus",
                 "approval-gate",

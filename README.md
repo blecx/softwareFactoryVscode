@@ -82,6 +82,8 @@ Once installed, check out our user guides to learn how to operate the factory ef
 - **[Harness Namespace Migration Mitigation Plan](docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md):** Provides the phased migration plan, Definition of Done, verification steps, and review prompts for moving from hidden-tree installs to namespaced `.copilot` / `.github` integration.
 - **[Harness Namespace Implementation Backlog](docs/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md):** Breaks the migration into concrete implementation phases with likely files to change, dependency order, Definition of Done, review criteria, and anti-hallucination guardrails.
 
+The explicit runtime mode selector is `FACTORY_RUNTIME_MODE` in the installed `.factory.env`. `development` remains the deterministic default, while `production` selects the manager-backed fail-closed internal-production profile that surfaces `runtime_mode=production` in `preflight` / `status` and disables silent mock fallback.
+
 ### Architecture Notes
 
 The repository uses Architecture Decision Records (ADRs) to document non-trivial design choices and avoid future drift.
