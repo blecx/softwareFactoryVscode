@@ -101,6 +101,24 @@ Still deferred after this readiness pass:
   automation, or broader orchestration/UI work is already part of the
   supported baseline.
 
+## Internal production boundary and sign-off
+
+The readiness snapshot above documents the current **baseline** only. It is not
+the final production claim for this repository.
+
+- The supported production target is **internal self-hosted use** for the
+  namespace-first, manager-backed runtime model.
+- **External hosted multi-tenant SaaS production remains out of scope.**
+- [`docs/PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md) is the canonical
+  readiness contract for scope, blockers, evidence, and final sign-off rules.
+- [`docs/PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) remains
+  the implementation roadmap for reaching that contract.
+
+Do not describe the repository as production ready until the blocking internal
+production requirements have landed and the final sign-off evidence bundle is
+complete, including the canonical production-readiness gate and three
+consecutive clean runs.
+
 ## Prerequisites
 
 Before installation, verify you have the following installed on your local host:

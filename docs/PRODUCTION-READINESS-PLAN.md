@@ -4,6 +4,9 @@ This plan defines the work required to make `softwareFactoryVscode` production r
 
 It is designed to be detailed enough to split directly into GitHub issues and execute without inventing missing scope later.
 
+`docs/PRODUCTION-READINESS.md` is the canonical operator-facing readiness contract.
+This plan remains the implementation roadmap for reaching that contract.
+
 ## Scope boundary
 
 ### In scope
