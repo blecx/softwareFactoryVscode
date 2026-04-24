@@ -18,7 +18,15 @@ class RuntimeProfileName(StrEnum):
     """Named runtime profiles for static service selection."""
 
     WORKSPACE_DEFAULT = "workspace-default"
+    WORKSPACE_PRODUCTION = "workspace-production"
     HARNESS_DEFAULT = "harness-default"
+
+
+class RuntimeMode(StrEnum):
+    """Operator-visible runtime mode for manager-backed readiness."""
+
+    DEVELOPMENT = "development"
+    PRODUCTION = "production"
 
 
 class ServiceKind(StrEnum):
@@ -365,6 +373,7 @@ class RuntimeSnapshot:
     lifecycle_state: RuntimeLifecycleState
     selection: SelectionMetadata
     persisted_runtime_state: str
+    runtime_mode: RuntimeMode = RuntimeMode.DEVELOPMENT
     last_transition_at: str | None = None
     last_transition_reason_codes: tuple[ReasonCode, ...] = ()
     shared_mode: str = ""
