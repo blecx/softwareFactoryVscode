@@ -59,6 +59,9 @@ PORT_LAYOUT: dict[str, int] = {
 SHARED_SERVICE_MODE_ENV_KEY = "FACTORY_SHARED_SERVICE_MODE"
 PER_WORKSPACE_TOPOLOGY_MODE = "per-workspace"
 SHARED_TOPOLOGY_MODE = "shared"
+RUNTIME_MODE_ENV_KEY = "FACTORY_RUNTIME_MODE"
+DEVELOPMENT_RUNTIME_MODE = "development"
+PRODUCTION_RUNTIME_MODE = "production"
 TENANCY_MODE_ENV_KEY = "FACTORY_TENANCY_MODE"
 COMPATIBILITY_TENANCY_MODE = "compatibility"
 PROMOTED_SHARED_TENANCY_MODE = "shared"
@@ -153,6 +156,7 @@ MANAGED_ENV_KEYS = [
     "FACTORY_DATA_DIR",
     "FACTORY_INSTANCE_ID",
     "FACTORY_PORT_INDEX",
+    RUNTIME_MODE_ENV_KEY,
     *PORT_LAYOUT.keys(),
 ]
 
@@ -181,6 +185,7 @@ class WorkspaceRuntimeConfig:
     port_index: int
     env_values: dict[str, str]
     ports: dict[str, int]
+    runtime_mode: str
     shared_service_mode: str
     shared_service_urls: dict[str, str]
     mcp_server_urls: dict[str, str]
@@ -353,6 +358,15 @@ def normalize_shared_service_mode(raw_value: str | None) -> str:
     return PER_WORKSPACE_TOPOLOGY_MODE
 
 
+def normalize_runtime_mode(raw_value: str | None) -> str:
+    normalized = str(raw_value or "").strip().lower()
+    if normalized in {"", DEVELOPMENT_RUNTIME_MODE, "dev", "local"}:
+        return DEVELOPMENT_RUNTIME_MODE
+    if normalized in {PRODUCTION_RUNTIME_MODE, "prod"}:
+        return PRODUCTION_RUNTIME_MODE
+    return DEVELOPMENT_RUNTIME_MODE
+
+
 def normalize_tenancy_mode(raw_value: str | None) -> str:
     normalized = str(raw_value or "").strip().lower()
     if normalized in {
@@ -418,7 +432,11 @@ def build_runtime_topology(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
             "shared_service_env_key": shared_service_env_key,
         }
 
-    return {"mode": config.shared_service_mode, "services": services}
+    return {
+        "mode": config.shared_service_mode,
+        "runtime_mode": config.runtime_mode,
+        "services": services,
+    }
 
 
 def build_shared_mode_diagnostics(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
@@ -925,6 +943,9 @@ def build_runtime_config(
         ),
         "FACTORY_INSTANCE_ID": factory_instance_id,
         "FACTORY_PORT_INDEX": str(port_index),
+        RUNTIME_MODE_ENV_KEY: normalize_runtime_mode(
+            existing_env.get(RUNTIME_MODE_ENV_KEY, "")
+        ),
         **{key: str(value) for key, value in ports.items()},
     }
     if "CONTEXT7_API_KEY" in existing_env:
@@ -938,6 +959,7 @@ def build_runtime_config(
         if key not in managed_env and key not in MANAGED_ENV_KEYS
     }
     env_values = {**managed_env, **extra_env}
+    runtime_mode = normalize_runtime_mode(env_values.get(RUNTIME_MODE_ENV_KEY, ""))
     shared_service_mode = normalize_shared_service_mode(
         existing_env.get(SHARED_SERVICE_MODE_ENV_KEY, "")
     )
@@ -966,6 +988,7 @@ def build_runtime_config(
         port_index=port_index,
         env_values=env_values,
         ports=ports,
+        runtime_mode=runtime_mode,
         shared_service_mode=shared_service_mode,
         shared_service_urls=shared_service_urls,
         mcp_server_urls=build_mcp_server_urls(ports),
@@ -999,6 +1022,7 @@ def build_runtime_manifest(config: WorkspaceRuntimeConfig) -> dict[str, Any]:
         "factory_version": factory_version,
         "factory_display_version": release_metadata["display_version"],
         "factory_release": release_metadata,
+        "runtime_mode": config.runtime_mode,
         "runtime_topology": runtime_topology,
         "mcp_servers": {
             name: {

@@ -14,6 +14,16 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
+RUNTIME_MODE_ENV_KEY = "FACTORY_RUNTIME_MODE"
+PRODUCTION_RUNTIME_MODE = "production"
+
+
+def _production_runtime_mode_enabled() -> bool:
+    return (
+        os.environ.get(RUNTIME_MODE_ENV_KEY, "").strip().lower()
+        == PRODUCTION_RUNTIME_MODE
+    )
+
 
 class OpenAIAPIKeyMissingError(RuntimeError):
     """Raised when `OPENAI_API_KEY` is not configured."""
@@ -51,7 +61,6 @@ class OpenAIImagesClient:
         resolved_key = api_key or os.getenv("OPENAI_API_KEY")
         # --- Check Dynamic Overrides ---
         import json
-        import os
 
         override_path = os.getenv("LLM_OVERRIDE_PATH", "configs/runtime_override.json")
         if os.path.exists(override_path):
@@ -65,6 +74,11 @@ class OpenAIImagesClient:
                 pass
         # -------------------------------
         if not resolved_key and openai_client is None:
+            if _production_runtime_mode_enabled():
+                raise OpenAIAPIKeyMissingError(
+                    "OpenAI image generation requires a live API key when "
+                    "FACTORY_RUNTIME_MODE=production; mock fallback is disabled."
+                )
             resolved_key = "sk-dummy-test"
             base_url = os.getenv("MOCK_LLM_URL", "http://localhost:9090/v1")
         else:

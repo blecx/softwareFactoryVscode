@@ -16,6 +16,16 @@ from typing import Awaitable, Callable, Dict, Optional
 import httpx
 from openai import AsyncOpenAI
 
+RUNTIME_MODE_ENV_KEY = "FACTORY_RUNTIME_MODE"
+PRODUCTION_RUNTIME_MODE = "production"
+
+
+def _production_runtime_mode_enabled() -> bool:
+    return (
+        os.environ.get(RUNTIME_MODE_ENV_KEY, "").strip().lower()
+        == PRODUCTION_RUNTIME_MODE
+    )
+
 
 class _LLMRequestThrottle:
     """Process-local async request throttle for outbound LLM calls."""
@@ -367,6 +377,12 @@ class LLMClientFactory:
         # GitHub Models
         if provider == "github" or "models.github.ai" in base_url:
             if LLMClientFactory._looks_like_placeholder(api_key):
+                if _production_runtime_mode_enabled():
+                    raise ValueError(
+                        "GitHub Models credentials are required when "
+                        "FACTORY_RUNTIME_MODE=production; mock fallback is disabled. "
+                        "Set GITHUB_TOKEN, GH_TOKEN, GITHUB_PAT, or a non-placeholder api_key."
+                    )
                 # Fallback to Mock LLM Gateway
                 return AsyncOpenAI(
                     base_url=os.getenv("MOCK_LLM_URL", "http://localhost:9090/v1"),

@@ -788,8 +788,18 @@ def verify_runtime(
     violations.extend(build_shared_mode_expectation_violations(shared_mode_diagnostics))
 
     snapshot_services = dict(getattr(snapshot, "services", {}) or {})
+    selection = getattr(snapshot, "selection", None)
+    selected_profiles = getattr(selection, "profiles", None)
+    selected_service_names = tuple(
+        str(service_name)
+        for service_name in getattr(selected_profiles, "required_services", ())
+        if str(service_name)
+    ) or tuple(RUNTIME_SERVICES.keys())
 
-    for service_name, metadata in RUNTIME_SERVICES.items():
+    for service_name in selected_service_names:
+        metadata = RUNTIME_SERVICES.get(service_name)
+        if metadata is None:
+            continue
         service_record = snapshot_services.get(service_name)
         if service_record is None:
             violations.append(

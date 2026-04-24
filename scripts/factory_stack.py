@@ -252,6 +252,7 @@ def build_preflight_report_from_snapshot(
         "issues": list(readiness.issues),
         "blocking_services": list(readiness.blocking_services),
         "config": config,
+        "runtime_mode": getattr(snapshot, "runtime_mode", config.runtime_mode),
         "workspace_urls": dict(snapshot.workspace_urls),
         "manifest_server_urls": dict(snapshot.manifest_server_urls),
         "manifest_health_urls": dict(snapshot.manifest_health_urls),
@@ -333,6 +334,7 @@ def print_preflight_report(report: dict[str, Any]) -> None:
     print(f"instance_id={config.factory_instance_id}")
     print(f"target={config.target_dir}")
     print(f"compose_project={config.compose_project_name}")
+    print(f"runtime_mode={report.get('runtime_mode', config.runtime_mode)}")
     print(
         "topology_mode="
         f"{runtime_topology.get('mode', factory_workspace.PER_WORKSPACE_TOPOLOGY_MODE)}"
@@ -622,6 +624,8 @@ def start_stack(
             action.append("--build")
         if wait:
             action.extend(["--wait", "--wait-timeout", str(wait_timeout)])
+    if config.runtime_mode == factory_workspace.PRODUCTION_RUNTIME_MODE:
+        action.extend(["--scale", "mock-llm-gateway=0"])
     if config.shared_service_mode == factory_workspace.SHARED_TOPOLOGY_MODE:
         for service_name in sorted(factory_workspace.PROMOTABLE_SHARED_SERVICES):
             action.extend(["--scale", f"{service_name}=0"])
@@ -894,6 +898,7 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     print(f"target={config.target_dir}")
     print(f"compose_project={config.compose_project_name}")
     print(f"topology_mode={config.shared_service_mode}")
+    print(f"runtime_mode={getattr(snapshot, 'runtime_mode', config.runtime_mode)}")
     print(f"runtime_state={runtime_state}")
     print(f"active={str(active).lower()}")
     print(f"port_index={config.port_index}")

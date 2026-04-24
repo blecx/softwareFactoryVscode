@@ -16,6 +16,7 @@ from factory_runtime.mcp_runtime import (
     RepairStep,
     RuntimeActionTrigger,
     RuntimeLifecycleState,
+    RuntimeMode,
     RuntimeProfileName,
     RuntimeSnapshot,
     SelectionMetadata,
@@ -181,6 +182,7 @@ def test_runtime_catalog_exposes_workspace_and_harness_profiles() -> None:
     harness_selection = catalog.select_profiles([RuntimeProfileName.HARNESS_DEFAULT])
 
     assert RuntimeProfileName.WORKSPACE_DEFAULT in catalog.profiles
+    assert RuntimeProfileName.WORKSPACE_PRODUCTION in catalog.profiles
     assert RuntimeProfileName.HARNESS_DEFAULT in catalog.profiles
     assert catalog.services["mcp-memory"].scope == ServiceScope.SHARED_CAPABLE
     assert catalog.services["github-ops-mcp"].workspace_server_name == "githubOps"
@@ -231,6 +233,90 @@ def test_manager_builds_canonical_snapshot_for_workspace_identity(
     assert snapshot.readiness.status == ReadinessStatus.READY
     assert snapshot.services["mcp-memory"].status == ServiceInstanceStatus.RUNNING
     assert snapshot.as_dict()["selection"]["profiles"]["names"] == ["workspace-default"]
+
+
+def test_manager_builds_production_snapshot_without_mock_gateway(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8")
+        + "FACTORY_RUNTIME_MODE=production\n"
+        + "GITHUB_TOKEN=test-github-token\n",
+        encoding="utf-8",
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+
+    assert snapshot.runtime_mode == RuntimeMode.PRODUCTION
+    assert snapshot.selection.profiles.names == (
+        RuntimeProfileName.WORKSPACE_PRODUCTION,
+    )
+    assert "mock-llm-gateway" not in snapshot.services
+    assert readiness is not None
+    assert readiness.status == ReadinessStatus.READY
+
+
+def test_manager_blocks_production_snapshot_when_live_github_token_is_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8") + "FACTORY_RUNTIME_MODE=production\n",
+        encoding="utf-8",
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+
+    assert snapshot.runtime_mode == RuntimeMode.PRODUCTION
+    assert snapshot.selection.profiles.names == (
+        RuntimeProfileName.WORKSPACE_PRODUCTION,
+    )
+    assert "mock-llm-gateway" not in snapshot.services
+    assert readiness is not None
+    assert readiness.status == ReadinessStatus.CONFIG_DRIFT
+    assert ReasonCode.MISSING_SECRET in readiness.reason_codes
+    assert any("GITHUB_TOKEN" in issue for issue in readiness.issues)
 
 
 def test_manager_normalizes_workspace_url_drift_reason_codes(

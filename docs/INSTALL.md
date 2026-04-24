@@ -229,6 +229,7 @@ COMPOSE_PROJECT_NAME=factory_my-project
 FACTORY_INSTANCE_ID=factory-abc123def456
 FACTORY_PORT_INDEX=0
 FACTORY_DIR=/path/to/your/project/.copilot/softwareFactoryVscode
+FACTORY_RUNTIME_MODE=development
 
 PORT_CONTEXT7=3010
 PORT_BASH=3011
@@ -265,6 +266,23 @@ That manifest is the effective runtime contract for the installed workspace and 
 - the structured factory release/build metadata used for update decisions
 - the effective MCP URLs used by the generated workspace settings
 - runtime health endpoints used by verification
+
+### Runtime mode selector
+
+The installed workspace runtime now exposes one explicit mode selector through `.copilot/softwareFactoryVscode/.factory.env`:
+
+- `FACTORY_RUNTIME_MODE=development` — the default mode; keeps the current deterministic local workflow and allows the existing mock-friendly behavior.
+- `FACTORY_RUNTIME_MODE=production` — selects the manager-backed internal-production runtime profile, surfaces `runtime_mode=production` in `factory_stack.py preflight` / `status`, disables silent mock substitution, and fails closed when required live configuration is missing.
+
+For the supported internal-production boundary, set at least:
+
+```env
+FACTORY_RUNTIME_MODE=production
+GITHUB_TOKEN=your_live_github_token_here
+CONTEXT7_API_KEY=your_context7_key_here
+```
+
+If you use the optional OpenAI image-generation tooling in production mode, also provide a live `OPENAI_API_KEY`; the mock image fallback is disabled in that mode.
 
 ---
 
@@ -321,6 +339,8 @@ These commands distinguish:
 - **running** — the workspace currently owns Docker runtime resources
 - **active** — the workspace the current VS Code / Copilot CLI workflow is meant to act on, recorded explicitly in the host registry
 
+`preflight` and `status` now also print `runtime_mode`, so operators can tell whether the workspace is running in the default deterministic `development` mode or the explicit fail-closed `production` mode.
+
 The current practical baseline now supports a bounded user-facing `suspended`
 runtime state. Enter it through `factory_stack.py suspend`, and use
 `factory_stack.py resume` to re-hydrate the same workspace runtime.
@@ -355,6 +375,12 @@ generated workspace MCP URLs before any live endpoint probing. That lets you tel
 `preflight` and `status` also print a `topology_mode` so operators can tell whether
 the workspace is using the default per-workspace runtime or an explicit shared-service
 topology for the ADR-008 candidate shared services.
+
+When `FACTORY_RUNTIME_MODE=production`, the runtime keeps the same manager-backed truth surface but changes the readiness gate:
+
+- the `workspace-production` profile excludes `mock-llm-gateway` from default readiness/startup;
+- `verify_factory_install.py --runtime` fails closed when required live production config is missing instead of silently downgrading to the mock gateway; and
+- a healthy production run therefore requires the live configuration expected by the selected services before the runtime can report `ready`.
 
 That shared-mode contract now extends beyond discovery: if runtime verification
 passes, operators can expect memory, bus child records, and shared-service audit

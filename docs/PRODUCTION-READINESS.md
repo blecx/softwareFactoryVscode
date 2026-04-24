@@ -61,6 +61,23 @@ A final internal-production claim requires all of the following to be true:
 
 Until every blocking requirement exists and is validated, the repository must describe itself as having a readiness **baseline** or **plan**, not as fully production ready.
 
+## Explicit runtime mode selector (current PR-02 contract)
+
+The current explicit runtime mode selector is `FACTORY_RUNTIME_MODE`.
+
+- `development` is the default and preserves the current deterministic local workflow, including mock-friendly behavior where the repository already supports it.
+- `production` selects the manager-backed `workspace-production` runtime profile and must fail closed when required live configuration is missing.
+
+The authoritative behavior of `FACTORY_RUNTIME_MODE=production` is:
+
+- `scripts/factory_stack.py preflight` and `scripts/factory_stack.py status` surface the effective mode as `runtime_mode=production` through the manager-backed snapshot/readiness contract.
+- `scripts/verify_factory_install.py --runtime` refuses to report a ready runtime when required live configuration for the production profile is missing.
+- the production profile excludes `mock-llm-gateway` from default readiness and startup, so production mode cannot silently substitute the mock gateway for a live runtime dependency.
+- production-mode GitHub Models usage requires a live GitHub credential (`GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_PAT`, or a non-placeholder configured API key); placeholder/mock fallback is disabled.
+- production-mode image generation requires a live `OPENAI_API_KEY` when that tooling path is invoked; mock image fallback is disabled there as well.
+
+This is a necessary blocking requirement for the internal production claim, not the final claim by itself.
+
 ## Current baseline: necessary, not sufficient
 
 The current default branch already provides a meaningful readiness baseline:

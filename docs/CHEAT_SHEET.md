@@ -100,6 +100,15 @@ resume-unsafe, and manual recovery cases.
 - If the foreground task exits while containers still exist, `status` and `preflight` remain the source of truth for runtime state.
 - Re-running `factory_stack.py start` while the runtime is already healthy is a reconcile/idempotent action, not a request for a second runtime.
 
+### Runtime modes
+
+- `FACTORY_RUNTIME_MODE=development` is the default and preserves the current deterministic local workflow.
+- `FACTORY_RUNTIME_MODE=production` selects the manager-backed `workspace-production` profile.
+- `preflight` and `status` surface the effective mode as `runtime_mode=development|production`.
+- Production mode excludes `mock-llm-gateway` from default readiness/startup and fails closed when required live config is missing.
+- For the current internal-production boundary, populate at least `GITHUB_TOKEN` and `CONTEXT7_API_KEY` before expecting `preflight` / `verify_factory_install.py --runtime` to report ready.
+- If OpenAI image generation is used in production mode, provide `OPENAI_API_KEY`; the mock image fallback is disabled there.
+
 ## 🧪 Validation
 
 ```bash
