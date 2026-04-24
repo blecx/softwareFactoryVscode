@@ -10,13 +10,13 @@ Use these Copilot agents in VS Code Chat:
 1. `@resolve-issue` — implement one scoped issue into one PR.
 1. `@pr-merge` — validate, merge, and close the linked issue.
 1. `@queue-backend` or `@queue-phase-2` — continue the repeatable
-  one-issue-at-a-time loop with a manual checkpoint between iterations,
-  using the same `@resolve-issue` → `@pr-merge` slice path.
+   one-issue-at-a-time loop with a manual checkpoint between iterations,
+   using the same `@resolve-issue` → `@pr-merge` slice path.
 1. `@execute-approved-plan` — execute a bounded approved GitHub-backed issue
-  plan end-to-end when the operator explicitly says things like
-  `execute the plan`, `continue the plan`, or `run the approved queue`, by
-  repeating the same `@resolve-issue` → `@pr-merge` slice path automatically
-  within the approved set.
+   plan end-to-end when the operator explicitly says things like
+   `execute the plan`, `continue the plan`, or `run the approved queue`, by
+   repeating the same `@resolve-issue` → `@pr-merge` slice path automatically
+   within the approved set.
 
 ## Loop rules
 
@@ -34,14 +34,14 @@ Use these Copilot agents in VS Code Chat:
 The repository supports exactly one canonical issue-to-merge process:
 
 1. `@resolve-issue` owns implementation, branch selection, local validation,
-  PR-body preparation, and PR creation for one issue.
+   PR-body preparation, and PR creation for one issue.
 2. `@pr-merge` owns PR readiness checks, CI polling, merge, issue close, and
-  post-merge cleanup.
+   post-merge cleanup.
 3. `@execute-approved-plan` is the bounded multi-issue wrapper that repeats the
-  same `@resolve-issue` → `@pr-merge` slice path for an explicit approved set.
+   same `@resolve-issue` → `@pr-merge` slice path for an explicit approved set.
 4. `@queue-backend` and `@queue-phase-2` are scoped/manual-checkpoint wrappers
-  over that same canonical slice path; they do **not** define a different
-  implementation, PR, or merge process.
+   over that same canonical slice path; they do **not** define a different
+   implementation, PR, or merge process.
 
 If a PR has CI errors or merge-readiness problems, return to `@resolve-issue`
 to fix the root cause on the active slice, rerun the local prechecks, and then
@@ -223,4 +223,4 @@ For a new item:
 4. When the PR is ready, use `@pr-merge`.
 5. For ongoing queue work, switch to `@queue-backend` or `@queue-phase-2`.
 6. When the operator has already approved a finite GitHub-backed issue set and
-  wants continuous execution, use `@execute-approved-plan`.
+   wants continuous execution, use `@execute-approved-plan`.

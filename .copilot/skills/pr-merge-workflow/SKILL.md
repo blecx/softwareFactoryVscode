@@ -16,7 +16,7 @@ repository's issue → PR → merge process.
 - A PR is ready or nearly ready and needs merge validation.
 - An issue number needs to be resolved through PR discovery and merge.
 - A PR has CI or merge-readiness issues that need triage before deciding
-   whether to merge or hand back to implementation.
+  whether to merge or hand back to implementation.
 
 ## When Not to Use
 

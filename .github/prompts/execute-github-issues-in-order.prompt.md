@@ -76,9 +76,11 @@ set that should continue automatically within the set, use
 12. Never claim an issue is complete until GitHub confirms the PR is merged and the linked issue state is correct.
 13. Subagents are allowed, but the parent workflow must remain accountable for order and continuity:
     - use read-only exploration subagents for discovery only
-   - use `resolve-issue` for implementation
-   - use `pr-merge` for merge validation and merge
-    - use `queue-backend` or `queue-phase-2` only after the current issue is fully merged or intentionally blocked
+
+- use `resolve-issue` for implementation
+- use `pr-merge` for merge validation and merge
+- use `queue-backend` or `queue-phase-2` only after the current issue is fully merged or intentionally blocked
+
 14. Do not start the next issue automatically after a merge. Require an explicit operator checkpoint and approval.
 
 ## Required Working Method
@@ -101,8 +103,8 @@ set that should continue automatically within the set, use
    ```
 
 5. Execute the current issue only.
-    - Use the same canonical `resolve-issue` → `pr-merge` slice path as every
-       other repository workflow.
+   - Use the same canonical `resolve-issue` → `pr-merge` slice path as every
+     other repository workflow.
 6. Before any handoff, interruption recovery, or completion claim, re-check GitHub truth.
    - If continuity was lost, capture `.tmp/interruption-recovery-snapshot.md` before resuming.
 7. End each iteration with one of these states only:
