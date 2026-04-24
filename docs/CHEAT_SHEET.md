@@ -115,6 +115,17 @@ python3 scripts/verify_factory_install.py --target ../my-target-project --runtim
 
 `verify_factory_install.py --runtime` reuses the same manager-backed readiness vocabulary as `preflight` and `status`; any extra endpoint probes are additive evidence only.
 
+## 🏁 Internal production contract
+
+- The supported production target is **internal self-hosted use** for the
+  current namespace-first, manager-backed runtime model.
+- **External hosted multi-tenant SaaS production is out of scope.**
+- [`docs/PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md) is the canonical
+  readiness contract; this cheat sheet is only a summary surface.
+- The current default branch has a strong readiness baseline, but the final
+  production claim still requires the blocking readiness gates and three
+  consecutive clean runs defined in the contract.
+
 ## ✅ Readiness closeout evidence
 
 Use this bundle when a closeout note needs reproducible proof for the current

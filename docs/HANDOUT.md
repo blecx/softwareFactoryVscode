@@ -97,6 +97,21 @@ Release notes and operator docs use the same ADR-008 promotion vocabulary:
 - `advanced groundwork` — important rollout slices have landed, but the final promotion gate is still not satisfied
 - `fulfilled` — the current default branch now meets this threshold for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`; shared mode remains deliberate and opt-in rather than mandatory for every workspace
 
+## 🏁 Internal production contract
+
+The supported production target for this repository is **internal self-hosted
+use** only.
+
+- **External hosted multi-tenant SaaS production is out of scope.**
+- [`docs/PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md) is the canonical
+  operator-facing readiness contract.
+- [`docs/PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) is the
+  implementation roadmap for satisfying that contract.
+- The readiness baseline described in this handout is necessary, but it is not
+  the final production claim. Final sign-off still requires the blocking
+  readiness gates and three consecutive clean runs recorded by the canonical
+  production-readiness flow.
+
 ## ✅ Readiness closeout boundaries
 
 This handout documents the current default-branch readiness baseline. It does
