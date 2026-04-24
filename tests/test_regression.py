@@ -83,21 +83,30 @@ def test_copilot_queue_agents_exist_without_legacy_continue_aliases():
     repo_root = Path(__file__).parent.parent
     queue_phase_2 = repo_root / ".github" / "agents" / "queue-phase-2.md"
     queue_backend = repo_root / ".github" / "agents" / "queue-backend.md"
+    execute_approved_plan = (
+        repo_root / ".github" / "agents" / "execute-approved-plan.md"
+    )
     workflow_doc = repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md"
 
     assert queue_phase_2.exists()
     assert queue_backend.exists()
+    assert execute_approved_plan.exists()
     assert not (repo_root / ".github" / "agents" / "continue-phase-2.md").exists()
     assert not (repo_root / ".github" / "agents" / "continue-backend.md").exists()
     assert workflow_doc.exists()
 
     assert "phase-2-queue-workflow" in queue_phase_2.read_text(encoding="utf-8")
     assert "backend-queue-workflow" in queue_backend.read_text(encoding="utf-8")
+    assert (
+        ".copilot/skills/approved-plan-execution-workflow/SKILL.md"
+        in execute_approved_plan.read_text(encoding="utf-8")
+    )
 
     workflow_doc_text = workflow_doc.read_text(encoding="utf-8")
 
     assert "@queue-backend" in workflow_doc_text
     assert "@queue-phase-2" in workflow_doc_text
+    assert "@execute-approved-plan" in workflow_doc_text
     assert "@continue-backend" not in workflow_doc_text
     assert "@continue-phase-2" not in workflow_doc_text
 
@@ -111,10 +120,63 @@ def test_low_friction_profile_approves_canonical_queue_agents():
     )
 
     auto_approve = approval_profiles["low-friction"]["chat.tools.subagent.autoApprove"]
+    assert auto_approve["execute-approved-plan"] is True
     assert auto_approve["queue-backend"] is True
     assert auto_approve["queue-phase-2"] is True
     assert "continue-backend" not in auto_approve
     assert "continue-phase-2" not in auto_approve
+
+
+def test_execute_approved_plan_skill_and_alias_routing_exist():
+    repo_root = Path(__file__).parent.parent
+    agent = (repo_root / ".github" / "agents" / "execute-approved-plan.md").read_text(
+        encoding="utf-8"
+    )
+    skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    approval_profiles = json.loads(
+        (repo_root / ".copilot" / "config" / "vscode-approval-profiles.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    lowered_agent = agent.lower()
+    lowered_skill = skill.lower()
+    lowered_instructions = instructions.lower()
+
+    for phrase in [
+        "execute the plan",
+        "continue the plan",
+        "run the approved queue",
+        "work through the approved backlog",
+        "finish the approved issue set",
+    ]:
+        assert phrase in lowered_agent
+        assert phrase in lowered_skill
+
+    assert ".tmp/github-issue-queue-state.md" in skill
+    assert "single source of truth" in lowered_skill
+    assert "resolve-issue` → `pr-merge`" in skill
+    assert "do not stop merely because ci is pending" in lowered_skill
+    assert "execute-approved-plan" in workflow_doc
+    assert "run the approved queue" in lowered_instructions
+    assert (
+        approval_profiles["trusted-workflow"]["chat.tools.subagent.autoApprove"][
+            "execute-approved-plan"
+        ]
+        is True
+    )
 
 
 def test_legacy_continue_alias_files_are_removed():
@@ -228,13 +290,8 @@ def test_work_issue_workflow_restores_template_and_precheck_guardrails():
     assert "ADR-006-Local-CI-Parity-Prechecks.md" in workflow_doc
 
 
-def test_ordered_issue_queue_guard_assets_and_docs_exist():
+def test_ordered_issue_checkpoint_contract_is_documented_without_prompt_hook():
     repo_root = Path(__file__).parent.parent
-    hook_config = json.loads(
-        (repo_root / ".github" / "hooks" / "github-issue-queue-guard.json").read_text(
-            encoding="utf-8"
-        )
-    )
     workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
         encoding="utf-8"
     )
@@ -247,21 +304,72 @@ def test_ordered_issue_queue_guard_assets_and_docs_exist():
     merge_skill = (
         repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
     ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
 
-    assert hook_config["hooks"]["UserPromptSubmit"][0]["command"] == (
-        "python3 ./scripts/github_issue_queue_guard.py"
-    )
-    assert (repo_root / "scripts" / "github_issue_queue_guard.py").exists()
+    assert not (
+        repo_root / ".github" / "hooks" / "github-issue-queue-guard.json"
+    ).exists()
+    assert not (repo_root / "scripts" / "github_issue_queue_guard.py").exists()
 
-    assert ".github/hooks/github-issue-queue-guard.json" in workflow_doc
-    assert "github_issue_queue_guard.py" in workflow_doc
+    assert "Deterministic queue checkpoint contract" in workflow_doc
+    assert "does **not** use a global `UserPromptSubmit`" in workflow_doc
 
-    for text in [workflow_doc, guardrails_doc, resolve_skill, merge_skill]:
+    for text in [
+        workflow_doc,
+        guardrails_doc,
+        resolve_skill,
+        merge_skill,
+        approved_plan_skill,
+    ]:
         assert ".tmp/github-issue-queue-state.md" in text
 
-    assert "github_issue_queue_guard.py" in guardrails_doc
-    assert ".github/hooks/github-issue-queue-guard.json" in resolve_skill
-    assert ".github/hooks/github-issue-queue-guard.json" in merge_skill
+    assert (
+        "There is no supported global `UserPromptSubmit` workflow hook"
+        in guardrails_doc
+    )
+    assert "shared checkpoint" in guardrails_doc
+    assert ".github/hooks/github-issue-queue-guard.json" not in resolve_skill
+    assert ".github/hooks/github-issue-queue-guard.json" not in merge_skill
+
+
+def test_queue_wrappers_share_one_canonical_issue_to_merge_process() -> None:
+    repo_root = Path(__file__).parent.parent
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    backend_queue_skill = (
+        repo_root / ".copilot" / "skills" / "backend-queue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    phase_2_queue_skill = (
+        repo_root / ".copilot" / "skills" / "phase-2-queue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "canonical implementation and PR-preparation half" in resolve_skill
+    assert "canonical PR-validation, merge, and closeout half" in merge_skill
+    assert "single source of truth" in approved_plan_skill.lower()
+    assert "same canonical `resolve-issue` → `pr-merge` process" in backend_queue_skill
+    assert "same canonical `resolve-issue` → `pr-merge` process" in phase_2_queue_skill
+    assert "## Single source of truth for issue execution" in workflow_doc
+    assert "Do not invent a separate “fix the PR” workflow." in workflow_doc
 
 
 def test_interruption_recovery_assets_and_docs_exist():

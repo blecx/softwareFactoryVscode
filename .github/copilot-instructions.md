@@ -10,7 +10,7 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - **Consult Guardrails Before Fixing:** Before proposing or implementing any fix, you must mentally cross-reference the architecture documentation (`docs/architecture/ADR-*.md`).
 - **No Destructive Workarounds:** Do not mutate, ignore, or bypass strict repository contracts (e.g., namespace definitions, installation boundaries like ADR-012, or ephemeral `TMPDIR` constraints) just to unblock an error message.
 - **Fail Safe:** If a bug fix requires violating a known constraint or ADR, you must pause, escalate the conflict to the human user, and ask for architectural clarification rather than silently applying the non-compliant fix.
-- **Respect ordered-issue enforcement:** When work is moving through the issue → PR → merge loop, keep `.tmp/github-issue-queue-state.md` current. The repository-owned hook at `.github/hooks/github-issue-queue-guard.json` runs `python3 ./scripts/github_issue_queue_guard.py` and will block unsafe continuation, merge, close, or completion prompts until GitHub-truth evidence (`issue_state`, `pr_state`, `ci_state`, `cleanup_state`, `last_github_truth`) is recorded.
+- **Respect ordered-issue checkpoints:** When work is moving through the issue → PR → merge loop, keep `.tmp/github-issue-queue-state.md` current. `resolve-issue`, `pr-merge`, `execute-approved-plan`, and interruption recovery all consume that shared checkpoint; do not invent a second enforcement path or bypass the GitHub-truth evidence (`issue_state`, `pr_state`, `ci_state`, `cleanup_state`, `last_github_truth`).
 - **Respect execution surfaces:** Generated-workspace-sensitive tasks belong to the host repository's generated `software-factory.code-workspace` surface (or an explicit companion runtime target), not the source checkout alone. Source-checkout tooling may inspect or point at the companion installed workspace, but it must not invent a second runtime contract or silently pretend that `Host Project (Root)` exists when it does not.
 
 ## 2. ADR and Architectural Awareness
@@ -37,5 +37,14 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Do **not** update changelog or release notes for ordinary commits unless the user asks for it or `VERSION` changes.
 - When preparing a release bump, ensure the changelog contains a dedicated `## [<version>]` section and the GitHub release notes explicitly mention the same version.
 - GitHub release notes should include a `## Delivery status snapshot` table summarizing what the release fulfills, what remains open, and why that boundary matters.
+
+## 6. Natural-Language Workflow Alias Routing
+
+- Treat `resolve-issue` plus `pr-merge` as the single canonical issue → PR → merge process. `execute-approved-plan` is the bounded multi-issue wrapper over that same process, and `queue-backend` / `queue-phase-2` are scoped manual-checkpoint variants rather than alternate implementation or merge workflows.
+- Treat phrases such as `execute the plan`, `continue the plan`, `run the approved queue`, `work through the approved backlog`, or `finish the approved issue set` as workflow-orchestration requests, not generic planning chatter.
+- When a finite GitHub-backed issue set, umbrella issue, or queue checkpoint makes the target plan unambiguous, prefer the dedicated `execute-approved-plan` workflow path over ad-hoc conversational planning.
+- If more than one plausible plan exists, do not guess which plan the operator means; ask which issue set is approved.
+- Do not force these aliases onto single-issue execution requests; those still belong to `resolve-issue`.
+- There is no supported global `UserPromptSubmit` workflow hook in this contract. Prompt-time hooks created a second process and must not be reintroduced as issue/merge gatekeepers.
 
 Remember: **You solve nothing if you fix one bug by creating architectural debt or violating design guardrails.**

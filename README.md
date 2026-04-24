@@ -22,7 +22,7 @@ The Software Factory is deeply integrated into VS Code to provide a frictionless
 - **VS Code Tasks:** Built-in tasks (like `🐳 Docker: Build & Start`, `💼 Select Next PR`, or `🚀 Start: Full Stack (Dev)`) power the complete workflow directly from the Command Palette or Terminal menu.
 - **Runtime Lifecycle Management:** Use the provided runtime tasks to start and stop the companion Software Factory stack when needed. The source checkout no longer pins a separate static MCP URL contract into `.vscode/settings.json`.
 - **Native MCP Client:** It exposes standard Model Context Protocol servers to your VS Code AI extensions (like GitHub Copilot), enriching the AI's context with specific repository knowledge, execution capabilities, and isolated memory stores.
-- **Interactive Chat Agents:** Work seamlessly via the Copilot Chat interface using specialized agents (e.g., `@queue-backend` or `@queue-phase-2`) to process issues and navigate the codebase.
+- **Interactive Chat Agents:** Work via the Copilot Chat interface using one canonical issue-to-merge slice process: `@resolve-issue` for implementation, `@pr-merge` for PR validation/merge, `@execute-approved-plan` for bounded multi-issue execution, and `@queue-backend` / `@queue-phase-2` as scoped manual-checkpoint wrappers over that same process.
 
 ## Why it improves the development experience
 

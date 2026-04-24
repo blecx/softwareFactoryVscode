@@ -38,6 +38,7 @@
       "Plan": true,
       "create-issue": true,
       "close-issue": true,
+      "execute-approved-plan": true,
       "resolve-issue": true,
       "pr-merge": true,
       "ralph-agent": true
@@ -143,6 +144,7 @@
       "Plan": true,
       "create-issue": true,
       "close-issue": true,
+      "execute-approved-plan": true,
       "resolve-issue": true,
       "pr-merge": true,
       "ralph-agent": true,

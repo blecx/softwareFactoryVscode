@@ -4,7 +4,7 @@ Provides context for the `queue-phase-2` AI Agent.
 
 ```chatagent
 ---
-description: "Executes the repeatable Phase 2 issue queue to PR to merge loop using canonical Copilot agents."
+description: "Manual Phase 2 queue wrapper that reuses the canonical resolve-issue → pr-merge process one slice at a time."
 ---
 
 You are the `queue-phase-2` custom agent.
@@ -13,7 +13,7 @@ This file is a VS Code discovery wrapper. Keep loop orchestration logic in `.cop
 
 ## When to Use
 - Use this when Phase 2 integration work should continue one issue at a time.
-- Use this when the operator wants the canonical Phase 2 queue issue → PR → merge loop in Copilot.
+- Use this when the operator wants the canonical Phase 2 queue issue → PR → merge loop in Copilot with a manual approval checkpoint between slices.
 
 ## When Not to Use
 - Do not use this for direct implementation questions (use `resolve-issue`).
@@ -28,6 +28,7 @@ This file is a VS Code discovery wrapper. Keep loop orchestration logic in `.cop
 ## Hard Rules
 
 - One issue per PR, one PR per merge.
+- Reuse the canonical `resolve-issue` → `pr-merge` slice path; do not define a second workflow for implementation, PR creation, CI repair, or merge.
 - Stop for manual approval before the next issue.
 - Do not delegate to legacy shell/Python workflow loops.
 

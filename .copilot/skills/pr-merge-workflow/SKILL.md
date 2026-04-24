@@ -8,10 +8,15 @@
 
 Provides context and instructions for the `pr-merge-workflow` skill module.
 
+This is the canonical PR-validation, merge, and closeout half of the
+repository's issue → PR → merge process.
+
 ## When to Use
 
 - A PR is ready or nearly ready and needs merge validation.
 - An issue number needs to be resolved through PR discovery and merge.
+- A PR has CI or merge-readiness issues that need triage before deciding
+   whether to merge or hand back to implementation.
 
 ## When Not to Use
 
@@ -33,7 +38,8 @@ Provides context and instructions for the `pr-merge-workflow` skill module.
 4. Confirm required CI/CD checks are green by explicitly polling:
    `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER>`
    - Prefer JSON polling over `gh pr checks --watch`; watch/pager UI adds unnecessary terminal churn in repo automation.
-   - Refresh `.tmp/github-issue-queue-state.md` from GitHub truth before merge/close narration. Record `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; `.github/hooks/github-issue-queue-guard.json` / `scripts/github_issue_queue_guard.py` treat that checkpoint as the enforced merge and completion gate.
+   - Refresh `.tmp/github-issue-queue-state.md` from GitHub truth before merge/close narration. Record `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; that checkpoint is the shared state contract used by canonical workflows and interruption recovery.
+   - If checks fail or the PR is not mergeable, do not invent a separate repair path. Hand the slice back to `resolve-issue`, fix the root cause there, rerun local prechecks, and then re-enter `pr-merge`.
 5. Merge with squash and delete branch:
    `gh pr merge <PR_NUMBER> --squash --delete-branch`
 6. Comment and close linked issue (if needed).
