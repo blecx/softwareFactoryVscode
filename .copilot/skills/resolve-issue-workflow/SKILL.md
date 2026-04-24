@@ -16,7 +16,7 @@ issue → PR → merge process.
 - A specific issue number is provided for implementation.
 - The user asks to pick the next issue and execute one issue-to-PR slice.
 - A PR or branch failed CI and needs implementation fixes before returning to
-   merge readiness.
+  merge readiness.
 
 ## When Not to Use
 
@@ -45,7 +45,8 @@ issue → PR → merge process.
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`
 10. Run `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md` before creating or updating the PR.
 11. Address CI failures by root cause and re-validate.
-   - If merge work discovers failing CI or merge-readiness issues that require code changes, stay on the same issue/branch and continue using this workflow rather than inventing a separate PR-repair path.
+
+- If merge work discovers failing CI or merge-readiness issues that require code changes, stay on the same issue/branch and continue using this workflow rather than inventing a separate PR-repair path.
 
 ## Required Planning Shape
 
@@ -87,5 +88,5 @@ Return a concise result that states:
 - validation status,
 - PR or blocking condition,
 - any follow-up split/dependency if scope exceeded the slice.
-</file>
-</skill>
+  </file>
+  </skill>

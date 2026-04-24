@@ -75,6 +75,7 @@ Once installed, check out our user guides to learn how to operate the factory ef
 - **[User Handout](docs/HANDOUT.md):** A detailed overview of concepts and workflows.
 - **[Cheat Sheet](docs/CHEAT_SHEET.md):** Quick reference for common tasks and CLI commands.
 - **[Issue Workflow](docs/WORK-ISSUE-WORKFLOW.md):** Learn how to work through issues using Copilot agents.
+- **[Internal Production Readiness Plan](docs/PRODUCTION-READINESS-PLAN.md):** Issue-ready hardening plan for internal self-hosted production, explicitly excluding external hosted multi-tenant SaaS scope.
 - **[Copilot Harness Model](docs/COPILOT-HARNESS-MODEL.md):** Explains what `softwareFactoryVscode` is meant to be, why it lives in its own repository, and the intended namespace-first integration model.
 - **[Harness Integration Specification](docs/HARNESS-INTEGRATION-SPEC.md):** Defines artifact classes, ownership boundaries, and the target install/update contract.
 - **[Harness Namespace Migration Mitigation Plan](docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md):** Provides the phased migration plan, Definition of Done, verification steps, and review prompts for moving from hidden-tree installs to namespaced `.copilot` / `.github` integration.
