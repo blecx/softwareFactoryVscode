@@ -2946,8 +2946,15 @@ class MCPRuntimeManager:
         temporary_path = destination_path.with_name(
             destination_path.name + ".restore-tmp"
         )
-        shutil.copy2(source_path, temporary_path)
-        temporary_path.replace(destination_path)
+        if temporary_path.exists():
+            temporary_path.unlink()
+        try:
+            shutil.copyfile(source_path, temporary_path)
+            temporary_path.replace(destination_path)
+        except Exception:
+            if temporary_path.exists():
+                temporary_path.unlink()
+            raise
 
     def _resolve_restore_boundary_timestamp(
         self,
