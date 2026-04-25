@@ -372,6 +372,12 @@ def create_source_factory_repo(path: Path) -> None:
         (REPO_ROOT / "requirements.dev.txt").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
+    (path / "factory_runtime" / "secret_safety.py").write_text(
+        (REPO_ROOT / "factory_runtime" / "secret_safety.py").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
     (path / "VERSION").write_text(RELEASE_VERSION + "\n", encoding="utf-8")
     (path / "factory_runtime").mkdir(parents=True, exist_ok=True)
     (path / "factory_runtime" / "agents").mkdir(parents=True, exist_ok=True)
@@ -5232,6 +5238,7 @@ def test_factory_stack_preflight_surfaces_production_mode_without_mock_gateway(
                 f"FACTORY_DIR={repo_root}",
                 "FACTORY_RUNTIME_MODE=production",
                 "GITHUB_TOKEN=test-github-token",
+                "GITHUB_OPS_ALLOWED_REPOS=blecx/softwareFactoryVscode",
                 "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
@@ -5319,6 +5326,7 @@ def test_factory_stack_status_reports_production_mode(
                 f"FACTORY_DIR={repo_root}",
                 "FACTORY_RUNTIME_MODE=production",
                 "GITHUB_TOKEN=test-github-token",
+                "GITHUB_OPS_ALLOWED_REPOS=blecx/softwareFactoryVscode",
                 "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
@@ -5414,6 +5422,7 @@ def test_verify_runtime_fails_closed_when_production_mode_lacks_github_token(
                 f"PROJECT_WORKSPACE_ID={target_repo.name}",
                 f"COMPOSE_PROJECT_NAME=factory_{target_repo.name}",
                 "FACTORY_RUNTIME_MODE=production",
+                "GITHUB_OPS_ALLOWED_REPOS=blecx/softwareFactoryVscode",
                 "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]
@@ -5549,6 +5558,7 @@ def test_verify_runtime_uses_production_profile_when_live_github_token_is_presen
                 f"COMPOSE_PROJECT_NAME=factory_{target_repo.name}",
                 "FACTORY_RUNTIME_MODE=production",
                 "GITHUB_TOKEN=test-github-token",
+                "GITHUB_OPS_ALLOWED_REPOS=blecx/softwareFactoryVscode",
                 "CONTEXT7_API_KEY=test-context7-key",
                 "",
             ]

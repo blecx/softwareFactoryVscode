@@ -16,15 +16,36 @@ from typing import Awaitable, Callable, Dict, Optional
 import httpx
 from openai import AsyncOpenAI
 
-RUNTIME_MODE_ENV_KEY = "FACTORY_RUNTIME_MODE"
-PRODUCTION_RUNTIME_MODE = "production"
+from factory_runtime.secret_safety import (
+    is_blank_or_placeholder,
+    production_runtime_mode_enabled,
+)
 
 
 def _production_runtime_mode_enabled() -> bool:
-    return (
-        os.environ.get(RUNTIME_MODE_ENV_KEY, "").strip().lower()
-        == PRODUCTION_RUNTIME_MODE
-    )
+    return production_runtime_mode_enabled()
+
+
+def _load_dynamic_override_api_key() -> str:
+    override_path = os.getenv("LLM_OVERRIDE_PATH", "configs/runtime_override.json")
+    if not os.path.exists(override_path):
+        return ""
+
+    if _production_runtime_mode_enabled():
+        raise ValueError(
+            "Dynamic LLM override files via LLM_OVERRIDE_PATH are disabled when "
+            "FACTORY_RUNTIME_MODE=production. Remove the override file or switch "
+            "to development mode."
+        )
+
+    try:
+        with open(override_path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except Exception:
+        return ""
+
+    candidate = str(data.get("api_key", "")).strip() if isinstance(data, dict) else ""
+    return candidate
 
 
 class _LLMRequestThrottle:
@@ -140,14 +161,7 @@ class LLMClientFactory:
 
     @staticmethod
     def _looks_like_placeholder(key: str) -> bool:
-        if not key:
-            return True
-        lowered = key.lower().strip()
-        return (
-            lowered in {"your-api-key-here", "your-token-here", "changeme"}
-            or "your_token_here" in lowered
-            or "your token here" in lowered
-        )
+        return is_blank_or_placeholder(key)
 
     @staticmethod
     def _get_github_token_from_env() -> str:
@@ -361,17 +375,9 @@ class LLMClientFactory:
             api_key = LLMClientFactory.resolve_github_api_key(api_key)
 
         # --- Check Dynamic Overrides ---
-        override_path = os.getenv("LLM_OVERRIDE_PATH", "configs/runtime_override.json")
-        if os.path.exists(override_path):
-            try:
-                import json
-
-                with open(override_path, "r") as f:
-                    data = json.load(f)
-                    if data.get("api_key"):
-                        api_key = data["api_key"]
-            except Exception:
-                pass
+        override_api_key = _load_dynamic_override_api_key()
+        if override_api_key:
+            api_key = override_api_key
         # -------------------------------
 
         # GitHub Models

@@ -107,7 +107,11 @@ resume-unsafe, and manual recovery cases.
 - `preflight` and `status` surface the effective mode as `runtime_mode=development|production`.
 - Production mode excludes `mock-llm-gateway` from default readiness/startup and fails closed when required live config is missing.
 - For the current internal-production boundary, populate at least `GITHUB_TOKEN` and `CONTEXT7_API_KEY` before expecting `preflight` / `verify_factory_install.py --runtime` to report ready.
+- `GITHUB_OPS_ALLOWED_REPOS` must contain real `owner/repo` values in production mode; placeholder allowlists are rejected.
+- You can use `GH_TOKEN`, `GITHUB_PAT`, or an untracked JSON file referenced by `LLM_CONFIG_PATH` instead of `GITHUB_TOKEN` for the GitHub Models credential path.
 - If OpenAI image generation is used in production mode, provide `OPENAI_API_KEY`; the mock image fallback is disabled there.
+- `LLM_OVERRIDE_PATH` override files and agent-bus `bus_set_live_key` live-key injection are development-only; production mode blocks them.
+- Touched audit/diagnostic surfaces redact secret values, and production readiness distinguishes `missing-config` from `missing-secret` outcomes.
 
 ## 🧪 Validation
 
