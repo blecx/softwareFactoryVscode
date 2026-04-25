@@ -712,6 +712,49 @@ def test_manager_marks_promoted_shared_services_as_external(
     assert snapshot.shared_mode == "shared"
 
 
+def test_manager_snapshot_as_dict_is_machine_readable_for_shared_topology(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+        shared_mode=True,
+    )
+
+    inventory = build_full_service_inventory(config)
+    for service_name in ("mcp-memory", "mcp-agent-bus", "approval-gate"):
+        del inventory[service_name]
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: inventory,
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    snapshot_dict = snapshot.as_dict()
+
+    assert snapshot_dict["workspace_id"] == config.project_workspace_id
+    assert snapshot_dict["instance_id"] == config.factory_instance_id
+    assert snapshot_dict["selection"]["installed"] is True
+    assert snapshot_dict["runtime_topology"]["mode"] == "shared"
+    assert snapshot_dict["shared_mode"] == "shared"
+    assert snapshot_dict["shared_mode_diagnostics"]["tenant_identity_required"] is True
+    assert snapshot_dict["services"]["mcp-memory"]["status"] == "external"
+    assert snapshot_dict["services"]["mcp-memory"]["workspace_owned"] is False
+    assert snapshot_dict["readiness"]["status"] == "ready"
+
+
 def build_repairable_snapshot(
     manager: MCPRuntimeManager,
     config: Any,

@@ -110,6 +110,25 @@ The current supported recovery lifecycle commands are:
 
 This closes blocking requirement `6` for the supported internal runtime boundary, but it does **not** waive any of the other blocking requirements above.
 
+## Supported machine-readable monitoring surface (current PR-08 contract)
+
+The current canonical machine-readable monitoring surface is the additive JSON form of the existing lifecycle commands:
+
+- `scripts/factory_stack.py preflight --json`
+- `scripts/factory_stack.py status --json`
+
+These commands remain grounded in the same authoritative manager-backed snapshot/readiness contract already used by the human-oriented lifecycle output.
+
+The supported JSON surface includes:
+
+- runtime state and lifecycle metadata;
+- per-service health/status plus service-level reason codes/details where present;
+- readiness status, recommended action, and top-level blocking reason codes;
+- topology mode and shared-mode tenant diagnostics; and
+- canonical workspace identity, including active-workspace facts.
+
+Operator automation and alerting should consume this JSON surface instead of scraping prose. See `docs/ops/MONITORING.md` for the supported field layout and triage examples.
+
 ## Current baseline: necessary, not sufficient
 
 The current default branch already provides a meaningful readiness baseline:
@@ -149,7 +168,7 @@ At minimum, the final evidence bundle must include:
 - runtime verification against the generated effective endpoints and manager-backed readiness surface;
 - the blocking Docker E2E runtime proof lane, currently satisfied by the promoted strict-tenant and stop/cleanup scenarios within `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`;
 - supported backup and restore evidence, including one recovery roundtrip proof;
-- machine-readable diagnostics evidence for the supported lifecycle surface;
+- machine-readable diagnostics evidence for the supported lifecycle surface (for example `scripts/factory_stack.py status --json` or `scripts/factory_stack.py preflight --json`);
 - links to the required runbooks and operator procedures; and
 - the canonical internal production-readiness gate passing locally, in CI, and in **three consecutive clean runs**.
 

@@ -30,6 +30,9 @@ From an installed target repository, use `.copilot/softwareFactoryVscode/scripts
 # Inspect whether the workspace is ready, needs ramp-up, is drifting, or degraded
 python3 scripts/factory_stack.py preflight
 
+# Emit the same readiness surface as machine-readable JSON
+python3 scripts/factory_stack.py preflight --json
+
 # Start the runtime explicitly
 python3 scripts/factory_stack.py start --build
 
@@ -44,6 +47,9 @@ python3 scripts/factory_stack.py list
 
 # Show current workspace state, effective URLs, and rebuild hinting
 python3 scripts/factory_stack.py status
+
+# Emit the same runtime/status surface as machine-readable JSON
+python3 scripts/factory_stack.py status --json
 
 # Refresh generated runtime artifacts and mark the workspace active
 python3 scripts/factory_stack.py activate
@@ -112,6 +118,14 @@ resume-unsafe, and manual recovery cases.
 - If OpenAI image generation is used in production mode, provide `OPENAI_API_KEY`; the mock image fallback is disabled there.
 - `LLM_OVERRIDE_PATH` override files and agent-bus `bus_set_live_key` live-key injection are development-only; production mode blocks them.
 - Touched audit/diagnostic surfaces redact secret values, and production readiness distinguishes `missing-config` from `missing-secret` outcomes.
+
+### Machine-readable monitoring
+
+- `preflight --json` and `status --json` are the canonical structured diagnostics surfaces for alerting and automation.
+- They stay grounded in the same manager-backed snapshot/readiness authority as the text output; there is no second monitoring truth surface.
+- Use `status --json` when you need runtime-state, active-workspace, and rebuild metadata in addition to readiness.
+- Use `preflight --json` as the fastest readiness/config-drift probe.
+- See [`docs/ops/MONITORING.md`](ops/MONITORING.md) for field layout and `jq` examples.
 
 ## 🧪 Validation
 

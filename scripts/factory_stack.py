@@ -23,6 +23,7 @@ if str(REPO_ROOT) not in sys.path:
 import factory_workspace
 
 from factory_runtime.mcp_runtime import MCPRuntimeManager, RuntimeLifecycleState
+from factory_runtime.mcp_runtime.models import serialize_contract_value
 
 DEFAULT_WAIT_TIMEOUT = 300
 DEFAULT_WORKSPACE_FILENAME = factory_workspace.DEFAULT_WORKSPACE_FILENAME
@@ -265,6 +266,303 @@ def build_preflight_report_from_snapshot(
     }
 
 
+def serialize_machine_readable_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if hasattr(value, "as_dict") and callable(getattr(value, "as_dict")):
+        return value.as_dict()
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {
+            str(key): serialize_machine_readable_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [serialize_machine_readable_value(item) for item in value]
+    serialized = serialize_contract_value(value)
+    if serialized is not value:
+        return serialized
+    if hasattr(value, "__dict__"):
+        return {
+            str(key): serialize_machine_readable_value(item)
+            for key, item in vars(value).items()
+        }
+    return serialized
+
+
+def build_active_workspace_identity_payload(
+    registry: dict[str, Any],
+    current_instance_id: str,
+) -> dict[str, Any] | None:
+    active_instance_id = str(registry.get("active_workspace", "")).strip()
+    if not active_instance_id:
+        return None
+
+    active_record = registry.get("workspaces", {}).get(active_instance_id, {})
+    active_workspace_id = None
+    if isinstance(active_record, dict):
+        active_workspace_id = active_record.get("project_workspace_id") or None
+
+    return {
+        "instance_id": active_instance_id,
+        "workspace_id": active_workspace_id,
+        "is_current": active_instance_id == current_instance_id,
+    }
+
+
+def build_workspace_identity_payload(
+    config: factory_workspace.WorkspaceRuntimeConfig,
+    registry: dict[str, Any],
+    *,
+    snapshot: Any | None = None,
+    active: bool | None = None,
+) -> dict[str, Any]:
+    runtime_topology = getattr(snapshot, "runtime_topology", {}) or {}
+    runtime_mode = getattr(snapshot, "runtime_mode", config.runtime_mode)
+    active_flag = (
+        registry.get("active_workspace", "") == config.factory_instance_id
+        if active is None
+        else active
+    )
+    return {
+        "workspace_id": config.project_workspace_id,
+        "instance_id": config.factory_instance_id,
+        "target": str(config.target_dir),
+        "compose_project": config.compose_project_name,
+        "runtime_mode": serialize_machine_readable_value(runtime_mode),
+        "topology_mode": runtime_topology.get("mode", config.shared_service_mode),
+        "active": active_flag,
+        "active_workspace": build_active_workspace_identity_payload(
+            registry,
+            config.factory_instance_id,
+        ),
+    }
+
+
+def build_service_diagnostics_payload(snapshot: Any) -> dict[str, dict[str, Any]]:
+    services = getattr(snapshot, "services", {}) or {}
+    diagnostics: dict[str, dict[str, Any]] = {}
+    for service_name in sorted(services.keys()):
+        service_record = services[service_name]
+        published_ports = list(getattr(service_record, "published_ports", ()) or ())
+        expected_port = getattr(service_record, "expected_port", None)
+        diagnostics[service_name] = {
+            "status": getattr(
+                getattr(service_record, "status", None),
+                "value",
+                getattr(service_record, "status", ""),
+            ),
+            "docker_status": getattr(service_record, "docker_status", ""),
+            "service_kind": getattr(
+                getattr(service_record, "service_kind", None),
+                "value",
+                getattr(service_record, "service_kind", ""),
+            ),
+            "scope": getattr(
+                getattr(service_record, "scope", None),
+                "value",
+                getattr(service_record, "scope", ""),
+            ),
+            "topology_mode": getattr(service_record, "topology_mode", ""),
+            "workspace_owned": bool(getattr(service_record, "workspace_owned", False)),
+            "runtime_identity": getattr(
+                service_record,
+                "runtime_identity",
+                service_name,
+            ),
+            "workspace_server_name": getattr(
+                service_record,
+                "workspace_server_name",
+                None,
+            ),
+            "expected_port": expected_port,
+            "published_ports": published_ports,
+            "port_match": (
+                expected_port in published_ports if expected_port is not None else None
+            ),
+            "discovery_url": getattr(service_record, "discovery_url", ""),
+            "probe_url": getattr(service_record, "probe_url", ""),
+            "reason_codes": [
+                getattr(reason_code, "value", str(reason_code))
+                for reason_code in (getattr(service_record, "reason_codes", ()) or ())
+            ],
+            "details": list(getattr(service_record, "details", ()) or ()),
+        }
+    return diagnostics
+
+
+def build_preflight_json_payload(
+    report: dict[str, Any],
+    registry: dict[str, Any],
+    *,
+    command: str,
+    runtime_state: str | None = None,
+    notices: Sequence[str] = (),
+) -> dict[str, Any]:
+    config = report["config"]
+    snapshot = require_preflight_snapshot(report)
+    readiness = report.get("readiness") or getattr(snapshot, "readiness", None)
+    payload = {
+        "command": command,
+        "authority": "manager-backed-snapshot-readiness",
+        "notices": list(notices),
+        "workspace": build_workspace_identity_payload(
+            config,
+            registry,
+            snapshot=snapshot,
+        ),
+        "runtime": {
+            "runtime_state": runtime_state
+            or resolve_status_runtime_state_from_snapshot(snapshot),
+            "lifecycle_state": serialize_machine_readable_value(
+                getattr(snapshot, "lifecycle_state", None)
+            ),
+            "persisted_runtime_state": getattr(
+                snapshot,
+                "persisted_runtime_state",
+                "",
+            ),
+            "selection": serialize_machine_readable_value(
+                getattr(snapshot, "selection", None)
+            ),
+            "recovery": serialize_machine_readable_value(
+                getattr(snapshot, "recovery", None)
+            ),
+            "last_transition_at": getattr(snapshot, "last_transition_at", None),
+            "last_transition_reason_codes": serialize_machine_readable_value(
+                getattr(snapshot, "last_transition_reason_codes", ())
+            ),
+        },
+        "preflight": {
+            "status": report["status"],
+            "recommended_action": report["recommended_action"],
+            "reason_codes": list(report.get("reason_codes", [])),
+            "issues": list(report.get("issues", [])),
+            "blocking_services": list(report.get("blocking_services", [])),
+            "readiness": serialize_machine_readable_value(readiness),
+        },
+        "diagnostics": {
+            "runtime_topology": serialize_machine_readable_value(
+                getattr(snapshot, "runtime_topology", {})
+            ),
+            "shared_mode_diagnostics": serialize_machine_readable_value(
+                getattr(snapshot, "shared_mode_diagnostics", {})
+            ),
+            "workspace_urls": serialize_machine_readable_value(
+                getattr(snapshot, "workspace_urls", {})
+            ),
+            "expected_workspace_urls": serialize_machine_readable_value(
+                getattr(snapshot, "expected_workspace_urls", {})
+                or config.mcp_server_urls
+            ),
+            "manifest_server_urls": serialize_machine_readable_value(
+                getattr(snapshot, "manifest_server_urls", {})
+            ),
+            "manifest_health_urls": serialize_machine_readable_value(
+                getattr(snapshot, "manifest_health_urls", {})
+            ),
+            "expected_service_ports": serialize_machine_readable_value(
+                getattr(snapshot, "expected_service_ports", {})
+            ),
+        },
+        "services": build_service_diagnostics_payload(snapshot),
+    }
+    return payload
+
+
+def build_status_json_payload(
+    config: factory_workspace.WorkspaceRuntimeConfig,
+    registry: dict[str, Any],
+    preflight: dict[str, Any],
+    snapshot: Any,
+    *,
+    runtime_state: str,
+    active: bool,
+    installed_version: str,
+    head_commit: str,
+    lock_commit: str,
+    needs_rebuild: bool,
+    notices: Sequence[str] = (),
+) -> dict[str, Any]:
+    payload = build_preflight_json_payload(
+        preflight,
+        registry,
+        command="status",
+        runtime_state=runtime_state,
+        notices=notices,
+    )
+    payload["workspace"]["active"] = active
+    payload["workspace"]["port_index"] = config.port_index
+    payload["runtime"].update(
+        {
+            "installed_version": installed_version,
+            "factory_commit": head_commit,
+            "lock_commit": lock_commit,
+            "needs_rebuild": needs_rebuild,
+        }
+    )
+    payload["diagnostics"]["effective_workspace_urls"] = (
+        serialize_machine_readable_value(
+            getattr(snapshot, "expected_workspace_urls", {}) or config.mcp_server_urls
+        )
+    )
+    return payload
+
+
+def build_status_preflight_error_payload(
+    command: str,
+    config: factory_workspace.WorkspaceRuntimeConfig,
+    registry: dict[str, Any],
+    exc: Exception,
+    *,
+    notices: Sequence[str] = (),
+) -> dict[str, Any]:
+    return {
+        "command": command,
+        "authority": "manager-backed-snapshot-readiness",
+        "notices": list(notices),
+        "workspace": build_workspace_identity_payload(config, registry),
+        "runtime": {
+            "runtime_state": "error",
+            "lifecycle_state": None,
+            "persisted_runtime_state": "",
+            "selection": None,
+            "recovery": None,
+            "last_transition_at": None,
+            "last_transition_reason_codes": [],
+        },
+        "preflight": {
+            "status": "error",
+            "recommended_action": "inspect-registry",
+            "reason_codes": [],
+            "issues": [str(exc)],
+            "blocking_services": [],
+            "readiness": None,
+        },
+        "diagnostics": {
+            "error": str(exc),
+            "runtime_topology": {},
+            "shared_mode_diagnostics": {},
+            "workspace_urls": {},
+            "expected_workspace_urls": serialize_machine_readable_value(
+                config.mcp_server_urls
+            ),
+            "manifest_server_urls": {},
+            "manifest_health_urls": {},
+            "expected_service_ports": {},
+            "effective_workspace_urls": serialize_machine_readable_value(
+                config.mcp_server_urls
+            ),
+        },
+        "services": {},
+    }
+
+
+def print_json_output(payload: dict[str, Any]) -> None:
+    print(json.dumps(payload, indent=2, sort_keys=True))
+
+
 def resolve_status_runtime_state_from_snapshot(snapshot: Any) -> str:
     persisted_state = snapshot.persisted_runtime_state.strip() or "installed"
 
@@ -421,13 +719,43 @@ def preflight_workspace(
     *,
     env_file: Path | None = None,
     workspace_file: str = DEFAULT_WORKSPACE_FILENAME,
+    output_json: bool = False,
 ) -> int:
-    report = build_preflight_report(
-        repo_root,
-        env_file=env_file,
-        workspace_file=workspace_file,
-    )
-    print_preflight_report(report)
+    try:
+        report = build_preflight_report(
+            repo_root,
+            env_file=env_file,
+            workspace_file=workspace_file,
+        )
+    except RuntimeError as exc:
+        if not output_json:
+            raise
+        resolved_env_file = resolve_env_file(repo_root, env_file)
+        config = sync_workspace_runtime(
+            repo_root,
+            env_file=resolved_env_file,
+            persist=False,
+        )
+        print_json_output(
+            build_status_preflight_error_payload(
+                "preflight",
+                config,
+                factory_workspace.load_registry(),
+                exc,
+            )
+        )
+        return 1
+
+    if output_json:
+        print_json_output(
+            build_preflight_json_payload(
+                report,
+                factory_workspace.load_registry(),
+                command="preflight",
+            )
+        )
+    else:
+        print_preflight_report(report)
     return 0 if report["status"] == "ready" else 1
 
 
@@ -890,49 +1218,78 @@ def list_workspaces() -> int:
     return 0
 
 
-def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
+def status_workspace(
+    repo_root: Path,
+    *,
+    env_file: Path | None = None,
+    output_json: bool = False,
+) -> int:
     resolved_env_file = resolve_env_file(repo_root, env_file)
     config = sync_workspace_runtime(
         repo_root, env_file=resolved_env_file, persist=False
     )
     registry = factory_workspace.load_registry()
+    notices: list[str] = []
     record = registry.get("workspaces", {}).get(config.factory_instance_id)
     record_persisted = isinstance(record, dict) and bool(record)
     if not isinstance(record, dict) or not record:
         try:
             factory_workspace.refresh_registry_entry(config.target_dir)
         except FileNotFoundError as exc:
-            print(
-                "⚠️ Unable to resolve workspace registry record for "
+            message = (
+                "Unable to resolve workspace registry record for "
                 f"`{config.target_dir}`. Continuing with transient installed state."
             )
-            print(f"error={exc}")
+            if output_json:
+                notices.extend([message, f"error={exc}"])
+            else:
+                print(f"⚠️ {message}")
+                print(f"error={exc}")
             record = {"runtime_state": "installed"}
             record_persisted = False
         else:
             registry = factory_workspace.load_registry()
             record = registry.get("workspaces", {}).get(config.factory_instance_id)
             if not isinstance(record, dict) or not record:
-                print(
-                    "⚠️ Unable to recover workspace registry record for "
+                message = (
+                    "Unable to recover workspace registry record for "
                     f"`{config.factory_instance_id}` after refresh. "
                     "Continuing with transient installed state."
                 )
+                if output_json:
+                    notices.append(message)
+                else:
+                    print(f"⚠️ {message}")
                 record = {"runtime_state": "installed"}
                 record_persisted = False
             else:
                 record_persisted = True
-                print(
-                    "♻️ Recovered missing registry record for: "
+                message = (
+                    "Recovered missing registry record for: "
                     f"{config.factory_instance_id}"
                 )
+                if output_json:
+                    notices.append(message)
+                else:
+                    print(f"♻️ {message}")
 
     persisted_state = str(record.get("runtime_state", "installed"))
     try:
         preflight = build_preflight_report(repo_root, env_file=resolved_env_file)
         snapshot = require_preflight_snapshot(preflight)
     except RuntimeError as exc:
-        print_status_preflight_error(config, exc)
+        if output_json:
+            print_json_output(
+                build_status_preflight_error_payload(
+                    "status",
+                    config,
+                    registry,
+                    exc,
+                    notices=notices,
+                )
+            )
+        else:
+            print_status_preflight_error(config, exc)
         return 1
 
     runtime_state = resolve_status_runtime_state_from_snapshot(snapshot)
@@ -943,10 +1300,22 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
                 config.factory_instance_id, runtime_state
             )
         except KeyError:
-            print(
-                "❌ Workspace registry entry disappeared while updating runtime state "
+            message = (
+                "Workspace registry entry disappeared while updating runtime state "
                 f"for `{config.factory_instance_id}`."
             )
+            if output_json:
+                print_json_output(
+                    build_status_preflight_error_payload(
+                        "status",
+                        config,
+                        registry,
+                        RuntimeError(message),
+                        notices=notices,
+                    )
+                )
+            else:
+                print(f"❌ {message}")
             return 1
         registry = factory_workspace.load_registry()
         record = registry.get("workspaces", {}).get(config.factory_instance_id, record)
@@ -961,6 +1330,27 @@ def status_workspace(repo_root: Path, *, env_file: Path | None = None) -> int:
     needs_rebuild = bool(head_commit) and (
         not lock_commit or lock_commit != head_commit
     )
+    if output_json:
+        print_json_output(
+            build_status_json_payload(
+                config,
+                registry,
+                preflight,
+                snapshot,
+                runtime_state=runtime_state,
+                active=active,
+                installed_version=release_data.get(
+                    "display_version",
+                    lock_data.get("version", "unknown"),
+                ),
+                head_commit=head_commit,
+                lock_commit=lock_commit,
+                needs_rebuild=needs_rebuild,
+                notices=notices,
+            )
+        )
+        return 0
+
     print(f"workspace_id={config.project_workspace_id}")
     print(f"instance_id={config.factory_instance_id}")
     print(f"target={config.target_dir}")
@@ -1187,6 +1577,11 @@ def parse_args() -> argparse.Namespace:
             "paired backup metadata files."
         ),
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON for `status` and `preflight`.",
+    )
     return parser.parse_args()
 
 
@@ -1244,15 +1639,22 @@ def main() -> int:
     elif args.command == "list":
         return list_workspaces()
     elif args.command == "status":
-        return status_workspace(repo_root, env_file=env_file)
+        return status_workspace(
+            repo_root,
+            env_file=env_file,
+            output_json=args.json,
+        )
     elif args.command == "preflight":
         return preflight_workspace(
             repo_root,
             env_file=env_file,
             workspace_file=args.workspace_file,
+            output_json=args.json,
         )
     elif args.command == "activate":
         return activate_workspace(repo_root, env_file=env_file)
+    elif args.json:
+        raise SystemExit("`--json` is supported only for `status` and `preflight`.")
     else:
         return deactivate_workspace(repo_root, env_file=env_file)
 
