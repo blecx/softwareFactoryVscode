@@ -7866,6 +7866,9 @@ def test_ci_workflow_has_container_build_job() -> None:
     assert (
         "container-build" in text or "docker build" in text.lower()
     ), "CI workflow must have a container-build or Docker build validation job"
+    assert (
+        "--mode production" in text
+    ), "CI container-build job must invoke the canonical production parity command"
     # Confirm it loops over all Dockerfiles
     assert (
         "docker/*/Dockerfile" in text or "Dockerfile" in text

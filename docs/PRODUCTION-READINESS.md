@@ -40,7 +40,7 @@ The following sources define the readiness boundary and must stay aligned:
 - `docs/architecture/ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md`
 - `scripts/factory_stack.py` for canonical lifecycle, `preflight`, and `status`
 - `scripts/verify_factory_install.py` for installation/runtime verification
-- `scripts/local_ci_parity.py` for the repo's default CI-parity baseline
+- `scripts/local_ci_parity.py` for both the repo's default CI-parity baseline and the canonical production-grade parity command
 - `docs/PRODUCTION-READINESS-PLAN.md` for the bounded implementation roadmap
 
 Operator-facing summaries in `README.md`, `docs/INSTALL.md`, `docs/CHEAT_SHEET.md`, and `docs/HANDOUT.md` must defer to this document rather than define a competing readiness story.
@@ -100,6 +100,14 @@ The current default branch already provides a meaningful readiness baseline:
 
 That baseline is necessary for internal production readiness, but it is not sufficient by itself. It does not waive any blocking requirement listed above.
 
+## Local parity surfaces: default baseline vs production gate
+
+Use the local parity commands intentionally:
+
+- `./.venv/bin/python ./scripts/local_ci_parity.py` is the default faster baseline for day-to-day local iteration. In this path, Docker image build parity remains an explicit warning-only skip so routine development does not silently become a slow production sign-off lane.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical production-grade parity command. It includes `docker/*/Dockerfile` builds by default and treats Docker build failures as blocking errors.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains supported as a compatibility alias when you want the Docker build expansion path without switching the named mode, but the canonical production sign-off command is `--mode production`.
+
 ## Evidence and sign-off rules
 
 Any final internal-production sign-off must be reproducible, bounded, and retained as evidence.
@@ -107,8 +115,8 @@ Any final internal-production sign-off must be reproducible, bounded, and retain
 At minimum, the final evidence bundle must include:
 
 - the repo CI-parity baseline via `./.venv/bin/python ./scripts/local_ci_parity.py`;
+- the canonical blocking production parity command via `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`;
 - runtime verification against the generated effective endpoints and manager-backed readiness surface;
-- the blocking Docker build parity lane;
 - the blocking Docker E2E runtime proof lane;
 - supported backup and restore evidence, including one recovery roundtrip proof;
 - machine-readable diagnostics evidence for the supported lifecycle surface;

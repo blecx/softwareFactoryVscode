@@ -119,6 +119,12 @@ production requirements have landed and the final sign-off evidence bundle is
 complete, including the canonical production-readiness gate and three
 consecutive clean runs.
 
+For local validation, keep the two parity paths distinct:
+
+- `./.venv/bin/python ./scripts/local_ci_parity.py` is the default faster local precheck.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical production-grade parity command and includes blocking Docker image builds by default.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains available as a compatibility alias when you only need the Docker build expansion path.
+
 ## Prerequisites
 
 Before installation, verify you have the following installed on your local host:

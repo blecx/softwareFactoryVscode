@@ -116,6 +116,15 @@ resume-unsafe, and manual recovery cases.
 ## 🧪 Validation
 
 ```bash
+# Default faster local parity baseline (Docker build parity stays a warning-only skip here)
+./.venv/bin/python ./scripts/local_ci_parity.py
+
+# Canonical production-grade parity command (Docker image builds are blocking by default)
+./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+
+# Compatibility alias for the Docker build expansion path
+./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build
+
 # Run the local test suite
 python3 -m pytest tests/ -v
 

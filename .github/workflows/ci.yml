@@ -74,10 +74,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate all Dockerfiles build successfully
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
         run: |
-          for dockerfile in docker/*/Dockerfile; do
-            service=$(basename $(dirname $dockerfile))
-            echo "Building $service..."
-            docker build -f "$dockerfile" . --quiet --tag "factory-ci-${service}:test"
-          done
+          bash ./setup.sh
+
+      - name: Run production-grade parity command
+        run: |
+          # The canonical production parity command performs blocking builds for
+          # every tracked docker/*/Dockerfile target.
+          ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
