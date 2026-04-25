@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 import factory_runtime.mcp_runtime.manager as runtime_manager_module
 from factory_runtime.mcp_runtime import (
     MCPRuntimeManager,
@@ -1168,6 +1170,146 @@ def test_manager_suspend_with_execution_lease_marks_resume_unsafe(
     registry = factory_workspace.load_registry(registry_path)
     record = registry["workspaces"][config.factory_instance_id]
     assert record["last_completed_tool_call_boundary_at"] is None
+
+
+def test_manager_backup_requires_bounded_suspended_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="requires the bounded `suspended` lifecycle state",
+    ):
+        manager.backup(repo_root, env_file=env_path)
+
+
+def test_manager_backup_creates_timestamped_bundle_with_checksums(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    data_root = Path(config.env_values["FACTORY_DATA_DIR"])
+    memory_db = data_root / "memory" / config.factory_instance_id / "memory.db"
+    agent_bus_db = data_root / "bus" / config.factory_instance_id / "agent_bus.db"
+    memory_db.write_text("memory-state\n", encoding="utf-8")
+    agent_bus_db.write_text("agent-bus-state\n", encoding="utf-8")
+
+    registry = factory_workspace.load_registry(registry_path)
+    registry["workspaces"][config.factory_instance_id].update(
+        {
+            "runtime_state": RuntimeLifecycleState.SUSPENDED.value,
+            "last_runtime_action": RuntimeActionTrigger.SUSPEND.value,
+            "last_runtime_action_at": "2026-04-25T08:00:00Z",
+            "last_runtime_action_reason_codes": [ReasonCode.SUSPEND_REQUESTED.value],
+            "last_completed_tool_call_boundary_at": "2026-04-25T08:00:05Z",
+        }
+    )
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: {},
+    )
+
+    result = manager.backup(repo_root, env_file=env_path)
+
+    bundle_path = Path(result["bundle_path"])
+    manifest_path = bundle_path / "bundle-manifest.json"
+    checksums_path = bundle_path / "checksums.sha256"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    checksums = checksums_path.read_text(encoding="utf-8")
+    runtime_snapshot = json.loads(
+        (bundle_path / "metadata" / "runtime-snapshot.json").read_text(encoding="utf-8")
+    )
+    registry_snapshot = json.loads(
+        (bundle_path / "metadata" / "workspace-registry.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert bundle_path.parent == data_root / "backups" / config.factory_instance_id
+    assert bundle_path.name.startswith("backup-")
+    assert result["required_precondition"] == RuntimeLifecycleState.SUSPENDED.value
+    assert result["captured_artifact_count"] == 6
+    assert manifest["required_precondition"] == RuntimeLifecycleState.SUSPENDED.value
+    assert manifest["runtime_state"] == RuntimeLifecycleState.SUSPENDED.value
+    assert manifest["recovery_classification"] == "resume-safe"
+    assert manifest["completed_tool_call_boundary"] is True
+
+    artifact_map = {
+        artifact["logical_name"]: artifact for artifact in manifest["artifacts"]
+    }
+    assert set(artifact_map) == {
+        "memory-db",
+        "agent-bus-db",
+        "factory-env",
+        "runtime-manifest",
+        "runtime-snapshot",
+        "workspace-registry",
+    }
+    assert (bundle_path / artifact_map["memory-db"]["bundle_relative_path"]).read_text(
+        encoding="utf-8"
+    ) == "memory-state\n"
+    assert (
+        bundle_path / artifact_map["agent-bus-db"]["bundle_relative_path"]
+    ).read_text(encoding="utf-8") == "agent-bus-state\n"
+    assert "workspace/.copilot/softwareFactoryVscode/.factory.env" in checksums
+    assert (
+        "workspace/.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json"
+        in checksums
+    )
+    assert runtime_snapshot["lifecycle_state"] == RuntimeLifecycleState.SUSPENDED.value
+    assert registry_snapshot["workspace_record_source"] == "registry"
+    assert (
+        registry_snapshot["workspace_record"]["factory_instance_id"]
+        == config.factory_instance_id
+    )
+
+    updated_registry = factory_workspace.load_registry(registry_path)
+    updated_record = updated_registry["workspaces"][config.factory_instance_id]
+    assert updated_record["runtime_state"] == RuntimeLifecycleState.SUSPENDED.value
+    assert updated_record["last_runtime_action"] == RuntimeActionTrigger.BACKUP.value
+    assert (
+        ReasonCode.BACKUP_REQUESTED.value
+        in updated_record["last_runtime_action_reason_codes"]
+    )
+    assert (
+        updated_record["last_completed_tool_call_boundary_at"] == "2026-04-25T08:00:05Z"
+    )
 
 
 def test_manager_resume_repairs_unready_suspended_runtime(
