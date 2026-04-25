@@ -89,8 +89,17 @@ Reproducible closeout evidence for this baseline is:
 ```text
 ./.venv/bin/pytest tests/test_regression.py -v
 ./.venv/bin/python ./scripts/local_ci_parity.py
-RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace or stop_cleanup_retains_images_and_supports_restart" -v
+./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace" -v
 ```
+
+The canonical production-grade parity command now carries the blocking Docker
+image build lane plus the promoted Docker E2E runtime scenarios
+`test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
+and `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`.
+`test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace`
+remains targeted supplemental evidence when the claim depends on explicit
+multi-workspace activation truth.
 
 Still deferred after this readiness pass:
 
@@ -122,8 +131,19 @@ consecutive clean runs.
 For local validation, keep the two parity paths distinct:
 
 - `./.venv/bin/python ./scripts/local_ci_parity.py` is the default faster local precheck.
-- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical production-grade parity command and includes blocking Docker image builds by default.
-- `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains available as a compatibility alias when you only need the Docker build expansion path.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical production-grade parity command and includes blocking Docker image builds plus the promoted Docker E2E runtime proof lane by default.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains available as a compatibility alias when you only need the Docker build expansion path without the promoted Docker E2E lane.
+
+The promoted blocking Docker E2E subset inside `--mode production` currently
+covers:
+
+- `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
+- `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`
+
+Targeted Docker-backed proofs such as
+`test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace`
+remain opt-in evidence when a slice depends on additional multi-workspace
+runtime truth beyond the promoted production gate.
 
 ## Prerequisites
 

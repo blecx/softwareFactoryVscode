@@ -105,8 +105,17 @@ That baseline is necessary for internal production readiness, but it is not suff
 Use the local parity commands intentionally:
 
 - `./.venv/bin/python ./scripts/local_ci_parity.py` is the default faster baseline for day-to-day local iteration. In this path, Docker image build parity remains an explicit warning-only skip so routine development does not silently become a slow production sign-off lane.
-- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical production-grade parity command. It includes `docker/*/Dockerfile` builds by default and treats Docker build failures as blocking errors.
-- `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains supported as a compatibility alias when you want the Docker build expansion path without switching the named mode, but the canonical production sign-off command is `--mode production`.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical production-grade parity command. It includes `docker/*/Dockerfile` builds by default, runs the promoted Docker E2E runtime proof lane, and treats those failures as blocking errors.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains supported as a compatibility alias when you want the Docker build expansion path without switching the named mode, but it does **not** add the promoted Docker E2E lane and the canonical production sign-off command is `--mode production`.
+
+The promoted blocking Docker E2E lane currently covers:
+
+- `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
+- `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`
+
+`test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace`
+remains targeted supplemental evidence when a sign-off claim depends on
+explicit multi-workspace activation truth beyond the promoted gate.
 
 ## Evidence and sign-off rules
 
@@ -117,7 +126,7 @@ At minimum, the final evidence bundle must include:
 - the repo CI-parity baseline via `./.venv/bin/python ./scripts/local_ci_parity.py`;
 - the canonical blocking production parity command via `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`;
 - runtime verification against the generated effective endpoints and manager-backed readiness surface;
-- the blocking Docker E2E runtime proof lane;
+- the blocking Docker E2E runtime proof lane, currently satisfied by the promoted strict-tenant and stop/cleanup scenarios within `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`;
 - supported backup and restore evidence, including one recovery roundtrip proof;
 - machine-readable diagnostics evidence for the supported lifecycle surface;
 - links to the required runbooks and operator procedures; and
