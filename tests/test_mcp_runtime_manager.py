@@ -1484,6 +1484,82 @@ def test_manager_restore_rehydrates_suspended_runtime_from_backup_bundle(
     )
 
 
+def test_manager_restore_does_not_require_source_metadata_copy(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    data_root = Path(config.env_values["FACTORY_DATA_DIR"])
+    memory_db = data_root / "memory" / config.factory_instance_id / "memory.db"
+    agent_bus_db = data_root / "bus" / config.factory_instance_id / "agent_bus.db"
+    memory_db.write_text("memory-state\n", encoding="utf-8")
+    agent_bus_db.write_text("agent-bus-state\n", encoding="utf-8")
+
+    registry = factory_workspace.load_registry(registry_path)
+    registry["workspaces"][config.factory_instance_id].update(
+        {
+            "runtime_state": RuntimeLifecycleState.SUSPENDED.value,
+            "last_runtime_action": RuntimeActionTrigger.SUSPEND.value,
+            "last_runtime_action_at": "2026-04-25T08:30:00Z",
+            "last_runtime_action_reason_codes": [ReasonCode.SUSPEND_REQUESTED.value],
+            "last_completed_tool_call_boundary_at": "2026-04-25T08:30:05Z",
+        }
+    )
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: {},
+    )
+
+    backup_result = manager.backup(repo_root, env_file=env_path)
+    bundle_path = Path(backup_result["bundle_path"])
+
+    manager._remove_runtime_data_dirs(config)
+    env_path.unlink()
+    config.runtime_manifest_path.unlink()
+    manager._persist_runtime_deleted_record(
+        target_path=config.target_dir,
+        factory_dir=repo_root,
+        config=config,
+        trigger=RuntimeActionTrigger.CLEANUP,
+        reason_codes=(),
+    )
+
+    def fail_copystat(
+        src: str | bytes | Path,
+        dst: str | bytes | Path,
+        *,
+        follow_symlinks: bool = True,
+    ) -> None:
+        del src, dst, follow_symlinks
+        raise PermissionError("metadata copy blocked")
+
+    monkeypatch.setattr(runtime_manager_module.shutil, "copystat", fail_copystat)
+
+    restore_result = manager.restore(repo_root, bundle_path=bundle_path)
+
+    assert restore_result["runtime_state"] == RuntimeLifecycleState.SUSPENDED.value
+    assert memory_db.read_text(encoding="utf-8") == "memory-state\n"
+    assert agent_bus_db.read_text(encoding="utf-8") == "agent-bus-state\n"
+    assert not list(memory_db.parent.glob("*.restore-tmp"))
+    assert not list(agent_bus_db.parent.glob("*.restore-tmp"))
+
+
 def test_manager_restore_requires_resume_safe_bundle(
     tmp_path: Path,
     monkeypatch,
