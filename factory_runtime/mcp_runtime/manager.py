@@ -3899,6 +3899,7 @@ class MCPRuntimeManager:
         docker_available: bool,
         installed: bool,
     ) -> RuntimeLifecycleState:
+        persisted_degraded = persisted_runtime_state in {"failed", "degraded"}
         if not installed:
             return RuntimeLifecycleState.RUNTIME_DELETED
         if persisted_runtime_state == RuntimeLifecycleState.RUNTIME_DELETED.value:
@@ -3909,16 +3910,20 @@ class MCPRuntimeManager:
             return RuntimeLifecycleState.REPAIRING
         if persisted_runtime_state == RuntimeLifecycleState.SUSPENDED.value:
             return RuntimeLifecycleState.SUSPENDED
-        if persisted_runtime_state in {"failed", "degraded"}:
-            return RuntimeLifecycleState.DEGRADED
         if not docker_available:
+            if persisted_degraded:
+                return RuntimeLifecycleState.DEGRADED
             return (
                 RuntimeLifecycleState.RUNNING
                 if persisted_runtime_state == "running"
                 else RuntimeLifecycleState.STOPPED
             )
         if not services:
-            return RuntimeLifecycleState.STOPPED
+            return (
+                RuntimeLifecycleState.DEGRADED
+                if persisted_degraded
+                else RuntimeLifecycleState.STOPPED
+            )
 
         non_external = [
             record
@@ -3930,7 +3935,11 @@ class MCPRuntimeManager:
         if all(
             record.status == ServiceInstanceStatus.MISSING for record in non_external
         ):
-            return RuntimeLifecycleState.STOPPED
+            return (
+                RuntimeLifecycleState.DEGRADED
+                if persisted_degraded
+                else RuntimeLifecycleState.STOPPED
+            )
         if any(
             record.status
             in {ServiceInstanceStatus.DEGRADED, ServiceInstanceStatus.MISSING}
@@ -3941,7 +3950,11 @@ class MCPRuntimeManager:
             record.status == ServiceInstanceStatus.RUNNING for record in non_external
         ):
             return RuntimeLifecycleState.RUNNING
-        return RuntimeLifecycleState.STOPPED
+        return (
+            RuntimeLifecycleState.DEGRADED
+            if persisted_degraded
+            else RuntimeLifecycleState.STOPPED
+        )
 
     def _build_runtime_config_from_snapshot(
         self,

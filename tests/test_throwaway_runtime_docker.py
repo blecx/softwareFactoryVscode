@@ -1267,7 +1267,10 @@ def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_c
         )
 
         seeded_env_values = _parse_env_file(env_path)
+        seeded_env_values["FACTORY_RUNTIME_MODE"] = "production"
         seeded_env_values["CONTEXT7_API_KEY"] = "test-context7-key"
+        seeded_env_values["GITHUB_TOKEN"] = "test-github-token"
+        seeded_env_values["GITHUB_OPS_ALLOWED_REPOS"] = "blecx/softwareFactoryVscode"
         env_path.write_text(
             "\n".join(f"{key}={value}" for key, value in seeded_env_values.items())
             + "\n",

@@ -70,13 +70,13 @@ Docker-backed strict-tenant scenario in `tests/test_throwaway_runtime_docker.py`
 The current practical baseline is backed by an explicit mix of focused local
 tests and opt-in Docker-backed proofs:
 
-| Lifecycle path | Focused automated proof | Docker-backed evidence | Guarantee / note |
-| --- | --- | --- | --- |
-| A → B → A activation / switch-back | `test_activate_workspace_switch_back_clears_stale_selection_leases` in `tests/test_factory_install.py` | `test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace` in `tests/test_throwaway_runtime_docker.py` | Active selection, generated endpoints, and lease cleanup follow the operator-selected workspace rather than whichever runtime happened to start first. |
-| Stop → status | `test_factory_stack_stop_followed_by_status_reports_needs_ramp_up` in `tests/test_factory_install.py` | `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart` in `tests/test_throwaway_runtime_docker.py` | After an explicit stop, manager-backed status reports `stopped` / `needs-ramp-up` instead of inventing a second runtime truth. |
-| Stop → verify | `test_verify_factory_runtime_reports_needs_ramp_up_after_stop` in `tests/test_factory_install.py` | Reuses the same Docker stop proof above when real container teardown matters. | Runtime verification fails closed with `needs-ramp-up` after a supported stop path. |
-| Cleanup / `runtime-deleted` | `test_cleanup_workspace` and `test_delete_runtime_matches_cleanup_artifact_effects_with_distinct_trigger_metadata` in `tests/test_factory_install.py` | `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart` in `tests/test_throwaway_runtime_docker.py` | Cleanup and policy-driven `delete-runtime` remove live runtime ownership/artifacts while retaining the installed baseline and Docker images. |
-| Reload / reopen recovery | `test_build_runtime_config_preserves_persisted_ports_when_workspace_reopens` in `tests/test_factory_install.py` | Not required for the practical baseline; this is metadata/config recovery rather than live container truth. | Reopening a workspace preserves the persisted port/runtime contract without implying hidden auto-start behavior. |
+| Lifecycle path                     | Focused automated proof                                                                                                                               | Docker-backed evidence                                                                                                | Guarantee / note                                                                                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A → B → A activation / switch-back | `test_activate_workspace_switch_back_clears_stale_selection_leases` in `tests/test_factory_install.py`                                                | `test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace` in `tests/test_throwaway_runtime_docker.py`  | Active selection, generated endpoints, and lease cleanup follow the operator-selected workspace rather than whichever runtime happened to start first. |
+| Stop → status                      | `test_factory_stack_stop_followed_by_status_reports_needs_ramp_up` in `tests/test_factory_install.py`                                                 | `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart` in `tests/test_throwaway_runtime_docker.py` | After an explicit stop, manager-backed status reports `stopped` / `needs-ramp-up` instead of inventing a second runtime truth.                         |
+| Stop → verify                      | `test_verify_factory_runtime_reports_needs_ramp_up_after_stop` in `tests/test_factory_install.py`                                                     | Reuses the same Docker stop proof above when real container teardown matters.                                         | Runtime verification fails closed with `needs-ramp-up` after a supported stop path.                                                                    |
+| Cleanup / `runtime-deleted`        | `test_cleanup_workspace` and `test_delete_runtime_matches_cleanup_artifact_effects_with_distinct_trigger_metadata` in `tests/test_factory_install.py` | `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart` in `tests/test_throwaway_runtime_docker.py` | Cleanup and policy-driven `delete-runtime` remove live runtime ownership/artifacts while retaining the installed baseline and Docker images.           |
+| Reload / reopen recovery           | `test_build_runtime_config_preserves_persisted_ports_when_workspace_reopens` in `tests/test_factory_install.py`                                       | Not required for the practical baseline; this is metadata/config recovery rather than live container truth.           | Reopening a workspace preserves the persisted port/runtime contract without implying hidden auto-start behavior.                                       |
 
 The canonical production-grade parity command
 `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` now runs a
@@ -84,6 +84,7 @@ promoted blocking subset of these Docker-backed lifecycle proofs:
 
 - `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
 - `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`
+- `test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_contract`
 
 Other Docker-backed lifecycle proofs remain **targeted and opt-in** via
 `RUN_DOCKER_E2E=1`; they are required evidence where real container/image state
@@ -103,9 +104,13 @@ RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "a
 ```
 
 `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` now covers
-the promoted strict-tenant and stop/cleanup Docker E2E scenarios. Use the extra
-`RUN_DOCKER_E2E=1` command when the claim also depends on the multi-workspace
-activation / switch-back proof.
+the promoted strict-tenant, stop/cleanup, and backup/restore Docker E2E scenarios.
+Use the extra `RUN_DOCKER_E2E=1` command when the claim also depends on the
+multi-workspace activation / switch-back proof.
+
+The same canonical production gate also refreshes `.tmp/production-readiness/latest.md`,
+`.tmp/production-readiness/latest.json`, and `.tmp/production-readiness/history.json`
+for concise sign-off evidence and three-run streak tracking.
 
 Still deferred after this readiness pass:
 

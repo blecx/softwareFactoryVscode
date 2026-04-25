@@ -237,6 +237,44 @@ def test_manager_builds_canonical_snapshot_for_workspace_identity(
     assert snapshot.as_dict()["selection"]["profiles"]["names"] == ["workspace-default"]
 
 
+def test_manager_recovers_running_lifecycle_from_persisted_degraded_state(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    registry["workspaces"][config.factory_instance_id][
+        "runtime_state"
+    ] = RuntimeLifecycleState.DEGRADED.value
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+
+    assert snapshot.persisted_runtime_state == RuntimeLifecycleState.DEGRADED.value
+    assert snapshot.lifecycle_state == RuntimeLifecycleState.RUNNING
+    assert snapshot.readiness is not None
+    assert snapshot.readiness.status == ReadinessStatus.READY
+
+
 def test_manager_builds_production_snapshot_without_mock_gateway(
     tmp_path: Path,
     monkeypatch,

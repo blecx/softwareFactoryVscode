@@ -8313,20 +8313,21 @@ def test_adr_011_agent_worker_liveness_contract_exists() -> None:
     ), "ADR-011 must reference the run-queue entrypoint"
 
 
-def test_ci_workflow_has_container_build_job() -> None:
+def test_ci_workflow_has_internal_production_readiness_job() -> None:
     """Finding #7 — CI must have a job that validates Dockerfiles build successfully."""
     ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
     text = ci_file.read_text(encoding="utf-8")
     assert (
-        "container-build" in text or "docker build" in text.lower()
-    ), "CI workflow must have a container-build or Docker build validation job"
+        "production-readiness" in text or "Internal Production Readiness Gate" in text
+    ), "CI workflow must have a canonical internal production-readiness job"
     assert (
         "--mode production" in text
-    ), "CI container-build job must invoke the canonical production parity command"
-    # Confirm it loops over all Dockerfiles
+    ), "CI production-readiness job must invoke the canonical production gate command"
     assert (
         "docker/*/Dockerfile" in text or "Dockerfile" in text
-    ), "CI container-build job must reference Dockerfiles"
+    ), "CI production-readiness job must retain Docker build parity coverage"
+    assert "actions/upload-artifact@v4" in text
+    assert ".tmp/production-readiness/" in text
 
 
 def test_workspace_sensitive_tasks_use_surface_guard() -> None:
