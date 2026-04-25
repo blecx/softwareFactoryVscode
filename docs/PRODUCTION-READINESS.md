@@ -89,6 +89,18 @@ When production validation fails, the readiness/verifier surfaces distinguish mi
 
 This is a necessary blocking requirement for the internal production claim, not the final claim by itself.
 
+## Supported backup contract (current PR-06 contract)
+
+The current supported backup lifecycle command is `scripts/factory_stack.py backup`.
+
+- Supported backups require the manager-backed bounded `suspended` lifecycle state.
+- Operators must suspend a ready runtime before backup; the canonical precondition step is `scripts/factory_stack.py suspend --completed-tool-call-boundary` when the session can prove a safe boundary.
+- The backup command writes a timestamped bundle under `FACTORY_DATA_DIR/backups/<factory_instance_id>/backup-<timestamp>/`.
+- Each supported bundle includes the stateful runtime databases, the canonical `.factory.env`, the current runtime manifest, a scoped workspace-registry snapshot, a manager-backed runtime snapshot, and a `checksums.sha256` file.
+- The bundle manifest (`bundle-manifest.json`) records the required precondition, bundle timestamp, selected profiles, recovery classification, and per-artifact SHA-256 metadata.
+
+Restore automation and roundtrip recovery proof are still separate blocking work under requirement `6`; backup support alone does not satisfy the final production-readiness claim.
+
 ## Current baseline: necessary, not sufficient
 
 The current default branch already provides a meaningful readiness baseline:
