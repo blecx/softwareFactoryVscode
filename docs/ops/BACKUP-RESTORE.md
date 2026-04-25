@@ -1,5 +1,7 @@
 # Backup and Restore
 
+For the incident-response decision tree that tells you when to suspend, backup, restore, resume, restart, or escalate, use [`INCIDENT-RESPONSE.md`](INCIDENT-RESPONSE.md).
+
 ## Supported today
 
 The current supported runtime lifecycle commands are:
