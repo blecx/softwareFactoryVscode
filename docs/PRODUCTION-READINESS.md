@@ -129,6 +129,16 @@ The supported JSON surface includes:
 
 Operator automation and alerting should consume this JSON surface instead of scraping prose. See `docs/ops/MONITORING.md` for the supported field layout and triage examples.
 
+## Supported operator runbooks (current PR-09 contract)
+
+Blocking requirement `8` is satisfied only by the current operator runbooks for the manager-backed runtime model:
+
+- `docs/ops/INCIDENT-RESPONSE.md` for incident response, diagnosis/action/validation/escalation flows, and day-two recovery decisions;
+- `docs/ops/MONITORING.md` for the machine-readable status/reason-code field layout; and
+- `docs/ops/BACKUP-RESTORE.md` for the bounded backup/restore contract and roundtrip recovery flow.
+
+These runbooks map the supported monitoring statuses and reason-code families to concrete operator actions without authorizing legacy flows or a second lifecycle authority.
+
 ## Current baseline: necessary, not sufficient
 
 The current default branch already provides a meaningful readiness baseline:

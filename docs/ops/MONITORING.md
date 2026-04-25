@@ -4,6 +4,8 @@ This document describes the canonical machine-readable monitoring surface for th
 
 Do **not** invent a second monitoring workflow or scrape the human-oriented key/value output when automation needs structured diagnostics. Use the JSON form of the existing lifecycle commands instead.
 
+For the operator decision tree that turns these statuses, reason codes, and shared-mode diagnostics into concrete day-two actions, use [`INCIDENT-RESPONSE.md`](INCIDENT-RESPONSE.md).
+
 ## Canonical commands
 
 From the source checkout:
