@@ -2313,6 +2313,19 @@ def test_factory_stack_parse_args_accepts_restore(monkeypatch) -> None:
     assert args.bundle_path == "/tmp/backup-20260425T081500Z"
 
 
+def test_factory_stack_parse_args_accepts_status_json(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["factory_stack.py", "status", "--json"],
+    )
+
+    args = factory_stack.parse_args()
+
+    assert args.command == "status"
+    assert args.json is True
+
+
 def test_workspace_runtime_allocates_distinct_port_blocks_and_registry_state(
     tmp_path: Path,
     monkeypatch,
@@ -3103,6 +3116,101 @@ def test_factory_stack_status_reports_degraded_when_required_service_restarts(
         registry["workspaces"][config.factory_instance_id]["runtime_state"]
         == "degraded"
     )
+
+
+def test_factory_stack_status_json_reports_degraded_machine_readable_diagnostics(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "CONTEXT7_API_KEY=test-context7-key\n",
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda compose_project_name: {
+            "mock-llm-gateway": "Up 10 seconds (healthy)",
+            "mcp-memory": "Up 10 seconds (healthy)",
+            "mcp-agent-bus": "Up 10 seconds (healthy)",
+            "approval-gate": "Up 10 seconds (healthy)",
+            "agent-worker": "Restarting (1) 3 seconds ago",
+        },
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_service_inventory",
+        lambda compose_project_name: build_full_service_inventory(
+            config,
+            agent_worker_status="Restarting (1) 3 seconds ago",
+        ),
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+        output_json=True,
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["command"] == "status"
+    assert payload["authority"] == "manager-backed-snapshot-readiness"
+    assert payload["workspace"]["workspace_id"] == config.project_workspace_id
+    assert payload["workspace"]["active"] is False
+    assert payload["runtime"]["runtime_state"] == "degraded"
+    assert payload["preflight"]["status"] == "degraded"
+    assert payload["preflight"]["recommended_action"] == "inspect"
+    assert payload["services"]["agent-worker"]["status"] == "degraded"
+    assert "service-not-running" in payload["services"]["agent-worker"]["reason_codes"]
+    assert "agent-worker" in payload["preflight"]["blocking_services"]
 
 
 def test_factory_stack_status_demotes_running_workspace_to_stopped_when_services_missing(
@@ -4151,6 +4259,114 @@ def test_factory_stack_preflight_treats_promoted_shared_services_as_external(
     )
 
 
+def test_factory_stack_preflight_json_reports_machine_readable_shared_topology_diagnostics(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+    monkeypatch.setattr(factory_stack.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(
+        factory_stack, "get_factory_head_commit", lambda _path: "deadbeef"
+    )
+    stub_runtime_manager_with_successful_probes(
+        monkeypatch,
+        factory_stack,
+        registry_path=registry_path,
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    env_path = repo_root / ".factory.env"
+    env_path.write_text(
+        "\n".join(
+            [
+                f"TARGET_WORKSPACE_PATH={target_repo}",
+                "PROJECT_WORKSPACE_ID=target-project",
+                "COMPOSE_PROJECT_NAME=factory_target-project",
+                f"FACTORY_DIR={repo_root}",
+                "FACTORY_SHARED_SERVICE_MODE=shared",
+                "FACTORY_TENANCY_MODE=shared",
+                "FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030",
+                "FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031",
+                "FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001",
+                "CONTEXT7_API_KEY=test-context7-key",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=True,
+    )
+    (target_repo / "software-factory.code-workspace").write_text(
+        json.dumps(
+            {
+                "folders": [
+                    {"name": "Host Project (Root)", "path": "."},
+                    {
+                        "name": "AI Agent Factory",
+                        "path": ".copilot/softwareFactoryVscode",
+                    },
+                ],
+                "settings": config.workspace_settings,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    inventory = build_full_service_inventory(config)
+    for service_name in ("mcp-memory", "mcp-agent-bus", "approval-gate"):
+        del inventory[service_name]
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_service_inventory",
+        lambda _name: inventory,
+    )
+
+    exit_code = factory_stack.preflight_workspace(
+        repo_root,
+        env_file=env_path,
+        output_json=True,
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["command"] == "preflight"
+    assert payload["workspace"]["workspace_id"] == config.project_workspace_id
+    assert payload["workspace"]["active"] is True
+    assert payload["workspace"]["active_workspace"]["workspace_id"] == (
+        config.project_workspace_id
+    )
+    assert payload["workspace"]["topology_mode"] == "shared"
+    assert payload["preflight"]["status"] == "ready"
+    assert (
+        payload["diagnostics"]["shared_mode_diagnostics"]["tenant_identity_required"]
+        is True
+    )
+    assert payload["services"]["mcp-memory"]["status"] == "external"
+    assert payload["services"]["mcp-memory"]["workspace_owned"] is False
+
+
 def test_factory_stack_preflight_flags_missing_shared_tenant_enforcement(
     tmp_path: Path,
     monkeypatch,
@@ -4912,6 +5128,73 @@ def test_factory_stack_status_fails_closed_without_manager_snapshot(
     assert exit_code == 1
     assert "preflight_status=error" in output
     assert "manager-backed snapshot" in output
+
+
+def test_factory_stack_status_json_fails_closed_without_manager_snapshot(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        factory_stack.factory_workspace, "ports_available", lambda ports: True
+    )
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".copilot" / "config").mkdir(parents=True)
+    (repo_root / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+        (REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    (repo_root / ".factory.env").write_text(
+        "CONTEXT7_API_KEY=test-context7-key\n",
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+    factory_workspace.sync_runtime_artifacts(
+        config,
+        runtime_state="running",
+        active=False,
+    )
+
+    monkeypatch.setattr(
+        factory_stack,
+        "collect_running_services",
+        lambda _compose_project_name: (_ for _ in ()).throw(
+            AssertionError(
+                "status_workspace should fail closed before trying a Docker-side fallback"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        factory_stack,
+        "build_preflight_report",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "recommended_action": "none",
+            "issues": [],
+        },
+    )
+
+    exit_code = factory_stack.status_workspace(
+        repo_root,
+        env_file=target_repo / ".copilot/softwareFactoryVscode/.factory.env",
+        output_json=True,
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 1
+    assert payload["command"] == "status"
+    assert payload["preflight"]["status"] == "error"
+    assert payload["preflight"]["recommended_action"] == "inspect-registry"
+    assert "manager-backed snapshot" in payload["preflight"]["issues"][0]
 
 
 def test_deactivate_workspace_does_not_clear_another_active_workspace(
