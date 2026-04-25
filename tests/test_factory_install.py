@@ -8314,7 +8314,7 @@ def test_adr_011_agent_worker_liveness_contract_exists() -> None:
 
 
 def test_ci_workflow_has_internal_production_readiness_job() -> None:
-    """Finding #7 — CI must have a job that validates Dockerfiles build successfully."""
+    """Finding #7 — CI must use the canonical production gate with Node 24-compatible action majors."""
     ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
     text = ci_file.read_text(encoding="utf-8")
     assert (
@@ -8326,7 +8326,12 @@ def test_ci_workflow_has_internal_production_readiness_job() -> None:
     assert (
         "docker/*/Dockerfile" in text or "Dockerfile" in text
     ), "CI production-readiness job must retain Docker build parity coverage"
-    assert "actions/upload-artifact@v4" in text
+    assert "actions/checkout@v6" in text
+    assert "actions/setup-python@v6" in text
+    assert "actions/upload-artifact@v7" in text
+    assert "actions/checkout@v4" not in text
+    assert "actions/setup-python@v5" not in text
+    assert "actions/upload-artifact@v4" not in text
     assert ".tmp/production-readiness/" in text
 
 
