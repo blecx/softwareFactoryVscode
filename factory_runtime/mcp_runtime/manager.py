@@ -8,6 +8,7 @@ outside the harness layer, as sequenced by
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import re
@@ -100,6 +101,10 @@ _PRODUCTION_GITHUB_CREDENTIAL_ENV_KEYS = (
 _LLM_CONFIG_PATH_ENV_KEY = "LLM_CONFIG_PATH"
 _LLM_OVERRIDE_PATH_ENV_KEY = "LLM_OVERRIDE_PATH"
 _GITHUB_OPS_ALLOWED_REPOS_ENV_KEY = "GITHUB_OPS_ALLOWED_REPOS"
+BACKUP_BUNDLES_DIRNAME = "backups"
+BACKUP_BUNDLE_PREFIX = "backup-"
+BACKUP_MANIFEST_FILENAME = "bundle-manifest.json"
+BACKUP_CHECKSUMS_FILENAME = "checksums.sha256"
 
 
 class MCPRuntimeManager:
@@ -1035,6 +1040,213 @@ class MCPRuntimeManager:
             selected_profiles=selected_profiles,
         )
 
+    def backup(
+        self,
+        repo_root: Path,
+        *,
+        env_file: Path | None = None,
+        selected_profiles: Iterable[RuntimeProfileName | str] | None = None,
+        reason_codes: Iterable[ReasonCode | str] | None = None,
+    ) -> dict[str, Any]:
+        resolved_env_file = self.resolve_env_file(repo_root, env_file)
+        snapshot = self.build_snapshot(
+            repo_root,
+            env_file=resolved_env_file,
+            selected_profiles=selected_profiles,
+        )
+
+        if not snapshot.selection.installed:
+            raise RuntimeError(
+                "Cannot back up a runtime that is not installed in the canonical registry."
+            )
+        if snapshot.lifecycle_state != RuntimeLifecycleState.SUSPENDED:
+            raise RuntimeError(
+                "Supported runtime backup requires the bounded `suspended` lifecycle "
+                "state. Suspend a ready runtime first via `factory_stack.py suspend`; "
+                f"current state is `{snapshot.lifecycle_state.value}`."
+            )
+
+        config = self._prepare_runtime_config_for_actions(
+            repo_root,
+            resolved_env_file,
+            snapshot,
+        )
+        data_root = self._resolve_factory_data_dir(config)
+        bundle_created_at = factory_workspace.utc_now_iso()
+        bundle_dir = self._create_backup_bundle_dir(
+            data_root,
+            config.factory_instance_id,
+            bundle_created_at,
+        )
+        artifact_specs: list[dict[str, str]] = []
+
+        try:
+            copy_specs = [
+                (
+                    "memory-db",
+                    data_root / "memory" / config.factory_instance_id / "memory.db",
+                    Path("data") / "memory" / config.factory_instance_id / "memory.db",
+                ),
+                (
+                    "agent-bus-db",
+                    data_root / "bus" / config.factory_instance_id / "agent_bus.db",
+                    Path("data") / "bus" / config.factory_instance_id / "agent_bus.db",
+                ),
+                (
+                    "factory-env",
+                    resolved_env_file,
+                    Path("workspace")
+                    / factory_workspace.FACTORY_DIRNAME
+                    / ".factory.env",
+                ),
+                (
+                    "runtime-manifest",
+                    config.runtime_manifest_path,
+                    Path("workspace")
+                    / factory_workspace.TMP_SUBPATH
+                    / factory_workspace.RUNTIME_MANIFEST_FILENAME,
+                ),
+            ]
+            missing_sources = [
+                str(source_path)
+                for _logical_name, source_path, _relative_path in copy_specs
+                if not source_path.exists()
+            ]
+            if missing_sources:
+                raise RuntimeError(
+                    "Supported runtime backup requires all canonical state files to "
+                    "exist. Missing: " + ", ".join(missing_sources)
+                )
+
+            for logical_name, source_path, relative_path in copy_specs:
+                destination = bundle_dir / relative_path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_path, destination)
+                artifact_specs.append(
+                    {
+                        "logical_name": logical_name,
+                        "source_path": str(source_path.resolve()),
+                        "bundle_relative_path": relative_path.as_posix(),
+                    }
+                )
+
+            registry_snapshot = self._build_backup_registry_snapshot(snapshot, config)
+            generated_artifacts = [
+                (
+                    "runtime-snapshot",
+                    Path("metadata") / "runtime-snapshot.json",
+                    snapshot.as_dict(),
+                ),
+                (
+                    "workspace-registry",
+                    Path("metadata") / "workspace-registry.json",
+                    registry_snapshot,
+                ),
+            ]
+            for logical_name, relative_path, payload in generated_artifacts:
+                destination = bundle_dir / relative_path
+                factory_workspace.write_json_atomic(destination, payload)
+                artifact_specs.append(
+                    {
+                        "logical_name": logical_name,
+                        "source_path": "",
+                        "bundle_relative_path": relative_path.as_posix(),
+                    }
+                )
+
+            artifacts: list[dict[str, Any]] = []
+            checksum_lines: list[str] = []
+            for artifact in artifact_specs:
+                relative_path = Path(artifact["bundle_relative_path"])
+                bundled_path = bundle_dir / relative_path
+                sha256 = self._sha256_file(bundled_path)
+                checksum_lines.append(f"{sha256}  {relative_path.as_posix()}")
+                artifacts.append(
+                    {
+                        **artifact,
+                        "sha256": sha256,
+                        "size_bytes": bundled_path.stat().st_size,
+                    }
+                )
+
+            checksums_path = bundle_dir / BACKUP_CHECKSUMS_FILENAME
+            checksums_path.write_text(
+                "\n".join(checksum_lines) + "\n",
+                encoding="utf-8",
+            )
+
+            recovery_classification = (
+                snapshot.recovery.classification.value
+                if snapshot.recovery is not None
+                else ""
+            )
+            completed_tool_call_boundary = bool(
+                snapshot.recovery.completed_tool_call_boundary
+                if snapshot.recovery is not None
+                else False
+            )
+            manifest = {
+                "schema_version": 1,
+                "bundle_created_at": bundle_created_at,
+                "workspace_id": snapshot.workspace_id,
+                "instance_id": snapshot.instance_id,
+                "compose_project_name": snapshot.compose_project_name,
+                "target_dir": str(snapshot.target_dir),
+                "factory_dir": str(snapshot.factory_dir),
+                "factory_data_dir": str(data_root),
+                "runtime_mode": snapshot.runtime_mode.value,
+                "runtime_state": snapshot.lifecycle_state.value,
+                "required_precondition": RuntimeLifecycleState.SUSPENDED.value,
+                "shared_mode": snapshot.shared_mode,
+                "recovery_classification": recovery_classification,
+                "completed_tool_call_boundary": completed_tool_call_boundary,
+                "selected_profiles": [
+                    profile.value for profile in snapshot.selection.profiles.names
+                ],
+                "checksums_file": BACKUP_CHECKSUMS_FILENAME,
+                "artifacts": artifacts,
+            }
+            factory_workspace.write_json_atomic(
+                bundle_dir / BACKUP_MANIFEST_FILENAME,
+                manifest,
+            )
+        except Exception:
+            shutil.rmtree(bundle_dir, ignore_errors=True)
+            raise
+
+        merged_reason_codes = self._tuple_unique(
+            [
+                ReasonCode.BACKUP_REQUESTED,
+                *self._coerce_reason_codes(reason_codes),
+            ]
+        )
+        self._persist_runtime_action_metadata(
+            snapshot=snapshot,
+            runtime_state=RuntimeLifecycleState.SUSPENDED,
+            trigger=RuntimeActionTrigger.BACKUP,
+            action_at=factory_workspace.utc_now_iso(),
+            reason_codes=merged_reason_codes,
+            completed_tool_call_boundary_at=(
+                snapshot.recovery.last_completed_tool_call_at
+                if snapshot.recovery is not None
+                else None
+            ),
+        )
+
+        return {
+            "workspace_id": snapshot.workspace_id,
+            "instance_id": snapshot.instance_id,
+            "runtime_state": snapshot.lifecycle_state.value,
+            "required_precondition": RuntimeLifecycleState.SUSPENDED.value,
+            "bundle_created_at": bundle_created_at,
+            "bundle_path": str(bundle_dir),
+            "manifest_path": str(bundle_dir / BACKUP_MANIFEST_FILENAME),
+            "checksums_path": str(bundle_dir / BACKUP_CHECKSUMS_FILENAME),
+            "captured_artifact_count": len(artifact_specs),
+            "recovery_classification": recovery_classification,
+            "completed_tool_call_boundary": completed_tool_call_boundary,
+        }
+
     def cleanup(
         self,
         repo_root: Path,
@@ -1933,6 +2145,81 @@ class MCPRuntimeManager:
             )
         except Exception:  # noqa: BLE001
             return None
+
+    def _resolve_factory_data_dir(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+    ) -> Path:
+        data_dir_value = str(config.env_values.get("FACTORY_DATA_DIR", "")).strip()
+        if not data_dir_value:
+            raise RuntimeError(
+                "Supported runtime backup requires `FACTORY_DATA_DIR` to be configured."
+            )
+        return Path(data_dir_value).expanduser().resolve()
+
+    def _create_backup_bundle_dir(
+        self,
+        data_root: Path,
+        instance_id: str,
+        bundle_created_at: str,
+    ) -> Path:
+        backup_root = data_root / BACKUP_BUNDLES_DIRNAME / instance_id
+        backup_root.mkdir(parents=True, exist_ok=True)
+
+        base_name = (
+            f"{BACKUP_BUNDLE_PREFIX}"
+            f"{bundle_created_at.replace('-', '').replace(':', '')}"
+        )
+        candidate = backup_root / base_name
+        suffix = 2
+        while candidate.exists():
+            candidate = backup_root / f"{base_name}-{suffix}"
+            suffix += 1
+        candidate.mkdir(parents=True, exist_ok=False)
+        return candidate
+
+    def _build_backup_registry_snapshot(
+        self,
+        snapshot: RuntimeSnapshot,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+    ) -> dict[str, Any]:
+        matched_instance_id, existing_record, registry = (
+            self._load_runtime_registry_entry(
+                snapshot.instance_id,
+                snapshot.target_dir,
+            )
+        )
+        if existing_record is None:
+            workspace_record = factory_workspace.build_registry_record_from_manifest(
+                factory_workspace.build_runtime_manifest(config),
+                runtime_state=snapshot.persisted_runtime_state,
+            )
+            record_source = "manifest-fallback"
+        else:
+            workspace_record = dict(existing_record)
+            record_source = "registry"
+
+        registry_path = (
+            self._registry_path.resolve()
+            if self._registry_path is not None
+            else factory_workspace.default_registry_path()
+        )
+        return {
+            "schema_version": 1,
+            "captured_at": factory_workspace.utc_now_iso(),
+            "registry_path": str(registry_path),
+            "active_workspace": str(registry.get("active_workspace", "")),
+            "workspace_record_source": record_source,
+            "workspace_record_instance_id": matched_instance_id or snapshot.instance_id,
+            "workspace_record": workspace_record,
+        }
+
+    def _sha256_file(self, path: Path) -> str:
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
 
     def _remove_runtime_data_dirs(
         self,

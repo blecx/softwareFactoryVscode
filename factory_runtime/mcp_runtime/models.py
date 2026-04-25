@@ -133,6 +133,7 @@ class ReasonCode(StrEnum):
     REPAIR_DEPENDENCY = "repair-dependency"
     REPAIR_RECONCILE_METADATA = "repair-reconcile-metadata"
     REPAIR_CIRCUIT_BREAKER = "repair-circuit-breaker"
+    BACKUP_REQUESTED = "backup-requested"
     SUSPEND_REQUESTED = "suspend-requested"
     SUSPEND_REQUIRES_READY_RUNTIME = "suspend-requires-ready-runtime"
     RESUME_REQUESTED = "resume-requested"
@@ -175,6 +176,7 @@ class RepairStep(StrEnum):
 class RuntimeActionTrigger(StrEnum):
     """Normalized trigger vocabulary for manager-owned runtime actions."""
 
+    BACKUP = "backup"
     CLEANUP = "cleanup"
     DELETE_RUNTIME = "delete-runtime"
     REPAIR = "repair"

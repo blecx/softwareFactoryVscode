@@ -2287,6 +2287,14 @@ def test_factory_stack_parse_args_accepts_foreground(monkeypatch) -> None:
     assert args.foreground is True
 
 
+def test_factory_stack_parse_args_accepts_backup(monkeypatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["factory_stack.py", "backup"])
+
+    args = factory_stack.parse_args()
+
+    assert args.command == "backup"
+
+
 def test_workspace_runtime_allocates_distinct_port_blocks_and_registry_state(
     tmp_path: Path,
     monkeypatch,
@@ -3331,6 +3339,80 @@ def test_factory_stack_resume_workspace_reports_readiness_and_recovery(
     assert "runtime_state=running" in output
     assert "preflight_status=ready" in output
     assert "recommended_action=none" in output
+    assert "recovery_classification=resume-safe" in output
+    assert "completed_tool_call_boundary=true" in output
+
+
+def test_factory_stack_backup_workspace_reports_bundle_metadata(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    env_path = tmp_path / ".factory.env"
+    env_path.write_text("", encoding="utf-8")
+    calls: list[tuple[Path, Path | None]] = []
+
+    backup_result = {
+        "workspace_id": "target-project",
+        "instance_id": "factory-target-project",
+        "runtime_state": "suspended",
+        "required_precondition": "suspended",
+        "bundle_created_at": "2026-04-25T08:15:00Z",
+        "bundle_path": (
+            "/workspace/data/backups/factory-target-project/" "backup-20260425T081500Z"
+        ),
+        "manifest_path": (
+            "/workspace/data/backups/factory-target-project/"
+            "backup-20260425T081500Z/bundle-manifest.json"
+        ),
+        "checksums_path": (
+            "/workspace/data/backups/factory-target-project/"
+            "backup-20260425T081500Z/checksums.sha256"
+        ),
+        "captured_artifact_count": 6,
+        "recovery_classification": "resume-safe",
+        "completed_tool_call_boundary": True,
+    }
+
+    class FakeRuntimeManager:
+        def backup(
+            self,
+            repo_root: Path,
+            *,
+            env_file: Path | None = None,
+        ) -> Any:
+            calls.append((repo_root, env_file))
+            return backup_result
+
+    monkeypatch.setattr(
+        factory_stack,
+        "build_runtime_manager",
+        lambda: FakeRuntimeManager(),
+    )
+
+    exit_code = factory_stack.backup_workspace(tmp_path, env_file=env_path)
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert calls == [(tmp_path, env_path)]
+    assert "workspace_id=target-project" in output
+    assert "instance_id=factory-target-project" in output
+    assert "runtime_state=suspended" in output
+    assert "required_precondition=suspended" in output
+    assert "bundle_created_at=2026-04-25T08:15:00Z" in output
+    assert (
+        "bundle_path=/workspace/data/backups/factory-target-project/"
+        "backup-20260425T081500Z" in output
+    )
+    assert (
+        "manifest_path=/workspace/data/backups/factory-target-project/"
+        "backup-20260425T081500Z/bundle-manifest.json" in output
+    )
+    assert (
+        "checksums_path=/workspace/data/backups/factory-target-project/"
+        "backup-20260425T081500Z/checksums.sha256" in output
+    )
+    assert "captured_artifact_count=6" in output
     assert "recovery_classification=resume-safe" in output
     assert "completed_tool_call_boundary=true" in output
 

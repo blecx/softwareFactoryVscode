@@ -779,6 +779,38 @@ def resume_workspace(
     return 0
 
 
+def backup_workspace(
+    repo_root: Path,
+    *,
+    env_file: Path | None = None,
+) -> int:
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    manager = build_runtime_manager()
+    backup_result = manager.backup(
+        repo_root,
+        env_file=resolved_env_file,
+    )
+    print(f"workspace_id={backup_result['workspace_id']}")
+    print(f"instance_id={backup_result['instance_id']}")
+    print(f"runtime_state={backup_result['runtime_state']}")
+    print(f"required_precondition={backup_result['required_precondition']}")
+    print(f"bundle_created_at={backup_result['bundle_created_at']}")
+    print(f"bundle_path={backup_result['bundle_path']}")
+    print(f"manifest_path={backup_result['manifest_path']}")
+    print(f"checksums_path={backup_result['checksums_path']}")
+    print(f"captured_artifact_count={backup_result['captured_artifact_count']}")
+    recovery_classification = str(
+        backup_result.get("recovery_classification", "")
+    ).strip()
+    if recovery_classification:
+        print(f"recovery_classification={recovery_classification}")
+    print(
+        "completed_tool_call_boundary="
+        f"{str(bool(backup_result.get('completed_tool_call_boundary'))).lower()}"
+    )
+    return 0
+
+
 def cleanup_workspace(
     repo_root: Path,
     *,
@@ -1016,9 +1048,9 @@ def deactivate_workspace(repo_root: Path, *, env_file: Path | None = None) -> in
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Canonical Software Factory runtime lifecycle helper. Supported stop "
-            "and cleanup paths remove containers/runtime artifacts as documented, "
-            "but do not prune Docker images."
+            "Canonical Software Factory runtime lifecycle helper. Supported stop, "
+            "cleanup, and backup paths follow the documented manager-backed "
+            "lifecycle contract and do not prune Docker images."
         )
     )
     parser.add_argument(
@@ -1028,6 +1060,7 @@ def parse_args() -> argparse.Namespace:
             "stop",
             "suspend",
             "resume",
+            "backup",
             "list",
             "status",
             "preflight",
@@ -1140,6 +1173,11 @@ def main() -> int:
         )
     elif args.command == "resume":
         return resume_workspace(
+            repo_root,
+            env_file=env_file,
+        )
+    elif args.command == "backup":
+        return backup_workspace(
             repo_root,
             env_file=env_file,
         )
