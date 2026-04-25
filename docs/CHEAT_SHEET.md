@@ -127,6 +127,12 @@ resume-unsafe, and manual recovery cases.
 - Use `preflight --json` as the fastest readiness/config-drift probe.
 - See [`docs/ops/MONITORING.md`](ops/MONITORING.md) for field layout and `jq` examples.
 
+### Day-two runbooks
+
+- [`docs/ops/INCIDENT-RESPONSE.md`](ops/INCIDENT-RESPONSE.md) — diagnosis/action/validation/escalation playbooks for startup failure, degraded services, config drift, shared mode, backup/restore, and update failure.
+- [`docs/ops/MONITORING.md`](ops/MONITORING.md) — machine-readable field reference for `preflight --json` and `status --json`.
+- [`docs/ops/BACKUP-RESTORE.md`](ops/BACKUP-RESTORE.md) — supported backup/restore preconditions, bundle contents, and roundtrip contract.
+
 ## 🧪 Validation
 
 ```bash

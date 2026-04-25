@@ -482,6 +482,14 @@ Inside VS Code, the matching workspace task is:
 
 - `🩺 Verify: Runtime Compliance + MCP`
 
+## Day-two operator docs
+
+Once the install is running, use these canonical operator references for day-two work:
+
+- `docs/ops/INCIDENT-RESPONSE.md` — supported incident-response and operator runbooks
+- `docs/ops/MONITORING.md` — machine-readable readiness/status field reference
+- `docs/ops/BACKUP-RESTORE.md` — supported backup/restore and disaster-recovery contract
+
 ## Using the Installed Agents in VS Code
 
 Open the generated `software-factory.code-workspace` file from the target repository root.
