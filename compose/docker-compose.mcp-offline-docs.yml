@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: docker/mcp-offline-docs/Dockerfile
-    user: "${OFFLINE_DOCS_UID:-1000}:${OFFLINE_DOCS_GID:-1000}"
     restart: unless-stopped
     environment:
       - OFFLINE_DOCS_MCP_PORT=3017
