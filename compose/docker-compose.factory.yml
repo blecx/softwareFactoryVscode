@@ -55,6 +55,7 @@ services:
       dockerfile: docker/mcp-memory/Dockerfile
     image: factory/mcp-memory:latest
     restart: unless-stopped
+    user: "${FACTORY_HOST_UID:-0}:${FACTORY_HOST_GID:-0}"
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
       FACTORY_SHARED_SERVICE_MODE: "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"
@@ -88,6 +89,7 @@ services:
       dockerfile: docker/mcp-agent-bus/Dockerfile
     image: factory/mcp-agent-bus:latest
     restart: unless-stopped
+    user: "${FACTORY_HOST_UID:-0}:${FACTORY_HOST_GID:-0}"
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
       FACTORY_SHARED_SERVICE_MODE: "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"
@@ -153,6 +155,7 @@ services:
       dockerfile: docker/agent-worker/Dockerfile
     image: factory/agent-worker:latest
     restart: unless-stopped
+    user: "${FACTORY_HOST_UID:-0}:${FACTORY_HOST_GID:-0}"
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
       FACTORY_SHARED_SERVICE_MODE: "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"

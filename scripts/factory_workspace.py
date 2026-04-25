@@ -62,6 +62,8 @@ SHARED_TOPOLOGY_MODE = "shared"
 RUNTIME_MODE_ENV_KEY = "FACTORY_RUNTIME_MODE"
 DEVELOPMENT_RUNTIME_MODE = "development"
 PRODUCTION_RUNTIME_MODE = "production"
+HOST_UID_ENV_KEY = "FACTORY_HOST_UID"
+HOST_GID_ENV_KEY = "FACTORY_HOST_GID"
 TENANCY_MODE_ENV_KEY = "FACTORY_TENANCY_MODE"
 COMPATIBILITY_TENANCY_MODE = "compatibility"
 PROMOTED_SHARED_TENANCY_MODE = "shared"
@@ -154,6 +156,8 @@ MANAGED_ENV_KEYS = [
     "COMPOSE_PROJECT_NAME",
     "FACTORY_DIR",
     "FACTORY_DATA_DIR",
+    HOST_UID_ENV_KEY,
+    HOST_GID_ENV_KEY,
     "FACTORY_INSTANCE_ID",
     "FACTORY_PORT_INDEX",
     RUNTIME_MODE_ENV_KEY,
@@ -235,6 +239,24 @@ def parse_env_file(path: Path) -> dict[str, str]:
 def write_env_file(path: Path, values: dict[str, str]) -> None:
     lines = [f"{key}={value}" for key, value in values.items()]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _resolve_host_posix_id(getter_name: str) -> str:
+    getter = getattr(os, getter_name, None)
+    if not callable(getter):
+        return "0"
+    try:
+        return str(int(getter()))
+    except (OSError, TypeError, ValueError):
+        return "0"
+
+
+def current_host_uid() -> str:
+    return _resolve_host_posix_id("getuid")
+
+
+def current_host_gid() -> str:
+    return _resolve_host_posix_id("getgid")
 
 
 def slugify_identifier(value: str) -> str:
@@ -941,6 +963,8 @@ def build_runtime_config(
         "FACTORY_DATA_DIR": existing_env.get(
             "FACTORY_DATA_DIR", str(resolved_factory / "data")
         ),
+        HOST_UID_ENV_KEY: current_host_uid(),
+        HOST_GID_ENV_KEY: current_host_gid(),
         "FACTORY_INSTANCE_ID": factory_instance_id,
         "FACTORY_PORT_INDEX": str(port_index),
         RUNTIME_MODE_ENV_KEY: normalize_runtime_mode(

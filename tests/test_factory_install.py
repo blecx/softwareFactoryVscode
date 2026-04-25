@@ -2912,6 +2912,30 @@ def test_activate_workspace_recovers_effective_ports_from_runtime_metadata_when_
     )
 
 
+def test_build_runtime_config_records_host_uid_gid_in_managed_env(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+
+    assert (
+        config.env_values[factory_workspace.HOST_UID_ENV_KEY]
+        == factory_workspace.current_host_uid()
+    )
+    assert (
+        config.env_values[factory_workspace.HOST_GID_ENV_KEY]
+        == factory_workspace.current_host_gid()
+    )
+
+
 def test_factory_stack_start_rolls_back_runtime_state_when_compose_fails(
     tmp_path: Path,
     monkeypatch,
@@ -6752,6 +6776,17 @@ def test_runtime_compose_interservice_urls_use_fixed_internal_ports() -> None:
         worker_env.get("APPROVAL_GATE_URL")
         == "${FACTORY_SHARED_APPROVAL_GATE_URL:-http://approval-gate:8001}"
     )
+
+
+def test_runtime_compose_bind_mount_services_run_as_host_uid_gid() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+    expected = "${FACTORY_HOST_UID:-0}:${FACTORY_HOST_GID:-0}"
+
+    assert services.get("mcp-memory", {}).get("user") == expected
+    assert services.get("mcp-agent-bus", {}).get("user") == expected
+    assert services.get("agent-worker", {}).get("user") == expected
 
 
 def test_runtime_compose_agent_worker_has_healthcheck() -> None:

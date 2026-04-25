@@ -1692,7 +1692,8 @@ def test_local_ci_parity_production_mode_reports_docker_e2e_failures_as_blocking
                 name="Docker E2E runtime proof lane",
                 summary=(
                     "The promoted Docker E2E runtime proof lane reported failures "
-                    "for the blocking strict-tenant, stop/cleanup, and backup/restore scenarios."
+                    "for at least one of the blocking strict-tenant, stop/cleanup, "
+                    "and backup/restore scenarios."
                 ),
                 remediation="Investigate the promoted Docker E2E scenarios and rerun production parity.",
                 command=(
@@ -1808,13 +1809,19 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
         "create_fresh_checkout_snapshot",
         lambda repo_root, *, head_rev: snapshot_path,
     )
-    monkeypatch.setattr(module, "resolve_head_revision", lambda repo_root, head_rev: "deadbeef")
-    monkeypatch.setattr(module, "worktree_has_uncommitted_changes", lambda repo_root: True)
+    monkeypatch.setattr(
+        module, "resolve_head_revision", lambda repo_root, head_rev: "deadbeef"
+    )
+    monkeypatch.setattr(
+        module, "worktree_has_uncommitted_changes", lambda repo_root: True
+    )
 
     def _fake_run_command(command, *, cwd):
         command_tuple = tuple(command)
         calls.append((command_tuple, cwd))
-        return subprocess.CompletedProcess(list(command_tuple), 0, stdout="ok\n", stderr="")
+        return subprocess.CompletedProcess(
+            list(command_tuple), 0, stdout="ok\n", stderr=""
+        )
 
     monkeypatch.setattr(module, "run_command", _fake_run_command)
 
