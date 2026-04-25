@@ -3048,7 +3048,14 @@ class MCPRuntimeManager:
             for instance_dir in (instance_memory_dir, instance_bus_dir):
                 if instance_dir.exists() and instance_dir.is_dir():
                     shutil.rmtree(instance_dir, ignore_errors=True)
-                    print(f"🧹 Erased data directory {instance_dir}")
+                    if instance_dir.exists():
+                        print(
+                            "⚠️ Could not fully erase data directory "
+                            f"{instance_dir}; stale bind-mounted contents may "
+                            "remain until the host regains write access."
+                        )
+                    else:
+                        print(f"🧹 Erased data directory {instance_dir}")
         except Exception as exc:  # noqa: BLE001
             print(f"⚠️ Could not fully erase configured data directories: {exc}")
 

@@ -140,8 +140,9 @@ def worktree_has_uncommitted_changes(repo_root: Path) -> bool:
 
 
 def create_fresh_checkout_snapshot(repo_root: Path, *, head_rev: str) -> Path:
-    snapshot_parent = repo_root.parent / LOCAL_CI_PARITY_SNAPSHOT_PARENT_TEMPLATE.format(
-        repo_name=repo_root.name
+    snapshot_parent = (
+        repo_root.parent
+        / LOCAL_CI_PARITY_SNAPSHOT_PARENT_TEMPLATE.format(repo_name=repo_root.name)
     )
     snapshot_parent.mkdir(parents=True, exist_ok=True)
 
@@ -157,7 +158,9 @@ def create_fresh_checkout_snapshot(repo_root: Path, *, head_rev: str) -> Path:
         ["worktree", "add", "--detach", str(snapshot_path), head_rev],
     )
     if result.returncode != 0:
-        details = (result.stderr or result.stdout or "unknown git worktree failure").strip()
+        details = (
+            result.stderr or result.stdout or "unknown git worktree failure"
+        ).strip()
         raise RuntimeError(
             "Unable to create a fresh-checkout CI-parity snapshot via `git worktree add`: "
             f"{details}"
@@ -711,9 +714,9 @@ def run_docker_e2e_validation(
             severity="error",
             name="Docker E2E runtime proof lane",
             summary=(
-                "The promoted Docker E2E runtime proof lane reported failures for "
-                "the blocking strict-tenant, stop/cleanup, and backup/restore "
-                "scenarios "
+                "The promoted Docker E2E runtime proof lane reported at least one "
+                "failure among the blocking strict-tenant, stop/cleanup, and "
+                "backup/restore scenarios "
                 f"(exit code {result.returncode}). Raw output was saved to "
                 f"`{display_path(transcript_path, repo_root)}`."
             ),
@@ -1189,8 +1192,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.mode == PRODUCTION_MODE and not os.getenv("GITHUB_ACTIONS", "").strip():
         print(
-            "exact_github_parity_command="
-            f"{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}"
+            "exact_github_parity_command=" f"{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}"
         )
 
     findings: list[Finding] = []

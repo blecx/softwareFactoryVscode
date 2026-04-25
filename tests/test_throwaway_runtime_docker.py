@@ -200,7 +200,6 @@ def _seed_pending_run_via_mcp(
     )
     assert isinstance(run, dict)
     run_id = str(run["run_id"])
-
     _mcp_tool_call(
         bus_url,
         "bus_set_status",
@@ -1348,6 +1347,31 @@ def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_c
             issue_number=108,
             repo="blecx/softwareFactoryVscode",
             goal="Restore roundtrip proof",
+        )
+        memory_db = (
+            repo_root
+            / "data"
+            / "memory"
+            / env_values["FACTORY_INSTANCE_ID"]
+            / "memory.db"
+        )
+        agent_bus_db = (
+            repo_root
+            / "data"
+            / "bus"
+            / env_values["FACTORY_INSTANCE_ID"]
+            / "agent_bus.db"
+        )
+
+        assert memory_db.exists()
+        assert agent_bus_db.exists()
+        assert os.access(memory_db.parent, os.W_OK), (
+            "The throwaway runtime memory bind mount must stay writable by the "
+            "host user so cleanup and restore can rewrite bundled state."
+        )
+        assert os.access(agent_bus_db.parent, os.W_OK), (
+            "The throwaway runtime agent-bus bind mount must stay writable by the "
+            "host user so cleanup and restore can rewrite bundled state."
         )
 
         pending_before = httpx.get(
