@@ -2,9 +2,13 @@
 
 ## Supported today
 
-The current supported runtime backup command is:
+The current supported runtime lifecycle commands are:
 
 `./.venv/bin/python ./scripts/factory_stack.py backup`
+
+`./.venv/bin/python ./scripts/factory_stack.py restore --bundle-path <bundle-dir>`
+
+`./.venv/bin/python ./scripts/factory_stack.py resume`
 
 ## Required precondition
 
@@ -58,14 +62,39 @@ Each supported bundle includes:
 
 `checksums.sha256` provides a flat checksum list for the captured files.
 
-## Restore status
+## Supported restore contract
 
-Restore automation is **not** supported yet in this slice.
+The supported restore entrypoint is:
 
-That work remains separate because the repository still needs:
+`./.venv/bin/python ./scripts/factory_stack.py restore --bundle-path <bundle-dir>`
 
-- deterministic restore validation
-- recovery-path safety checks
-- roundtrip recovery proof
+Restore is deterministic and fails closed unless all of the following are true before any runtime metadata is rewritten:
 
-Until restore lands, this document defines only the supported backup contract and the expected bundle shape for future recovery work.
+- the bundle manifest is schema-version `1`;
+- the bundle was captured from the bounded `suspended` lifecycle state;
+- the bundle recorded `recovery_classification=resume-safe` and `completed_tool_call_boundary=true`;
+- the bundle checksums still match every captured artifact;
+- the target workspace path, canonical factory path, workspace identity, compose project, and port block match the current installed workspace; and
+- the backed-up port block is currently available and the target compose project is not still running.
+
+The restore flow rehydrates only the supported runtime boundary:
+
+- `data/memory/<factory_instance_id>/memory.db`
+- `data/bus/<factory_instance_id>/agent_bus.db`
+- the canonical `.factory.env`
+- the canonical runtime manifest and registry record via the manager-backed runtime artifact sync path
+
+Restore does **not** auto-start the runtime. A successful restore leaves the runtime in the bounded `suspended` state so the canonical next step is `resume`.
+
+## Canonical roundtrip recovery flow
+
+Use this bounded recovery sequence for the supported disaster-recovery roundtrip:
+
+1. `./.venv/bin/python ./scripts/factory_stack.py suspend --completed-tool-call-boundary`
+2. `./.venv/bin/python ./scripts/factory_stack.py backup`
+3. `./.venv/bin/python ./scripts/factory_stack.py cleanup` (or `stop --remove-volumes` when you are intentionally keeping metadata in place)
+4. `./.venv/bin/python ./scripts/factory_stack.py restore --bundle-path <bundle-dir>`
+5. `./.venv/bin/python ./scripts/factory_stack.py resume`
+6. `./.venv/bin/python ./scripts/verify_factory_install.py --target . --runtime --check-vscode-mcp`
+
+The Docker-backed roundtrip proof for this contract lives in `tests/test_throwaway_runtime_docker.py` and verifies that representative memory and agent-bus state survive cleanup, restore, resume, and runtime verification.

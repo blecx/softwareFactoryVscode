@@ -76,6 +76,14 @@ def _parse_env_file(env_path: Path) -> dict[str, str]:
     return values
 
 
+def _extract_output_value(output: str, key: str) -> str:
+    prefix = f"{key}="
+    for line in output.splitlines():
+        if line.startswith(prefix):
+            return line.split("=", 1)[1].strip()
+    raise AssertionError(f"Expected `{key}` in command output:\n{output}")
+
+
 def _mcp_tool_call(
     base_url: str,
     tool_name: str,
@@ -263,6 +271,47 @@ def _docker_compose_project_container_ids(compose_project_name: str) -> list[str
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def _verify_runtime_install(
+    target_repo: Path,
+    repo_root: Path,
+    env: dict[str, str],
+    *,
+    attempts: int = 1,
+    delay_seconds: float = 2.0,
+) -> None:
+    command = [
+        str(repo_root / ".venv" / "bin" / "python"),
+        str(repo_root / "scripts" / "verify_factory_install.py"),
+        "--target",
+        str(target_repo),
+        "--runtime",
+        "--check-vscode-mcp",
+    ]
+
+    last_result: subprocess.CompletedProcess[str] | None = None
+    for attempt in range(max(1, attempts)):
+        result = subprocess.run(
+            command,
+            cwd=target_repo,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            return
+        last_result = result
+        if attempt + 1 < attempts:
+            time.sleep(delay_seconds)
+
+    assert last_result is not None
+    raise AssertionError(
+        "Runtime verification did not reach a ready manager-backed state.\n"
+        f"stdout:\n{last_result.stdout}\n\n"
+        f"stderr:\n{last_result.stderr}"
+    )
+
+
 def _docker_image_exists(image_name: str) -> bool:
     result = subprocess.run(
         ["docker", "image", "inspect", image_name],
@@ -436,6 +485,7 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
 
     env = os.environ.copy()
     env["SOFTWARE_FACTORY_REGISTRY_PATH"] = str(registry_path)
+    env_path = target_repo / ".copilot/softwareFactoryVscode/.factory.env"
 
     try:
         subprocess.run(
@@ -452,6 +502,13 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
             env=env,
             text=True,
             check=True,
+        )
+
+        env_values = _parse_env_file(env_path)
+        env_values["CONTEXT7_API_KEY"] = "test-context7-key"
+        env_path.write_text(
+            "\n".join(f"{key}={value}" for key, value in env_values.items()) + "\n",
+            encoding="utf-8",
         )
 
         subprocess.run(
@@ -1151,6 +1208,273 @@ def test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart(
         assert not manifest_path.exists()
         assert _docker_compose_project_container_ids(compose_project_name) == []
         assert _docker_image_exists(retained_image)
+    finally:
+        if env_path.exists() and repo_root.exists():
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(FACTORY_STACK_SCRIPT),
+                    "stop",
+                    "--repo-root",
+                    str(repo_root),
+                    "--env-file",
+                    str(env_path),
+                    "--remove-volumes",
+                ],
+                cwd=REPO_ROOT,
+                env=env,
+                text=True,
+                check=False,
+            )
+
+
+@pytest.mark.docker
+@pytest.mark.skipif(
+    os.getenv("RUN_DOCKER_E2E", "0") != "1",
+    reason="Set RUN_DOCKER_E2E=1 to run Docker-enabled throwaway runtime E2E tests.",
+)
+def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_contract(
+    tmp_path: Path,
+) -> None:
+    if not _docker_ready():
+        pytest.skip("Docker CLI is not available on PATH.")
+
+    target_repo = tmp_path / "throwaway-target"
+    registry_path = tmp_path / "registry.json"
+
+    env = os.environ.copy()
+    env["SOFTWARE_FACTORY_REGISTRY_PATH"] = str(registry_path)
+
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    env_path = repo_root / ".factory.env"
+    manifest_path = repo_root / ".tmp" / "runtime-manifest.json"
+
+    try:
+        subprocess.run(
+            [
+                sys.executable,
+                str(VALIDATE_THROWAWAY_SCRIPT),
+                "--target",
+                str(target_repo),
+                "--skip-runtime",
+                "--skip-source-stack-handoff",
+                "--allow-external-target",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        seeded_env_values = _parse_env_file(env_path)
+        seeded_env_values["CONTEXT7_API_KEY"] = "test-context7-key"
+        env_path.write_text(
+            "\n".join(f"{key}={value}" for key, value in seeded_env_values.items())
+            + "\n",
+            encoding="utf-8",
+        )
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "start",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+                "--build",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        compose_project_name = str(manifest["compose_project_name"])
+
+        env_values = _parse_env_file(env_path)
+        workspace_id = env_values["PROJECT_WORKSPACE_ID"]
+        approval_url = f"http://127.0.0.1:{env_values['APPROVAL_GATE_PORT']}"
+        bus_url = f"http://127.0.0.1:{env_values['AGENT_BUS_PORT']}"
+        memory_url = f"http://127.0.0.1:{env_values['MEMORY_MCP_PORT']}"
+
+        assert _wait_until_reachable(f"{approval_url}/health")
+
+        _mcp_tool_call(
+            memory_url,
+            "memory_store_lesson",
+            {
+                "issue_number": 108,
+                "outcome": "success",
+                "summary": "restore roundtrip lesson",
+                "learnings": ["bundled state survives cleanup"],
+                "repo": "blecx/softwareFactoryVscode",
+            },
+            workspace_id=workspace_id,
+        )
+        run_id = _seed_pending_run_via_mcp(
+            bus_url,
+            workspace_id=workspace_id,
+            issue_number=108,
+            repo="blecx/softwareFactoryVscode",
+            goal="Restore roundtrip proof",
+        )
+
+        pending_before = httpx.get(
+            f"{approval_url}/pending",
+            headers={"X-Workspace-ID": workspace_id},
+            timeout=10.0,
+        )
+        pending_before.raise_for_status()
+        assert [run["run_id"] for run in pending_before.json()] == [run_id]
+
+        _verify_runtime_install(
+            target_repo,
+            repo_root,
+            env,
+            attempts=15,
+            delay_seconds=2.0,
+        )
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "suspend",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+                "--completed-tool-call-boundary",
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        backup_result = subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "backup",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        bundle_path = _extract_output_value(backup_result.stdout, "bundle_path")
+
+        cleanup_result = subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "cleanup",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        assert (
+            "`cleanup` removed workspace containers and named volumes when present"
+            in cleanup_result.stdout
+        )
+        assert not env_path.exists()
+        assert not manifest_path.exists()
+        assert _docker_compose_project_container_ids(compose_project_name) == []
+
+        restore_result = subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "restore",
+                "--repo-root",
+                str(repo_root),
+                "--bundle-path",
+                bundle_path,
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+
+        assert "runtime_state=suspended" in restore_result.stdout
+        assert "recommended_action=resume" in restore_result.stdout
+        assert "recovery_classification=resume-safe" in restore_result.stdout
+        assert "completed_tool_call_boundary=true" in restore_result.stdout
+        assert env_path.exists()
+        assert manifest_path.exists()
+
+        subprocess.run(
+            [
+                sys.executable,
+                str(FACTORY_STACK_SCRIPT),
+                "resume",
+                "--repo-root",
+                str(repo_root),
+                "--env-file",
+                str(env_path),
+            ],
+            cwd=REPO_ROOT,
+            env=env,
+            text=True,
+            check=True,
+        )
+
+        assert _wait_until_reachable(f"{approval_url}/health")
+
+        _verify_runtime_install(
+            target_repo,
+            repo_root,
+            env,
+            attempts=10,
+            delay_seconds=2.0,
+        )
+
+        lessons = _mcp_tool_call(
+            memory_url,
+            "memory_get_recent",
+            {"limit": 10},
+            workspace_id=workspace_id,
+        )
+        assert isinstance(lessons, dict)
+        assert [lesson["summary"] for lesson in lessons["lessons"]] == [
+            "restore roundtrip lesson"
+        ]
+
+        packet = _mcp_tool_call(
+            bus_url,
+            "bus_read_context_packet",
+            {"run_id": run_id},
+            workspace_id=workspace_id,
+        )
+        assert isinstance(packet, dict)
+        assert packet["run"]["status"] == "awaiting_approval"
+
+        pending_after = httpx.get(
+            f"{approval_url}/pending",
+            headers={"X-Workspace-ID": workspace_id},
+            timeout=10.0,
+        )
+        pending_after.raise_for_status()
+        assert [run["run_id"] for run in pending_after.json()] == [run_id]
     finally:
         if env_path.exists() and repo_root.exists():
             subprocess.run(
