@@ -14,15 +14,38 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
-RUNTIME_MODE_ENV_KEY = "FACTORY_RUNTIME_MODE"
-PRODUCTION_RUNTIME_MODE = "production"
+from factory_runtime.secret_safety import (
+    is_blank_or_placeholder,
+    production_runtime_mode_enabled,
+)
 
 
 def _production_runtime_mode_enabled() -> bool:
-    return (
-        os.environ.get(RUNTIME_MODE_ENV_KEY, "").strip().lower()
-        == PRODUCTION_RUNTIME_MODE
-    )
+    return production_runtime_mode_enabled()
+
+
+def _load_dynamic_override_api_key() -> str:
+    override_path = os.getenv("LLM_OVERRIDE_PATH", "configs/runtime_override.json")
+    if not os.path.exists(override_path):
+        return ""
+
+    if _production_runtime_mode_enabled():
+        raise OpenAIAPIKeyMissingError(
+            "Dynamic LLM override files via LLM_OVERRIDE_PATH are disabled when "
+            "FACTORY_RUNTIME_MODE=production. Remove the override file or switch "
+            "to development mode."
+        )
+
+    import json
+
+    try:
+        with open(override_path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except Exception:
+        return ""
+
+    candidate = str(data.get("api_key", "")).strip() if isinstance(data, dict) else ""
+    return candidate
 
 
 class OpenAIAPIKeyMissingError(RuntimeError):
@@ -59,20 +82,14 @@ class OpenAIImagesClient:
         openai_client: Any | None = None,
     ):
         resolved_key = api_key or os.getenv("OPENAI_API_KEY")
-        # --- Check Dynamic Overrides ---
-        import json
+        override_api_key = _load_dynamic_override_api_key()
+        if override_api_key:
+            resolved_key = override_api_key
 
-        override_path = os.getenv("LLM_OVERRIDE_PATH", "configs/runtime_override.json")
-        if os.path.exists(override_path):
-            try:
-                with open(override_path, "r") as f:
-                    data = json.load(f)
-                    if data.get("api_key"):
-                        resolved_key = data["api_key"]
-                        base_url = None
-            except Exception:
-                pass
-        # -------------------------------
+        if is_blank_or_placeholder(resolved_key):
+            resolved_key = ""
+
+        # --- Check Dynamic Overrides ---
         if not resolved_key and openai_client is None:
             if _production_runtime_mode_enabled():
                 raise OpenAIAPIKeyMissingError(

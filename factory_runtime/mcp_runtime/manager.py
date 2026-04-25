@@ -52,6 +52,10 @@ from factory_runtime.mcp_runtime.models import (
     ServiceInstanceStatus,
     ServiceRuntimeRecord,
 )
+from factory_runtime.secret_safety import (
+    is_blank_or_placeholder,
+    is_placeholder_repo_list,
+)
 
 _PORT_MAPPING_PATTERN = re.compile(r"(?P<host>\d+)->(?P<container>\d+)/(?:tcp|udp)")
 _METADATA_DRIFT_REASON_CODES = {
@@ -88,6 +92,14 @@ DEFAULT_MCP_PROTOCOL_VERSION = "2025-03-26"
 MCP_SESSION_ID_HEADER = "mcp-session-id"
 MCP_PROTOCOL_VERSION_HEADER = "mcp-protocol-version"
 MCP_ACCEPT_HEADER = "application/json, text/event-stream"
+_PRODUCTION_GITHUB_CREDENTIAL_ENV_KEYS = (
+    "GITHUB_TOKEN",
+    "GH_TOKEN",
+    "GITHUB_PAT",
+)
+_LLM_CONFIG_PATH_ENV_KEY = "LLM_CONFIG_PATH"
+_LLM_OVERRIDE_PATH_ENV_KEY = "LLM_OVERRIDE_PATH"
+_GITHUB_OPS_ALLOWED_REPOS_ENV_KEY = "GITHUB_OPS_ALLOWED_REPOS"
 
 
 class MCPRuntimeManager:
@@ -544,6 +556,15 @@ class MCPRuntimeManager:
 
         catalog = snapshot.catalog or self.load_catalog()
         profile_services = snapshot.selection.profiles.required_services
+
+        if resolved_config is not None:
+            production_issues, production_codes = self._production_config_issues(
+                resolved_config,
+                profile_services,
+            )
+            if production_issues:
+                config_drift_issues.extend(production_issues)
+                config_drift_codes.extend(production_codes)
 
         service_config_issues: dict[str, list[str]] = {}
         service_config_codes: dict[str, list[ReasonCode]] = {}
@@ -1640,6 +1661,183 @@ class MCPRuntimeManager:
             circuit_breaker_tripped_at=circuit_breaker_tripped_at,
         )
 
+    def _production_config_issues(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+        profile_services: Sequence[str],
+    ) -> tuple[list[str], list[ReasonCode]]:
+        if (
+            factory_workspace.normalize_runtime_mode(config.runtime_mode)
+            != factory_workspace.PRODUCTION_RUNTIME_MODE
+        ):
+            return [], []
+
+        issues: list[str] = []
+        reason_codes: list[ReasonCode] = []
+
+        if "agent-worker" in profile_services:
+            llm_config_path, llm_config_data, llm_config_error = (
+                self._load_production_llm_config(config)
+            )
+            if llm_config_error:
+                issues.append(llm_config_error)
+                reason_codes.append(ReasonCode.MISSING_CONFIG)
+            elif not self._has_live_github_models_credential(
+                config,
+                llm_config_data,
+            ):
+                issues.append(
+                    "Production runtime requires a non-placeholder GitHub Models "
+                    "credential via `GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_PAT`, or "
+                    f"a non-placeholder `api_key` in `{llm_config_path}`."
+                )
+                reason_codes.append(ReasonCode.MISSING_SECRET)
+
+        if "github-ops-mcp" in profile_services and is_placeholder_repo_list(
+            config.env_values.get(_GITHUB_OPS_ALLOWED_REPOS_ENV_KEY, "")
+        ):
+            issues.append(
+                "Production runtime requires non-placeholder "
+                "`GITHUB_OPS_ALLOWED_REPOS` entries for `github-ops-mcp` "
+                "(comma-separated `owner/repo` values)."
+            )
+            reason_codes.append(ReasonCode.MISSING_CONFIG)
+
+        override_issue = self._production_override_issue(config)
+        if override_issue:
+            issues.append(override_issue)
+            reason_codes.append(ReasonCode.PROFILE_MISMATCH)
+
+        return issues, reason_codes
+
+    def _load_production_llm_config(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+    ) -> tuple[Path | None, dict[str, Any] | None, str | None]:
+        raw_path = str(config.env_values.get(_LLM_CONFIG_PATH_ENV_KEY, "")).strip()
+        candidates = self._llm_config_candidates(config, raw_path)
+        llm_config_path = next(
+            (candidate for candidate in candidates if candidate.exists()), None
+        )
+
+        if llm_config_path is None:
+            if raw_path:
+                checked_paths = ", ".join(str(path) for path in candidates)
+                return (
+                    None,
+                    None,
+                    "Production runtime requires `LLM_CONFIG_PATH` to resolve to an "
+                    f"existing JSON file. Checked: {checked_paths}",
+                )
+            return (
+                None,
+                None,
+                "Production runtime requires a readable LLM configuration file for "
+                "the agent-worker GitHub Models path, but no default config was found.",
+            )
+
+        try:
+            data = json.loads(llm_config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return (
+                llm_config_path,
+                None,
+                f"Production runtime requires valid JSON in `{llm_config_path}`: {exc}",
+            )
+
+        if not isinstance(data, dict):
+            return (
+                llm_config_path,
+                None,
+                f"Production runtime requires `{llm_config_path}` to contain a JSON object.",
+            )
+
+        return llm_config_path, data, None
+
+    def _llm_config_candidates(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+        raw_path: str,
+    ) -> tuple[Path, ...]:
+        if raw_path:
+            return self._resolve_runtime_path_candidates(config, raw_path)
+
+        candidates = [Path("/config/llm.json")]
+        for base_dir in (config.factory_dir, config.target_dir, Path.cwd()):
+            candidates.append((base_dir / "configs/llm.json").resolve())
+            candidates.append((base_dir / "configs/llm.default.json").resolve())
+
+        return tuple(dict.fromkeys(candidates))
+
+    def _resolve_runtime_path_candidates(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+        raw_path: str,
+    ) -> tuple[Path, ...]:
+        expanded = Path(raw_path).expanduser()
+        if expanded.is_absolute():
+            return (expanded.resolve(),)
+
+        candidates = [
+            (config.target_dir / expanded).resolve(),
+            (config.factory_dir / expanded).resolve(),
+            (Path.cwd() / expanded).resolve(),
+        ]
+        return tuple(dict.fromkeys(candidates))
+
+    def _extract_api_keys_from_config(self, value: Any) -> tuple[str, ...]:
+        collected: list[str] = []
+
+        def _walk(candidate: Any) -> None:
+            if isinstance(candidate, dict):
+                for key, item in candidate.items():
+                    if str(key) == "api_key" and isinstance(item, str):
+                        collected.append(item)
+                    else:
+                        _walk(item)
+            elif isinstance(candidate, list):
+                for item in candidate:
+                    _walk(item)
+
+        _walk(value)
+        return tuple(collected)
+
+    def _has_live_github_models_credential(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+        llm_config_data: dict[str, Any] | None,
+    ) -> bool:
+        for env_key in _PRODUCTION_GITHUB_CREDENTIAL_ENV_KEYS:
+            if not is_blank_or_placeholder(config.env_values.get(env_key, "")):
+                return True
+
+        if llm_config_data is None:
+            return False
+
+        return any(
+            not is_blank_or_placeholder(candidate)
+            for candidate in self._extract_api_keys_from_config(llm_config_data)
+        )
+
+    def _production_override_issue(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+    ) -> str | None:
+        raw_path = str(config.env_values.get(_LLM_OVERRIDE_PATH_ENV_KEY, "")).strip()
+        default_path = raw_path or "configs/runtime_override.json"
+        candidates = self._resolve_runtime_path_candidates(config, default_path)
+        override_path = next(
+            (candidate for candidate in candidates if candidate.exists()), None
+        )
+        if override_path is None:
+            return None
+
+        return (
+            "Production runtime disables dynamic override files via "
+            f"`{_LLM_OVERRIDE_PATH_ENV_KEY}`; remove `{override_path}` or switch "
+            "to development mode."
+        )
+
     def _extract_record_transition_reason_codes(
         self,
         record: dict[str, Any],
@@ -2442,17 +2640,8 @@ class MCPRuntimeManager:
         entry: ServiceCatalogEntry,
     ) -> list[str]:
         missing_keys: list[str] = []
-        required_config_keys = list(entry.required_config_keys)
-        if (
-            factory_workspace.normalize_runtime_mode(config.runtime_mode)
-            == factory_workspace.PRODUCTION_RUNTIME_MODE
-            and entry.name == "agent-worker"
-            and "GITHUB_TOKEN" not in required_config_keys
-        ):
-            required_config_keys.append("GITHUB_TOKEN")
-
-        for config_key in required_config_keys:
-            if str(config.env_values.get(config_key, "")).strip():
+        for config_key in entry.required_config_keys:
+            if not is_blank_or_placeholder(config.env_values.get(config_key, "")):
                 continue
             missing_keys.append(config_key)
         return missing_keys

@@ -1,23 +1,15 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-_TOKEN_PATTERNS: list[re.Pattern[str]] = [
-    re.compile(r"\b(GH_TOKEN|GITHUB_TOKEN)\s*=\s*[^\s\"]+"),
-    re.compile(r"ghp_[A-Za-z0-9]{20,}"),
-    re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),
-]
+from factory_runtime.secret_safety import redact_secret_text
 
 
 def redact_secrets(text: str) -> str:
-    value = text or ""
-    for pattern in _TOKEN_PATTERNS:
-        value = pattern.sub("[REDACTED]", value)
-    return value
+    return redact_secret_text(text)
 
 
 @dataclass(frozen=True)
@@ -47,7 +39,7 @@ class AuditStore:
             exit_code=record.exit_code,
             duration_sec=record.duration_sec,
             cwd=record.cwd,
-            command=record.command,
+            command=[redact_secrets(part) for part in record.command],
             output=redact_secrets(record.output),
         )
 

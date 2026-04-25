@@ -256,6 +256,11 @@ def test_manager_builds_production_snapshot_without_mock_gateway(
         + "GITHUB_TOKEN=test-github-token\n",
         encoding="utf-8",
     )
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8")
+        + "GITHUB_OPS_ALLOWED_REPOS=blecx/softwareFactoryVscode\n",
+        encoding="utf-8",
+    )
 
     manager = build_manager_with_successful_probes(registry_path=registry_path)
     monkeypatch.setattr(manager, "_docker_available", lambda: True)
@@ -293,7 +298,9 @@ def test_manager_blocks_production_snapshot_when_live_github_token_is_missing(
         registry_path=registry_path,
     )
     env_path.write_text(
-        env_path.read_text(encoding="utf-8") + "FACTORY_RUNTIME_MODE=production\n",
+        env_path.read_text(encoding="utf-8")
+        + "FACTORY_RUNTIME_MODE=production\n"
+        + "GITHUB_OPS_ALLOWED_REPOS=blecx/softwareFactoryVscode\n",
         encoding="utf-8",
     )
 
@@ -317,6 +324,141 @@ def test_manager_blocks_production_snapshot_when_live_github_token_is_missing(
     assert readiness.status == ReadinessStatus.CONFIG_DRIFT
     assert ReasonCode.MISSING_SECRET in readiness.reason_codes
     assert any("GITHUB_TOKEN" in issue for issue in readiness.issues)
+
+
+def test_manager_builds_production_snapshot_with_live_llm_config_api_key(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    configs_dir = repo_root / "configs"
+    configs_dir.mkdir(parents=True, exist_ok=True)
+    (configs_dir / "llm.default.json").write_text(
+        json.dumps(
+            {
+                "provider": "github",
+                "base_url": "https://models.github.ai/inference",
+                "api_key": "live-config-github-token",
+            }
+        ),
+        encoding="utf-8",
+    )
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8")
+        + "FACTORY_RUNTIME_MODE=production\n"
+        + "GITHUB_OPS_ALLOWED_REPOS=blecx/softwareFactoryVscode\n",
+        encoding="utf-8",
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+
+    assert readiness is not None
+    assert readiness.status == ReadinessStatus.READY
+    assert snapshot.runtime_mode == RuntimeMode.PRODUCTION
+
+
+def test_manager_blocks_production_snapshot_when_github_ops_allowlist_is_placeholder(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8")
+        + "FACTORY_RUNTIME_MODE=production\n"
+        + "GITHUB_TOKEN=test-github-token\n"
+        + "GITHUB_OPS_ALLOWED_REPOS=YOUR_ORG/YOUR_REPO\n",
+        encoding="utf-8",
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+
+    assert readiness is not None
+    assert readiness.status == ReadinessStatus.CONFIG_DRIFT
+    assert ReasonCode.MISSING_CONFIG in readiness.reason_codes
+    assert any("GITHUB_OPS_ALLOWED_REPOS" in issue for issue in readiness.issues)
+
+
+def test_manager_blocks_production_snapshot_when_override_file_exists(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+    override_path = repo_root / "configs" / "runtime_override.json"
+    override_path.parent.mkdir(parents=True, exist_ok=True)
+    override_path.write_text(
+        json.dumps({"api_key": "live-override-key"}), encoding="utf-8"
+    )
+    env_path.write_text(
+        env_path.read_text(encoding="utf-8")
+        + "FACTORY_RUNTIME_MODE=production\n"
+        + "GITHUB_TOKEN=test-github-token\n"
+        + "GITHUB_OPS_ALLOWED_REPOS=blecx/softwareFactoryVscode\n",
+        encoding="utf-8",
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: build_full_service_inventory(config),
+    )
+
+    snapshot = manager.build_snapshot(repo_root, env_file=env_path)
+    readiness = snapshot.readiness
+
+    assert readiness is not None
+    assert readiness.status == ReadinessStatus.CONFIG_DRIFT
+    assert ReasonCode.PROFILE_MISMATCH in readiness.reason_codes
+    assert any("LLM_OVERRIDE_PATH" in issue for issue in readiness.issues)
 
 
 def test_manager_normalizes_workspace_url_drift_reason_codes(
