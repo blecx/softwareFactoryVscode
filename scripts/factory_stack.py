@@ -811,6 +811,42 @@ def backup_workspace(
     return 0
 
 
+def restore_workspace(
+    repo_root: Path,
+    *,
+    bundle_path: Path,
+    env_file: Path | None = None,
+) -> int:
+    resolved_env_file = resolve_env_file(repo_root, env_file)
+    manager = build_runtime_manager()
+    restore_result = manager.restore(
+        repo_root,
+        bundle_path=bundle_path,
+        env_file=resolved_env_file,
+    )
+    print(f"workspace_id={restore_result['workspace_id']}")
+    print(f"instance_id={restore_result['instance_id']}")
+    print(f"runtime_state={restore_result['runtime_state']}")
+    print(f"bundle_path={restore_result['bundle_path']}")
+    print(f"restored_artifact_count={restore_result['restored_artifact_count']}")
+    preflight_status = str(restore_result.get("preflight_status", "")).strip()
+    if preflight_status:
+        print(f"preflight_status={preflight_status}")
+    recommended_action = str(restore_result.get("recommended_action", "")).strip()
+    if recommended_action:
+        print(f"recommended_action={recommended_action}")
+    recovery_classification = str(
+        restore_result.get("recovery_classification", "")
+    ).strip()
+    if recovery_classification:
+        print(f"recovery_classification={recovery_classification}")
+    print(
+        "completed_tool_call_boundary="
+        f"{str(bool(restore_result.get('completed_tool_call_boundary'))).lower()}"
+    )
+    return 0
+
+
 def cleanup_workspace(
     repo_root: Path,
     *,
@@ -1049,7 +1085,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Canonical Software Factory runtime lifecycle helper. Supported stop, "
-            "cleanup, and backup paths follow the documented manager-backed "
+            "cleanup, backup, and restore paths follow the documented manager-backed "
             "lifecycle contract and do not prune Docker images."
         )
     )
@@ -1061,6 +1097,7 @@ def parse_args() -> argparse.Namespace:
             "suspend",
             "resume",
             "backup",
+            "restore",
             "list",
             "status",
             "preflight",
@@ -1141,6 +1178,15 @@ def parse_args() -> argparse.Namespace:
             "completed tool-call boundary so resume remains classified as safe."
         ),
     )
+    parser.add_argument(
+        "--bundle-path",
+        default="",
+        help=(
+            "Backup bundle directory used by `restore`. This should point to the "
+            f"directory containing `{factory_workspace.RUNTIME_MANIFEST_FILENAME}`'s "
+            "paired backup metadata files."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -1179,6 +1225,15 @@ def main() -> int:
     elif args.command == "backup":
         return backup_workspace(
             repo_root,
+            env_file=env_file,
+        )
+    elif args.command == "restore":
+        bundle_path_text = str(args.bundle_path).strip()
+        if not bundle_path_text:
+            raise SystemExit("`restore` requires --bundle-path <backup-bundle-dir>.")
+        return restore_workspace(
+            repo_root,
+            bundle_path=Path(bundle_path_text).expanduser().resolve(),
             env_file=env_file,
         )
     elif args.command == "cleanup":

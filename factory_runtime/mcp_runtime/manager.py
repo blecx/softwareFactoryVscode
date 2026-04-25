@@ -105,6 +105,14 @@ BACKUP_BUNDLES_DIRNAME = "backups"
 BACKUP_BUNDLE_PREFIX = "backup-"
 BACKUP_MANIFEST_FILENAME = "bundle-manifest.json"
 BACKUP_CHECKSUMS_FILENAME = "checksums.sha256"
+_RESTORE_REQUIRED_ARTIFACTS = {
+    "memory-db",
+    "agent-bus-db",
+    "factory-env",
+    "runtime-manifest",
+    "runtime-snapshot",
+    "workspace-registry",
+}
 
 
 class MCPRuntimeManager:
@@ -1247,6 +1255,150 @@ class MCPRuntimeManager:
             "completed_tool_call_boundary": completed_tool_call_boundary,
         }
 
+    def restore(
+        self,
+        repo_root: Path,
+        *,
+        bundle_path: Path,
+        env_file: Path | None = None,
+        selected_profiles: Iterable[RuntimeProfileName | str] | None = None,
+        reason_codes: Iterable[ReasonCode | str] | None = None,
+    ) -> dict[str, Any]:
+        resolved_repo_root = repo_root.expanduser().resolve()
+        resolved_bundle_path = bundle_path.expanduser().resolve()
+        bundle_manifest = self._load_restore_bundle_manifest(resolved_bundle_path)
+        artifact_catalog = self._validate_restore_bundle_artifacts(
+            resolved_bundle_path,
+            bundle_manifest,
+        )
+        bundled_env_values = factory_workspace.parse_env_file(
+            artifact_catalog["factory-env"]["path"]
+        )
+        bundled_runtime_manifest = self._load_json_object(
+            artifact_catalog["runtime-manifest"]["path"],
+            label="bundled runtime manifest",
+        )
+        bundled_runtime_snapshot = self._load_json_object(
+            artifact_catalog["runtime-snapshot"]["path"],
+            label="bundled runtime snapshot",
+        )
+        bundled_registry_snapshot = self._load_json_object(
+            artifact_catalog["workspace-registry"]["path"],
+            label="bundled workspace registry snapshot",
+        )
+
+        restore_config = self._build_restore_config(
+            resolved_repo_root,
+            bundled_env_values,
+            bundled_runtime_manifest,
+        )
+        resolved_env_file = self.resolve_env_file(resolved_repo_root, env_file)
+        expected_env_file = (
+            restore_config.target_dir
+            / factory_workspace.FACTORY_DIRNAME
+            / ".factory.env"
+        )
+        if resolved_env_file != expected_env_file:
+            raise RuntimeError(
+                "Supported runtime restore requires the canonical installed-workspace "
+                f"env path `{expected_env_file}`, but received `{resolved_env_file}`."
+            )
+
+        self._validate_restore_bundle_identity(
+            repo_root=resolved_repo_root,
+            config=restore_config,
+            bundle_manifest=bundle_manifest,
+            bundled_env_values=bundled_env_values,
+            bundled_runtime_manifest=bundled_runtime_manifest,
+            bundled_runtime_snapshot=bundled_runtime_snapshot,
+            bundled_registry_snapshot=bundled_registry_snapshot,
+        )
+        self._validate_restore_port_safety(restore_config)
+        self._validate_restore_runtime_stopped(restore_config.compose_project_name)
+
+        data_root = self._resolve_factory_data_dir(restore_config)
+        restore_targets = [
+            (
+                artifact_catalog["memory-db"]["path"],
+                data_root / "memory" / restore_config.factory_instance_id / "memory.db",
+            ),
+            (
+                artifact_catalog["agent-bus-db"]["path"],
+                data_root / "bus" / restore_config.factory_instance_id / "agent_bus.db",
+            ),
+        ]
+
+        for source_path, destination_path in restore_targets:
+            self._restore_bundle_file(source_path, destination_path)
+
+        factory_workspace.sync_runtime_artifacts(
+            restore_config,
+            registry_path=self._registry_path,
+            runtime_state=RuntimeLifecycleState.SUSPENDED.value,
+            active=None,
+        )
+
+        restored_snapshot = self.build_snapshot(
+            resolved_repo_root,
+            env_file=expected_env_file,
+            selected_profiles=selected_profiles,
+        )
+        restore_boundary_at = self._resolve_restore_boundary_timestamp(
+            bundle_manifest,
+            bundled_runtime_snapshot,
+            bundled_registry_snapshot,
+        )
+        merged_reason_codes = self._tuple_unique(
+            [
+                ReasonCode.RESTORE_REQUESTED,
+                *self._coerce_reason_codes(reason_codes),
+            ]
+        )
+        self._persist_runtime_action_metadata(
+            snapshot=restored_snapshot,
+            runtime_state=RuntimeLifecycleState.SUSPENDED,
+            trigger=RuntimeActionTrigger.RESTORE,
+            action_at=factory_workspace.utc_now_iso(),
+            reason_codes=merged_reason_codes,
+            completed_tool_call_boundary_at=restore_boundary_at,
+            clear_repair_failure_state=True,
+        )
+        restored_snapshot = self.build_snapshot(
+            resolved_repo_root,
+            env_file=expected_env_file,
+            selected_profiles=selected_profiles,
+        )
+        restored_readiness = restored_snapshot.readiness
+        restored_recovery = restored_snapshot.recovery
+
+        return {
+            "workspace_id": restored_snapshot.workspace_id,
+            "instance_id": restored_snapshot.instance_id,
+            "runtime_state": restored_snapshot.lifecycle_state.value,
+            "bundle_path": str(resolved_bundle_path),
+            "restored_artifact_count": len(restore_targets) + 2,
+            "preflight_status": (
+                restored_readiness.status.value
+                if restored_readiness is not None
+                else ""
+            ),
+            "recommended_action": (
+                restored_readiness.recommended_action.value
+                if restored_readiness is not None
+                else ""
+            ),
+            "recovery_classification": (
+                restored_recovery.classification.value
+                if restored_recovery is not None
+                else ""
+            ),
+            "completed_tool_call_boundary": bool(
+                restored_recovery.completed_tool_call_boundary
+                if restored_recovery is not None
+                else False
+            ),
+        }
+
     def cleanup(
         self,
         repo_root: Path,
@@ -2177,6 +2329,620 @@ class MCPRuntimeManager:
             suffix += 1
         candidate.mkdir(parents=True, exist_ok=False)
         return candidate
+
+    def _load_restore_bundle_manifest(self, bundle_dir: Path) -> dict[str, Any]:
+        if not bundle_dir.exists() or not bundle_dir.is_dir():
+            raise RuntimeError(
+                "Supported runtime restore requires an existing backup bundle "
+                f"directory, but `{bundle_dir}` was not found."
+            )
+        return self._load_json_object(
+            bundle_dir / BACKUP_MANIFEST_FILENAME,
+            label="backup bundle manifest",
+        )
+
+    def _load_json_object(self, path: Path, *, label: str) -> dict[str, Any]:
+        if not path.exists():
+            raise RuntimeError(
+                f"Supported runtime restore requires {label} at `{path}`."
+            )
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                f"Supported runtime restore could not parse {label} at `{path}`: {exc}"
+            ) from exc
+        if not isinstance(data, dict):
+            raise RuntimeError(
+                f"Supported runtime restore requires {label} at `{path}` to contain a JSON object."
+            )
+        return data
+
+    def _validate_restore_bundle_artifacts(
+        self,
+        bundle_dir: Path,
+        bundle_manifest: dict[str, Any],
+    ) -> dict[str, dict[str, Any]]:
+        schema_version = bundle_manifest.get("schema_version")
+        if schema_version != 1:
+            raise RuntimeError(
+                "Supported runtime restore requires backup bundle schema_version `1`, "
+                f"but `{schema_version}` was recorded."
+            )
+        if (
+            str(bundle_manifest.get("required_precondition", "")).strip()
+            != RuntimeLifecycleState.SUSPENDED.value
+        ):
+            raise RuntimeError(
+                "Supported runtime restore requires a bundle captured from the "
+                "bounded `suspended` lifecycle state."
+            )
+        if (
+            str(bundle_manifest.get("runtime_state", "")).strip()
+            != RuntimeLifecycleState.SUSPENDED.value
+        ):
+            raise RuntimeError(
+                "Supported runtime restore only supports bundles whose runtime_state "
+                "was recorded as `suspended`."
+            )
+        if str(
+            bundle_manifest.get("recovery_classification", "")
+        ).strip() != RecoveryClassification.RESUME_SAFE.value or not bool(
+            bundle_manifest.get("completed_tool_call_boundary")
+        ):
+            raise RuntimeError(
+                "Supported runtime restore only accepts bundles captured from a "
+                "`resume-safe` suspended boundary with `completed_tool_call_boundary=true`."
+            )
+        if (
+            str(bundle_manifest.get("checksums_file", "")).strip()
+            != BACKUP_CHECKSUMS_FILENAME
+        ):
+            raise RuntimeError(
+                "Supported runtime restore requires the canonical checksum manifest "
+                f"`{BACKUP_CHECKSUMS_FILENAME}`."
+            )
+
+        raw_artifacts = bundle_manifest.get("artifacts")
+        if not isinstance(raw_artifacts, list) or not raw_artifacts:
+            raise RuntimeError(
+                "Supported runtime restore requires a non-empty `artifacts` list in the backup bundle manifest."
+            )
+
+        checksum_entries = self._load_restore_checksum_entries(
+            bundle_dir / BACKUP_CHECKSUMS_FILENAME
+        )
+        artifact_catalog: dict[str, dict[str, Any]] = {}
+
+        for raw_artifact in raw_artifacts:
+            if not isinstance(raw_artifact, dict):
+                raise RuntimeError(
+                    "Supported runtime restore requires every backup manifest artifact entry to be a JSON object."
+                )
+            logical_name = str(raw_artifact.get("logical_name", "")).strip()
+            relative_path_text = str(
+                raw_artifact.get("bundle_relative_path", "")
+            ).strip()
+            if not logical_name or not relative_path_text:
+                raise RuntimeError(
+                    "Supported runtime restore requires each backup artifact entry "
+                    "to include logical_name and bundle_relative_path."
+                )
+            if logical_name in artifact_catalog:
+                raise RuntimeError(
+                    "Supported runtime restore requires unique backup artifact "
+                    f"logical names, but `{logical_name}` was duplicated."
+                )
+
+            relative_path = Path(relative_path_text)
+            if relative_path.is_absolute() or ".." in relative_path.parts:
+                raise RuntimeError(
+                    "Supported runtime restore rejects backup artifact paths that "
+                    f"escape the bundle root: `{relative_path_text}`."
+                )
+
+            artifact_path = (bundle_dir / relative_path).resolve()
+            try:
+                artifact_path.relative_to(bundle_dir)
+            except ValueError as exc:
+                raise RuntimeError(
+                    "Supported runtime restore rejects backup artifact paths that "
+                    f"escape the bundle root: `{relative_path_text}`."
+                ) from exc
+            if not artifact_path.exists() or not artifact_path.is_file():
+                raise RuntimeError(
+                    "Supported runtime restore requires bundled artifact "
+                    f"`{logical_name}` at `{artifact_path}`."
+                )
+
+            checksum_key = relative_path.as_posix()
+            expected_checksum = checksum_entries.get(checksum_key, "")
+            if not expected_checksum:
+                raise RuntimeError(
+                    "Supported runtime restore requires a checksum entry for backup "
+                    f"artifact `{checksum_key}`."
+                )
+            actual_checksum = self._sha256_file(artifact_path)
+            if actual_checksum != expected_checksum:
+                raise RuntimeError(
+                    "Supported runtime restore detected a checksum mismatch for "
+                    f"`{checksum_key}`. Expected `{expected_checksum}` but found `{actual_checksum}`."
+                )
+
+            manifest_checksum = str(raw_artifact.get("sha256", "")).strip()
+            if manifest_checksum and manifest_checksum != actual_checksum:
+                raise RuntimeError(
+                    "Supported runtime restore detected a bundle-manifest checksum "
+                    f"mismatch for `{checksum_key}`."
+                )
+            size_bytes = raw_artifact.get("size_bytes")
+            if (
+                size_bytes is not None
+                and int(size_bytes) != artifact_path.stat().st_size
+            ):
+                raise RuntimeError(
+                    "Supported runtime restore detected a size mismatch for backup "
+                    f"artifact `{checksum_key}`."
+                )
+
+            artifact_catalog[logical_name] = {
+                "path": artifact_path,
+                "relative_path": checksum_key,
+            }
+
+        missing_artifacts = sorted(_RESTORE_REQUIRED_ARTIFACTS - set(artifact_catalog))
+        if missing_artifacts:
+            raise RuntimeError(
+                "Supported runtime restore requires the canonical backup bundle "
+                "artifacts, but these logical names were missing: "
+                + ", ".join(missing_artifacts)
+            )
+
+        return artifact_catalog
+
+    def _load_restore_checksum_entries(
+        self,
+        checksums_path: Path,
+    ) -> dict[str, str]:
+        if not checksums_path.exists() or not checksums_path.is_file():
+            raise RuntimeError(
+                "Supported runtime restore requires the canonical checksum file at "
+                f"`{checksums_path}`."
+            )
+
+        entries: dict[str, str] = {}
+        for raw_line in checksums_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            parts = raw_line.split("  ", 1)
+            if len(parts) != 2:
+                raise RuntimeError(
+                    "Supported runtime restore requires checksum lines in the form "
+                    "`<sha256>  <relative-path>`."
+                )
+            checksum = parts[0].strip().lower()
+            relative_path = parts[1].strip()
+            if not re.fullmatch(r"[0-9a-f]{64}", checksum):
+                raise RuntimeError(
+                    "Supported runtime restore requires SHA-256 checksum entries, "
+                    f"but `{parts[0]}` was invalid."
+                )
+            if not relative_path:
+                raise RuntimeError(
+                    "Supported runtime restore requires every checksum entry to record a relative path."
+                )
+            entries[relative_path] = checksum
+        if not entries:
+            raise RuntimeError(
+                "Supported runtime restore requires a non-empty checksum file in the backup bundle."
+            )
+        return entries
+
+    def _build_restore_config(
+        self,
+        repo_root: Path,
+        bundled_env_values: dict[str, str],
+        bundled_runtime_manifest: dict[str, Any],
+    ) -> factory_workspace.WorkspaceRuntimeConfig:
+        target_dir = (
+            Path(str(bundled_env_values.get("TARGET_WORKSPACE_PATH", "")).strip())
+            .expanduser()
+            .resolve()
+        )
+        if not str(target_dir).strip() or str(target_dir) == ".":
+            raise RuntimeError(
+                "Supported runtime restore requires `TARGET_WORKSPACE_PATH` in the bundled `.factory.env`."
+            )
+
+        ports: dict[str, int] = {}
+        for key in factory_workspace.PORT_LAYOUT:
+            raw_value = str(bundled_env_values.get(key, "")).strip()
+            if not raw_value:
+                raise RuntimeError(
+                    "Supported runtime restore requires the bundled `.factory.env` "
+                    f"to define `{key}`."
+                )
+            try:
+                ports[key] = int(raw_value)
+            except ValueError as exc:
+                raise RuntimeError(
+                    "Supported runtime restore requires integer port values in the "
+                    f"bundled `.factory.env`, but `{key}={raw_value}` was invalid."
+                ) from exc
+
+        raw_port_index = str(bundled_env_values.get("FACTORY_PORT_INDEX", "")).strip()
+        try:
+            port_index = int(raw_port_index)
+        except ValueError as exc:
+            raise RuntimeError(
+                "Supported runtime restore requires `FACTORY_PORT_INDEX` in the bundled `.factory.env`."
+            ) from exc
+
+        workspace_file = (
+            str(
+                bundled_runtime_manifest.get(
+                    "workspace_file",
+                    self._default_workspace_file,
+                )
+            ).strip()
+            or self._default_workspace_file
+        )
+
+        normalized_env_values = dict(bundled_env_values)
+        normalized_env_values.update(
+            {
+                "TARGET_WORKSPACE_PATH": str(target_dir),
+                "FACTORY_DIR": str(repo_root),
+                "FACTORY_PORT_INDEX": str(port_index),
+                factory_workspace.RUNTIME_MODE_ENV_KEY: factory_workspace.normalize_runtime_mode(
+                    bundled_env_values.get(factory_workspace.RUNTIME_MODE_ENV_KEY, "")
+                ),
+                **{key: str(value) for key, value in ports.items()},
+            }
+        )
+
+        shared_service_mode = factory_workspace.normalize_shared_service_mode(
+            normalized_env_values.get(factory_workspace.SHARED_SERVICE_MODE_ENV_KEY, "")
+        )
+        shared_service_urls = {
+            service_name: normalized_env_values.get(env_key, "").strip()
+            for service_name, env_key in factory_workspace.SHARED_SERVICE_URL_ENV_KEYS.items()
+            if normalized_env_values.get(env_key, "").strip()
+        }
+
+        return factory_workspace.WorkspaceRuntimeConfig(
+            target_dir=target_dir,
+            factory_dir=repo_root,
+            workspace_file=workspace_file,
+            workspace_file_path=(target_dir / workspace_file).resolve(),
+            runtime_manifest_path=(
+                target_dir
+                / factory_workspace.TMP_SUBPATH
+                / factory_workspace.RUNTIME_MANIFEST_FILENAME
+            ).resolve(),
+            project_workspace_id=str(
+                normalized_env_values.get("PROJECT_WORKSPACE_ID", "")
+            ).strip(),
+            factory_instance_id=str(
+                normalized_env_values.get("FACTORY_INSTANCE_ID", "")
+            ).strip(),
+            compose_project_name=str(
+                normalized_env_values.get("COMPOSE_PROJECT_NAME", "")
+            ).strip(),
+            port_index=port_index,
+            env_values=normalized_env_values,
+            ports=ports,
+            runtime_mode=factory_workspace.normalize_runtime_mode(
+                normalized_env_values.get(factory_workspace.RUNTIME_MODE_ENV_KEY, "")
+            ),
+            shared_service_mode=shared_service_mode,
+            shared_service_urls=shared_service_urls,
+            mcp_server_urls=factory_workspace.build_mcp_server_urls(ports),
+            workspace_settings=factory_workspace.build_effective_workspace_settings(
+                repo_root,
+                ports,
+            ),
+        )
+
+    def _validate_restore_bundle_identity(
+        self,
+        *,
+        repo_root: Path,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+        bundle_manifest: dict[str, Any],
+        bundled_env_values: dict[str, str],
+        bundled_runtime_manifest: dict[str, Any],
+        bundled_runtime_snapshot: dict[str, Any],
+        bundled_registry_snapshot: dict[str, Any],
+    ) -> None:
+        expected_factory_dir = (
+            config.target_dir / factory_workspace.FACTORY_DIRNAME
+        ).resolve()
+        if repo_root != expected_factory_dir:
+            raise RuntimeError(
+                "Supported runtime restore must run against the canonical installed "
+                f"workspace root `{expected_factory_dir}`, but received `{repo_root}`."
+            )
+
+        workspace_record = bundled_registry_snapshot.get("workspace_record")
+        if not isinstance(workspace_record, dict):
+            raise RuntimeError(
+                "Supported runtime restore requires the bundled workspace registry "
+                "snapshot to include `workspace_record`."
+            )
+
+        self._validate_restore_identity_group(
+            "workspace_id",
+            config.project_workspace_id,
+            (
+                (
+                    "bundled .factory.env",
+                    bundled_env_values.get("PROJECT_WORKSPACE_ID", ""),
+                ),
+                ("backup bundle manifest", bundle_manifest.get("workspace_id", "")),
+                (
+                    "bundled runtime manifest",
+                    bundled_runtime_manifest.get("project_workspace_id", ""),
+                ),
+                (
+                    "bundled runtime snapshot",
+                    bundled_runtime_snapshot.get("workspace_id", ""),
+                ),
+                (
+                    "bundled workspace registry",
+                    workspace_record.get("project_workspace_id", ""),
+                ),
+            ),
+        )
+        self._validate_restore_identity_group(
+            "instance_id",
+            config.factory_instance_id,
+            (
+                (
+                    "bundled .factory.env",
+                    bundled_env_values.get("FACTORY_INSTANCE_ID", ""),
+                ),
+                ("backup bundle manifest", bundle_manifest.get("instance_id", "")),
+                (
+                    "bundled runtime manifest",
+                    bundled_runtime_manifest.get("factory_instance_id", ""),
+                ),
+                (
+                    "bundled runtime snapshot",
+                    bundled_runtime_snapshot.get("instance_id", ""),
+                ),
+                (
+                    "bundled workspace registry",
+                    workspace_record.get("factory_instance_id", ""),
+                ),
+            ),
+        )
+        self._validate_restore_identity_group(
+            "compose_project_name",
+            config.compose_project_name,
+            (
+                (
+                    "bundled .factory.env",
+                    bundled_env_values.get("COMPOSE_PROJECT_NAME", ""),
+                ),
+                (
+                    "backup bundle manifest",
+                    bundle_manifest.get("compose_project_name", ""),
+                ),
+                (
+                    "bundled runtime manifest",
+                    bundled_runtime_manifest.get("compose_project_name", ""),
+                ),
+                (
+                    "bundled runtime snapshot",
+                    bundled_runtime_snapshot.get("compose_project_name", ""),
+                ),
+                (
+                    "bundled workspace registry",
+                    workspace_record.get("compose_project_name", ""),
+                ),
+            ),
+        )
+        self._validate_restore_identity_group(
+            "target_workspace_path",
+            str(config.target_dir),
+            (
+                (
+                    "bundled .factory.env",
+                    bundled_env_values.get("TARGET_WORKSPACE_PATH", ""),
+                ),
+                ("backup bundle manifest", bundle_manifest.get("target_dir", "")),
+                (
+                    "bundled runtime manifest",
+                    bundled_runtime_manifest.get("target_workspace_path", ""),
+                ),
+                (
+                    "bundled runtime snapshot",
+                    bundled_runtime_snapshot.get("target_dir", ""),
+                ),
+                (
+                    "bundled workspace registry",
+                    workspace_record.get("target_workspace_path", ""),
+                ),
+            ),
+            path_like=True,
+        )
+        self._validate_restore_identity_group(
+            "factory_dir",
+            str(repo_root),
+            (
+                ("bundled .factory.env", bundled_env_values.get("FACTORY_DIR", "")),
+                ("backup bundle manifest", bundle_manifest.get("factory_dir", "")),
+                (
+                    "bundled runtime manifest",
+                    bundled_runtime_manifest.get("factory_dir", ""),
+                ),
+                (
+                    "bundled runtime snapshot",
+                    bundled_runtime_snapshot.get("factory_dir", ""),
+                ),
+                ("bundled workspace registry", workspace_record.get("factory_dir", "")),
+            ),
+            path_like=True,
+        )
+
+        self._validate_restore_port_metadata(
+            config,
+            bundled_runtime_manifest,
+            workspace_record,
+        )
+
+    def _validate_restore_identity_group(
+        self,
+        label: str,
+        expected_value: Any,
+        candidates: Sequence[tuple[str, Any]],
+        *,
+        path_like: bool = False,
+    ) -> None:
+        normalized_expected = self._normalize_restore_identity_value(
+            expected_value,
+            path_like=path_like,
+        )
+        if not normalized_expected:
+            raise RuntimeError(
+                f"Supported runtime restore requires a non-empty `{label}` for the current target."
+            )
+
+        for source_name, candidate_value in candidates:
+            normalized_candidate = self._normalize_restore_identity_value(
+                candidate_value,
+                path_like=path_like,
+            )
+            if normalized_candidate != normalized_expected:
+                raise RuntimeError(
+                    "Supported runtime restore requires a consistent "
+                    f"`{label}` across the backup bundle and current target. "
+                    f"Expected `{normalized_expected}` but {source_name} recorded `{normalized_candidate}`."
+                )
+
+    def _normalize_restore_identity_value(
+        self,
+        value: Any,
+        *,
+        path_like: bool,
+    ) -> str:
+        text = str(value or "").strip()
+        if not text:
+            return ""
+        if not path_like:
+            return text
+        return str(Path(text).expanduser().resolve())
+
+    def _validate_restore_port_metadata(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+        bundled_runtime_manifest: dict[str, Any],
+        workspace_record: dict[str, Any],
+    ) -> None:
+        for source_name, raw_ports in (
+            ("bundled runtime manifest", bundled_runtime_manifest.get("ports", {})),
+            ("bundled workspace registry", workspace_record.get("ports", {})),
+        ):
+            normalized_ports: dict[str, int] = {}
+            if isinstance(raw_ports, dict):
+                for key, value in raw_ports.items():
+                    if key not in factory_workspace.PORT_LAYOUT:
+                        continue
+                    normalized_ports[key] = int(value)
+            if normalized_ports and normalized_ports != config.ports:
+                raise RuntimeError(
+                    "Supported runtime restore requires the backed-up runtime port "
+                    f"block to stay consistent, but {source_name} disagreed with the bundled `.factory.env`."
+                )
+
+        expected_port_index = config.port_index
+        runtime_manifest_port_index = bundled_runtime_manifest.get("port_index")
+        if (
+            runtime_manifest_port_index is not None
+            and int(runtime_manifest_port_index) != expected_port_index
+        ):
+            raise RuntimeError(
+                "Supported runtime restore requires the backed-up `port_index` to "
+                "match the bundled `.factory.env`."
+            )
+        registry_port_index = workspace_record.get("port_index")
+        if (
+            registry_port_index is not None
+            and int(registry_port_index) != expected_port_index
+        ):
+            raise RuntimeError(
+                "Supported runtime restore requires the backed-up registry `port_index` to "
+                "match the bundled `.factory.env`."
+            )
+
+    def _validate_restore_port_safety(
+        self,
+        config: factory_workspace.WorkspaceRuntimeConfig,
+    ) -> None:
+        factory_workspace.assert_ports_do_not_conflict(
+            config.ports,
+            registry_path=self._registry_path,
+            exclude_instance_id=config.factory_instance_id,
+        )
+        if not factory_workspace.ports_available(config.ports):
+            raise RuntimeError(
+                "Supported runtime restore requires the backed-up port block to be "
+                "available before metadata is rewritten. Resolve the current port "
+                "collision and retry the restore."
+            )
+
+    def _validate_restore_runtime_stopped(self, compose_project_name: str) -> None:
+        if not compose_project_name or not self._docker_available():
+            return
+        try:
+            inventory = self._collect_service_inventory(compose_project_name)
+        except Exception:  # noqa: BLE001
+            return
+
+        running_services = [
+            service_name
+            for service_name, service_data in inventory.items()
+            if "up" in str(service_data.get("status", "")).lower()
+        ]
+        if running_services:
+            raise RuntimeError(
+                "Supported runtime restore requires the compose project to be fully "
+                "stopped before mutating runtime state. Running services: "
+                + ", ".join(sorted(running_services))
+            )
+
+    def _restore_bundle_file(self, source_path: Path, destination_path: Path) -> None:
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = destination_path.with_name(
+            destination_path.name + ".restore-tmp"
+        )
+        shutil.copy2(source_path, temporary_path)
+        temporary_path.replace(destination_path)
+
+    def _resolve_restore_boundary_timestamp(
+        self,
+        bundle_manifest: dict[str, Any],
+        bundled_runtime_snapshot: dict[str, Any],
+        bundled_registry_snapshot: dict[str, Any],
+    ) -> str | None:
+        recovery = bundled_runtime_snapshot.get("recovery")
+        if isinstance(recovery, dict):
+            boundary_at = str(recovery.get("last_completed_tool_call_at", "")).strip()
+            if boundary_at:
+                return boundary_at
+
+        workspace_record = bundled_registry_snapshot.get("workspace_record")
+        if isinstance(workspace_record, dict):
+            boundary_at = str(
+                workspace_record.get("last_completed_tool_call_boundary_at", "")
+            ).strip()
+            if boundary_at:
+                return boundary_at
+
+        bundle_created_at = str(bundle_manifest.get("bundle_created_at", "")).strip()
+        return bundle_created_at or None
 
     def _build_backup_registry_snapshot(
         self,

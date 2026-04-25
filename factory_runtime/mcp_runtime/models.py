@@ -134,6 +134,7 @@ class ReasonCode(StrEnum):
     REPAIR_RECONCILE_METADATA = "repair-reconcile-metadata"
     REPAIR_CIRCUIT_BREAKER = "repair-circuit-breaker"
     BACKUP_REQUESTED = "backup-requested"
+    RESTORE_REQUESTED = "restore-requested"
     SUSPEND_REQUESTED = "suspend-requested"
     SUSPEND_REQUIRES_READY_RUNTIME = "suspend-requires-ready-runtime"
     RESUME_REQUESTED = "resume-requested"
@@ -180,6 +181,7 @@ class RuntimeActionTrigger(StrEnum):
     CLEANUP = "cleanup"
     DELETE_RUNTIME = "delete-runtime"
     REPAIR = "repair"
+    RESTORE = "restore"
     SUSPEND = "suspend"
     RESUME = "resume"
 
