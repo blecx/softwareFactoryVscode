@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from factory_runtime.secret_safety import (
+    is_placeholder_repo_list,
+    production_runtime_mode_enabled,
+)
+
 
 class GitHubOpsPolicyError(ValueError):
     """Raised when a request violates GitHub Ops policy."""
@@ -33,6 +38,13 @@ class GitHubOpsPolicy:
 
         if not normalized:
             raise GitHubOpsPolicyError("At least one allowed repo must be configured")
+
+        if production_runtime_mode_enabled() and is_placeholder_repo_list(
+            ",".join(normalized)
+        ):
+            raise GitHubOpsPolicyError(
+                "Production runtime requires non-placeholder GITHUB_OPS_ALLOWED_REPOS values."
+            )
 
         return cls(allowed_repos=frozenset(normalized))
 

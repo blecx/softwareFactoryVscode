@@ -24,6 +24,7 @@ from typing import Any, Optional
 import uvicorn
 from mcp.server.fastmcp import Context, FastMCP
 
+from factory_runtime.secret_safety import production_runtime_mode_enabled
 from factory_runtime.shared_tenancy import (
     default_project_id,
     header_workspace_id,
@@ -408,6 +409,12 @@ def bus_set_live_key(api_key: str) -> dict[str, Any]:
     Args:
         api_key: The real API key to use.
     """
+    if production_runtime_mode_enabled():
+        raise ValueError(
+            "Dynamic live-key injection via bus_set_live_key is disabled when "
+            "FACTORY_RUNTIME_MODE=production."
+        )
+
     import os
 
     override_path = os.getenv("LLM_OVERRIDE_PATH", "configs/runtime_override.json")

@@ -248,6 +248,13 @@ PORT_TUI=9090
 # Required for AI/MCP connectivity
 CONTEXT7_API_KEY=your_context7_key_here
 
+# Required for github-ops-mcp when FACTORY_RUNTIME_MODE=production
+GITHUB_OPS_ALLOWED_REPOS=your-org/your-repo
+
+# Optional: point to an untracked JSON file with a live GitHub Models api_key
+# instead of exporting GITHUB_TOKEN / GH_TOKEN / GITHUB_PAT directly.
+# LLM_CONFIG_PATH=/absolute/path/to/untracked-llm.json
+
 # Optional shared-service topology override (ADR-008 rollout track)
 # Default is per-workspace ownership for mcp-memory, mcp-agent-bus, and approval-gate.
 FACTORY_SHARED_SERVICE_MODE=per-workspace
@@ -279,10 +286,19 @@ For the supported internal-production boundary, set at least:
 ```env
 FACTORY_RUNTIME_MODE=production
 GITHUB_TOKEN=your_live_github_token_here
+GITHUB_OPS_ALLOWED_REPOS=your-org/your-repo
 CONTEXT7_API_KEY=your_context7_key_here
 ```
 
+You may provide the GitHub Models credential through `GH_TOKEN`, `GITHUB_PAT`, or a non-placeholder `api_key` in an untracked JSON file referenced by `LLM_CONFIG_PATH` instead of `GITHUB_TOKEN`.
+
 If you use the optional OpenAI image-generation tooling in production mode, also provide a live `OPENAI_API_KEY`; the mock image fallback is disabled in that mode.
+
+Production mode also tightens developer conveniences:
+
+- placeholder values like `your-token-here` and `YOUR_ORG/YOUR_REPO` are rejected by the readiness/verifier path;
+- dynamic override files via `LLM_OVERRIDE_PATH` are blocked in production mode; and
+- dynamic live-key injection through the agent-bus `bus_set_live_key` flow is development-only.
 
 ---
 
@@ -381,6 +397,13 @@ When `FACTORY_RUNTIME_MODE=production`, the runtime keeps the same manager-backe
 - the `workspace-production` profile excludes `mock-llm-gateway` from default readiness/startup;
 - `verify_factory_install.py --runtime` fails closed when required live production config is missing instead of silently downgrading to the mock gateway; and
 - a healthy production run therefore requires the live configuration expected by the selected services before the runtime can report `ready`.
+
+Those production failures now distinguish configuration shape problems from missing secret material:
+
+- `missing-config` covers things like an unreadable `LLM_CONFIG_PATH`, a blocked `LLM_OVERRIDE_PATH`, or placeholder `GITHUB_OPS_ALLOWED_REPOS` values.
+- `missing-secret` covers absent or placeholder secret material such as GitHub credentials when the selected production services require them.
+
+Touched audit and diagnostic surfaces also redact secret values instead of printing them back verbatim.
 
 That shared-mode contract now extends beyond discovery: if runtime verification
 passes, operators can expect memory, bus child records, and shared-service audit
