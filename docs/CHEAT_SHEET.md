@@ -119,10 +119,10 @@ resume-unsafe, and manual recovery cases.
 # Default faster local parity baseline (Docker build parity stays a warning-only skip here)
 ./.venv/bin/python ./scripts/local_ci_parity.py
 
-# Canonical production-grade parity command (Docker image builds are blocking by default)
+# Canonical production-grade parity command (blocking Docker image builds + promoted Docker E2E runtime proofs)
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
 
-# Compatibility alias for the Docker build expansion path
+# Compatibility alias for the Docker build expansion path only (no promoted Docker E2E lane)
 ./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build
 
 # Run the local test suite
@@ -156,13 +156,18 @@ baseline:
 ```bash
 ./.venv/bin/pytest tests/test_regression.py -v
 ./.venv/bin/python ./scripts/local_ci_parity.py
-RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace or stop_cleanup_retains_images_and_supports_restart" -v
+./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace" -v
 ```
 
-This evidence bundle proves the practical baseline plus the targeted
-Docker-backed lifecycle paths where real container/image truth matters. It does
-**not** silently promote every future runtime-management idea into the
-supported baseline.
+This evidence bundle proves the practical baseline plus the promoted production
+gate for `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
+and `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`.
+The extra `RUN_DOCKER_E2E=1` command keeps
+`test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace`
+available as targeted supplemental evidence when multi-workspace activation
+truth matters. It does **not** silently promote every future runtime-management
+idea into the supported baseline.
 
 Still deferred after this readiness pass:
 

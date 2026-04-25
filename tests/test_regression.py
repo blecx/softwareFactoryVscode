@@ -702,6 +702,12 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     assert "Reproducible closeout evidence for this baseline is:" in install_doc
     assert "./.venv/bin/pytest tests/test_regression.py -v" in install_doc
     assert "./.venv/bin/python ./scripts/local_ci_parity.py" in install_doc
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+        in install_doc
+    )
+    assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in install_doc
+    assert "stop_cleanup_retains_images_and_supports_restart" in install_doc
     assert "Still deferred after this readiness pass:" in install_doc
     assert "no release/version bump is implied" in install_doc
     assert "dynamic profile expansion" in install_doc
@@ -737,6 +743,7 @@ def test_readme_tracks_version_aware_copilot_setup():
     assert "Copilot Free" in readme
     assert "GitHub Pull Requests and Issues extension" in readme
     assert "not required for Copilot chat, inline suggestions, or agents" in readme
+    assert "promoted Docker E2E runtime proof lane" in readme
 
 
 def test_tests_readme_maps_practical_baseline_coverage_surfaces():
@@ -769,6 +776,12 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
     assert "Reload / reopen recovery" in tests_readme
     assert "RUN_DOCKER_E2E=1" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+        in tests_readme
+    )
+    assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in tests_readme
+    assert "stop_cleanup_retains_images_and_supports_restart" in tests_readme
     assert "## Readiness closeout evidence bundle" in tests_readme
     assert "./.venv/bin/pytest tests/test_regression.py -v" in tests_readme
     assert "./.venv/bin/python ./scripts/local_ci_parity.py" in tests_readme
@@ -848,6 +861,11 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "## ✅ Readiness closeout evidence" in cheat_sheet
     assert "./.venv/bin/pytest tests/test_regression.py -v" in cheat_sheet
     assert "./.venv/bin/python ./scripts/local_ci_parity.py" in cheat_sheet
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+        in cheat_sheet
+    )
+    assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in cheat_sheet
     assert "supported baseline" in cheat_sheet
     assert "Still deferred after this readiness pass:" in cheat_sheet
     assert (
@@ -1480,14 +1498,19 @@ def test_local_ci_parity_production_mode_runs_blocking_docker_build_parity(
     capsys,
 ):
     module = _load_local_ci_parity_module()
-    docker_calls: list[Path] = []
+    docker_build_calls: list[Path] = []
+    docker_e2e_calls: list[tuple[Path, str]] = []
 
     def _fake_run_command(command, *, cwd):
         del command, cwd
         return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
 
     def _fake_run_docker_build_validation(repo_root: Path):
-        docker_calls.append(repo_root)
+        docker_build_calls.append(repo_root)
+        return []
+
+    def _fake_run_docker_e2e_validation(repo_root: Path, *, python_executable: str):
+        docker_e2e_calls.append((repo_root, python_executable))
         return []
 
     monkeypatch.setattr(module, "run_command", _fake_run_command)
@@ -1495,6 +1518,11 @@ def test_local_ci_parity_production_mode_runs_blocking_docker_build_parity(
         module,
         "run_docker_build_validation",
         _fake_run_docker_build_validation,
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        _fake_run_docker_e2e_validation,
     )
 
     exit_code = module.main(
@@ -1510,7 +1538,8 @@ def test_local_ci_parity_production_mode_runs_blocking_docker_build_parity(
     captured = capsys.readouterr()
 
     assert exit_code == 0
-    assert docker_calls == [tmp_path.resolve()]
+    assert docker_build_calls == [tmp_path.resolve()]
+    assert docker_e2e_calls == [(tmp_path.resolve(), sys.executable)]
     assert "mode=production" in captured.out
     assert "[WARNING] Docker image build parity" not in captured.out
     assert "passed with no warnings or errors" in captured.out
@@ -1522,10 +1551,17 @@ def test_local_ci_parity_production_mode_reports_docker_build_failures_as_blocki
     capsys,
 ):
     module = _load_local_ci_parity_module()
+    docker_e2e_called = False
 
     def _fake_run_command(command, *, cwd):
         del command, cwd
         return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    def _fake_run_docker_e2e_validation(repo_root: Path, *, python_executable: str):
+        nonlocal docker_e2e_called
+        del repo_root, python_executable
+        docker_e2e_called = True
+        return []
 
     monkeypatch.setattr(module, "run_command", _fake_run_command)
     monkeypatch.setattr(
@@ -1548,6 +1584,11 @@ def test_local_ci_parity_production_mode_reports_docker_build_failures_as_blocki
             )
         ],
     )
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        _fake_run_docker_e2e_validation,
+    )
 
     exit_code = module.main(
         [
@@ -1565,6 +1606,7 @@ def test_local_ci_parity_production_mode_reports_docker_build_failures_as_blocki
     assert "[ERROR] Docker image build parity" in captured.out
     assert "demo-service" in captured.out
     assert "--mode production" in captured.out
+    assert not docker_e2e_called
 
 
 def test_local_ci_parity_include_docker_build_alias_still_runs_without_warning(
@@ -1583,11 +1625,22 @@ def test_local_ci_parity_include_docker_build_alias_still_runs_without_warning(
         docker_calls.append(repo_root)
         return []
 
+    def _fail_if_docker_e2e_runs(repo_root: Path, *, python_executable: str):
+        del repo_root, python_executable
+        raise AssertionError(
+            "docker E2E lane should not run for --include-docker-build"
+        )
+
     monkeypatch.setattr(module, "run_command", _fake_run_command)
     monkeypatch.setattr(
         module,
         "run_docker_build_validation",
         _fake_run_docker_build_validation,
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        _fail_if_docker_e2e_runs,
     )
 
     exit_code = module.main(
@@ -1605,6 +1658,129 @@ def test_local_ci_parity_include_docker_build_alias_still_runs_without_warning(
     assert docker_calls == [tmp_path.resolve()]
     assert "[WARNING] Docker image build parity" not in captured.out
     assert "passed with no warnings or errors" in captured.out
+
+
+def test_local_ci_parity_production_mode_reports_docker_e2e_failures_as_blocking(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(module, "run_docker_build_validation", lambda repo_root: [])
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: [
+            module.Finding(
+                severity="error",
+                name="Docker E2E runtime proof lane",
+                summary=(
+                    "The promoted Docker E2E runtime proof lane reported failures "
+                    "for the blocking strict-tenant and stop/cleanup scenarios."
+                ),
+                remediation="Investigate the promoted Docker E2E scenarios and rerun production parity.",
+                command=(
+                    "env",
+                    "RUN_DOCKER_E2E=1",
+                    python_executable,
+                    "-m",
+                    "pytest",
+                    module.DOCKER_E2E_TEST_FILE,
+                    "-k",
+                    module.PRODUCTION_DOCKER_E2E_KEYWORD_EXPR,
+                    "-v",
+                ),
+                returncode=1,
+            )
+        ],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "[ERROR] Docker E2E runtime proof lane" in captured.out
+    assert "RUN_DOCKER_E2E=1" in captured.out
+    assert module.PRODUCTION_DOCKER_E2E_KEYWORD_EXPR in captured.out
+
+
+def test_run_docker_e2e_validation_sets_env_and_selected_pytest_filter(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    call: dict[str, object] = {}
+
+    def _fake_subprocess_run(
+        command,
+        *,
+        cwd,
+        check,
+        capture_output,
+        text,
+        env,
+    ):
+        call["command"] = command
+        call["cwd"] = cwd
+        call["check"] = check
+        call["capture_output"] = capture_output
+        call["text"] = text
+        call["run_docker_e2e"] = env.get("RUN_DOCKER_E2E")
+        return subprocess.CompletedProcess(command, 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(module.subprocess, "run", _fake_subprocess_run)
+
+    findings = module.run_docker_e2e_validation(
+        tmp_path,
+        python_executable="/custom/python",
+    )
+
+    assert findings == []
+    assert call["command"] == [
+        "/custom/python",
+        "-m",
+        "pytest",
+        module.DOCKER_E2E_TEST_FILE,
+        "-k",
+        module.PRODUCTION_DOCKER_E2E_KEYWORD_EXPR,
+        "-v",
+    ]
+    assert call["cwd"] == str(tmp_path)
+    assert call["check"] is False
+    assert call["capture_output"] is True
+    assert call["text"] is True
+    assert call["run_docker_e2e"] == "1"
+
+
+def test_production_readiness_docs_name_promoted_docker_e2e_gate():
+    repo_root = Path(__file__).parent.parent
+    readiness_doc = (repo_root / "docs" / "PRODUCTION-READINESS.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+        in readiness_doc
+    )
+    assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in readiness_doc
+    assert "stop_cleanup_retains_images_and_supports_restart" in readiness_doc
+    assert "activate_switch_back_keeps_one_active_workspace" in readiness_doc
 
 
 def test_local_ci_parity_production_mode_missing_docker_cli_mentions_canonical_command(

@@ -89,5 +89,6 @@ jobs:
       - name: Run production-grade parity command
         run: |
           # The canonical production parity command performs blocking builds for
-          # every tracked docker/*/Dockerfile target.
+          # every tracked docker/*/Dockerfile target and runs the promoted
+          # Docker E2E runtime proof lane.
           ./.venv/bin/python ./scripts/local_ci_parity.py --mode production

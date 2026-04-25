@@ -4,14 +4,16 @@
 This script mirrors `.github/workflows/ci.yml` checks where they are executable
 locally. The default `standard` mode keeps Docker image build validation
 optional for faster local iteration, while `--mode production` is the canonical
-blocking parity path and includes Docker image builds by default. The existing
-`--include-docker-build` flag remains available as a compatibility alias.
+blocking parity path and includes Docker image builds plus the promoted Docker
+E2E runtime proof lane by default. The existing `--include-docker-build` flag
+remains available as a compatibility alias for the build-only expansion path.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import shlex
 import shutil
 import subprocess
@@ -29,6 +31,16 @@ CANONICAL_PRODUCTION_PARITY_COMMAND = (
 )
 DOCKER_BUILD_COMPATIBILITY_ALIAS = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build"
+)
+DOCKER_E2E_TEST_FILE = "tests/test_throwaway_runtime_docker.py"
+PRODUCTION_DOCKER_E2E_TEST_NAMES = (
+    "strict_tenant_mode_blocks_cross_tenant_approval_leaks",
+    "stop_cleanup_retains_images_and_supports_restart",
+)
+PRODUCTION_DOCKER_E2E_KEYWORD_EXPR = " or ".join(PRODUCTION_DOCKER_E2E_TEST_NAMES)
+CANONICAL_PRODUCTION_DOCKER_E2E_COMMAND = (
+    f"RUN_DOCKER_E2E=1 ./.venv/bin/pytest {DOCKER_E2E_TEST_FILE} "
+    f'-k "{PRODUCTION_DOCKER_E2E_KEYWORD_EXPR}" -v'
 )
 
 
@@ -62,6 +74,13 @@ def blocking_docker_build_guidance() -> str:
     return (
         f"{CANONICAL_PRODUCTION_PARITY_COMMAND} "
         f"(or {DOCKER_BUILD_COMPATIBILITY_ALIAS})"
+    )
+
+
+def blocking_docker_e2e_guidance() -> str:
+    return (
+        f"{CANONICAL_PRODUCTION_PARITY_COMMAND} "
+        f"(or {CANONICAL_PRODUCTION_DOCKER_E2E_COMMAND})"
     )
 
 
@@ -438,6 +457,92 @@ def run_docker_build_validation(repo_root: Path) -> list[Finding]:
     return findings
 
 
+def run_docker_e2e_validation(
+    repo_root: Path, *, python_executable: str
+) -> list[Finding]:
+    display_command = (
+        "env",
+        "RUN_DOCKER_E2E=1",
+        python_executable,
+        "-m",
+        "pytest",
+        DOCKER_E2E_TEST_FILE,
+        "-k",
+        PRODUCTION_DOCKER_E2E_KEYWORD_EXPR,
+        "-v",
+    )
+
+    if shutil.which("docker") is None:
+        return [
+            Finding(
+                severity="error",
+                name="Docker E2E runtime proof lane",
+                summary=(
+                    "Docker CLI is required for the blocking Docker E2E runtime "
+                    "proof lane but was not found on PATH."
+                ),
+                remediation=(
+                    "Install or expose the Docker CLI on PATH, then rerun "
+                    f"`{blocking_docker_e2e_guidance()}`."
+                ),
+                command=display_command,
+            )
+        ]
+
+    print("\n▶ Docker E2E runtime proof lane")
+    env = os.environ.copy()
+    env["RUN_DOCKER_E2E"] = "1"
+    command = display_command[2:]
+
+    try:
+        result = subprocess.run(
+            list(command),
+            cwd=str(repo_root),
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+    except OSError as exc:
+        return [
+            Finding(
+                severity="error",
+                name="Docker E2E runtime proof lane",
+                summary=(
+                    "The promoted Docker E2E runtime proof lane could not start "
+                    f"({exc})."
+                ),
+                remediation=(
+                    "Fix the local runtime environment, then rerun "
+                    f"`{blocking_docker_e2e_guidance()}`."
+                ),
+                command=display_command,
+            )
+        ]
+
+    emit_command_output(result)
+    if result.returncode == 0:
+        return []
+
+    return [
+        Finding(
+            severity="error",
+            name="Docker E2E runtime proof lane",
+            summary=(
+                "The promoted Docker E2E runtime proof lane reported failures for "
+                "the blocking strict-tenant and stop/cleanup scenarios "
+                f"(exit code {result.returncode})."
+            ),
+            remediation=(
+                f"Investigate the promoted scenarios in `{DOCKER_E2E_TEST_FILE}` "
+                f"and rerun `{blocking_docker_e2e_guidance()}` once they pass."
+            ),
+            command=display_command,
+            returncode=result.returncode,
+        )
+    ]
+
+
 def build_improvement_plan(
     findings: Sequence[Finding], *, rerun_command: str
 ) -> list[str]:
@@ -531,7 +636,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=(
             "Validation mode. `standard` keeps Docker build parity optional for "
             "faster local iteration; `production` is the canonical blocking parity "
-            "path and includes Docker image builds by default."
+            "path and includes Docker image builds plus the promoted Docker E2E "
+            "runtime proof lane by default."
         ),
     )
     parser.add_argument(
@@ -539,8 +645,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help=(
             "Also run docker/*/Dockerfile build parity checks. This remains a "
-            "compatibility alias for the Docker-build expansion path when you are "
-            "not using `--mode production`."
+            "compatibility alias for the Docker-build expansion path only when "
+            "you are not using `--mode production`; it does not add the promoted "
+            "Docker E2E lane."
         ),
     )
     return parser.parse_args(argv)
@@ -683,8 +790,10 @@ def main(argv: list[str] | None = None) -> int:
             if finding is not None:
                 findings.append(finding)
 
+    docker_build_findings: list[Finding] = []
     if docker_build_requested(args):
-        findings.extend(run_docker_build_validation(repo_root))
+        docker_build_findings = run_docker_build_validation(repo_root)
+        findings.extend(docker_build_findings)
     else:
         warning = (
             "Docker image build parity is skipped by default in standard mode; "
@@ -708,6 +817,20 @@ def main(argv: list[str] | None = None) -> int:
                 ),
             )
         )
+
+    if args.mode == PRODUCTION_MODE:
+        if any(finding.severity == "error" for finding in docker_build_findings):
+            print(
+                "\nℹ️ Skipping Docker E2E runtime proof lane until Docker image "
+                "build parity is green."
+            )
+        else:
+            findings.extend(
+                run_docker_e2e_validation(
+                    repo_root,
+                    python_executable=args.python,
+                )
+            )
 
     print_findings_report(findings)
     print_improvement_plan(findings, rerun_command=build_rerun_command(args))
