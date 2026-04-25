@@ -1469,8 +1469,176 @@ def test_local_ci_parity_warnings_do_not_fail_the_standard_precheck(
     assert exit_code == 0
     assert "Summary: 0 error(s), 1 warning(s)." in captured.out
     assert "[WARNING] Docker image build parity" in captured.out
+    assert "--mode production" in captured.out
     assert "Improvement plan" in captured.out
     assert "passed with 1 warning(s)" in captured.out
+
+
+def test_local_ci_parity_production_mode_runs_blocking_docker_build_parity(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+    docker_calls: list[Path] = []
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    def _fake_run_docker_build_validation(repo_root: Path):
+        docker_calls.append(repo_root)
+        return []
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(
+        module,
+        "run_docker_build_validation",
+        _fake_run_docker_build_validation,
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert docker_calls == [tmp_path.resolve()]
+    assert "mode=production" in captured.out
+    assert "[WARNING] Docker image build parity" not in captured.out
+    assert "passed with no warnings or errors" in captured.out
+
+
+def test_local_ci_parity_production_mode_reports_docker_build_failures_as_blocking(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(
+        module,
+        "run_docker_build_validation",
+        lambda repo_root: [
+            module.Finding(
+                severity="error",
+                name="Docker image build parity",
+                summary="Docker image build validation failed for `demo-service`.",
+                remediation="Inspect `docker/demo-service/Dockerfile` and rerun the production parity command.",
+                command=(
+                    "docker",
+                    "build",
+                    "-f",
+                    "docker/demo-service/Dockerfile",
+                    ".",
+                ),
+                returncode=1,
+            )
+        ],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "[ERROR] Docker image build parity" in captured.out
+    assert "demo-service" in captured.out
+    assert "--mode production" in captured.out
+
+
+def test_local_ci_parity_include_docker_build_alias_still_runs_without_warning(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+    docker_calls: list[Path] = []
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    def _fake_run_docker_build_validation(repo_root: Path):
+        docker_calls.append(repo_root)
+        return []
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(
+        module,
+        "run_docker_build_validation",
+        _fake_run_docker_build_validation,
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--include-docker-build",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert docker_calls == [tmp_path.resolve()]
+    assert "[WARNING] Docker image build parity" not in captured.out
+    assert "passed with no warnings or errors" in captured.out
+
+
+def test_local_ci_parity_production_mode_missing_docker_cli_mentions_canonical_command(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(module.shutil, "which", lambda name: None)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert (
+        "Docker CLI is required for blocking Docker image build parity" in captured.out
+    )
+    assert "--mode production" in captured.out
+    assert "--include-docker-build" in captured.out
 
 
 def test_local_ci_parity_reports_missing_dev_dependencies_before_quality_steps(

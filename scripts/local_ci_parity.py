@@ -2,8 +2,10 @@
 """Run local CI-parity prechecks for softwareFactoryVscode.
 
 This script mirrors `.github/workflows/ci.yml` checks where they are executable
-locally. Docker image build validation is available via `--include-docker-build`
-but is optional by default because it is slower and host-dependent.
+locally. The default `standard` mode keeps Docker image build validation
+optional for faster local iteration, while `--mode production` is the canonical
+blocking parity path and includes Docker image builds by default. The existing
+`--include-docker-build` flag remains available as a compatibility alias.
 """
 
 from __future__ import annotations
@@ -20,6 +22,14 @@ from typing import Sequence
 
 DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
 REQUIRED_DEV_TOOL_MODULES = ("black", "flake8", "isort", "pytest")
+STANDARD_MODE = "standard"
+PRODUCTION_MODE = "production"
+CANONICAL_PRODUCTION_PARITY_COMMAND = (
+    "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+)
+DOCKER_BUILD_COMPATIBILITY_ALIAS = (
+    "./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build"
+)
 
 
 @dataclass(frozen=True)
@@ -42,6 +52,35 @@ class Finding:
 
 def format_command(command: Sequence[str]) -> str:
     return shlex.join(command)
+
+
+def docker_build_requested(args: argparse.Namespace) -> bool:
+    return args.mode == PRODUCTION_MODE or args.include_docker_build
+
+
+def blocking_docker_build_guidance() -> str:
+    return (
+        f"{CANONICAL_PRODUCTION_PARITY_COMMAND} "
+        f"(or {DOCKER_BUILD_COMPATIBILITY_ALIAS})"
+    )
+
+
+def build_rerun_command(args: argparse.Namespace) -> str:
+    command: list[str] = [
+        "./.venv/bin/python",
+        "./scripts/local_ci_parity.py",
+    ]
+    if args.mode != STANDARD_MODE:
+        command.extend(["--mode", args.mode])
+    elif args.include_docker_build:
+        command.append("--include-docker-build")
+    if args.pr_body_file.strip():
+        command.extend(["--pr-body-file", args.pr_body_file.strip()])
+    if args.skip_integration:
+        command.append("--skip-integration")
+    if args.skip_pr_template_check:
+        command.append("--skip-pr-template-check")
+    return format_command(command)
 
 
 def run_command(
@@ -341,12 +380,12 @@ def run_docker_build_validation(repo_root: Path) -> list[Finding]:
                 severity="error",
                 name="Docker image build parity",
                 summary=(
-                    "Docker CLI is required for `--include-docker-build` but was "
-                    "not found on PATH."
+                    "Docker CLI is required for blocking Docker image build parity "
+                    "but was not found on PATH."
                 ),
                 remediation=(
-                    "Install or expose the Docker CLI on PATH, then rerun the precheck "
-                    "with `--include-docker-build`."
+                    "Install or expose the Docker CLI on PATH, then rerun "
+                    f"`{blocking_docker_build_guidance()}`."
                 ),
             )
         )
@@ -361,7 +400,7 @@ def run_docker_build_validation(repo_root: Path) -> list[Finding]:
                 summary="No Dockerfiles were found under `docker/*/Dockerfile`.",
                 remediation=(
                     "Restore the expected Dockerfiles under `docker/*/Dockerfile` "
-                    "before rerunning the precheck."
+                    f"before rerunning `{blocking_docker_build_guidance()}`."
                 ),
             )
         )
@@ -387,8 +426,8 @@ def run_docker_build_validation(repo_root: Path) -> list[Finding]:
                 ),
                 remediation=(
                     f"Inspect `docker/{service}/Dockerfile` and its repo-root build "
-                    "context assumptions, then rerun the precheck with "
-                    "`--include-docker-build`."
+                    "context assumptions, then rerun "
+                    f"`{blocking_docker_build_guidance()}`."
                 ),
             ),
             cwd=repo_root,
@@ -399,7 +438,9 @@ def run_docker_build_validation(repo_root: Path) -> list[Finding]:
     return findings
 
 
-def build_improvement_plan(findings: Sequence[Finding]) -> list[str]:
+def build_improvement_plan(
+    findings: Sequence[Finding], *, rerun_command: str
+) -> list[str]:
     plan: list[str] = []
     seen: set[str] = set()
 
@@ -410,8 +451,8 @@ def build_improvement_plan(findings: Sequence[Finding]) -> list[str]:
         plan.append(finding.remediation)
 
     rerun_step = (
-        "Re-run `./.venv/bin/python ./scripts/local_ci_parity.py` after applying the "
-        "fixes and confirm the findings list is free of blocking errors."
+        f"Re-run `{rerun_command}` after applying the fixes and confirm the "
+        "findings list is free of blocking errors."
     )
     if (
         any(finding.severity == "error" for finding in findings)
@@ -444,8 +485,8 @@ def print_findings_report(findings: Sequence[Finding]) -> None:
             print(f"   Exit code: {finding.returncode}")
 
 
-def print_improvement_plan(findings: Sequence[Finding]) -> None:
-    plan = build_improvement_plan(findings)
+def print_improvement_plan(findings: Sequence[Finding], *, rerun_command: str) -> None:
+    plan = build_improvement_plan(findings, rerun_command=rerun_command)
     if not plan:
         return
 
@@ -484,9 +525,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Skip PR template/body validation checks.",
     )
     parser.add_argument(
+        "--mode",
+        choices=(STANDARD_MODE, PRODUCTION_MODE),
+        default=STANDARD_MODE,
+        help=(
+            "Validation mode. `standard` keeps Docker build parity optional for "
+            "faster local iteration; `production` is the canonical blocking parity "
+            "path and includes Docker image builds by default."
+        ),
+    )
+    parser.add_argument(
         "--include-docker-build",
         action="store_true",
-        help="Also run docker/*/Dockerfile build parity checks.",
+        help=(
+            "Also run docker/*/Dockerfile build parity checks. This remains a "
+            "compatibility alias for the Docker-build expansion path when you are "
+            "not using `--mode production`."
+        ),
     )
     return parser.parse_args(argv)
 
@@ -506,6 +561,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"repo_root={repo_root}")
     print(f"base_rev={base_rev}")
     print(f"head_rev={args.head_rev}")
+    print(f"mode={args.mode}")
 
     findings: list[Finding] = []
 
@@ -627,16 +683,18 @@ def main(argv: list[str] | None = None) -> int:
             if finding is not None:
                 findings.append(finding)
 
-    if args.include_docker_build:
+    if docker_build_requested(args):
         findings.extend(run_docker_build_validation(repo_root))
     else:
         warning = (
-            "Docker image build parity is skipped by default; this run did not "
+            "Docker image build parity is skipped by default in standard mode; "
+            "this run did not "
             "validate `docker/*/Dockerfile` builds."
         )
         print(
             "\nℹ️ "
-            f"{warning} Run again with --include-docker-build for full container-build parity."
+            f"{warning} Run `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` "
+            "(or `--include-docker-build`) for blocking container-build parity."
         )
         findings.append(
             Finding(
@@ -644,15 +702,15 @@ def main(argv: list[str] | None = None) -> int:
                 name="Docker image build parity",
                 summary=warning,
                 remediation=(
-                    "Run `./.venv/bin/python ./scripts/local_ci_parity.py "
-                    "--include-docker-build` before merge when you need full "
-                    "container-build parity."
+                    "Run `./.venv/bin/python ./scripts/local_ci_parity.py --mode "
+                    "production` (or `--include-docker-build`) before production "
+                    "sign-off when you need blocking container-build parity."
                 ),
             )
         )
 
     print_findings_report(findings)
-    print_improvement_plan(findings)
+    print_improvement_plan(findings, rerun_command=build_rerun_command(args))
 
     error_count = sum(1 for finding in findings if finding.severity == "error")
     warning_count = sum(1 for finding in findings if finding.severity == "warning")
