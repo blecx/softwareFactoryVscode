@@ -37,7 +37,7 @@ We mandate **local CI-parity prechecks** before remote validation is used as a m
 
 ### 3. Local/CI Boundary Must Be Explicit
 
-- **Rule:** Docker image build validation remains part of CI (`container-build`) and may be optional in default local prechecks due host/runtime constraints.
+- **Rule:** Docker image build validation remains part of CI through the canonical internal production-readiness lane (`production-readiness`) and may be optional in default local prechecks due host/runtime constraints.
 - **Rule:** If Docker build parity is skipped by default, the workflow/docs MUST state that boundary explicitly and provide an opt-in local path.
 - **Rule:** The documented opt-in path for local container-build parity is `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build`.
 

@@ -131,7 +131,7 @@ consecutive clean runs.
 For local validation, keep the two parity paths distinct:
 
 - `./.venv/bin/python ./scripts/local_ci_parity.py` is the default faster local precheck.
-- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical production-grade parity command and includes blocking Docker image builds plus the promoted Docker E2E runtime proof lane by default.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical internal production-readiness gate and includes blocking Docker image builds, the promoted Docker E2E runtime proof lane (including backup/restore roundtrip evidence), required internal-production docs/runbooks presence checks, and a concise sign-off bundle under `.tmp/production-readiness/`.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains available as a compatibility alias when you only need the Docker build expansion path without the promoted Docker E2E lane.
 
 The promoted blocking Docker E2E subset inside `--mode production` currently
@@ -139,11 +139,14 @@ covers:
 
 - `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
 - `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`
+- `test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_contract`
 
 Targeted Docker-backed proofs such as
 `test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace`
 remain opt-in evidence when a slice depends on additional multi-workspace
 runtime truth beyond the promoted production gate.
+
+Every successful `--mode production` run refreshes `.tmp/production-readiness/latest.md`, `.tmp/production-readiness/latest.json`, and the rolling streak history in `.tmp/production-readiness/history.json`. Final sign-off still requires three consecutive **clean** runs from that canonical gate.
 
 ## Prerequisites
 

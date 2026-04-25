@@ -1524,6 +1524,11 @@ def test_local_ci_parity_production_mode_runs_blocking_docker_build_parity(
         "run_docker_e2e_validation",
         _fake_run_docker_e2e_validation,
     )
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: [],
+    )
 
     exit_code = module.main(
         [
@@ -1588,6 +1593,11 @@ def test_local_ci_parity_production_mode_reports_docker_build_failures_as_blocki
         module,
         "run_docker_e2e_validation",
         _fake_run_docker_e2e_validation,
+    )
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: [],
     )
 
     exit_code = module.main(
@@ -1682,7 +1692,7 @@ def test_local_ci_parity_production_mode_reports_docker_e2e_failures_as_blocking
                 name="Docker E2E runtime proof lane",
                 summary=(
                     "The promoted Docker E2E runtime proof lane reported failures "
-                    "for the blocking strict-tenant and stop/cleanup scenarios."
+                    "for the blocking strict-tenant, stop/cleanup, and backup/restore scenarios."
                 ),
                 remediation="Investigate the promoted Docker E2E scenarios and rerun production parity.",
                 command=(
@@ -1699,6 +1709,11 @@ def test_local_ci_parity_production_mode_reports_docker_e2e_failures_as_blocking
                 returncode=1,
             )
         ],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: [],
     )
 
     exit_code = module.main(
@@ -1780,7 +1795,125 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
     )
     assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in readiness_doc
     assert "stop_cleanup_retains_images_and_supports_restart" in readiness_doc
+    assert (
+        "backup_restore_roundtrip_recovers_state_and_runtime_contract" in readiness_doc
+    )
     assert "activate_switch_back_keeps_one_active_workspace" in readiness_doc
+    assert ".tmp/production-readiness/latest.md" in readiness_doc
+    assert "three consecutive clean runs" in readiness_doc
+
+
+def test_local_ci_parity_production_mode_reports_missing_required_docs_as_blocking(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(module, "run_docker_build_validation", lambda repo_root: [])
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: [],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "[ERROR] Required internal-production docs/runbooks" in captured.out
+    assert "docs/PRODUCTION-READINESS.md" in captured.out
+    assert "docs/ops/BACKUP-RESTORE.md" in captured.out
+
+
+def test_local_ci_parity_production_mode_writes_signoff_bundle_and_tracks_green_streak(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    for relative_path in module.PRODUCTION_READINESS_REQUIRED_DOCS:
+        doc_path = tmp_path / relative_path
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        doc_path.write_text(f"# {relative_path}\n", encoding="utf-8")
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(module, "run_docker_build_validation", lambda repo_root: [])
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: [],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    assert exit_code == 0
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    latest_report = json.loads(
+        (tmp_path / ".tmp" / "production-readiness" / "latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    latest_summary = (
+        tmp_path / ".tmp" / "production-readiness" / "latest.md"
+    ).read_text(encoding="utf-8")
+    history = json.loads(
+        (tmp_path / ".tmp" / "production-readiness" / "history.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert latest_report["scope"] == module.PRODUCTION_READINESS_SCOPE
+    assert latest_report["status"] == "pass"
+    assert latest_report["green_run"] is True
+    assert latest_report["current_green_streak"] == 2
+    assert (
+        latest_report["final_signoff_status"] == "pending-three-consecutive-green-runs"
+    )
+    assert "Consecutive clean runs: `2/3`" in latest_summary
+    assert "Internal production-readiness sign-off" in captured.out
+    assert history["current_streak"]["count"] == 2
+    assert len(history["runs"]) == 2
 
 
 def test_local_ci_parity_production_mode_missing_docker_cli_mentions_canonical_command(
@@ -1796,6 +1929,11 @@ def test_local_ci_parity_production_mode_missing_docker_cli_mentions_canonical_c
 
     monkeypatch.setattr(module, "run_command", _fake_run_command)
     monkeypatch.setattr(module.shutil, "which", lambda name: None)
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: [],
+    )
 
     exit_code = module.main(
         [
