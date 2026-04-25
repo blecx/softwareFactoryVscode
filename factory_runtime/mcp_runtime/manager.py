@@ -2476,14 +2476,16 @@ class MCPRuntimeManager:
                     f"mismatch for `{checksum_key}`."
                 )
             size_bytes = raw_artifact.get("size_bytes")
-            if (
-                size_bytes is not None
-                and int(size_bytes) != artifact_path.stat().st_size
-            ):
-                raise RuntimeError(
-                    "Supported runtime restore detected a size mismatch for backup "
-                    f"artifact `{checksum_key}`."
+            if size_bytes is not None:
+                expected_size_bytes = self._coerce_restore_int_value(
+                    size_bytes,
+                    label=f"`size_bytes` value for backup artifact `{checksum_key}`",
                 )
+                if expected_size_bytes != artifact_path.stat().st_size:
+                    raise RuntimeError(
+                        "Supported runtime restore detected a size mismatch for backup "
+                        f"artifact `{checksum_key}`."
+                    )
 
             artifact_catalog[logical_name] = {
                 "path": artifact_path,
@@ -2538,6 +2540,14 @@ class MCPRuntimeManager:
                 "Supported runtime restore requires a non-empty checksum file in the backup bundle."
             )
         return entries
+
+    def _coerce_restore_int_value(self, value: Any, *, label: str) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError(
+                f"Supported runtime restore detected an invalid {label}: `{value}`."
+            ) from exc
 
     def _build_restore_config(
         self,
@@ -2850,7 +2860,10 @@ class MCPRuntimeManager:
                 for key, value in raw_ports.items():
                     if key not in factory_workspace.PORT_LAYOUT:
                         continue
-                    normalized_ports[key] = int(value)
+                    normalized_ports[key] = self._coerce_restore_int_value(
+                        value,
+                        label=f"port value for `{key}` in {source_name}",
+                    )
             if normalized_ports and normalized_ports != config.ports:
                 raise RuntimeError(
                     "Supported runtime restore requires the backed-up runtime port "
@@ -2861,7 +2874,11 @@ class MCPRuntimeManager:
         runtime_manifest_port_index = bundled_runtime_manifest.get("port_index")
         if (
             runtime_manifest_port_index is not None
-            and int(runtime_manifest_port_index) != expected_port_index
+            and self._coerce_restore_int_value(
+                runtime_manifest_port_index,
+                label="`port_index` value in bundled runtime manifest",
+            )
+            != expected_port_index
         ):
             raise RuntimeError(
                 "Supported runtime restore requires the backed-up `port_index` to "
@@ -2870,7 +2887,11 @@ class MCPRuntimeManager:
         registry_port_index = workspace_record.get("port_index")
         if (
             registry_port_index is not None
-            and int(registry_port_index) != expected_port_index
+            and self._coerce_restore_int_value(
+                registry_port_index,
+                label="`port_index` value in bundled workspace registry",
+            )
+            != expected_port_index
         ):
             raise RuntimeError(
                 "Supported runtime restore requires the backed-up registry `port_index` to "
@@ -2898,8 +2919,15 @@ class MCPRuntimeManager:
             return
         try:
             inventory = self._collect_service_inventory(compose_project_name)
-        except Exception:  # noqa: BLE001
-            return
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(
+                "Supported runtime restore requires proving the compose project is "
+                "fully stopped before mutating runtime state, but service "
+                f"inventory for compose project `{compose_project_name}` could not "
+                "be collected. Ensure Docker is reachable, verify the compose "
+                "project state manually, stop any running services, and retry the "
+                f"restore. Inventory error: {exc}"
+            ) from exc
 
         running_services = [
             service_name

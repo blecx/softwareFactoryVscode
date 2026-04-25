@@ -1461,6 +1461,127 @@ def test_manager_restore_requires_resume_safe_bundle(
         manager.restore(repo_root, bundle_path=bundle_path)
 
 
+def test_manager_restore_rejects_invalid_bundle_size_bytes_metadata(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    data_root = Path(config.env_values["FACTORY_DATA_DIR"])
+    (data_root / "memory" / config.factory_instance_id / "memory.db").write_text(
+        "memory-state\n",
+        encoding="utf-8",
+    )
+    (data_root / "bus" / config.factory_instance_id / "agent_bus.db").write_text(
+        "agent-bus-state\n",
+        encoding="utf-8",
+    )
+
+    registry = factory_workspace.load_registry(registry_path)
+    registry["workspaces"][config.factory_instance_id].update(
+        {
+            "runtime_state": RuntimeLifecycleState.SUSPENDED.value,
+            "last_runtime_action": RuntimeActionTrigger.SUSPEND.value,
+            "last_runtime_action_at": "2026-04-25T09:30:00Z",
+            "last_runtime_action_reason_codes": [ReasonCode.SUSPEND_REQUESTED.value],
+            "last_completed_tool_call_boundary_at": "2026-04-25T09:30:05Z",
+        }
+    )
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: {},
+    )
+
+    backup_result = manager.backup(repo_root, env_file=env_path)
+    bundle_path = Path(backup_result["bundle_path"])
+    bundle_manifest = json.loads(
+        (bundle_path / "bundle-manifest.json").read_text(encoding="utf-8")
+    )
+    bundle_manifest["artifacts"][0]["size_bytes"] = "not-a-number"
+
+    with pytest.raises(RuntimeError, match="invalid `size_bytes` value"):
+        manager._validate_restore_bundle_artifacts(bundle_path, bundle_manifest)
+
+
+def test_manager_restore_rejects_invalid_backed_up_port_metadata(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, _, config, _ = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    invalid_port_key = next(iter(factory_workspace.PORT_LAYOUT))
+
+    with pytest.raises(RuntimeError, match="invalid port value"):
+        manager._validate_restore_port_metadata(
+            config,
+            {"ports": {invalid_port_key: "not-a-number"}},
+            {"ports": {}},
+        )
+
+    with pytest.raises(RuntimeError, match="invalid `port_index` value"):
+        manager._validate_restore_port_metadata(
+            config,
+            {"ports": {}, "port_index": "not-a-number"},
+            {"ports": {}},
+        )
+
+
+def test_manager_restore_requires_inventory_collection_when_docker_is_available(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, _, config, _ = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: (
+            (_ for _ in ()).throw(RuntimeError("docker inspect failed"))
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="inventory for compose project"):
+        manager._validate_restore_runtime_stopped(config.compose_project_name)
+
+
 def test_manager_resume_repairs_unready_suspended_runtime(
     tmp_path: Path,
     monkeypatch,
