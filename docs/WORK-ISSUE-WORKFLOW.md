@@ -178,6 +178,9 @@ Routing rule:
 - The canonical blocking production-grade parity command is
   `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`; it now
   includes Docker image builds plus the promoted Docker E2E runtime proof lane.
+- When you need the closest local replay of GitHub's checkout/bootstrap surface
+  before merge, run
+  `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout`.
 - Docker image build parity remains intentionally optional for the default
   local precheck path due host/runtime constraints.
 - `--include-docker-build` remains the build-only compatibility alias when you

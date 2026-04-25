@@ -1781,6 +1781,66 @@ def test_run_docker_e2e_validation_sets_env_and_selected_pytest_filter(
     assert call["capture_output"] is True
     assert call["text"] is True
     assert call["run_docker_e2e"] == "1"
+    transcript = (
+        tmp_path
+        / ".tmp"
+        / "production-readiness"
+        / module.DOCKER_E2E_LATEST_LOG_FILENAME
+    )
+    assert transcript.exists()
+    transcript_text = transcript.read_text(encoding="utf-8")
+    assert module.DOCKER_E2E_TEST_FILE in transcript_text
+    assert "Exit code: 0" in transcript_text
+
+
+def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+    snapshot_path = tmp_path / "fresh-checkout"
+    snapshot_path.mkdir(parents=True, exist_ok=True)
+    calls: list[tuple[tuple[str, ...], Path]] = []
+
+    monkeypatch.setattr(
+        module,
+        "create_fresh_checkout_snapshot",
+        lambda repo_root, *, head_rev: snapshot_path,
+    )
+    monkeypatch.setattr(module, "resolve_head_revision", lambda repo_root, head_rev: "deadbeef")
+    monkeypatch.setattr(module, "worktree_has_uncommitted_changes", lambda repo_root: True)
+
+    def _fake_run_command(command, *, cwd):
+        command_tuple = tuple(command)
+        calls.append((command_tuple, cwd))
+        return subprocess.CompletedProcess(list(command_tuple), 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--fresh-checkout",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert calls[0] == (("bash", "./setup.sh"), snapshot_path)
+    child_command, child_cwd = calls[1]
+    assert child_cwd == snapshot_path
+    assert child_command[:2] == ("./.venv/bin/python", "./scripts/local_ci_parity.py")
+    assert "--fresh-checkout" not in child_command
+    assert "--python" in child_command
+    assert "./.venv/bin/python" in child_command
+    assert "snapshot_path=" in captured.out
+    assert "committed HEAD only" in captured.out
 
 
 def test_production_readiness_docs_name_promoted_docker_e2e_gate():
@@ -1801,6 +1861,7 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
     assert "activate_switch_back_keeps_one_active_workspace" in readiness_doc
     assert ".tmp/production-readiness/latest.md" in readiness_doc
     assert "three consecutive clean runs" in readiness_doc
+    assert "--fresh-checkout" in readiness_doc
 
 
 def test_local_ci_parity_production_mode_reports_missing_required_docs_as_blocking(

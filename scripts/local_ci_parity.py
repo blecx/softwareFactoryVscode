@@ -30,6 +30,9 @@ PRODUCTION_MODE = "production"
 CANONICAL_PRODUCTION_PARITY_COMMAND = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
 )
+FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND = (
+    "./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout"
+)
 DOCKER_BUILD_COMPATIBILITY_ALIAS = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build"
 )
@@ -37,6 +40,8 @@ DOCKER_E2E_TEST_FILE = "tests/test_throwaway_runtime_docker.py"
 PRODUCTION_READINESS_SCOPE = "internal-self-hosted-production"
 PRODUCTION_READINESS_REQUIRED_GREEN_RUNS = 3
 PRODUCTION_READINESS_BUNDLE_SUBDIR = Path(".tmp") / "production-readiness"
+LOCAL_CI_PARITY_SNAPSHOT_PARENT_TEMPLATE = ".{repo_name}-local-ci-parity-snapshots"
+DOCKER_E2E_LATEST_LOG_FILENAME = "docker-e2e-latest.log"
 PRODUCTION_READINESS_REQUIRED_DOCS = (
     "docs/PRODUCTION-READINESS.md",
     "docs/INSTALL.md",
@@ -116,6 +121,8 @@ def build_rerun_command(args: argparse.Namespace) -> str:
         command.extend(["--mode", args.mode])
     elif args.include_docker_build:
         command.append("--include-docker-build")
+    if args.fresh_checkout:
+        command.append("--fresh-checkout")
     if args.pr_body_file.strip():
         command.extend(["--pr-body-file", args.pr_body_file.strip()])
     if args.skip_integration:
@@ -123,6 +130,123 @@ def build_rerun_command(args: argparse.Namespace) -> str:
     if args.skip_pr_template_check:
         command.append("--skip-pr-template-check")
     return format_command(command)
+
+
+def worktree_has_uncommitted_changes(repo_root: Path) -> bool:
+    result = run_git(repo_root, ["status", "--short"])
+    if result.returncode != 0:
+        return False
+    return bool(result.stdout.strip())
+
+
+def create_fresh_checkout_snapshot(repo_root: Path, *, head_rev: str) -> Path:
+    snapshot_parent = repo_root.parent / LOCAL_CI_PARITY_SNAPSHOT_PARENT_TEMPLATE.format(
+        repo_name=repo_root.name
+    )
+    snapshot_parent.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    sanitized_head = (
+        "".join(character for character in head_rev[:12] if character.isalnum())
+        or "head"
+    )
+    snapshot_path = snapshot_parent / f"{timestamp}-{sanitized_head}"
+
+    result = run_git(
+        repo_root,
+        ["worktree", "add", "--detach", str(snapshot_path), head_rev],
+    )
+    if result.returncode != 0:
+        details = (result.stderr or result.stdout or "unknown git worktree failure").strip()
+        raise RuntimeError(
+            "Unable to create a fresh-checkout CI-parity snapshot via `git worktree add`: "
+            f"{details}"
+        )
+
+    return snapshot_path
+
+
+def build_fresh_checkout_command(
+    args: argparse.Namespace,
+    *,
+    base_rev: str,
+    head_rev: str,
+) -> tuple[str, ...]:
+    command: list[str] = [
+        "./.venv/bin/python",
+        "./scripts/local_ci_parity.py",
+        "--repo-root",
+        ".",
+        "--base-rev",
+        base_rev,
+        "--head-rev",
+        head_rev,
+        "--python",
+        "./.venv/bin/python",
+    ]
+
+    if args.mode != STANDARD_MODE:
+        command.extend(["--mode", args.mode])
+    elif args.include_docker_build:
+        command.append("--include-docker-build")
+
+    if args.pr_body_file.strip():
+        command.extend(["--pr-body-file", args.pr_body_file.strip()])
+    if args.skip_integration:
+        command.append("--skip-integration")
+    if args.skip_pr_template_check:
+        command.append("--skip-pr-template-check")
+
+    return tuple(command)
+
+
+def run_fresh_checkout_validation(
+    args: argparse.Namespace,
+    *,
+    repo_root: Path,
+    base_rev: str,
+    head_rev: str,
+) -> int:
+    print("\n" + "=" * 60)
+    print("Fresh-checkout GitHub parity replay")
+    print("=" * 60)
+    print(
+        "This path mirrors GitHub's clean checkout + `setup.sh` bootstrap before "
+        "replaying the canonical parity command."
+    )
+
+    if worktree_has_uncommitted_changes(repo_root):
+        print(
+            "ℹ️ Working tree has uncommitted changes; fresh-checkout parity replays "
+            "committed HEAD only, which is the closest local match to the pushed "
+            "GitHub branch state."
+        )
+
+    try:
+        snapshot_path = create_fresh_checkout_snapshot(repo_root, head_rev=head_rev)
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        return 1
+
+    print(f"snapshot_path={snapshot_path}")
+
+    setup_result = run_command(("bash", "./setup.sh"), cwd=snapshot_path)
+    emit_command_output(setup_result)
+    if setup_result.returncode != 0:
+        print(
+            "❌ Fresh-checkout parity bootstrap failed during `./setup.sh`; "
+            "GitHub-like validation could not start."
+        )
+        return 1
+
+    child_command = build_fresh_checkout_command(
+        args,
+        base_rev=base_rev,
+        head_rev=head_rev,
+    )
+    child_result = run_command(child_command, cwd=snapshot_path)
+    emit_command_output(child_result)
+    return child_result.returncode
 
 
 def run_command(
@@ -134,6 +258,32 @@ def run_command(
         check=False,
         capture_output=True,
         text=True,
+    )
+
+
+def write_command_transcript(
+    path: Path,
+    *,
+    command: Sequence[str],
+    result: subprocess.CompletedProcess[str],
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stdout = result.stdout if result.stdout else "<empty>\n"
+    stderr = result.stderr if result.stderr else "<empty>\n"
+    path.write_text(
+        "".join(
+            [
+                f"Command: {format_command(command)}\n",
+                f"Exit code: {result.returncode}\n",
+                "\n",
+                "[stdout]\n",
+                stdout,
+                "\n",
+                "[stderr]\n",
+                stderr,
+            ]
+        ),
+        encoding="utf-8",
     )
 
 
@@ -516,6 +666,9 @@ def run_docker_e2e_validation(
     env = os.environ.copy()
     env["RUN_DOCKER_E2E"] = "1"
     command = display_command[2:]
+    transcript_path = (
+        repo_root / PRODUCTION_READINESS_BUNDLE_SUBDIR / DOCKER_E2E_LATEST_LOG_FILENAME
+    )
 
     try:
         result = subprocess.run(
@@ -543,6 +696,12 @@ def run_docker_e2e_validation(
             )
         ]
 
+    write_command_transcript(
+        transcript_path,
+        command=display_command,
+        result=result,
+    )
+
     emit_command_output(result)
     if result.returncode == 0:
         return []
@@ -555,7 +714,8 @@ def run_docker_e2e_validation(
                 "The promoted Docker E2E runtime proof lane reported failures for "
                 "the blocking strict-tenant, stop/cleanup, and backup/restore "
                 "scenarios "
-                f"(exit code {result.returncode})."
+                f"(exit code {result.returncode}). Raw output was saved to "
+                f"`{display_path(transcript_path, repo_root)}`."
             ),
             remediation=(
                 f"Investigate the promoted scenarios in `{DOCKER_E2E_TEST_FILE}` "
@@ -989,25 +1149,49 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "Docker E2E lane."
         ),
     )
+    parser.add_argument(
+        "--fresh-checkout",
+        action="store_true",
+        help=(
+            "Replay the parity command from a clean git worktree snapshot after "
+            "running `./setup.sh`, which is the closest local match to GitHub's "
+            "fresh-checkout bootstrap behavior."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     repo_root = Path(args.repo_root).expanduser().resolve()
+    head_rev = resolve_head_revision(repo_root, args.head_rev)
     base_rev = resolve_base_rev(
         repo_root,
         base_rev=args.base_rev,
-        head_rev=args.head_rev,
+        head_rev=head_rev,
     )
+
+    if args.fresh_checkout:
+        return run_fresh_checkout_validation(
+            args,
+            repo_root=repo_root,
+            base_rev=base_rev,
+            head_rev=head_rev,
+        )
 
     print("=" * 60)
     print("Local CI-parity precheck")
     print("=" * 60)
     print(f"repo_root={repo_root}")
     print(f"base_rev={base_rev}")
-    print(f"head_rev={args.head_rev}")
+    print(f"head_rev={head_rev}")
     print(f"mode={args.mode}")
+
+    if args.mode == PRODUCTION_MODE and not os.getenv("GITHUB_ACTIONS", "").strip():
+        print(
+            "exact_github_parity_command="
+            f"{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}"
+        )
 
     findings: list[Finding] = []
 
@@ -1181,7 +1365,7 @@ def main(argv: list[str] | None = None) -> int:
         production_bundle = write_production_readiness_bundle(
             repo_root,
             base_rev=base_rev,
-            head_rev=resolve_head_revision(repo_root, args.head_rev),
+            head_rev=head_rev,
             findings=findings,
         )
         print_production_readiness_bundle_summary(

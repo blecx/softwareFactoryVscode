@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -321,6 +322,34 @@ def _docker_image_exists(image_name: str) -> bool:
         check=False,
     )
     return result.returncode == 0
+
+
+def _run_checked_process(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    step_name: str,
+) -> subprocess.CompletedProcess[str]:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return result
+
+    stdout = result.stdout if result.stdout else "<empty>\n"
+    stderr = result.stderr if result.stderr else "<empty>\n"
+    raise AssertionError(
+        f"{step_name} failed with exit code {result.returncode}.\n"
+        f"command: {shlex.join(command)}\n\n"
+        f"stdout:\n{stdout}\n"
+        f"stderr:\n{stderr}"
+    )
 
 
 def test_validate_throwaway_runtime_relocates_system_tmp_target() -> None:
@@ -1139,7 +1168,7 @@ def test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart(
             images[0],
         )
 
-        stop_result = subprocess.run(
+        stop_result = _run_checked_process(
             [
                 sys.executable,
                 str(FACTORY_STACK_SCRIPT),
@@ -1152,9 +1181,7 @@ def test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart(
             ],
             cwd=REPO_ROOT,
             env=env,
-            text=True,
-            capture_output=True,
-            check=True,
+            step_name="throwaway runtime stop validation",
         )
 
         assert "Removed containers and named volumes" in stop_result.stdout
@@ -1182,7 +1209,7 @@ def test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart(
 
         assert _wait_until_reachable(context7_url)
 
-        cleanup_result = subprocess.run(
+        cleanup_result = _run_checked_process(
             [
                 sys.executable,
                 str(FACTORY_STACK_SCRIPT),
@@ -1194,9 +1221,7 @@ def test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart(
             ],
             cwd=REPO_ROOT,
             env=env,
-            text=True,
-            capture_output=True,
-            check=True,
+            step_name="throwaway runtime cleanup validation",
         )
 
         assert (
@@ -1358,7 +1383,7 @@ def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_c
             check=True,
         )
 
-        backup_result = subprocess.run(
+        backup_result = _run_checked_process(
             [
                 sys.executable,
                 str(FACTORY_STACK_SCRIPT),
@@ -1370,13 +1395,11 @@ def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_c
             ],
             cwd=REPO_ROOT,
             env=env,
-            text=True,
-            capture_output=True,
-            check=True,
+            step_name="throwaway runtime backup validation",
         )
         bundle_path = _extract_output_value(backup_result.stdout, "bundle_path")
 
-        cleanup_result = subprocess.run(
+        cleanup_result = _run_checked_process(
             [
                 sys.executable,
                 str(FACTORY_STACK_SCRIPT),
@@ -1388,9 +1411,7 @@ def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_c
             ],
             cwd=REPO_ROOT,
             env=env,
-            text=True,
-            capture_output=True,
-            check=True,
+            step_name="throwaway runtime cleanup-before-restore validation",
         )
 
         assert (
@@ -1401,7 +1422,7 @@ def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_c
         assert not manifest_path.exists()
         assert _docker_compose_project_container_ids(compose_project_name) == []
 
-        restore_result = subprocess.run(
+        restore_result = _run_checked_process(
             [
                 sys.executable,
                 str(FACTORY_STACK_SCRIPT),
@@ -1413,9 +1434,7 @@ def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_c
             ],
             cwd=REPO_ROOT,
             env=env,
-            text=True,
-            capture_output=True,
-            check=True,
+            step_name="throwaway runtime restore roundtrip validation",
         )
 
         assert "runtime_state=suspended" in restore_result.stdout
