@@ -40,11 +40,14 @@ We mandate **local CI-parity prechecks** before remote validation is used as a m
 - **Rule:** Docker image build validation remains part of CI through the canonical internal production-readiness lane (`production-readiness`) and may be optional in default local prechecks due host/runtime constraints.
 - **Rule:** If Docker build parity is skipped by default, the workflow/docs MUST state that boundary explicitly and provide an opt-in local path.
 - **Rule:** The documented opt-in path for local container-build parity is `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build`.
+- **Rule:** When merge-grade confidence depends on GitHub's fresh checkout + bootstrap semantics, the local workflow MUST expose an exact parity replay path that starts from a clean git checkout/worktree, runs `./setup.sh`, and then replays the canonical gate.
+- **Rule:** For the current repository, the exact local replay path for the canonical production gate is `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout`.
 
 ### 4. Remote CI Is a Gate, Not a Discovery Crutch
 
 - **Rule:** GitHub Actions remains mandatory before merge, but it MUST NOT be the first place a branch encounters known local checks.
 - **Rule:** If remote CI fails due to a missed local parity check, the failure should be treated as a workflow defect, not just a one-off mistake.
+- **Rule:** If a local parity surface hides the actionable failure details that GitHub needs for diagnosis, that observability gap is also a workflow defect and must be fixed in the local/CI evidence path.
 
 ### 5. Cost and Time Are Explicit Quality Concerns
 

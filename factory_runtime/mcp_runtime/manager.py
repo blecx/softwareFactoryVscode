@@ -2942,19 +2942,29 @@ class MCPRuntimeManager:
             )
 
     def _restore_bundle_file(self, source_path: Path, destination_path: Path) -> None:
-        destination_path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path = destination_path.with_name(
             destination_path.name + ".restore-tmp"
         )
-        if temporary_path.exists():
-            temporary_path.unlink()
-        try:
-            shutil.copyfile(source_path, temporary_path)
-            temporary_path.replace(destination_path)
-        except Exception:
+        for attempt in range(2):
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
             if temporary_path.exists():
                 temporary_path.unlink()
-            raise
+            try:
+                shutil.copyfile(source_path, temporary_path)
+                temporary_path.replace(destination_path)
+                return
+            except FileNotFoundError as exc:
+                if temporary_path.exists():
+                    temporary_path.unlink()
+                if attempt == 0 and str(exc.filename or "").strip() == str(
+                    temporary_path
+                ):
+                    continue
+                raise
+            except Exception:
+                if temporary_path.exists():
+                    temporary_path.unlink()
+                raise
 
     def _resolve_restore_boundary_timestamp(
         self,

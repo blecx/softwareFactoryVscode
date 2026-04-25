@@ -156,6 +156,7 @@ Use the local parity commands intentionally:
 
 - `./.venv/bin/python ./scripts/local_ci_parity.py` is the default faster baseline for day-to-day local iteration. In this path, Docker image build parity remains an explicit warning-only skip so routine development does not silently become a slow production sign-off lane.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical internal production-readiness gate. It includes `docker/*/Dockerfile` builds by default, runs the promoted Docker E2E runtime proof lane (including the backup/restore roundtrip), blocks on missing required internal-production docs/runbooks, and writes the latest concise sign-off bundle to `.tmp/production-readiness/latest.md` plus `.tmp/production-readiness/latest.json`.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout` is the closest local replay of GitHub's checkout-and-bootstrap behavior. It creates a clean git worktree snapshot, runs `./setup.sh`, and then replays the canonical production gate there before you trust the result as merge-grade local evidence.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains supported as a compatibility alias when you want the Docker build expansion path without switching the named mode, but it does **not** add the promoted Docker E2E lane and the canonical production sign-off command is `--mode production`.
 
 The promoted blocking Docker E2E lane currently covers:
@@ -176,6 +177,7 @@ At minimum, the final evidence bundle must include:
 
 - the repo CI-parity baseline via `./.venv/bin/python ./scripts/local_ci_parity.py`;
 - the canonical blocking production parity command via `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`;
+- the exact fresh-checkout replay path via `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout` whenever merge-grade confidence depends on GitHub-like checkout/bootstrap semantics;
 - runtime verification against the generated effective endpoints and manager-backed readiness surface;
 - the blocking Docker E2E runtime proof lane, currently satisfied by the promoted strict-tenant, stop/cleanup, and backup/restore roundtrip scenarios within `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`;
 - supported backup and restore evidence, including one recovery roundtrip proof;
