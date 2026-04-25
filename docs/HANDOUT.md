@@ -121,8 +121,14 @@ For reproducible closeout evidence, pair the operator guidance here with:
 
 - `./.venv/bin/pytest tests/test_regression.py -v`
 - `./.venv/bin/python ./scripts/local_ci_parity.py`
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`
 - targeted `RUN_DOCKER_E2E=1` lifecycle proofs when real container/image truth
   matters
+
+The canonical production-grade parity command now includes the promoted
+strict-tenant and stop/cleanup Docker E2E runtime proofs. Keep the extra
+`RUN_DOCKER_E2E=1` command for targeted scenarios such as explicit
+multi-workspace activation / switch-back evidence.
 
 Still deferred after this readiness pass:
 

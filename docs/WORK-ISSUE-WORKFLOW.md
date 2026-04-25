@@ -147,7 +147,13 @@ Routing rule:
   `pytest tests/`, integration regression, and PR-template validation against
   `.github/pull_request_template.md`.
 
-  Optional expanded parity:
+  Canonical production-grade parity:
+
+  ```text
+  ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+  ```
+
+  Optional build-only expansion alias:
 
   ```text
   ./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build
@@ -169,9 +175,13 @@ Routing rule:
 - Validate generated PR bodies locally with `./scripts/validate-pr-template.sh <pr-body-file>`
   (or `./.venv/bin/python ./scripts/local_ci_parity.py --pr-body-file <pr-body-file>`)
   before asking GitHub to enforce the same template in CI.
-- Docker image build parity exists in CI and is intentionally optional for the
-  default local precheck path due host/runtime constraints; use
-  `--include-docker-build` when you need full container-build parity pre-push.
+- The canonical blocking production-grade parity command is
+  `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`; it now
+  includes Docker image builds plus the promoted Docker E2E runtime proof lane.
+- Docker image build parity remains intentionally optional for the default
+  local precheck path due host/runtime constraints.
+- `--include-docker-build` remains the build-only compatibility alias when you
+  want container-build expansion without the full promoted production gate.
 - Keep the remote repository protections aligned with `docs/setup-github-repository.md` so required status checks and PR-before-merge rules backstop the local workflow.
 
 ## Readiness closeout evidence discipline
@@ -195,8 +205,11 @@ evidence bundle is:
 ./.venv/bin/python ./scripts/local_ci_parity.py
 ```
 
-Add the targeted `RUN_DOCKER_E2E=1` lifecycle proofs from `tests/README.md`
-whenever the slice depends on real container/image state.
+The promoted strict-tenant plus stop/cleanup subset is already part of
+`./.venv/bin/python ./scripts/local_ci_parity.py --mode production`. Add the
+targeted `RUN_DOCKER_E2E=1` lifecycle proofs from `tests/README.md` whenever
+the slice depends on other real container/image state, such as explicit
+multi-workspace activation truth.
 
 These are not optional style notes; they are the historical guardrails defined by `docs/architecture/ADR-001-AI-Workflow-Guardrails.md`, reinforced by `docs/architecture/ADR-005-Strong-Templating-Enforcement.md` and `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md`, plus `.copilot/skills/a2a-communication/SKILL.md`, `.github/workflows/ci.yml`, and the remote protection guidance in `docs/setup-github-repository.md`.
 

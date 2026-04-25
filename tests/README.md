@@ -78,7 +78,14 @@ tests and opt-in Docker-backed proofs:
 | Cleanup / `runtime-deleted` | `test_cleanup_workspace` and `test_delete_runtime_matches_cleanup_artifact_effects_with_distinct_trigger_metadata` in `tests/test_factory_install.py` | `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart` in `tests/test_throwaway_runtime_docker.py` | Cleanup and policy-driven `delete-runtime` remove live runtime ownership/artifacts while retaining the installed baseline and Docker images. |
 | Reload / reopen recovery | `test_build_runtime_config_preserves_persisted_ports_when_workspace_reopens` in `tests/test_factory_install.py` | Not required for the practical baseline; this is metadata/config recovery rather than live container truth. | Reopening a workspace preserves the persisted port/runtime contract without implying hidden auto-start behavior. |
 
-Docker-backed lifecycle proofs remain **targeted and opt-in** via
+The canonical production-grade parity command
+`./.venv/bin/python ./scripts/local_ci_parity.py --mode production` now runs a
+promoted blocking subset of these Docker-backed lifecycle proofs:
+
+- `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
+- `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`
+
+Other Docker-backed lifecycle proofs remain **targeted and opt-in** via
 `RUN_DOCKER_E2E=1`; they are required evidence where real container/image state
 matters, but they are not silently upgraded into the default local-CI-parity
 gate unless that policy is explicitly documented and reviewed.
@@ -91,12 +98,14 @@ is:
 ```bash
 ./.venv/bin/pytest tests/test_regression.py -v
 ./.venv/bin/python ./scripts/local_ci_parity.py
-RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace or stop_cleanup_retains_images_and_supports_restart" -v
+./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace" -v
 ```
 
-Use the Docker-backed command when the claim depends on real container/image
-truth; otherwise the first two commands cover the operator-doc and local-CI
-closeout surfaces.
+`./.venv/bin/python ./scripts/local_ci_parity.py --mode production` now covers
+the promoted strict-tenant and stop/cleanup Docker E2E scenarios. Use the extra
+`RUN_DOCKER_E2E=1` command when the claim also depends on the multi-workspace
+activation / switch-back proof.
 
 Still deferred after this readiness pass:
 

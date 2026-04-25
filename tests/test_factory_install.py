@@ -6361,6 +6361,9 @@ def test_offline_docs_compose_does_not_mount_over_runtime_code_path() -> None:
     service = data.get("services", {}).get("offline-docs-mcp", {})
     volumes = service.get("volumes", [])
     assert all(not str(volume).endswith(":/factory") for volume in volumes)
+    assert (
+        "user" not in service
+    ), "offline-docs-mcp must not pin a host-specific UID/GID because CI runners may use different bind-mount ownership"
 
     env = service.get("environment", [])
     joined_env = "\n".join(str(item) for item in env)
