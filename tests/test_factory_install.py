@@ -2295,6 +2295,24 @@ def test_factory_stack_parse_args_accepts_backup(monkeypatch) -> None:
     assert args.command == "backup"
 
 
+def test_factory_stack_parse_args_accepts_restore(monkeypatch) -> None:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "factory_stack.py",
+            "restore",
+            "--bundle-path",
+            "/tmp/backup-20260425T081500Z",
+        ],
+    )
+
+    args = factory_stack.parse_args()
+
+    assert args.command == "restore"
+    assert args.bundle_path == "/tmp/backup-20260425T081500Z"
+
+
 def test_workspace_runtime_allocates_distinct_port_blocks_and_registry_state(
     tmp_path: Path,
     monkeypatch,
@@ -3413,6 +3431,65 @@ def test_factory_stack_backup_workspace_reports_bundle_metadata(
         "backup-20260425T081500Z/checksums.sha256" in output
     )
     assert "captured_artifact_count=6" in output
+    assert "recovery_classification=resume-safe" in output
+    assert "completed_tool_call_boundary=true" in output
+
+
+def test_factory_stack_restore_workspace_reports_restore_metadata(
+    tmp_path: Path,
+    monkeypatch,
+    capsys,
+) -> None:
+    env_path = tmp_path / ".factory.env"
+    env_path.write_text("", encoding="utf-8")
+    bundle_path = tmp_path / "backup-20260425T081500Z"
+    calls: list[tuple[Path, Path, Path | None]] = []
+
+    restore_result = {
+        "workspace_id": "target-project",
+        "instance_id": "factory-target-project",
+        "runtime_state": "suspended",
+        "bundle_path": str(bundle_path),
+        "restored_artifact_count": 4,
+        "preflight_status": "needs-ramp-up",
+        "recommended_action": "resume",
+        "recovery_classification": "resume-safe",
+        "completed_tool_call_boundary": True,
+    }
+
+    class FakeRuntimeManager:
+        def restore(
+            self,
+            repo_root: Path,
+            *,
+            bundle_path: Path,
+            env_file: Path | None = None,
+        ) -> Any:
+            calls.append((repo_root, bundle_path, env_file))
+            return restore_result
+
+    monkeypatch.setattr(
+        factory_stack,
+        "build_runtime_manager",
+        lambda: FakeRuntimeManager(),
+    )
+
+    exit_code = factory_stack.restore_workspace(
+        tmp_path,
+        bundle_path=bundle_path,
+        env_file=env_path,
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert calls == [(tmp_path, bundle_path, env_path)]
+    assert "workspace_id=target-project" in output
+    assert "instance_id=factory-target-project" in output
+    assert "runtime_state=suspended" in output
+    assert f"bundle_path={bundle_path}" in output
+    assert "restored_artifact_count=4" in output
+    assert "preflight_status=needs-ramp-up" in output
+    assert "recommended_action=resume" in output
     assert "recovery_classification=resume-safe" in output
     assert "completed_tool_call_boundary=true" in output
 
@@ -6428,6 +6505,15 @@ def test_runtime_dockerfiles_copy_from_factory_runtime_tree() -> None:
     for dockerfile in dockerfiles:
         text = dockerfile.read_text(encoding="utf-8")
         assert "factory_runtime/" in text
+
+
+def test_context7_dockerfile_uses_env_based_auth_for_http_transport() -> None:
+    dockerfile = REPO_ROOT / "docker" / "context7" / "Dockerfile"
+    text = dockerfile.read_text(encoding="utf-8")
+
+    assert 'ENV CONTEXT7_API_KEY=""' in text
+    assert "context7-mcp --transport http --port ${CONTEXT7_PORT}" in text
+    assert "--api-key" not in text
 
 
 def test_agent_worker_requirements_include_openai_sdk() -> None:

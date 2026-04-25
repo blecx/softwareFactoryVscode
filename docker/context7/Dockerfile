@@ -8,4 +8,4 @@ EXPOSE 3010
 ENV CONTEXT7_PORT=3010
 ENV CONTEXT7_API_KEY=""
 
-CMD ["sh", "-c", "if [ -n \"$CONTEXT7_API_KEY\" ]; then context7-mcp --transport http --port ${CONTEXT7_PORT} --api-key ${CONTEXT7_API_KEY}; else context7-mcp --transport http --port ${CONTEXT7_PORT}; fi"]
+CMD ["sh", "-c", "context7-mcp --transport http --port ${CONTEXT7_PORT}"]

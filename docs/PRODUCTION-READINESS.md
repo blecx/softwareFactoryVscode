@@ -89,17 +89,26 @@ When production validation fails, the readiness/verifier surfaces distinguish mi
 
 This is a necessary blocking requirement for the internal production claim, not the final claim by itself.
 
-## Supported backup contract (current PR-06 contract)
+## Supported backup and restore contract (current PR-06 / PR-07 contract)
 
-The current supported backup lifecycle command is `scripts/factory_stack.py backup`.
+The current supported recovery lifecycle commands are:
+
+- `scripts/factory_stack.py backup`
+- `scripts/factory_stack.py restore --bundle-path <bundle-dir>`
+- `scripts/factory_stack.py resume`
 
 - Supported backups require the manager-backed bounded `suspended` lifecycle state.
 - Operators must suspend a ready runtime before backup; the canonical precondition step is `scripts/factory_stack.py suspend --completed-tool-call-boundary` when the session can prove a safe boundary.
 - The backup command writes a timestamped bundle under `FACTORY_DATA_DIR/backups/<factory_instance_id>/backup-<timestamp>/`.
 - Each supported bundle includes the stateful runtime databases, the canonical `.factory.env`, the current runtime manifest, a scoped workspace-registry snapshot, a manager-backed runtime snapshot, and a `checksums.sha256` file.
 - The bundle manifest (`bundle-manifest.json`) records the required precondition, bundle timestamp, selected profiles, recovery classification, and per-artifact SHA-256 metadata.
+- Supported restore automation accepts only bundles captured from a `resume-safe` bounded suspended state with `completed_tool_call_boundary=true`.
+- Restore validates bundle checksums plus target identity/path/compose/port alignment before mutating the runtime contract.
+- Restore rehydrates the supported memory/agent-bus data and regenerates the canonical `.factory.env`, runtime manifest, and registry record through the manager-backed artifact sync path.
+- A successful restore leaves the runtime in the bounded `suspended` state, and the canonical next step is `scripts/factory_stack.py resume`.
+- The repository includes a Docker-backed roundtrip recovery proof in `tests/test_throwaway_runtime_docker.py` that verifies backup → cleanup → restore → resume plus runtime verification.
 
-Restore automation and roundtrip recovery proof are still separate blocking work under requirement `6`; backup support alone does not satisfy the final production-readiness claim.
+This closes blocking requirement `6` for the supported internal runtime boundary, but it does **not** waive any of the other blocking requirements above.
 
 ## Current baseline: necessary, not sufficient
 
