@@ -89,7 +89,6 @@ services:
       dockerfile: docker/mcp-agent-bus/Dockerfile
     image: factory/mcp-agent-bus:latest
     restart: unless-stopped
-    user: "${FACTORY_HOST_UID:-0}:${FACTORY_HOST_GID:-0}"
     environment:
       PROJECT_WORKSPACE_ID: "${PROJECT_WORKSPACE_ID:-default}"
       FACTORY_SHARED_SERVICE_MODE: "${FACTORY_SHARED_SERVICE_MODE:-per-workspace}"
