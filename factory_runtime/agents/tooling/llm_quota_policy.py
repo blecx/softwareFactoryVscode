@@ -11,6 +11,7 @@ _DEFAULT_RESERVE_SHARE = 0.30
 _DEFAULT_JITTER_RATIO = 0.10
 _DEFAULT_MAX_WAIT_SECONDS = 180.0
 _DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS = 45.0
+_DEFAULT_CONCURRENCY_LEASE_LIMIT = 1
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class LLMQuotaPolicy:
     quota_bucket: str
     quota_source: str
     quota_ceiling_rps: float
+    concurrency_lease_limit: int
     foreground_share: float
     reserve_share: float
     foreground_lane_rps: float
@@ -36,6 +38,14 @@ class LLMQuotaPolicy:
 def _parse_positive_float(raw: str | None, default: float) -> float:
     try:
         value = float((raw or "").strip())
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def _parse_positive_int(raw: str | None, default: int) -> int:
+    try:
+        value = int((raw or "").strip())
     except ValueError:
         return default
     return value if value > 0 else default
@@ -98,12 +108,12 @@ def _resolve_lane_shares(
     return _round_quota(foreground_share), _round_quota(reserve_share)
 
 
-def _select_quota_bucket(provider: str, model_family: str) -> tuple[str, float]:
+def _select_quota_bucket(provider: str, model_family: str) -> tuple[str, float, int]:
     if provider == "github":
         if "gpt-4.1-mini" in model_family or "gpt-4o-mini" in model_family:
-            return "github-openai-mini", 0.50
+            return "github-openai-mini", 0.50, 2
         if "gpt-4.1" in model_family or "gpt-4o" in model_family:
-            return "github-openai-standard", 0.30
+            return "github-openai-standard", 0.30, 1
         if (
             model_family.startswith("openai/o1")
             or model_family.startswith("o1")
@@ -112,12 +122,12 @@ def _select_quota_bucket(provider: str, model_family: str) -> tuple[str, float]:
             or model_family.startswith("openai/o4")
             or model_family.startswith("o4")
         ):
-            return "github-openai-reasoning", 0.15
+            return "github-openai-reasoning", 0.15, 1
         if model_family.startswith("openai/"):
-            return "github-openai-other", 0.25
-        return "github-default", 0.20
+            return "github-openai-other", 0.25, 1
+        return "github-default", 0.20, 1
 
-    return "generic-default", 0.10
+    return "generic-default", 0.10, _DEFAULT_CONCURRENCY_LEASE_LIMIT
 
 
 def resolve_quota_policy(
@@ -141,6 +151,13 @@ def resolve_quota_policy(
         0.0,
     )
 
+    default_quota_bucket, default_quota_ceiling_rps, default_concurrency_lease_limit = (
+        _select_quota_bucket(
+            normalized_provider,
+            normalized_model,
+        )
+    )
+
     if explicit_ceiling_rps > 0:
         quota_bucket = "env-explicit-ceiling"
         quota_source = "WORK_ISSUE_QUOTA_CEILING_RPS"
@@ -150,13 +167,15 @@ def resolve_quota_policy(
         quota_source = "WORK_ISSUE_MAX_RPS"
         quota_ceiling_rps = legacy_foreground_rps / max(foreground_share, 0.01)
     else:
-        quota_bucket, quota_ceiling_rps = _select_quota_bucket(
-            normalized_provider,
-            normalized_model,
-        )
+        quota_bucket = default_quota_bucket
+        quota_ceiling_rps = default_quota_ceiling_rps
         quota_source = "model-family-fallback"
 
     quota_ceiling_rps = _round_quota(quota_ceiling_rps)
+    concurrency_lease_limit = _parse_positive_int(
+        runtime_env.get("WORK_ISSUE_CONCURRENCY_LEASE_LIMIT"),
+        default_concurrency_lease_limit,
+    )
     foreground_lane_rps = _round_quota(quota_ceiling_rps * foreground_share)
     reserve_lane_rps = _round_quota(quota_ceiling_rps * reserve_share)
     jitter_ratio = _parse_unit_ratio(
@@ -179,6 +198,7 @@ def resolve_quota_policy(
         quota_bucket=quota_bucket,
         quota_source=quota_source,
         quota_ceiling_rps=quota_ceiling_rps,
+        concurrency_lease_limit=concurrency_lease_limit,
         foreground_share=foreground_share,
         reserve_share=reserve_share,
         foreground_lane_rps=foreground_lane_rps,

@@ -21,6 +21,7 @@ def _make_policy() -> LLMQuotaPolicy:
         quota_bucket="github-openai-mini",
         quota_source="model-family-fallback",
         quota_ceiling_rps=0.50,
+        concurrency_lease_limit=2,
         foreground_share=0.70,
         reserve_share=0.30,
         foreground_lane_rps=0.35,
@@ -56,7 +57,7 @@ def test_default_quota_governance_contract_defines_authority_and_hierarchy() -> 
     ]
     assert contract.provider_budget.requests_per_second_ceiling == pytest.approx(0.50)
     assert contract.provider_budget.token_quota_per_minute is None
-    assert contract.provider_budget.concurrency_lease_limit is None
+    assert contract.provider_budget.concurrency_lease_limit == 2
 
 
 def test_subagent_requesters_inherit_parent_run_budget() -> None:

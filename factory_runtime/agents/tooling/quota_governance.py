@@ -199,6 +199,7 @@ def build_default_quota_governance_contract(
             quota_bucket=policy.quota_bucket,
             quota_source=policy.quota_source,
             requests_per_second_ceiling=policy.quota_ceiling_rps,
+            concurrency_lease_limit=policy.concurrency_lease_limit,
         ),
         budget_hierarchy=(
             QuotaBudgetLevel(

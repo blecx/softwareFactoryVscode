@@ -3,6 +3,7 @@ import os
 import random
 import re
 import time
+import uuid
 from pathlib import Path
 
 from factory_runtime.agents.tooling.llm_quota_policy import resolve_role_quota_policy
@@ -13,12 +14,24 @@ except ImportError:  # pragma: no cover
     fcntl = None
 
 
+_DEFAULT_CONCURRENCY_LEASE_TTL_SECONDS = 900.0
+
+
 def _parse_float_env(name: str, default: float) -> float:
     raw = (os.environ.get(name) or "").strip()
     try:
         return float(raw)
     except ValueError:
         return default
+
+
+def _parse_int_env(name: str, default: int) -> int:
+    raw = (os.environ.get(name) or "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default
 
 
 def _clamp(value: float, min_value: float, max_value: float) -> float:
@@ -90,6 +103,20 @@ def _resolve_rate_limit_cooldown_seconds(role: str | None = None) -> float:
     return max(1.0, policy.rate_limit_cooldown_seconds)
 
 
+def _resolve_concurrency_lease_limit(role: str | None = None) -> int:
+    policy = resolve_role_quota_policy(role=_resolve_role(role))
+    return max(1, int(policy.concurrency_lease_limit))
+
+
+def _resolve_concurrency_lease_ttl_seconds(role: str | None = None) -> float:
+    env_default = _parse_float_env(
+        "WORK_ISSUE_CONCURRENCY_LEASE_TTL_SECONDS",
+        _DEFAULT_CONCURRENCY_LEASE_TTL_SECONDS,
+    )
+    policy = resolve_role_quota_policy(role=_resolve_role(role))
+    return max(30.0, env_default, policy.max_wait_seconds)
+
+
 def _state_path() -> Path:
     configured = (os.environ.get("WORK_ISSUE_API_THROTTLE_STATE_FILE") or "").strip()
     if configured:
@@ -138,6 +165,51 @@ def _ensure_channel_state(state: dict, channel: str) -> dict:
         channels[channel] = channel_state
 
     return channel_state
+
+
+def _ensure_lease_scope_state(state: dict, lease_scope: str) -> dict:
+    lease_scopes = state.get("concurrency_leases")
+    if not isinstance(lease_scopes, dict):
+        lease_scopes = {}
+        state["concurrency_leases"] = lease_scopes
+
+    scope_state = lease_scopes.get(lease_scope)
+    if not isinstance(scope_state, dict):
+        scope_state = {}
+        lease_scopes[lease_scope] = scope_state
+
+    leases = scope_state.get("leases")
+    if not isinstance(leases, dict):
+        leases = {}
+        scope_state["leases"] = leases
+
+    return scope_state
+
+
+def _prune_expired_leases(scope_state: dict, now: float) -> None:
+    leases = scope_state.get("leases")
+    if not isinstance(leases, dict):
+        leases = {}
+        scope_state["leases"] = leases
+
+    expired = 0
+    for lease_id, lease_payload in list(leases.items()):
+        if not isinstance(lease_payload, dict):
+            leases.pop(lease_id, None)
+            expired += 1
+            continue
+
+        expires_at = _coerce_float(lease_payload.get("expires_at"), 0.0)
+        if expires_at > 0 and expires_at <= now:
+            leases.pop(lease_id, None)
+            expired += 1
+
+    if expired:
+        scope_state["expired_lease_reap_count"] = (
+            _coerce_int(scope_state.get("expired_lease_reap_count"), 0) + expired
+        )
+
+    scope_state["active_lease_count"] = len(leases)
 
 
 def _summarize_channel(channel_state: dict) -> dict:
@@ -453,6 +525,117 @@ def reserve_api_slot(channel: str = "llm", role: str | None = None) -> float:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
     return total_wait
+
+
+def reserve_concurrency_lease(
+    lease_scope: str,
+    *,
+    role: str | None = None,
+    limit: int | None = None,
+    holder: str | None = None,
+) -> tuple[str | None, float]:
+    """Try to reserve a shared concurrency lease for one upstream request.
+
+    Returns a `(lease_id, wait_seconds)` tuple. When a lease is granted,
+    `lease_id` is non-empty and `wait_seconds` is zero. When capacity is full,
+    `lease_id` is `None` and `wait_seconds` is a small retry hint.
+    """
+
+    if not shared_throttle_supported():
+        return None, 0.0
+
+    lease_limit = (
+        limit
+        if limit is not None and limit > 0
+        else _resolve_concurrency_lease_limit(role=role)
+    )
+    if lease_limit <= 0:
+        return None, 0.0
+
+    retry_hint_seconds = max(
+        0.01,
+        _parse_float_env("WORK_ISSUE_CONCURRENCY_LEASE_POLL_SECONDS", 0.05),
+    )
+    ttl_seconds = _resolve_concurrency_lease_ttl_seconds(role=role)
+
+    state_path = _state_path()
+    lock_path = _lock_path()
+    now = time.time()
+
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        state = _load_state(state_path)
+        scope_state = _ensure_lease_scope_state(state, lease_scope)
+        _prune_expired_leases(scope_state, now)
+        leases = scope_state.get("leases")
+        if not isinstance(leases, dict):
+            leases = {}
+            scope_state["leases"] = leases
+
+        scope_state["lease_limit"] = lease_limit
+        scope_state["updated_at"] = _round_metric(now)
+
+        if len(leases) < lease_limit:
+            lease_id = uuid.uuid4().hex
+            leases[lease_id] = {
+                "holder": holder or "",
+                "acquired_at": _round_metric(now),
+                "expires_at": _round_metric(now + ttl_seconds),
+            }
+            scope_state["lease_grant_count"] = (
+                _coerce_int(scope_state.get("lease_grant_count"), 0) + 1
+            )
+            scope_state["active_lease_count"] = len(leases)
+            scope_state["max_active_leases"] = max(
+                _coerce_int(scope_state.get("max_active_leases"), 0),
+                len(leases),
+            )
+            _save_state(state_path, state)
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            return lease_id, 0.0
+
+        scope_state["lease_wait_event_count"] = (
+            _coerce_int(scope_state.get("lease_wait_event_count"), 0) + 1
+        )
+        scope_state["last_wait_hint_seconds"] = _round_metric(retry_hint_seconds)
+        scope_state["updated_at"] = _round_metric(now)
+        _save_state(state_path, state)
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    return None, retry_hint_seconds
+
+
+def release_concurrency_lease(lease_scope: str, lease_id: str) -> bool:
+    """Release a previously granted shared concurrency lease."""
+
+    if not shared_throttle_supported() or not lease_scope or not lease_id:
+        return False
+
+    state_path = _state_path()
+    lock_path = _lock_path()
+    now = time.time()
+
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        state = _load_state(state_path)
+        scope_state = _ensure_lease_scope_state(state, lease_scope)
+        _prune_expired_leases(scope_state, now)
+        leases = scope_state.get("leases")
+        if not isinstance(leases, dict):
+            leases = {}
+            scope_state["leases"] = leases
+
+        removed = leases.pop(lease_id, None)
+        if removed is not None:
+            scope_state["lease_release_count"] = (
+                _coerce_int(scope_state.get("lease_release_count"), 0) + 1
+            )
+        scope_state["active_lease_count"] = len(leases)
+        scope_state["updated_at"] = _round_metric(now)
+        _save_state(state_path, state)
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    return removed is not None
 
 
 def extract_retry_after_seconds(text: str) -> float | None:
