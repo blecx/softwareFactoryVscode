@@ -14,6 +14,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from factory_runtime.apps.mcp.sqlite_permissions import (
+    finalize_sqlite_path,
+    prepare_sqlite_path,
+)
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -32,7 +37,7 @@ class MemoryStore:
     def __init__(self, db_path: str = ":memory:") -> None:
         self._db_path = db_path
         if self._db_path != ":memory:":
-            Path(self._db_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
+            self._db_path = str(prepare_sqlite_path(self._db_path))
         self._conn = sqlite3.connect(
             str(self._db_path),
             check_same_thread=False,
@@ -42,6 +47,8 @@ class MemoryStore:
         self._conn.execute("PRAGMA synchronous=NORMAL;")
         self._conn.row_factory = sqlite3.Row
         self._migrate()
+        if self._db_path != ":memory:":
+            finalize_sqlite_path(self._db_path)
 
     # ------------------------------------------------------------------
     # Schema

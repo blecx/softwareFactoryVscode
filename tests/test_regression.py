@@ -1794,6 +1794,103 @@ def test_run_docker_e2e_validation_sets_env_and_selected_pytest_filter(
     assert "Exit code: 0" in transcript_text
 
 
+def test_run_docker_bind_mount_ownership_parity_probe_reports_host_mapped_writes(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    probe_root = tmp_path / ".tmp" / "production-readiness" / "docker-bind-mount-parity"
+    cleanup_commands: list[tuple[str, ...]] = []
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        if "chown -R" in command_tuple[-1]:
+            cleanup_commands.append(command_tuple)
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                0,
+                stdout="",
+                stderr="",
+            )
+
+        nested_dir = probe_root / "nested"
+        nested_dir.mkdir(parents=True, exist_ok=True)
+        (nested_dir / "from-container").write_text("ok\n", encoding="utf-8")
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    finding = module.run_docker_bind_mount_ownership_parity_probe(tmp_path)
+
+    assert finding is not None
+    assert finding.name == "Docker bind-mount ownership parity"
+    assert "differ from GitHub-hosted runners" in finding.summary
+    assert (
+        cleanup_commands
+    ), "probe cleanup must restore writable ownership after the probe"
+    transcript = (
+        tmp_path
+        / ".tmp"
+        / "production-readiness"
+        / module.DOCKER_BIND_MOUNT_PARITY_LOG_FILENAME
+    )
+    assert transcript.exists()
+
+
+def test_run_docker_bind_mount_ownership_parity_probe_accepts_non_writable_nested_paths(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    probe_root = tmp_path / ".tmp" / "production-readiness" / "docker-bind-mount-parity"
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        if "chown -R" in command_tuple[-1]:
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                0,
+                stdout="",
+                stderr="",
+            )
+
+        nested_dir = probe_root / "nested"
+        nested_dir.mkdir(parents=True, exist_ok=True)
+        (nested_dir / "from-container").write_text("ok\n", encoding="utf-8")
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    real_access = module.os.access
+
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(
+        module.os,
+        "access",
+        lambda path, mode: (
+            False
+            if str(path).startswith(str(probe_root / "nested"))
+            else real_access(path, mode)
+        ),
+    )
+
+    finding = module.run_docker_bind_mount_ownership_parity_probe(tmp_path)
+
+    assert finding is None
+
+
 def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     monkeypatch,
     tmp_path: Path,
@@ -1814,6 +1911,11 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     )
     monkeypatch.setattr(
         module, "worktree_has_uncommitted_changes", lambda repo_root: True
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_bind_mount_ownership_parity_probe",
+        lambda repo_root: None,
     )
 
     def _fake_run_command(command, *, cwd):
@@ -1848,6 +1950,56 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     assert "./.venv/bin/python" in child_command
     assert "snapshot_path=" in captured.out
     assert "committed HEAD only" in captured.out
+
+
+def test_local_ci_parity_fresh_checkout_production_mode_blocks_on_docker_ownership_gap(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    monkeypatch.setattr(
+        module,
+        "run_docker_bind_mount_ownership_parity_probe",
+        lambda repo_root: module.Finding(
+            severity="error",
+            name="Docker bind-mount ownership parity",
+            summary=(
+                "Local Docker bind-mount ownership semantics differ from "
+                "GitHub-hosted runners."
+            ),
+            remediation=(
+                "Run exact fresh-checkout parity on a rootful Docker daemon/context."
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "create_fresh_checkout_snapshot",
+        lambda repo_root, *, head_rev: (_ for _ in ()).throw(
+            AssertionError(
+                "fresh-checkout snapshot must not be created after a parity gap"
+            )
+        ),
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--fresh-checkout",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "[ERROR] Docker bind-mount ownership parity" in captured.out
+    assert "rootful Docker daemon/context" in captured.out
 
 
 def test_production_readiness_docs_name_promoted_docker_e2e_gate():
