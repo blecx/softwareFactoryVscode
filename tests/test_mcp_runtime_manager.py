@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import errno
 import json
+import shutil
+import sqlite3
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 import factory_runtime.mcp_runtime.manager as runtime_manager_module
+from factory_runtime.apps.mcp.agent_bus.bus import AgentBus
 from factory_runtime.mcp_runtime import (
     MCPRuntimeManager,
     ReadinessResult,
@@ -1392,6 +1395,133 @@ def test_manager_backup_creates_timestamped_bundle_with_checksums(
     assert (
         updated_record["last_completed_tool_call_boundary_at"] == "2026-04-25T08:00:05Z"
     )
+
+
+def test_manager_restore_rehydrates_wal_backed_agent_bus_state_from_backup_bundle(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+    monkeypatch.setattr(
+        runtime_manager_module.factory_workspace,
+        "ports_available",
+        lambda ports: True,
+    )
+    _, repo_root, config, env_path = prepare_workspace(
+        tmp_path,
+        registry_path=registry_path,
+    )
+
+    data_root = Path(config.env_values["FACTORY_DATA_DIR"])
+    memory_db = data_root / "memory" / config.factory_instance_id / "memory.db"
+    agent_bus_db = data_root / "bus" / config.factory_instance_id / "agent_bus.db"
+    memory_db.write_text("memory-state\n", encoding="utf-8")
+
+    bus = AgentBus(str(agent_bus_db))
+    run_id = bus.create_run(
+        108,
+        repo="blecx/softwareFactoryVscode",
+        project_id=config.project_workspace_id,
+    )
+    bus.set_status(
+        run_id,
+        "routing",
+        project_id=config.project_workspace_id,
+    )
+    bus.set_status(
+        run_id,
+        "planning",
+        project_id=config.project_workspace_id,
+    )
+    bus.write_plan(
+        run_id,
+        goal="Restore roundtrip proof",
+        files=["src/example.py"],
+        acceptance_criteria=["criterion"],
+        validation_cmds=["pytest tests/test_multi_tenant.py"],
+        project_id=config.project_workspace_id,
+    )
+    bus.set_status(
+        run_id,
+        "awaiting_approval",
+        project_id=config.project_workspace_id,
+    )
+
+    raw_copy_path = tmp_path / "raw-agent-bus-copy.db"
+    shutil.copy2(agent_bus_db, raw_copy_path)
+    raw_copy_connection = sqlite3.connect(str(raw_copy_path))
+    try:
+        raw_copy_tables = {
+            row[0]
+            for row in raw_copy_connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall()
+        }
+    finally:
+        raw_copy_connection.close()
+
+    assert "task_runs" not in raw_copy_tables
+
+    registry = factory_workspace.load_registry(registry_path)
+    registry["workspaces"][config.factory_instance_id].update(
+        {
+            "runtime_state": RuntimeLifecycleState.SUSPENDED.value,
+            "last_runtime_action": RuntimeActionTrigger.SUSPEND.value,
+            "last_runtime_action_at": "2026-04-25T08:15:00Z",
+            "last_runtime_action_reason_codes": [ReasonCode.SUSPEND_REQUESTED.value],
+            "last_completed_tool_call_boundary_at": "2026-04-25T08:15:05Z",
+        }
+    )
+    factory_workspace.save_registry(registry, registry_path)
+
+    manager = build_manager_with_successful_probes(registry_path=registry_path)
+    monkeypatch.setattr(manager, "_docker_available", lambda: True)
+    monkeypatch.setattr(
+        manager,
+        "_collect_service_inventory",
+        lambda _compose_name: {},
+    )
+
+    backup_result = manager.backup(repo_root, env_file=env_path)
+    bus.close()
+    bundle_path = Path(backup_result["bundle_path"])
+    bundled_agent_bus_db = (
+        bundle_path / "data" / "bus" / config.factory_instance_id / "agent_bus.db"
+    )
+    bundled_connection = sqlite3.connect(str(bundled_agent_bus_db))
+    try:
+        bundled_row = bundled_connection.execute(
+            "SELECT run_id, status FROM task_runs"
+        ).fetchone()
+    finally:
+        bundled_connection.close()
+
+    assert bundled_row == (run_id, "awaiting_approval")
+
+    manager._remove_runtime_data_dirs(config)
+    env_path.unlink()
+    config.runtime_manifest_path.unlink()
+    manager._persist_runtime_deleted_record(
+        target_path=config.target_dir,
+        factory_dir=repo_root,
+        config=config,
+        trigger=RuntimeActionTrigger.CLEANUP,
+        reason_codes=(),
+    )
+
+    restore_result = manager.restore(repo_root, bundle_path=bundle_path)
+
+    assert restore_result["runtime_state"] == RuntimeLifecycleState.SUSPENDED.value
+    restored_connection = sqlite3.connect(str(agent_bus_db))
+    try:
+        restored_row = restored_connection.execute(
+            "SELECT run_id, status FROM task_runs"
+        ).fetchone()
+    finally:
+        restored_connection.close()
+
+    assert restored_row == (run_id, "awaiting_approval")
 
 
 def test_manager_restore_rehydrates_suspended_runtime_from_backup_bundle(
