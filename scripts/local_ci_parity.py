@@ -42,6 +42,8 @@ PRODUCTION_READINESS_REQUIRED_GREEN_RUNS = 3
 PRODUCTION_READINESS_BUNDLE_SUBDIR = Path(".tmp") / "production-readiness"
 LOCAL_CI_PARITY_SNAPSHOT_PARENT_TEMPLATE = ".{repo_name}-local-ci-parity-snapshots"
 DOCKER_E2E_LATEST_LOG_FILENAME = "docker-e2e-latest.log"
+DOCKER_BIND_MOUNT_PARITY_LOG_FILENAME = "docker-bind-mount-parity-latest.log"
+DOCKER_BIND_MOUNT_PARITY_PROBE_IMAGE = "alpine:3.22.1"
 PRODUCTION_READINESS_REQUIRED_DOCS = (
     "docs/PRODUCTION-READINESS.md",
     "docs/INSTALL.md",
@@ -132,6 +134,210 @@ def build_rerun_command(args: argparse.Namespace) -> str:
     return format_command(command)
 
 
+def _current_host_posix_id(getter_name: str) -> int | None:
+    getter = getattr(os, getter_name, None)
+    if not callable(getter):
+        return None
+
+    try:
+        return int(getter())
+    except (OSError, TypeError, ValueError):
+        return None
+
+
+def _cleanup_docker_bind_mount_probe(
+    repo_root: Path,
+    *,
+    probe_root: Path,
+    host_uid: int | None,
+    host_gid: int | None,
+) -> None:
+    if not probe_root.exists():
+        return
+
+    if (
+        shutil.which("docker") is not None
+        and host_uid is not None
+        and host_gid is not None
+    ):
+        cleanup_command = (
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{probe_root}:/probe",
+            DOCKER_BIND_MOUNT_PARITY_PROBE_IMAGE,
+            "sh",
+            "-lc",
+            f"chown -R {host_uid}:{host_gid} /probe || true",
+        )
+        try:
+            run_command(cleanup_command, cwd=repo_root)
+        except OSError:
+            pass
+
+    shutil.rmtree(probe_root, ignore_errors=True)
+
+
+def run_docker_bind_mount_ownership_parity_probe(repo_root: Path) -> Finding | None:
+    print("\n▶ Docker bind-mount ownership parity probe")
+
+    if shutil.which("docker") is None:
+        return Finding(
+            severity="error",
+            name="Docker bind-mount ownership parity",
+            summary=(
+                "Docker CLI is required for the exact GitHub Docker-ownership parity "
+                "probe but was not found on PATH."
+            ),
+            remediation=(
+                "Install or expose the Docker CLI on PATH, then rerun "
+                f"`{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}`."
+            ),
+        )
+
+    probe_root = (
+        repo_root / PRODUCTION_READINESS_BUNDLE_SUBDIR / "docker-bind-mount-parity"
+    )
+    transcript_path = (
+        repo_root
+        / PRODUCTION_READINESS_BUNDLE_SUBDIR
+        / DOCKER_BIND_MOUNT_PARITY_LOG_FILENAME
+    )
+    nested_dir = probe_root / "nested"
+    nested_file = nested_dir / "from-container"
+    host_uid = _current_host_posix_id("getuid")
+    host_gid = _current_host_posix_id("getgid")
+
+    command = (
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        f"{probe_root}:/probe",
+        DOCKER_BIND_MOUNT_PARITY_PROBE_IMAGE,
+        "sh",
+        "-lc",
+        (
+            "mkdir -p /probe/nested && touch /probe/nested/from-container && "
+            "stat -c '%u:%g %a %n' /probe/nested /probe/nested/from-container"
+        ),
+    )
+
+    shutil.rmtree(probe_root, ignore_errors=True)
+    probe_root.mkdir(parents=True, exist_ok=True)
+
+    try:
+        try:
+            result = run_command(command, cwd=repo_root)
+        except OSError as exc:
+            return Finding(
+                severity="error",
+                name="Docker bind-mount ownership parity",
+                summary=(
+                    "The exact GitHub Docker-ownership parity probe could not start "
+                    f"({exc})."
+                ),
+                remediation=(
+                    "Fix the local Docker runtime environment, then rerun "
+                    f"`{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}`."
+                ),
+                command=command,
+            )
+
+        write_command_transcript(
+            transcript_path,
+            command=command,
+            result=result,
+        )
+        emit_command_output(result)
+        if result.returncode != 0:
+            return Finding(
+                severity="error",
+                name="Docker bind-mount ownership parity",
+                summary=(
+                    "The exact GitHub Docker-ownership parity probe failed to run "
+                    f"(exit code {result.returncode}). Raw output was saved to "
+                    f"`{display_path(transcript_path, repo_root)}`."
+                ),
+                remediation=(
+                    "Fix the local Docker runtime environment, then rerun "
+                    f"`{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}`."
+                ),
+                command=command,
+                returncode=result.returncode,
+            )
+
+        if not nested_dir.exists() or not nested_file.exists():
+            return Finding(
+                severity="error",
+                name="Docker bind-mount ownership parity",
+                summary=(
+                    "The exact GitHub Docker-ownership parity probe did not create the "
+                    "expected nested bind-mount paths on the host."
+                ),
+                remediation=(
+                    "Inspect the local Docker bind-mount behavior and rerun "
+                    f"`{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}` once the probe can "
+                    "observe the nested paths."
+                ),
+                command=command,
+            )
+
+        nested_dir_owner = (nested_dir.stat().st_uid, nested_dir.stat().st_gid)
+        nested_file_owner = (nested_file.stat().st_uid, nested_file.stat().st_gid)
+        nested_dir_writable = os.access(nested_dir, os.W_OK)
+        nested_file_writable = os.access(nested_file, os.W_OK)
+
+        print(
+            "host_nested_dir="
+            f"{nested_dir_owner[0]}:{nested_dir_owner[1]} writable={nested_dir_writable}"
+        )
+        print(
+            "host_nested_file="
+            f"{nested_file_owner[0]}:{nested_file_owner[1]} writable={nested_file_writable}"
+        )
+
+        if (
+            host_uid is not None
+            and host_gid is not None
+            and nested_dir_owner == (host_uid, host_gid)
+            and nested_file_owner == (host_uid, host_gid)
+            and nested_dir_writable
+            and nested_file_writable
+        ):
+            return Finding(
+                severity="error",
+                name="Docker bind-mount ownership parity",
+                summary=(
+                    "Local Docker bind-mount ownership semantics differ from GitHub-hosted "
+                    "runners: container-root created nested bind-mount paths remain owned "
+                    "and writable by the host user. Ownership-sensitive promoted Docker "
+                    "proofs can pass locally while still failing remotely."
+                ),
+                remediation=(
+                    "Run exact fresh-checkout parity on a rootful Docker daemon/context "
+                    "that preserves root-owned bind-mount writes (GitHub-hosted runner "
+                    "semantics), or treat GitHub CI as the source of truth for this "
+                    "ownership-sensitive Docker dimension."
+                ),
+                command=command,
+            )
+
+        print(
+            "✅ Local Docker bind-mount ownership probe did not preserve host-user "
+            "ownership/writability for container-root-created nested paths."
+        )
+        return None
+    finally:
+        _cleanup_docker_bind_mount_probe(
+            repo_root,
+            probe_root=probe_root,
+            host_uid=host_uid,
+            host_gid=host_gid,
+        )
+
+
 def worktree_has_uncommitted_changes(repo_root: Path) -> bool:
     result = run_git(repo_root, ["status", "--short"])
     if result.returncode != 0:
@@ -217,6 +423,16 @@ def run_fresh_checkout_validation(
         "This path mirrors GitHub's clean checkout + `setup.sh` bootstrap before "
         "replaying the canonical parity command."
     )
+
+    if args.mode == PRODUCTION_MODE:
+        docker_parity_finding = run_docker_bind_mount_ownership_parity_probe(repo_root)
+        if docker_parity_finding is not None:
+            print_findings_report([docker_parity_finding])
+            print_improvement_plan(
+                [docker_parity_finding],
+                rerun_command=FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND,
+            )
+            return 1
 
     if worktree_has_uncommitted_changes(repo_root):
         print(
