@@ -21,6 +21,19 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
 - **All versions** — a GitHub account with Copilot access (paid plan or Copilot Free) is still required.
 - **GitHub Pull Requests and Issues** is optional and only needed for PR/issues UI inside VS Code.
 
+## 🚦 Immediate LLM quota policy
+
+- The immediate LLM limiter now chooses a shared workspace quota bucket from the active provider/model family instead of hard-coding one ultra-conservative global default.
+- Current GitHub Models fallbacks are intentionally modest and split into a shared **70% foreground lane / 30% reserve lane**:
+  - `gpt-4o-mini` / `gpt-4.1-mini` families → `0.50 RPS` ceiling (`0.35` foreground / `0.15` reserve)
+  - `gpt-4o` / `gpt-4.1` families → `0.30 RPS` ceiling (`0.21` foreground / `0.09` reserve)
+  - `o1` / `o3` / `o4` reasoning families → `0.15 RPS` ceiling (`0.105` foreground / `0.045` reserve)
+- Override the shared ceiling only when you need a stricter local cap:
+  - `WORK_ISSUE_QUOTA_CEILING_RPS`
+  - `WORK_ISSUE_FOREGROUND_SHARE`
+  - `WORK_ISSUE_RESERVE_SHARE`
+- Startup diagnostics now expose `request_quota_policy` and `role_request_policies` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket without spelunking through env vars like caffeinated archaeologists.
+
 ## 💻 Lifecycle commands
 
 From the source checkout, use `scripts/factory_stack.py`.

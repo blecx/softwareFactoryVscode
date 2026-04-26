@@ -172,9 +172,6 @@ Token Budget Mode:
     os.environ.setdefault("WORK_ISSUE_PLANNING_FALLBACK_AFTER_ATTEMPT", "3")
     os.environ.setdefault("WORK_ISSUE_PLANNING_FALLBACK_MAX_ATTEMPTS", "6")
     os.environ.setdefault("WORK_ISSUE_PLANNING_FALLBACK_PROMPT_CHARS", "1400")
-    os.environ.setdefault("WORK_ISSUE_MAX_RPS", "0.03")
-    os.environ.setdefault("WORK_ISSUE_RPS_JITTER", "0.25")
-    os.environ.setdefault("WORK_ISSUE_RATE_LIMIT_COOLDOWN_SECONDS", "120")
 
     archive_enabled = (
         not args.no_goal_archive
