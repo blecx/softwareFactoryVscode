@@ -33,9 +33,12 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
   - `WORK_ISSUE_QUOTA_CEILING_RPS`
   - `WORK_ISSUE_FOREGROUND_SHARE`
   - `WORK_ISSUE_RESERVE_SHARE`
-- Live parent-agent and subagent LLM clients now reserve slots from the same workspace-owned throttle state under `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json`, guarded by `.copilot/softwareFactoryVscode/.tmp/api-throttle.lock`, so a fresh client instance cannot quietly sprint past the shared budget.
+- `#141` layers a workspace-scoped quota broker on top of that same shared baseline. Live parent-agent and subagent LLM clients now enter one brokered admission path that reserves both request-rate slots and shared provider/model-family concurrency leases before an outbound provider call is sent.
+- The broker still stores its shared state under `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json`, guarded by `.copilot/softwareFactoryVscode/.tmp/api-throttle.lock`, so a fresh client instance cannot quietly sprint past the shared budget or bypass the shared in-flight lease ceiling.
+- Current default shared concurrency lease ceilings are intentionally conservative: GitHub mini buckets default to `2` shared in-flight leases, while the other current GitHub buckets default to `1`. Override them only when you have a measured reason:
+  - `WORK_ISSUE_CONCURRENCY_LEASE_LIMIT`
 - The long-term contract keeps those shared lanes as delegated workspace/run/requester budget partitions, not per-process entitlements and not a second runtime-truth surface.
-- Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket and see whether time is being burned in queue wait, upstream processing, retry-after hints, or shared cooldown windows.
+- Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket (including `concurrency_lease_limit`) and see whether time is being burned in queue wait, upstream processing, retry-after hints, or shared cooldown windows.
 - `scripts/work-issue.py` now prints the same limiter summary at startup and after execution, including work-issue retry/backoff totals for the current run.
 
 ## 💻 Lifecycle commands

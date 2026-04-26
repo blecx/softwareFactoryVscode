@@ -300,7 +300,11 @@ FACTORY_SHARED_SERVICE_MODE=per-workspace
 # WORK_ISSUE_QUOTA_CEILING_RPS=0.50
 # WORK_ISSUE_FOREGROUND_SHARE=0.70
 # WORK_ISSUE_RESERVE_SHARE=0.30
-# Live LLM clients share workspace-global limiter state at:
+# Optional shared in-flight lease ceiling for the workspace-scoped quota broker.
+# GitHub mini buckets default to 2 shared leases; the other current GitHub
+# buckets default to 1 unless you override them here.
+# WORK_ISSUE_CONCURRENCY_LEASE_LIMIT=2
+# Live LLM clients share workspace-global broker/limiter state at:
 # .copilot/softwareFactoryVscode/.tmp/api-throttle-state.json
 # .copilot/softwareFactoryVscode/.tmp/api-throttle.lock
 ```
