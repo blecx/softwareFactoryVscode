@@ -70,7 +70,7 @@ jobs:
         run: chmod +x ./scripts/validate-pr-template.sh && ./scripts/validate-pr-template.sh "${{ github.workspace }}/.github/pull_request_template.md"
 
   production-readiness:
-    name: "Internal Production Readiness Gate"
+    name: "Internal Production Gate — Docker Parity & Recovery Proofs"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -86,12 +86,15 @@ jobs:
         run: |
           bash ./setup.sh
 
-      - name: Run canonical internal production-readiness gate
+      - name: Run canonical internal production gate (Docker parity & recovery proofs)
         run: |
-          # The canonical internal production-readiness gate performs blocking
-          # Dockerfile builds, the promoted Docker E2E runtime proofs (including
-          # backup/restore roundtrip evidence), required docs/runbook presence
-          # checks, and emits a concise sign-off bundle under .tmp.
+          # The canonical internal production gate still reuses the documented
+          # `./scripts/local_ci_parity.py --mode production` contract, while CI
+          # surfaces a clearer human-facing label because this lane bundles
+          # blocking Dockerfile builds, promoted Docker E2E runtime proofs
+          # (including backup/restore roundtrip evidence), required
+          # docs/runbook presence checks, and a concise sign-off bundle under
+          # .tmp.
           ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
 
       - name: Upload production-readiness evidence bundle

@@ -1111,7 +1111,7 @@ def build_production_readiness_summary_markdown(
     ]
 
     lines = [
-        "# Internal production-readiness gate",
+        "# Internal production gate — Docker parity & recovery proofs",
         "",
         f"- Scope: `{PRODUCTION_READINESS_SCOPE}`",
         f"- Gate command: `{report_data['command']}`",
@@ -1306,7 +1306,7 @@ def print_production_readiness_bundle_summary(
     repo_root: Path,
 ) -> None:
     print("\n" + "=" * 60)
-    print("Internal production-readiness sign-off")
+    print("Internal production gate sign-off — Docker parity & recovery proofs")
     print("=" * 60)
     print(f"scope={PRODUCTION_READINESS_SCOPE}")
     print(f"gate_command={CANONICAL_PRODUCTION_PARITY_COMMAND}")

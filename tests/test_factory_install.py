@@ -8423,12 +8423,15 @@ def test_ci_workflow_has_internal_production_readiness_job() -> None:
     """Finding #7 — CI must use the canonical production gate with Node 24-compatible action majors."""
     ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
     text = ci_file.read_text(encoding="utf-8")
-    assert (
-        "production-readiness" in text or "Internal Production Readiness Gate" in text
-    ), "CI workflow must have a canonical internal production-readiness job"
+    assert "production-readiness:" in text
+    assert "Internal Production Gate — Docker Parity & Recovery Proofs" in text
     assert (
         "--mode production" in text
     ), "CI production-readiness job must invoke the canonical production gate command"
+    assert (
+        "Run canonical internal production gate (Docker parity & recovery proofs)"
+        in text
+    ), "CI production-readiness job should use clearer human-facing step wording"
     assert (
         "docker/*/Dockerfile" in text or "Dockerfile" in text
     ), "CI production-readiness job must retain Docker build parity coverage"

@@ -2131,7 +2131,13 @@ def test_local_ci_parity_production_mode_writes_signoff_bundle_and_tracks_green_
         latest_report["final_signoff_status"] == "pending-three-consecutive-green-runs"
     )
     assert "Consecutive clean runs: `2/3`" in latest_summary
-    assert "Internal production-readiness sign-off" in captured.out
+    assert (
+        "Internal production gate — Docker parity & recovery proofs" in latest_summary
+    )
+    assert (
+        "Internal production gate sign-off — Docker parity & recovery proofs"
+        in captured.out
+    )
     assert history["current_streak"]["count"] == 2
     assert len(history["runs"]) == 2
 
