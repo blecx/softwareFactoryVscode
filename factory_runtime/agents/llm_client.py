@@ -16,6 +16,7 @@ from typing import Awaitable, Callable, Dict, Optional
 import httpx
 from openai import AsyncOpenAI
 
+from factory_runtime.agents.tooling import api_throttle
 from factory_runtime.agents.tooling.llm_quota_policy import (
     LLMQuotaPolicy,
     get_llm_config_path,
@@ -53,6 +54,38 @@ def _load_dynamic_override_api_key() -> str:
 
     candidate = str(data.get("api_key", "")).strip() if isinstance(data, dict) else ""
     return candidate
+
+
+def _normalize_throttle_lane(lane: str) -> str:
+    normalized = (lane or "foreground").strip().lower()
+    return "reserve" if normalized == "reserve" else "foreground"
+
+
+def _build_shared_throttle_channel(role: str, lane: str = "foreground") -> str:
+    normalized_role = (role or "coding").strip().lower() or "coding"
+    channel = f"llm:{normalized_role}"
+    if _normalize_throttle_lane(lane) == "reserve":
+        return f"{channel}.reserve"
+    return channel
+
+
+def _extract_retry_after_seconds(response: httpx.Response) -> float | None:
+    retry_after = (response.headers.get("retry-after") or "").strip()
+    if retry_after:
+        try:
+            return max(0.0, float(retry_after))
+        except ValueError:
+            parsed = api_throttle.extract_retry_after_seconds(retry_after)
+            if parsed is not None:
+                return parsed
+
+    if response.status_code != 429:
+        return None
+
+    try:
+        return api_throttle.extract_retry_after_seconds(response.text)
+    except (httpx.ResponseNotRead, UnicodeDecodeError):
+        return None
 
 
 class _LLMRequestThrottle:
@@ -100,20 +133,59 @@ class _LLMRequestThrottle:
 class _RateLimitedAsyncHTTPClient(httpx.AsyncClient):
     """httpx client wrapper that throttles before each outbound request."""
 
-    def __init__(self, *, throttle: _LLMRequestThrottle):
-        super().__init__()
+    def __init__(
+        self,
+        *,
+        throttle: _LLMRequestThrottle,
+        role: str,
+        lane: str = "foreground",
+        sleeper: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        **client_kwargs,
+    ):
+        super().__init__(**client_kwargs)
         self._throttle = throttle
+        self._role = (role or "coding").strip().lower() or "coding"
+        self._lane = _normalize_throttle_lane(lane)
+        self._shared_channel = _build_shared_throttle_channel(self._role, self._lane)
+        self._sleeper = sleeper
+
+    async def _acquire_request_slot(self) -> None:
+        if api_throttle.shared_throttle_supported():
+            wait_seconds = api_throttle.reserve_api_slot(
+                channel=self._shared_channel,
+                role=self._role,
+            )
+            if wait_seconds > 0:
+                await self._sleeper(wait_seconds)
+            return
+
+        await self._throttle.acquire()
+
+    def _apply_shared_penalty(self, response: httpx.Response) -> None:
+        retry_after_seconds = _extract_retry_after_seconds(response)
+        if response.status_code != 429 and retry_after_seconds is None:
+            return
+
+        api_throttle.apply_rate_limit_penalty(
+            channel=self._shared_channel,
+            penalty_seconds=retry_after_seconds,
+            role=self._role,
+        )
 
     async def send(self, request, **kwargs):
-        await self._throttle.acquire()
-        return await super().send(request, **kwargs)
+        await self._acquire_request_slot()
+        response = await super().send(request, **kwargs)
+        self._apply_shared_penalty(response)
+        return response
 
 
 class LLMClientFactory:
     """Factory for creating LLM clients based on configuration."""
 
     _cached_github_token: Optional[str] = None
-    _shared_request_throttles: Dict[tuple[str, float, float], _LLMRequestThrottle] = {}
+    _shared_request_throttles: Dict[
+        tuple[str, str, float, float], _LLMRequestThrottle
+    ] = {}
     _default_role_models = {
         # gpt-5.2 does not exist on GitHub Models; use gpt-4o as the capable default.
         "planning": "openai/gpt-4o",
@@ -145,16 +217,26 @@ class LLMClientFactory:
         return resolve_role_quota_policy(role, config=role_config)
 
     @staticmethod
+    def _get_lane_rps(policy: LLMQuotaPolicy, lane: str) -> float:
+        if _normalize_throttle_lane(lane) == "reserve":
+            return policy.reserve_lane_rps
+        return policy.foreground_lane_rps
+
+    @staticmethod
     def _get_shared_request_throttle(
         role: str,
         role_config: Optional[dict] = None,
+        lane: str = "foreground",
     ) -> _LLMRequestThrottle:
         policy = LLMClientFactory._get_request_policy(role, role_config=role_config)
-        key = (role, policy.foreground_lane_rps, policy.jitter_ratio)
+        normalized_role = (role or "coding").strip().lower() or "coding"
+        normalized_lane = _normalize_throttle_lane(lane)
+        lane_rps = LLMClientFactory._get_lane_rps(policy, normalized_lane)
+        key = (normalized_role, normalized_lane, lane_rps, policy.jitter_ratio)
         throttle = LLMClientFactory._shared_request_throttles.get(key)
         if throttle is None:
             throttle = _LLMRequestThrottle(
-                max_rps=policy.foreground_lane_rps,
+                max_rps=lane_rps,
                 jitter_ratio=policy.jitter_ratio,
             )
             LLMClientFactory._shared_request_throttles[key] = throttle
@@ -164,12 +246,18 @@ class LLMClientFactory:
     def _create_rate_limited_http_client(
         role: str,
         role_config: Optional[dict] = None,
+        lane: str = "foreground",
     ) -> httpx.AsyncClient:
         throttle = LLMClientFactory._get_shared_request_throttle(
             role,
             role_config=role_config,
+            lane=lane,
         )
-        return _RateLimitedAsyncHTTPClient(throttle=throttle)
+        return _RateLimitedAsyncHTTPClient(
+            throttle=throttle,
+            role=role,
+            lane=lane,
+        )
 
     @staticmethod
     def _looks_like_placeholder(key: str) -> bool:
@@ -331,7 +419,7 @@ class LLMClientFactory:
         return LLMClientFactory._default_role_models.get(role, "openai/gpt-4o-mini")
 
     @staticmethod
-    def create_client_for_role(role: str) -> AsyncOpenAI:
+    def create_client_for_role(role: str, lane: str = "foreground") -> AsyncOpenAI:
         """Create an OpenAI-compatible async client for a given role.
 
         Supported:
@@ -371,6 +459,7 @@ class LLMClientFactory:
                     http_client=LLMClientFactory._create_rate_limited_http_client(
                         role,
                         role_config=role_config,
+                        lane=lane,
                     ),
                 )
             return AsyncOpenAI(
@@ -379,6 +468,7 @@ class LLMClientFactory:
                 http_client=LLMClientFactory._create_rate_limited_http_client(
                     role,
                     role_config=role_config,
+                    lane=lane,
                 ),
             )
 
@@ -388,7 +478,10 @@ class LLMClientFactory:
         )
 
     @staticmethod
-    def create_github_client(api_key: Optional[str] = None) -> AsyncOpenAI:
+    def create_github_client(
+        api_key: Optional[str] = None,
+        lane: str = "foreground",
+    ) -> AsyncOpenAI:
         """
         Create OpenAI client configured for GitHub Models.
 
@@ -411,7 +504,10 @@ class LLMClientFactory:
         return AsyncOpenAI(
             base_url="https://models.github.ai/inference",
             api_key=api_key,
-            http_client=LLMClientFactory._create_rate_limited_http_client("coding"),
+            http_client=LLMClientFactory._create_rate_limited_http_client(
+                "coding",
+                lane=lane,
+            ),
         )
 
     @staticmethod

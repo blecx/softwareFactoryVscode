@@ -32,6 +32,7 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
   - `WORK_ISSUE_QUOTA_CEILING_RPS`
   - `WORK_ISSUE_FOREGROUND_SHARE`
   - `WORK_ISSUE_RESERVE_SHARE`
+- Live parent-agent and subagent LLM clients now reserve slots from the same workspace-owned throttle state under `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json`, guarded by `.copilot/softwareFactoryVscode/.tmp/api-throttle.lock`, so a fresh client instance cannot quietly sprint past the shared budget.
 - Startup diagnostics now expose `request_quota_policy` and `role_request_policies` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket without spelunking through env vars like caffeinated archaeologists.
 
 ## 💻 Lifecycle commands
