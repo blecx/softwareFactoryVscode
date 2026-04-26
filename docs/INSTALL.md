@@ -304,9 +304,15 @@ FACTORY_SHARED_SERVICE_MODE=per-workspace
 # GitHub mini buckets default to 2 shared leases; the other current GitHub
 # buckets default to 1 unless you override them here.
 # WORK_ISSUE_CONCURRENCY_LEASE_LIMIT=2
+# Optional stale-waiter TTL for the lineage-fairness queue.
+# Keep this short unless you are debugging pathological retry behavior.
+# WORK_ISSUE_CONCURRENCY_WAITER_TTL_SECONDS=5
 # Live LLM clients share workspace-global broker/limiter state at:
 # .copilot/softwareFactoryVscode/.tmp/api-throttle-state.json
 # .copilot/softwareFactoryVscode/.tmp/api-throttle.lock
+# Parent-run clients automatically attach their run lineage, subagents inherit
+# their parent-run lineage, and provider Retry-After / cooldown feedback is
+# shared across the provider/model-family/lane scope rather than one role only.
 ```
 
 The bootstrap step also generates `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`.

@@ -152,6 +152,15 @@ class CoderAgent:
     # ------------------------------------------------------------------
 
     async def _run_lifecycle(self, run_id: str) -> CoderResult:
+        if self._llm is None:
+            from factory_runtime.agents.llm_client import LLMClientFactory
+
+            self._llm = LLMClientFactory.create_client_for_role(
+                "coding",
+                requester_class="parent-run",
+                run_id=run_id,
+            )
+
         # ── Phase 1: Read context ─────────────────────────────────────
         packet = await self._mcp.call_tool(
             "bus_read_context_packet", {"run_id": run_id}

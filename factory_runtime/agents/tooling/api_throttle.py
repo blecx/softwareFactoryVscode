@@ -15,6 +15,13 @@ except ImportError:  # pragma: no cover
 
 
 _DEFAULT_CONCURRENCY_LEASE_TTL_SECONDS = 900.0
+_DEFAULT_CONCURRENCY_WAITER_TTL_SECONDS = 5.0
+_REQUESTER_PRIORITY = {
+    "interactive": 0,
+    "parent-run": 1,
+    "subagent": 2,
+    "background": 3,
+}
 
 
 def _parse_float_env(name: str, default: float) -> float:
@@ -117,6 +124,31 @@ def _resolve_concurrency_lease_ttl_seconds(role: str | None = None) -> float:
     return max(30.0, env_default, policy.max_wait_seconds)
 
 
+def _resolve_waiter_ttl_seconds() -> float:
+    return max(
+        1.0,
+        _parse_float_env(
+            "WORK_ISSUE_CONCURRENCY_WAITER_TTL_SECONDS",
+            _DEFAULT_CONCURRENCY_WAITER_TTL_SECONDS,
+        ),
+        _parse_float_env("WORK_ISSUE_CONCURRENCY_LEASE_POLL_SECONDS", 0.05) * 5.0,
+    )
+
+
+def _normalize_requester_class(value: object) -> str:
+    candidate = str(value or "").strip().lower()
+    if candidate in _REQUESTER_PRIORITY:
+        return candidate
+    return "interactive"
+
+
+def _requester_priority_value(value: object) -> int:
+    return _REQUESTER_PRIORITY.get(
+        _normalize_requester_class(value),
+        len(_REQUESTER_PRIORITY),
+    )
+
+
 def _state_path() -> Path:
     configured = (os.environ.get("WORK_ISSUE_API_THROTTLE_STATE_FILE") or "").strip()
     if configured:
@@ -167,6 +199,20 @@ def _ensure_channel_state(state: dict, channel: str) -> dict:
     return channel_state
 
 
+def _ensure_shared_scope_state(state: dict, shared_scope: str) -> dict:
+    shared_scopes = state.get("shared_scopes")
+    if not isinstance(shared_scopes, dict):
+        shared_scopes = {}
+        state["shared_scopes"] = shared_scopes
+
+    scope_state = shared_scopes.get(shared_scope)
+    if not isinstance(scope_state, dict):
+        scope_state = {}
+        shared_scopes[shared_scope] = scope_state
+
+    return scope_state
+
+
 def _ensure_lease_scope_state(state: dict, lease_scope: str) -> dict:
     lease_scopes = state.get("concurrency_leases")
     if not isinstance(lease_scopes, dict):
@@ -182,6 +228,11 @@ def _ensure_lease_scope_state(state: dict, lease_scope: str) -> dict:
     if not isinstance(leases, dict):
         leases = {}
         scope_state["leases"] = leases
+
+    waiters = scope_state.get("waiters")
+    if not isinstance(waiters, dict):
+        waiters = {}
+        scope_state["waiters"] = waiters
 
     return scope_state
 
@@ -210,6 +261,24 @@ def _prune_expired_leases(scope_state: dict, now: float) -> None:
         )
 
     scope_state["active_lease_count"] = len(leases)
+
+
+def _prune_stale_waiters(scope_state: dict, now: float) -> None:
+    waiters = scope_state.get("waiters")
+    if not isinstance(waiters, dict):
+        waiters = {}
+        scope_state["waiters"] = waiters
+
+    ttl_seconds = _resolve_waiter_ttl_seconds()
+    for requester_id, waiter_payload in list(waiters.items()):
+        if not isinstance(waiter_payload, dict):
+            waiters.pop(requester_id, None)
+            continue
+        last_seen = _coerce_float(waiter_payload.get("last_seen"), 0.0)
+        if last_seen <= 0 or (now - last_seen) > ttl_seconds:
+            waiters.pop(requester_id, None)
+
+    scope_state["waiter_count"] = len(waiters)
 
 
 def _summarize_channel(channel_state: dict) -> dict:
@@ -276,6 +345,15 @@ def _summarize_channel(channel_state: dict) -> dict:
             0, _coerce_int(channel_state.get("rate_limit_response_count"), 0)
         ),
         "last_status_code": channel_state.get("last_status_code"),
+        "last_requester_class": channel_state.get("last_requester_class"),
+        "last_lineage_id": channel_state.get("last_lineage_id"),
+        "requester_class_counts": {
+            str(key): max(0, _coerce_int(value, 0))
+            for key, value in (
+                channel_state.get("requester_class_counts") or {}
+            ).items()
+            if isinstance(key, str)
+        },
         "next_allowed_ts": _round_metric(
             _coerce_float(channel_state.get("next_allowed_ts"), 0.0)
         ),
@@ -285,6 +363,42 @@ def _summarize_channel(channel_state: dict) -> dict:
         "last_request_finished_at": _round_metric(
             _coerce_float(channel_state.get("last_request_finished_at"), 0.0)
         ),
+    }
+
+
+def _summarize_lease_scope(scope_state: dict) -> dict:
+    waiters = scope_state.get("waiters")
+    if not isinstance(waiters, dict):
+        waiters = {}
+
+    return {
+        "lease_limit": max(0, _coerce_int(scope_state.get("lease_limit"), 0)),
+        "active_lease_count": max(
+            0, _coerce_int(scope_state.get("active_lease_count"), 0)
+        ),
+        "max_active_leases": max(
+            0, _coerce_int(scope_state.get("max_active_leases"), 0)
+        ),
+        "lease_grant_count": max(
+            0, _coerce_int(scope_state.get("lease_grant_count"), 0)
+        ),
+        "lease_release_count": max(
+            0, _coerce_int(scope_state.get("lease_release_count"), 0)
+        ),
+        "lease_wait_event_count": max(
+            0, _coerce_int(scope_state.get("lease_wait_event_count"), 0)
+        ),
+        "priority_wait_event_count": max(
+            0, _coerce_int(scope_state.get("priority_wait_event_count"), 0)
+        ),
+        "subagent_parallelism_cap_hits": max(
+            0, _coerce_int(scope_state.get("subagent_parallelism_cap_hits"), 0)
+        ),
+        "expired_lease_reap_count": max(
+            0, _coerce_int(scope_state.get("expired_lease_reap_count"), 0)
+        ),
+        "waiter_count": len(waiters),
+        "updated_at": _round_metric(_coerce_float(scope_state.get("updated_at"), 0.0)),
     }
 
 
@@ -307,6 +421,12 @@ def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
     channels = state.get("channels")
     if not isinstance(channels, dict):
         channels = {}
+    shared_scopes = state.get("shared_scopes")
+    if not isinstance(shared_scopes, dict):
+        shared_scopes = {}
+    concurrency_leases = state.get("concurrency_leases")
+    if not isinstance(concurrency_leases, dict):
+        concurrency_leases = {}
 
     selected_channels = {
         name: value
@@ -318,6 +438,18 @@ def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
     channel_metrics = {
         name: _summarize_channel(channel_state)
         for name, channel_state in selected_channels.items()
+    }
+    shared_scope_metrics = {
+        name: _summarize_channel(scope_state)
+        for name, scope_state in shared_scopes.items()
+        if isinstance(name, str)
+        and isinstance(scope_state, dict)
+        and (not channel_prefix or name.startswith(channel_prefix))
+    }
+    lease_scope_metrics = {
+        name: _summarize_lease_scope(scope_state)
+        for name, scope_state in concurrency_leases.items()
+        if isinstance(name, str) and isinstance(scope_state, dict)
     }
 
     summary = {
@@ -391,7 +523,96 @@ def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
         "lock_path": str(_lock_path()),
         "summary": summary,
         "channels": channel_metrics,
+        "shared_scopes": shared_scope_metrics,
+        "concurrency_leases": lease_scope_metrics,
     }
+
+
+def _record_outcome_metrics(
+    target_state: dict,
+    *,
+    now: float,
+    queue_wait_seconds: float,
+    upstream_processing_seconds: float,
+    status_code: int | None,
+    retry_after_seconds: float | None,
+    requester_class: str | None = None,
+    lineage_id: str | None = None,
+) -> None:
+    request_count = _coerce_int(target_state.get("request_count"), 0) + 1
+    queue_wait_seconds_value = _round_metric(queue_wait_seconds)
+    upstream_processing_seconds_value = _round_metric(upstream_processing_seconds)
+
+    target_state["request_count"] = request_count
+    target_state["total_queue_wait_seconds"] = _round_metric(
+        _coerce_float(target_state.get("total_queue_wait_seconds"), 0.0)
+        + queue_wait_seconds_value
+    )
+    target_state["last_queue_wait_seconds"] = queue_wait_seconds_value
+    if queue_wait_seconds_value > 0:
+        target_state["queue_wait_event_count"] = (
+            _coerce_int(target_state.get("queue_wait_event_count"), 0) + 1
+        )
+    target_state["max_queue_wait_seconds"] = _round_metric(
+        max(
+            _coerce_float(target_state.get("max_queue_wait_seconds"), 0.0),
+            queue_wait_seconds_value,
+        )
+    )
+    target_state["total_upstream_processing_seconds"] = _round_metric(
+        _coerce_float(target_state.get("total_upstream_processing_seconds"), 0.0)
+        + upstream_processing_seconds_value
+    )
+    target_state["last_upstream_processing_seconds"] = upstream_processing_seconds_value
+    if status_code is not None:
+        target_state["last_status_code"] = int(status_code)
+        if int(status_code) == 429:
+            target_state["rate_limit_response_count"] = (
+                _coerce_int(target_state.get("rate_limit_response_count"), 0) + 1
+            )
+    if retry_after_seconds is not None and retry_after_seconds > 0:
+        retry_after_value = _round_metric(retry_after_seconds)
+        target_state["retry_after_event_count"] = (
+            _coerce_int(target_state.get("retry_after_event_count"), 0) + 1
+        )
+        target_state["total_retry_after_seconds"] = _round_metric(
+            _coerce_float(target_state.get("total_retry_after_seconds"), 0.0)
+            + retry_after_value
+        )
+        target_state["last_retry_after_seconds"] = retry_after_value
+    if requester_class:
+        normalized_requester_class = _normalize_requester_class(requester_class)
+        requester_counts = target_state.get("requester_class_counts")
+        if not isinstance(requester_counts, dict):
+            requester_counts = {}
+            target_state["requester_class_counts"] = requester_counts
+        requester_counts[normalized_requester_class] = (
+            _coerce_int(requester_counts.get(normalized_requester_class), 0) + 1
+        )
+        target_state["last_requester_class"] = normalized_requester_class
+    if lineage_id:
+        target_state["last_lineage_id"] = str(lineage_id)
+
+    target_state["last_request_finished_at"] = _round_metric(now)
+    target_state["updated_at"] = _round_metric(now)
+
+
+def _apply_cooldown_metrics(target_state: dict, *, now: float, cooldown: float) -> None:
+    next_allowed_ts = target_state.get("next_allowed_ts", 0.0)
+    try:
+        next_allowed_ts = float(next_allowed_ts)
+    except (TypeError, ValueError):
+        next_allowed_ts = 0.0
+
+    target_state["next_allowed_ts"] = max(next_allowed_ts, now + cooldown)
+    target_state["cooldown_event_count"] = (
+        _coerce_int(target_state.get("cooldown_event_count"), 0) + 1
+    )
+    target_state["total_cooldown_seconds"] = _round_metric(
+        _coerce_float(target_state.get("total_cooldown_seconds"), 0.0) + cooldown
+    )
+    target_state["last_cooldown_seconds"] = _round_metric(cooldown)
+    target_state["updated_at"] = _round_metric(now)
 
 
 def record_request_outcome(
@@ -401,6 +622,9 @@ def record_request_outcome(
     upstream_processing_seconds: float = 0.0,
     status_code: int | None = None,
     retry_after_seconds: float | None = None,
+    shared_scope: str | None = None,
+    requester_class: str | None = None,
+    lineage_id: str | None = None,
 ) -> None:
     state_path = _state_path()
     lock_path = _lock_path()
@@ -409,55 +633,28 @@ def record_request_outcome(
 
     def _mutate(state: dict) -> dict:
         channel_state = _ensure_channel_state(state, channel)
-        request_count = _coerce_int(channel_state.get("request_count"), 0) + 1
-        queue_wait_seconds_value = _round_metric(queue_wait_seconds)
-        upstream_processing_seconds_value = _round_metric(upstream_processing_seconds)
-
-        channel_state["request_count"] = request_count
-        channel_state["total_queue_wait_seconds"] = _round_metric(
-            _coerce_float(channel_state.get("total_queue_wait_seconds"), 0.0)
-            + queue_wait_seconds_value
+        _record_outcome_metrics(
+            channel_state,
+            now=now,
+            queue_wait_seconds=queue_wait_seconds,
+            upstream_processing_seconds=upstream_processing_seconds,
+            status_code=status_code,
+            retry_after_seconds=retry_after_seconds,
+            requester_class=requester_class,
+            lineage_id=lineage_id,
         )
-        channel_state["last_queue_wait_seconds"] = queue_wait_seconds_value
-        if queue_wait_seconds_value > 0:
-            channel_state["queue_wait_event_count"] = (
-                _coerce_int(channel_state.get("queue_wait_event_count"), 0) + 1
+        if shared_scope:
+            shared_scope_state = _ensure_shared_scope_state(state, shared_scope)
+            _record_outcome_metrics(
+                shared_scope_state,
+                now=now,
+                queue_wait_seconds=queue_wait_seconds,
+                upstream_processing_seconds=upstream_processing_seconds,
+                status_code=status_code,
+                retry_after_seconds=retry_after_seconds,
+                requester_class=requester_class,
+                lineage_id=lineage_id,
             )
-        channel_state["max_queue_wait_seconds"] = _round_metric(
-            max(
-                _coerce_float(channel_state.get("max_queue_wait_seconds"), 0.0),
-                queue_wait_seconds_value,
-            )
-        )
-        channel_state["total_upstream_processing_seconds"] = _round_metric(
-            _coerce_float(
-                channel_state.get("total_upstream_processing_seconds"),
-                0.0,
-            )
-            + upstream_processing_seconds_value
-        )
-        channel_state["last_upstream_processing_seconds"] = (
-            upstream_processing_seconds_value
-        )
-        if status_code is not None:
-            channel_state["last_status_code"] = int(status_code)
-            if int(status_code) == 429:
-                channel_state["rate_limit_response_count"] = (
-                    _coerce_int(channel_state.get("rate_limit_response_count"), 0) + 1
-                )
-        if retry_after_seconds is not None and retry_after_seconds > 0:
-            retry_after_value = _round_metric(retry_after_seconds)
-            channel_state["retry_after_event_count"] = (
-                _coerce_int(channel_state.get("retry_after_event_count"), 0) + 1
-            )
-            channel_state["total_retry_after_seconds"] = _round_metric(
-                _coerce_float(channel_state.get("total_retry_after_seconds"), 0.0)
-                + retry_after_value
-            )
-            channel_state["last_retry_after_seconds"] = retry_after_value
-
-        channel_state["last_request_finished_at"] = _round_metric(now)
-        channel_state["updated_at"] = _round_metric(now)
         return state
 
     if not shared_throttle_supported():
@@ -472,7 +669,11 @@ def record_request_outcome(
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
-def reserve_api_slot(channel: str = "llm", role: str | None = None) -> float:
+def reserve_api_slot(
+    channel: str = "llm",
+    role: str | None = None,
+    shared_scope: str | None = None,
+) -> float:
     """Reserve the next outbound API slot across parallel processes.
 
     Returns the number of seconds the caller should wait before making
@@ -505,21 +706,38 @@ def reserve_api_slot(channel: str = "llm", role: str | None = None) -> float:
         if not isinstance(channel_state, dict):
             channel_state = {}
 
+        shared_scope_state = None
+        if shared_scope:
+            shared_scope_state = _ensure_shared_scope_state(state, shared_scope)
+
         next_allowed_ts = channel_state.get("next_allowed_ts", 0.0)
         try:
             next_allowed_ts = float(next_allowed_ts)
         except (TypeError, ValueError):
             next_allowed_ts = 0.0
 
-        base_wait = max(0.0, next_allowed_ts - now)
+        shared_next_allowed_ts = 0.0
+        if shared_scope_state is not None:
+            shared_next_allowed_ts = shared_scope_state.get("next_allowed_ts", 0.0)
+            try:
+                shared_next_allowed_ts = float(shared_next_allowed_ts)
+            except (TypeError, ValueError):
+                shared_next_allowed_ts = 0.0
+
+        base_wait = max(0.0, max(next_allowed_ts, shared_next_allowed_ts) - now)
         jitter_wait = random.uniform(0.0, min_interval * jitter_ratio)
         total_wait = min(max_wait_seconds, base_wait + jitter_wait)
 
         reserved_at = now + total_wait
-        channel_state["next_allowed_ts"] = reserved_at + min_interval
+        channel_state["next_allowed_ts"] = _round_metric(reserved_at + min_interval)
         channel_state["updated_at"] = now
         channels[channel] = channel_state
         state["channels"] = channels
+        if shared_scope_state is not None:
+            shared_scope_state["next_allowed_ts"] = _round_metric(
+                reserved_at + min_interval
+            )
+            shared_scope_state["updated_at"] = _round_metric(now)
         _save_state(state_path, state)
 
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
@@ -533,6 +751,9 @@ def reserve_concurrency_lease(
     role: str | None = None,
     limit: int | None = None,
     holder: str | None = None,
+    requester_class: str | None = None,
+    lineage_id: str | None = None,
+    requester_id: str | None = None,
 ) -> tuple[str | None, float]:
     """Try to reserve a shared concurrency lease for one upstream request.
 
@@ -557,6 +778,13 @@ def reserve_concurrency_lease(
         _parse_float_env("WORK_ISSUE_CONCURRENCY_LEASE_POLL_SECONDS", 0.05),
     )
     ttl_seconds = _resolve_concurrency_lease_ttl_seconds(role=role)
+    requester_class_value = _normalize_requester_class(requester_class)
+    lineage_value = str(lineage_id or "").strip() or str(
+        requester_id or holder or role or "workspace"
+    )
+    requester_key = str(requester_id or "").strip() or (
+        f"{requester_class_value}:{lineage_value}:{holder or role or 'requester'}"
+    )
 
     state_path = _state_path()
     lock_path = _lock_path()
@@ -567,21 +795,103 @@ def reserve_concurrency_lease(
         state = _load_state(state_path)
         scope_state = _ensure_lease_scope_state(state, lease_scope)
         _prune_expired_leases(scope_state, now)
+        _prune_stale_waiters(scope_state, now)
         leases = scope_state.get("leases")
         if not isinstance(leases, dict):
             leases = {}
             scope_state["leases"] = leases
+        waiters = scope_state.get("waiters")
+        if not isinstance(waiters, dict):
+            waiters = {}
+            scope_state["waiters"] = waiters
 
         scope_state["lease_limit"] = lease_limit
         scope_state["updated_at"] = _round_metric(now)
 
-        if len(leases) < lease_limit:
+        waiter_payload = waiters.get(requester_key)
+        existing_first_seen = (
+            _coerce_float(waiter_payload.get("first_seen"), now)
+            if isinstance(waiter_payload, dict)
+            else now
+        )
+        ticket = (
+            _coerce_int(waiter_payload.get("ticket"), 0)
+            if isinstance(waiter_payload, dict)
+            else 0
+        )
+        if ticket <= 0:
+            ticket = _coerce_int(scope_state.get("next_waiter_ticket"), 0) + 1
+            scope_state["next_waiter_ticket"] = ticket
+        waiters[requester_key] = {
+            "ticket": ticket,
+            "requester_class": requester_class_value,
+            "lineage_id": lineage_value,
+            "holder": holder or "",
+            "first_seen": _round_metric(existing_first_seen),
+            "last_seen": _round_metric(now),
+        }
+        scope_state["waiter_count"] = len(waiters)
+
+        active_subagent_lineage_counts: dict[str, int] = {}
+        for lease_payload in leases.values():
+            if not isinstance(lease_payload, dict):
+                continue
+            if (
+                _normalize_requester_class(lease_payload.get("requester_class"))
+                != "subagent"
+            ):
+                continue
+            lease_lineage_id = str(lease_payload.get("lineage_id") or "")
+            active_subagent_lineage_counts[lease_lineage_id] = (
+                active_subagent_lineage_counts.get(lease_lineage_id, 0) + 1
+            )
+        ordered_waiters = sorted(
+            waiters.items(),
+            key=lambda item: (
+                _requester_priority_value(item[1].get("requester_class")),
+                _coerce_int(item[1].get("ticket"), 0),
+                item[0],
+            ),
+        )
+
+        def _waiter_is_eligible(waiter_payload: dict) -> bool:
+            waiter_requester_class = _normalize_requester_class(
+                waiter_payload.get("requester_class")
+            )
+            waiter_lineage_id = str(waiter_payload.get("lineage_id") or "")
+            if waiter_requester_class == "subagent":
+                return active_subagent_lineage_counts.get(waiter_lineage_id, 0) < 1
+            return True
+
+        first_eligible_waiter_key = None
+        first_eligible_waiter_payload = None
+        for waiter_key, waiter_payload in ordered_waiters:
+            if _waiter_is_eligible(waiter_payload):
+                first_eligible_waiter_key = waiter_key
+                first_eligible_waiter_payload = waiter_payload
+                break
+
+        current_is_front = first_eligible_waiter_key == requester_key
+        subagent_parallelism_capped = (
+            requester_class_value == "subagent"
+            and active_subagent_lineage_counts.get(lineage_value, 0) >= 1
+        )
+
+        if (
+            len(leases) < lease_limit
+            and current_is_front
+            and not subagent_parallelism_capped
+        ):
             lease_id = uuid.uuid4().hex
             leases[lease_id] = {
                 "holder": holder or "",
+                "requester_class": requester_class_value,
+                "lineage_id": lineage_value,
+                "requester_id": requester_key,
                 "acquired_at": _round_metric(now),
                 "expires_at": _round_metric(now + ttl_seconds),
             }
+            waiters.pop(requester_key, None)
             scope_state["lease_grant_count"] = (
                 _coerce_int(scope_state.get("lease_grant_count"), 0) + 1
             )
@@ -590,10 +900,24 @@ def reserve_concurrency_lease(
                 _coerce_int(scope_state.get("max_active_leases"), 0),
                 len(leases),
             )
+            scope_state["waiter_count"] = len(waiters)
             _save_state(state_path, state)
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
             return lease_id, 0.0
 
+        if subagent_parallelism_capped:
+            scope_state["subagent_parallelism_cap_hits"] = (
+                _coerce_int(scope_state.get("subagent_parallelism_cap_hits"), 0) + 1
+            )
+        elif not current_is_front and first_eligible_waiter_payload is not None:
+            current_priority = _requester_priority_value(requester_class_value)
+            front_priority = _requester_priority_value(
+                first_eligible_waiter_payload.get("requester_class")
+            )
+            if front_priority < current_priority:
+                scope_state["priority_wait_event_count"] = (
+                    _coerce_int(scope_state.get("priority_wait_event_count"), 0) + 1
+                )
         scope_state["lease_wait_event_count"] = (
             _coerce_int(scope_state.get("lease_wait_event_count"), 0) + 1
         )
@@ -668,6 +992,7 @@ def apply_rate_limit_penalty(
     channel: str = "llm",
     penalty_seconds: float | None = None,
     role: str | None = None,
+    shared_scope: str | None = None,
 ) -> float:
     """Set a shared cooldown window after rate-limit responses.
 
@@ -690,22 +1015,10 @@ def apply_rate_limit_penalty(
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         state = _load_state(state_path)
         channel_state = _ensure_channel_state(state, channel)
-
-        next_allowed_ts = channel_state.get("next_allowed_ts", 0.0)
-        try:
-            next_allowed_ts = float(next_allowed_ts)
-        except (TypeError, ValueError):
-            next_allowed_ts = 0.0
-
-        channel_state["next_allowed_ts"] = max(next_allowed_ts, now + cooldown)
-        channel_state["cooldown_event_count"] = (
-            _coerce_int(channel_state.get("cooldown_event_count"), 0) + 1
-        )
-        channel_state["total_cooldown_seconds"] = _round_metric(
-            _coerce_float(channel_state.get("total_cooldown_seconds"), 0.0) + cooldown
-        )
-        channel_state["last_cooldown_seconds"] = _round_metric(cooldown)
-        channel_state["updated_at"] = _round_metric(now)
+        _apply_cooldown_metrics(channel_state, now=now, cooldown=cooldown)
+        if shared_scope:
+            shared_scope_state = _ensure_shared_scope_state(state, shared_scope)
+            _apply_cooldown_metrics(shared_scope_state, now=now, cooldown=cooldown)
         _save_state(state_path, state)
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 

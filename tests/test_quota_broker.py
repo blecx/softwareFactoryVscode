@@ -69,7 +69,7 @@ def test_quota_broker_reserves_and_releases_shared_concurrency_lease(
     monkeypatch.setattr(
         api_throttle,
         "reserve_api_slot",
-        lambda channel="llm", role=None: 0.0,
+        lambda channel="llm", role=None, shared_scope=None: 0.0,
     )
 
     broker = QuotaBroker(role="coding", lane="foreground", policy=_make_policy())
@@ -109,7 +109,7 @@ def test_second_broker_waits_for_shared_concurrency_lease_until_first_releases(
     monkeypatch.setattr(
         api_throttle,
         "reserve_api_slot",
-        lambda channel="llm", role=None: 0.0,
+        lambda channel="llm", role=None, shared_scope=None: 0.0,
     )
 
     clock = {"now": 100.0}
@@ -156,7 +156,7 @@ def test_rate_limited_http_client_releases_brokered_lease_after_request(
     monkeypatch.setattr(
         api_throttle,
         "reserve_api_slot",
-        lambda channel="llm", role=None: 0.0,
+        lambda channel="llm", role=None, shared_scope=None: 0.0,
     )
 
     broker = QuotaBroker(role="coding", lane="foreground", policy=_make_policy())
@@ -183,3 +183,147 @@ def test_rate_limited_http_client_releases_brokered_lease_after_request(
     assert scope_state["active_lease_count"] == 0
     assert scope_state["lease_grant_count"] == 1
     assert scope_state["lease_release_count"] == 1
+
+
+def test_subagent_lineage_cannot_open_parallel_child_leases(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    _clear_quota_env(monkeypatch)
+    state_file = tmp_path / "api-throttle-state.json"
+    lock_file = tmp_path / "api-throttle.lock"
+    monkeypatch.setenv("WORK_ISSUE_API_THROTTLE_STATE_FILE", str(state_file))
+    monkeypatch.setenv("WORK_ISSUE_API_THROTTLE_LOCK_FILE", str(lock_file))
+    monkeypatch.setattr(
+        api_throttle,
+        "reserve_api_slot",
+        lambda channel="llm", role=None, shared_scope=None: 0.0,
+    )
+
+    policy = _make_policy(concurrency_lease_limit=2)
+    first_subagent = QuotaBroker(
+        role="coding",
+        lane="foreground",
+        policy=policy,
+        requester_class="subagent",
+        run_id="child-a",
+        parent_run_id="run-123",
+    )
+    second_subagent = QuotaBroker(
+        role="coding",
+        lane="foreground",
+        policy=policy,
+        requester_class="subagent",
+        run_id="child-b",
+        parent_run_id="run-123",
+    )
+    other_lineage_subagent = QuotaBroker(
+        role="coding",
+        lane="foreground",
+        policy=policy,
+        requester_class="subagent",
+        run_id="child-c",
+        parent_run_id="run-999",
+    )
+
+    first_lease, _ = first_subagent._try_reserve_concurrency_lease()
+    second_lease, second_wait = second_subagent._try_reserve_concurrency_lease()
+    other_lineage_lease, _ = other_lineage_subagent._try_reserve_concurrency_lease()
+
+    assert first_lease is not None
+    assert second_lease is None
+    assert second_wait == pytest.approx(0.05)
+    assert other_lineage_lease is not None
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    scope_state = state["concurrency_leases"][first_subagent.lease_scope]
+    assert scope_state["subagent_parallelism_cap_hits"] >= 1
+
+    assert api_throttle.release_concurrency_lease(
+        first_subagent.lease_scope,
+        first_lease.lease_id,
+    )
+    assert api_throttle.release_concurrency_lease(
+        other_lineage_subagent.lease_scope,
+        other_lineage_lease.lease_id,
+    )
+
+
+def test_parent_run_waiter_beats_subagent_waiter_after_capacity_returns(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    _clear_quota_env(monkeypatch)
+    state_file = tmp_path / "api-throttle-state.json"
+    lock_file = tmp_path / "api-throttle.lock"
+    monkeypatch.setenv("WORK_ISSUE_API_THROTTLE_STATE_FILE", str(state_file))
+    monkeypatch.setenv("WORK_ISSUE_API_THROTTLE_LOCK_FILE", str(lock_file))
+    monkeypatch.setattr(
+        api_throttle,
+        "reserve_api_slot",
+        lambda channel="llm", role=None, shared_scope=None: 0.0,
+    )
+
+    clock = {"now": 100.0}
+    monkeypatch.setattr(api_throttle.time, "time", lambda: clock["now"])
+
+    policy = _make_policy(concurrency_lease_limit=1)
+    active_subagent = QuotaBroker(
+        role="coding",
+        lane="foreground",
+        policy=policy,
+        requester_class="subagent",
+        run_id="child-active",
+        parent_run_id="run-other-a",
+    )
+    waiting_subagent = QuotaBroker(
+        role="coding",
+        lane="foreground",
+        policy=policy,
+        requester_class="subagent",
+        run_id="child-waiting",
+        parent_run_id="run-other-b",
+    )
+    parent_run = QuotaBroker(
+        role="coding",
+        lane="foreground",
+        policy=policy,
+        requester_class="parent-run",
+        run_id="run-123",
+    )
+
+    active_lease, _ = active_subagent._try_reserve_concurrency_lease()
+    blocked_subagent, blocked_subagent_wait = (
+        waiting_subagent._try_reserve_concurrency_lease()
+    )
+    blocked_parent, blocked_parent_wait = parent_run._try_reserve_concurrency_lease()
+
+    assert active_lease is not None
+    assert blocked_subagent is None
+    assert blocked_subagent_wait == pytest.approx(0.05)
+    assert blocked_parent is None
+    assert blocked_parent_wait == pytest.approx(0.05)
+
+    assert api_throttle.release_concurrency_lease(
+        active_subagent.lease_scope,
+        active_lease.lease_id,
+    )
+    clock["now"] += 0.05
+
+    still_waiting_subagent, retry_hint = (
+        waiting_subagent._try_reserve_concurrency_lease()
+    )
+    granted_parent, _ = parent_run._try_reserve_concurrency_lease()
+
+    assert still_waiting_subagent is None
+    assert retry_hint == pytest.approx(0.05)
+    assert granted_parent is not None
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    scope_state = state["concurrency_leases"][parent_run.lease_scope]
+    assert scope_state["priority_wait_event_count"] >= 1
+
+    assert api_throttle.release_concurrency_lease(
+        parent_run.lease_scope,
+        granted_parent.lease_id,
+    )

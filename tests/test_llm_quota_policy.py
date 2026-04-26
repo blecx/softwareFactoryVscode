@@ -69,8 +69,18 @@ def _make_broker(
     *,
     role: str = "coding",
     lane: str = "foreground",
+    requester_class: str | None = None,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
 ) -> QuotaBroker:
-    return QuotaBroker(role=role, lane=lane, policy=policy)
+    return QuotaBroker(
+        role=role,
+        lane=lane,
+        policy=policy,
+        requester_class=requester_class,
+        run_id=run_id,
+        parent_run_id=parent_run_id,
+    )
 
 
 def test_resolve_quota_policy_uses_model_family_bucket_and_7030_split(
@@ -154,7 +164,7 @@ def test_api_throttle_distinguishes_foreground_and_reserve_lanes(monkeypatch) ->
 def test_rate_limited_http_client_uses_shared_workspace_slot(monkeypatch) -> None:
     _clear_quota_env(monkeypatch)
 
-    slot_calls: list[tuple[str, str | None]] = []
+    slot_calls: list[tuple[str, str | None, str | None]] = []
     local_acquires: list[str] = []
     sleep_calls: list[float] = []
 
@@ -168,7 +178,10 @@ def test_rate_limited_http_client_uses_shared_workspace_slot(monkeypatch) -> Non
     monkeypatch.setattr(
         api_throttle,
         "reserve_api_slot",
-        lambda channel="llm", role=None: slot_calls.append((channel, role)) or 0.25,
+        lambda channel="llm", role=None, shared_scope=None: slot_calls.append(
+            (channel, role, shared_scope)
+        )
+        or 0.25,
     )
 
     throttle = _LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0)
@@ -194,7 +207,7 @@ def test_rate_limited_http_client_uses_shared_workspace_slot(monkeypatch) -> Non
     response = asyncio.run(_run_test())
 
     assert response.status_code == 200
-    assert slot_calls == [("llm:coding", "coding")]
+    assert slot_calls == [("llm:coding", "coding", broker.feedback_scope)]
     assert sleep_calls == [pytest.approx(0.25)]
     assert local_acquires == []
 
@@ -273,18 +286,18 @@ def test_rate_limited_http_client_applies_shared_penalty_on_retry_after(
 ) -> None:
     _clear_quota_env(monkeypatch)
 
-    penalty_calls: list[tuple[str, float | None, str | None]] = []
+    penalty_calls: list[tuple[str, float | None, str | None, str | None]] = []
     monkeypatch.setattr(api_throttle, "shared_throttle_supported", lambda: True)
     monkeypatch.setattr(
         api_throttle,
         "reserve_api_slot",
-        lambda channel="llm", role=None: 0.0,
+        lambda channel="llm", role=None, shared_scope=None: 0.0,
     )
     monkeypatch.setattr(
         api_throttle,
         "apply_rate_limit_penalty",
-        lambda channel="llm", penalty_seconds=None, role=None: penalty_calls.append(
-            (channel, penalty_seconds, role)
+        lambda channel="llm", penalty_seconds=None, role=None, shared_scope=None: penalty_calls.append(
+            (channel, penalty_seconds, role, shared_scope)
         )
         or float(penalty_seconds or 0.0),
     )
@@ -312,7 +325,61 @@ def test_rate_limited_http_client_applies_shared_penalty_on_retry_after(
     response = asyncio.run(_run_test())
 
     assert response.status_code == 429
-    assert penalty_calls == [("llm:coding", 7.0, "coding")]
+    assert penalty_calls == [("llm:coding", 7.0, "coding", broker.feedback_scope)]
+
+
+def test_provider_feedback_penalty_is_shared_across_requesters(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    _clear_quota_env(monkeypatch)
+    monkeypatch.setenv(
+        "WORK_ISSUE_API_THROTTLE_STATE_FILE",
+        str(tmp_path / "api-throttle-state.json"),
+    )
+    monkeypatch.setenv(
+        "WORK_ISSUE_API_THROTTLE_LOCK_FILE",
+        str(tmp_path / "api-throttle.lock"),
+    )
+    monkeypatch.setattr(api_throttle.random, "uniform", lambda start, stop: 0.0)
+
+    clock = {"now": 200.0}
+    monkeypatch.setattr(api_throttle.time, "time", lambda: clock["now"])
+
+    policy = _make_policy(
+        quota_ceiling_rps=100.0,
+        foreground_lane_rps=100.0,
+        reserve_lane_rps=100.0,
+        concurrency_lease_limit=0,
+    )
+    parent_broker = _make_broker(
+        policy,
+        role="coding",
+        requester_class="parent-run",
+        run_id="run-123",
+    )
+    subagent_broker = _make_broker(
+        policy,
+        role="review",
+        requester_class="subagent",
+        run_id="child-1",
+        parent_run_id="run-123",
+    )
+
+    applied_penalty = parent_broker.apply_rate_limit_penalty(7.0)
+    assert applied_penalty == pytest.approx(7.0)
+
+    observed_wait = api_throttle.reserve_api_slot(
+        subagent_broker.request_channel,
+        role=subagent_broker.role,
+        shared_scope=subagent_broker.feedback_scope,
+    )
+    diagnostics = api_throttle.get_throttle_diagnostics()
+    shared_scope = diagnostics["shared_scopes"][subagent_broker.feedback_scope]
+
+    assert observed_wait == pytest.approx(7.0)
+    assert shared_scope["cooldown_event_count"] == 1
+    assert shared_scope["total_cooldown_seconds"] == pytest.approx(7.0)
 
 
 def test_api_throttle_diagnostics_capture_queue_wait_retry_and_cooldown(
