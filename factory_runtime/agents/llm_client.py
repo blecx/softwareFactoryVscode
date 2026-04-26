@@ -109,13 +109,13 @@ class _LLMRequestThrottle:
         self._lock = asyncio.Lock()
         self._last_request_time: Optional[float] = None
 
-    async def acquire(self) -> None:
+    async def acquire(self) -> float:
         """Wait until the next request slot is available."""
         async with self._lock:
             now = self._clock()
             if self._last_request_time is None:
                 self._last_request_time = now
-                return
+                return 0.0
 
             elapsed = now - self._last_request_time
             remaining = max(0.0, self.min_interval - elapsed)
@@ -128,6 +128,7 @@ class _LLMRequestThrottle:
                 now = self._clock()
 
             self._last_request_time = now
+            return wait_seconds
 
 
 class _RateLimitedAsyncHTTPClient(httpx.AsyncClient):
@@ -149,7 +150,7 @@ class _RateLimitedAsyncHTTPClient(httpx.AsyncClient):
         self._shared_channel = _build_shared_throttle_channel(self._role, self._lane)
         self._sleeper = sleeper
 
-    async def _acquire_request_slot(self) -> None:
+    async def _acquire_request_slot(self) -> float:
         if api_throttle.shared_throttle_supported():
             wait_seconds = api_throttle.reserve_api_slot(
                 channel=self._shared_channel,
@@ -157,26 +158,41 @@ class _RateLimitedAsyncHTTPClient(httpx.AsyncClient):
             )
             if wait_seconds > 0:
                 await self._sleeper(wait_seconds)
-            return
+            return wait_seconds
 
-        await self._throttle.acquire()
+        return await self._throttle.acquire()
 
-    def _apply_shared_penalty(self, response: httpx.Response) -> None:
+    def _apply_shared_penalty(self, response: httpx.Response) -> float | None:
         retry_after_seconds = _extract_retry_after_seconds(response)
         if response.status_code != 429 and retry_after_seconds is None:
-            return
+            return None
 
-        api_throttle.apply_rate_limit_penalty(
+        return api_throttle.apply_rate_limit_penalty(
             channel=self._shared_channel,
             penalty_seconds=retry_after_seconds,
             role=self._role,
         )
 
     async def send(self, request, **kwargs):
-        await self._acquire_request_slot()
-        response = await super().send(request, **kwargs)
-        self._apply_shared_penalty(response)
-        return response
+        queue_wait_seconds = await self._acquire_request_slot()
+        upstream_started_at = time.monotonic()
+        status_code: int | None = None
+        retry_after_seconds: float | None = None
+        try:
+            response = await super().send(request, **kwargs)
+            status_code = response.status_code
+            retry_after_seconds = _extract_retry_after_seconds(response)
+            self._apply_shared_penalty(response)
+            return response
+        finally:
+            upstream_elapsed_seconds = time.monotonic() - upstream_started_at
+            api_throttle.record_request_outcome(
+                channel=self._shared_channel,
+                queue_wait_seconds=queue_wait_seconds,
+                upstream_processing_seconds=upstream_elapsed_seconds,
+                status_code=status_code,
+                retry_after_seconds=retry_after_seconds,
+            )
 
 
 class LLMClientFactory:
@@ -385,6 +401,12 @@ class LLMClientFactory:
         coding_policy = role_request_policies.get("coding") or {}
         max_rps = coding_policy.get("foreground_lane_rps", 0.0)
         jitter_ratio = coding_policy.get("jitter_ratio", 0.0)
+        try:
+            request_diagnostics = api_throttle.get_throttle_diagnostics(
+                channel_prefix="llm:"
+            )
+        except Exception:
+            request_diagnostics = {}
         return {
             "config_path": config_path,
             "provider": config.get("provider", ""),
@@ -395,6 +417,7 @@ class LLMClientFactory:
                 "jitter_ratio": jitter_ratio,
             },
             "request_quota_policy": coding_policy,
+            "request_diagnostics": request_diagnostics,
             "role_endpoints": role_endpoints,
             "role_request_policies": role_request_policies,
         }
