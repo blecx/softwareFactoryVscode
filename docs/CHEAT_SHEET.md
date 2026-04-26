@@ -164,7 +164,7 @@ resume-unsafe, and manual recovery cases.
 # Default faster local parity baseline (Docker build parity stays a warning-only skip here)
 ./.venv/bin/python ./scripts/local_ci_parity.py
 
-# Canonical internal production-readiness gate (blocking Docker image builds + promoted Docker E2E runtime proofs + sign-off bundle)
+# Canonical internal production gate — Docker parity & recovery proofs (blocking Docker image builds + promoted Docker E2E runtime proofs + sign-off bundle)
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
 
 # Focused long-term quota-governance load / contention evidence
