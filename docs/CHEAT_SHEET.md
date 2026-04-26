@@ -40,9 +40,10 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
 - Current default shared concurrency lease ceilings are intentionally conservative: GitHub mini buckets default to `2` shared in-flight leases, while the other current GitHub buckets default to `1`. Override them only when you have a measured reason:
   - `WORK_ISSUE_CONCURRENCY_LEASE_LIMIT`
 - Provider `Retry-After` / `429` feedback now lands in a shared provider/model-family/lane scope, so every requester in that budget observes the same cooldown instead of only the role that first triggered the backoff.
+- `#143` adds operator-visible load/saturation telemetry for the long-term brokered architecture. `request_diagnostics.summary` now exposes `lease_grant_count`, `lease_denial_count`, `lease_wait_event_count`, `saturation_event_count`, `waiter_count`, `max_waiter_count`, `saturated_lease_scope_count`, and `oldest_waiter_seconds_max` so contention can be audited without inventing a second monitoring stack.
 - The long-term contract keeps those shared lanes as delegated workspace/run/requester budget partitions, not per-process entitlements and not a second runtime-truth surface.
 - Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket (including `concurrency_lease_limit`) and see whether time is being burned in queue wait, upstream processing, retry-after hints, shared cooldown windows, or fairness protections such as `priority_wait_event_count` / `subagent_parallelism_cap_hits`.
-- `request_diagnostics.channels` now include requester-class evidence (`last_requester_class`, `last_lineage_id`, `requester_class_counts`), while `request_diagnostics.shared_scopes` and `request_diagnostics.concurrency_leases` expose the shared feedback scope and lineage-fairness lease counters directly.
+- `request_diagnostics.channels` now include requester-class evidence (`last_requester_class`, `last_lineage_id`, `requester_class_counts`), while `request_diagnostics.shared_scopes` and `request_diagnostics.concurrency_leases` expose the shared feedback scope and lineage-fairness lease counters directly, including `max_waiter_count`, `oldest_waiter_seconds`, `lease_denial_count`, `saturation_event_count`, `saturated`, and `saturation_ratio`.
 - `scripts/work-issue.py` now prints the same limiter summary at startup and after execution, including work-issue retry/backoff totals for the current run.
 
 ## 💻 Lifecycle commands
@@ -165,6 +166,9 @@ resume-unsafe, and manual recovery cases.
 
 # Canonical internal production-readiness gate (blocking Docker image builds + promoted Docker E2E runtime proofs + sign-off bundle)
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+
+# Focused long-term quota-governance load / contention evidence
+./.venv/bin/pytest tests/test_quota_load_validation.py tests/test_quota_broker.py tests/test_llm_quota_policy.py -q
 
 # Compatibility alias for the Docker build expansion path only (no promoted Docker E2E lane)
 ./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build

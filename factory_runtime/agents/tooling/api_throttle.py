@@ -366,27 +366,43 @@ def _summarize_channel(channel_state: dict) -> dict:
     }
 
 
-def _summarize_lease_scope(scope_state: dict) -> dict:
+def _summarize_lease_scope(scope_state: dict, now: float) -> dict:
     waiters = scope_state.get("waiters")
     if not isinstance(waiters, dict):
         waiters = {}
 
+    lease_limit = max(0, _coerce_int(scope_state.get("lease_limit"), 0))
+    active_lease_count = max(0, _coerce_int(scope_state.get("active_lease_count"), 0))
+    oldest_waiter_seconds = 0.0
+    if waiters:
+        oldest_first_seen = min(
+            _coerce_float(waiter_payload.get("first_seen"), now)
+            for waiter_payload in waiters.values()
+            if isinstance(waiter_payload, dict)
+        )
+        oldest_waiter_seconds = _round_metric(max(0.0, now - oldest_first_seen))
+    saturated = bool((lease_limit > 0 and active_lease_count >= lease_limit) or waiters)
+
     return {
-        "lease_limit": max(0, _coerce_int(scope_state.get("lease_limit"), 0)),
-        "active_lease_count": max(
-            0, _coerce_int(scope_state.get("active_lease_count"), 0)
-        ),
+        "lease_limit": lease_limit,
+        "active_lease_count": active_lease_count,
         "max_active_leases": max(
             0, _coerce_int(scope_state.get("max_active_leases"), 0)
         ),
         "lease_grant_count": max(
             0, _coerce_int(scope_state.get("lease_grant_count"), 0)
         ),
+        "lease_denial_count": max(
+            0, _coerce_int(scope_state.get("lease_denial_count"), 0)
+        ),
         "lease_release_count": max(
             0, _coerce_int(scope_state.get("lease_release_count"), 0)
         ),
         "lease_wait_event_count": max(
             0, _coerce_int(scope_state.get("lease_wait_event_count"), 0)
+        ),
+        "saturation_event_count": max(
+            0, _coerce_int(scope_state.get("saturation_event_count"), 0)
         ),
         "priority_wait_event_count": max(
             0, _coerce_int(scope_state.get("priority_wait_event_count"), 0)
@@ -398,6 +414,12 @@ def _summarize_lease_scope(scope_state: dict) -> dict:
             0, _coerce_int(scope_state.get("expired_lease_reap_count"), 0)
         ),
         "waiter_count": len(waiters),
+        "max_waiter_count": max(0, _coerce_int(scope_state.get("max_waiter_count"), 0)),
+        "oldest_waiter_seconds": oldest_waiter_seconds,
+        "saturated": saturated,
+        "saturation_ratio": _round_metric(
+            (active_lease_count / lease_limit) if lease_limit > 0 else 0.0
+        ),
         "updated_at": _round_metric(_coerce_float(scope_state.get("updated_at"), 0.0)),
     }
 
@@ -418,6 +440,7 @@ def _load_state_snapshot() -> dict:
 
 def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
     state = _load_state_snapshot()
+    now = time.time()
     channels = state.get("channels")
     if not isinstance(channels, dict):
         channels = {}
@@ -447,7 +470,7 @@ def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
         and (not channel_prefix or name.startswith(channel_prefix))
     }
     lease_scope_metrics = {
-        name: _summarize_lease_scope(scope_state)
+        name: _summarize_lease_scope(scope_state, now)
         for name, scope_state in concurrency_leases.items()
         if isinstance(name, str) and isinstance(scope_state, dict)
     }
@@ -464,6 +487,14 @@ def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
         "total_cooldown_seconds": 0.0,
         "rate_limit_response_count": 0,
         "max_queue_wait_seconds": 0.0,
+        "lease_grant_count": 0,
+        "lease_denial_count": 0,
+        "lease_wait_event_count": 0,
+        "saturation_event_count": 0,
+        "waiter_count": 0,
+        "max_waiter_count": 0,
+        "saturated_lease_scope_count": 0,
+        "oldest_waiter_seconds_max": 0.0,
     }
     for channel_summary in channel_metrics.values():
         summary["request_count"] += channel_summary["request_count"]
@@ -487,6 +518,22 @@ def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
             summary["max_queue_wait_seconds"],
             channel_summary["max_queue_wait_seconds"],
         )
+    for lease_summary in lease_scope_metrics.values():
+        summary["lease_grant_count"] += lease_summary["lease_grant_count"]
+        summary["lease_denial_count"] += lease_summary["lease_denial_count"]
+        summary["lease_wait_event_count"] += lease_summary["lease_wait_event_count"]
+        summary["saturation_event_count"] += lease_summary["saturation_event_count"]
+        summary["waiter_count"] += lease_summary["waiter_count"]
+        summary["max_waiter_count"] = max(
+            summary["max_waiter_count"],
+            lease_summary["max_waiter_count"],
+        )
+        summary["oldest_waiter_seconds_max"] = max(
+            summary["oldest_waiter_seconds_max"],
+            lease_summary["oldest_waiter_seconds"],
+        )
+        if lease_summary["saturated"]:
+            summary["saturated_lease_scope_count"] += 1
 
     request_count = summary["request_count"]
     summary["total_queue_wait_seconds"] = _round_metric(
@@ -500,6 +547,9 @@ def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
     )
     summary["total_cooldown_seconds"] = _round_metric(summary["total_cooldown_seconds"])
     summary["max_queue_wait_seconds"] = _round_metric(summary["max_queue_wait_seconds"])
+    summary["oldest_waiter_seconds_max"] = _round_metric(
+        summary["oldest_waiter_seconds_max"]
+    )
     summary["avg_queue_wait_seconds"] = (
         _round_metric(summary["total_queue_wait_seconds"] / request_count)
         if request_count
@@ -687,7 +737,6 @@ def reserve_api_slot(
     min_interval = 1.0 / max_rps
     jitter_ratio = _resolve_jitter_ratio(role=role)
     max_wait_seconds = _resolve_max_wait_seconds(role=role)
-
     state_path = _state_path()
     lock_path = _lock_path()
 
@@ -831,6 +880,10 @@ def reserve_concurrency_lease(
             "last_seen": _round_metric(now),
         }
         scope_state["waiter_count"] = len(waiters)
+        scope_state["max_waiter_count"] = max(
+            _coerce_int(scope_state.get("max_waiter_count"), 0),
+            len(waiters),
+        )
 
         active_subagent_lineage_counts: dict[str, int] = {}
         for lease_payload in leases.values():
@@ -918,8 +971,14 @@ def reserve_concurrency_lease(
                 scope_state["priority_wait_event_count"] = (
                     _coerce_int(scope_state.get("priority_wait_event_count"), 0) + 1
                 )
+        scope_state["lease_denial_count"] = (
+            _coerce_int(scope_state.get("lease_denial_count"), 0) + 1
+        )
         scope_state["lease_wait_event_count"] = (
             _coerce_int(scope_state.get("lease_wait_event_count"), 0) + 1
+        )
+        scope_state["saturation_event_count"] = (
+            _coerce_int(scope_state.get("saturation_event_count"), 0) + 1
         )
         scope_state["last_wait_hint_seconds"] = _round_metric(retry_hint_seconds)
         scope_state["updated_at"] = _round_metric(now)
