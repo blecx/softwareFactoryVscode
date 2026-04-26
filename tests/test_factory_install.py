@@ -8424,10 +8424,21 @@ def test_ci_workflow_has_internal_production_readiness_job() -> None:
     ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
     text = ci_file.read_text(encoding="utf-8")
     assert "production-readiness:" in text
+    assert "production-docs-contract:" in text
+    assert "production-docker-build-parity:" in text
+    assert "production-runtime-proofs:" in text
+    assert "Production Docs Contract" in text
+    assert "Production Docker Build Parity" in text
+    assert "Production Runtime Proofs" in text
     assert "Internal Production Gate — Docker Parity & Recovery Proofs" in text
     assert (
         "--mode production" in text
     ), "CI production-readiness job must invoke the canonical production gate command"
+    assert "--production-group docs-contract" in text
+    assert "--production-group docker-builds" in text
+    assert "--production-group runtime-proofs" in text
+    assert "--production-groups-only" in text
+    assert "needs:" in text
     assert (
         "Run canonical internal production gate (Docker parity & recovery proofs)"
         in text

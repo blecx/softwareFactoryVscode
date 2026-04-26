@@ -69,8 +69,84 @@ jobs:
       - name: Validate PR Template Formatting
         run: chmod +x ./scripts/validate-pr-template.sh && ./scripts/validate-pr-template.sh "${{ github.workspace }}/.github/pull_request_template.md"
 
+  production-docs-contract:
+    name: "Production Docs Contract"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          bash ./setup.sh
+
+      - name: Run production docs-contract diagnostics
+        run: |
+          ./.venv/bin/python ./scripts/local_ci_parity.py \
+            --mode production \
+            --production-group docs-contract \
+            --production-groups-only
+
+  production-docker-build-parity:
+    name: "Production Docker Build Parity"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          bash ./setup.sh
+
+      - name: Run production docker-build diagnostics
+        run: |
+          ./.venv/bin/python ./scripts/local_ci_parity.py \
+            --mode production \
+            --production-group docker-builds \
+            --production-groups-only
+
+  production-runtime-proofs:
+    name: "Production Runtime Proofs"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          bash ./setup.sh
+
+      - name: Run production runtime-proof diagnostics
+        run: |
+          ./.venv/bin/python ./scripts/local_ci_parity.py \
+            --mode production \
+            --production-group runtime-proofs \
+            --production-groups-only
+
   production-readiness:
     name: "Internal Production Gate — Docker Parity & Recovery Proofs"
+    needs:
+      - production-docs-contract
+      - production-docker-build-parity
+      - production-runtime-proofs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

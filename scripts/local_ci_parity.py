@@ -146,6 +146,8 @@ def build_rerun_command(args: argparse.Namespace) -> str:
         command.append("--skip-integration")
     if args.skip_pr_template_check:
         command.append("--skip-pr-template-check")
+    if args.production_groups_only:
+        command.append("--production-groups-only")
     return format_command(command)
 
 
@@ -159,7 +161,19 @@ def resolve_production_group_selection(
 
     requested = args.production_group or [PRODUCTION_GROUP_AGGREGATE]
     deduped_requested = list(dict.fromkeys(requested))
+
+    if args.production_groups_only and args.mode != PRODUCTION_MODE:
+        raise ValueError(
+            "`--production-groups-only` is only supported with `--mode production`."
+        )
+
     if PRODUCTION_GROUP_AGGREGATE in deduped_requested:
+        if args.production_groups_only:
+            raise ValueError(
+                "`--production-groups-only` cannot be combined with aggregate "
+                "production mode. Choose one or more named production groups "
+                "instead."
+            )
         return True, PRODUCTION_GROUP_ORDER
 
     selected = tuple(
@@ -1419,6 +1433,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--production-groups-only",
+        action="store_true",
+        help=(
+            "Run only selected production groups and skip the default release, "
+            "Python-quality, integration, and PR-template prechecks. Use this "
+            "for production-diagnostic workflows in CI; canonical aggregate "
+            "sign-off remains `--mode production` without this flag."
+        ),
+    )
+    parser.add_argument(
         "--fresh-checkout",
         action="store_true",
         help=(
@@ -1471,6 +1495,8 @@ def main(argv: list[str] | None = None) -> int:
             "production_groups="
             f"{','.join(production_groups)} (mode={production_group_mode})"
         )
+        if args.production_groups_only:
+            print("production_groups_only=true")
 
     if args.mode == PRODUCTION_MODE and not os.getenv("GITHUB_ACTIONS", "").strip():
         print(
@@ -1479,116 +1505,102 @@ def main(argv: list[str] | None = None) -> int:
 
     findings: list[Finding] = []
 
-    for step in build_release_contract_steps(args, base_rev=base_rev):
-        finding = run_step(step, cwd=repo_root)
-        if finding is not None:
-            findings.append(finding)
-
-    python_environment_finding = run_python_environment_preflight(
-        args.python, cwd=repo_root
-    )
-    if python_environment_finding is not None:
-        findings.append(python_environment_finding)
+    if args.production_groups_only:
         print(
-            "ℹ️ Skipping Python quality/test steps until the selected "
-            "environment has the required development/test modules."
+            "ℹ️ Skipping default prechecks because `--production-groups-only` "
+            "was requested."
         )
     else:
-        for step in build_python_quality_steps(args):
+        for step in build_release_contract_steps(args, base_rev=base_rev):
             finding = run_step(step, cwd=repo_root)
             if finding is not None:
                 findings.append(finding)
 
-    if args.skip_integration:
-        warning = "Integration regression was skipped by request (--skip-integration)."
-        print(f"\nℹ️ {warning}")
-        findings.append(
-            Finding(
-                severity="warning",
-                name="Integration regression",
-                summary=warning,
-                remediation=(
-                    "Run the standard precheck again without `--skip-integration` "
-                    "before finalizing the PR."
-                ),
-                command=("bash", "./tests/run-integration-test.sh"),
+        python_environment_finding = run_python_environment_preflight(
+            args.python, cwd=repo_root
+        )
+        if python_environment_finding is not None:
+            findings.append(python_environment_finding)
+            print(
+                "ℹ️ Skipping Python quality/test steps until the selected "
+                "environment has the required development/test modules."
             )
-        )
-    else:
-        finding = run_step(
-            StepDefinition(
-                name="Integration regression",
-                command=("bash", "./tests/run-integration-test.sh"),
-                failure_summary="The integration regression suite reported failures.",
-                remediation=(
-                    "Investigate `./tests/run-integration-test.sh` failures, fix the "
-                    "root cause, and rerun the precheck."
-                ),
-            ),
-            cwd=repo_root,
-        )
-        if finding is not None:
-            findings.append(finding)
+        else:
+            for step in build_python_quality_steps(args):
+                finding = run_step(step, cwd=repo_root)
+                if finding is not None:
+                    findings.append(finding)
 
-    if args.skip_pr_template_check:
-        warning = (
-            "PR-template validation was skipped by request "
-            "(--skip-pr-template-check)."
-        )
-        print(f"ℹ️ {warning}")
-        findings.append(
-            Finding(
-                severity="warning",
-                name="PR-template format validation",
-                summary=warning,
-                remediation=(
-                    "Run the standard precheck again without `--skip-pr-template-check` "
-                    "before opening or finalizing the PR."
-                ),
-                command=(
-                    "bash",
-                    "./scripts/validate-pr-template.sh",
-                    "./.github/pull_request_template.md",
-                ),
+        if args.skip_integration:
+            warning = (
+                "Integration regression was skipped by request (--skip-integration)."
             )
-        )
-    else:
-        finding = run_step(
-            StepDefinition(
-                name="PR-template format validation (.github/pull_request_template.md)",
-                command=(
-                    "bash",
-                    "./scripts/validate-pr-template.sh",
-                    "./.github/pull_request_template.md",
-                ),
-                failure_summary=(
-                    "The repository PR template does not satisfy the template "
-                    "validation contract."
-                ),
-                remediation=(
-                    "Fix `./.github/pull_request_template.md` so it passes "
-                    "`./scripts/validate-pr-template.sh`."
-                ),
-            ),
-            cwd=repo_root,
-        )
-        if finding is not None:
-            findings.append(finding)
-        if args.pr_body_file.strip():
+            print(f"\nℹ️ {warning}")
+            findings.append(
+                Finding(
+                    severity="warning",
+                    name="Integration regression",
+                    summary=warning,
+                    remediation=(
+                        "Run the standard precheck again without `--skip-integration` "
+                        "before finalizing the PR."
+                    ),
+                    command=("bash", "./tests/run-integration-test.sh"),
+                )
+            )
+        else:
             finding = run_step(
                 StepDefinition(
-                    name="PR-template format validation (provided PR body)",
+                    name="Integration regression",
+                    command=("bash", "./tests/run-integration-test.sh"),
+                    failure_summary="The integration regression suite reported failures.",
+                    remediation=(
+                        "Investigate `./tests/run-integration-test.sh` failures, fix the "
+                        "root cause, and rerun the precheck."
+                    ),
+                ),
+                cwd=repo_root,
+            )
+            if finding is not None:
+                findings.append(finding)
+
+        if args.skip_pr_template_check:
+            warning = (
+                "PR-template validation was skipped by request "
+                "(--skip-pr-template-check)."
+            )
+            print(f"ℹ️ {warning}")
+            findings.append(
+                Finding(
+                    severity="warning",
+                    name="PR-template format validation",
+                    summary=warning,
+                    remediation=(
+                        "Run the standard precheck again without `--skip-pr-template-check` "
+                        "before opening or finalizing the PR."
+                    ),
                     command=(
                         "bash",
                         "./scripts/validate-pr-template.sh",
-                        str(Path(args.pr_body_file).expanduser().resolve()),
+                        "./.github/pull_request_template.md",
+                    ),
+                )
+            )
+        else:
+            finding = run_step(
+                StepDefinition(
+                    name="PR-template format validation (.github/pull_request_template.md)",
+                    command=(
+                        "bash",
+                        "./scripts/validate-pr-template.sh",
+                        "./.github/pull_request_template.md",
                     ),
                     failure_summary=(
-                        "The provided PR body does not satisfy the template "
+                        "The repository PR template does not satisfy the template "
                         "validation contract."
                     ),
                     remediation=(
-                        "Update the provided PR body so it passes "
+                        "Fix `./.github/pull_request_template.md` so it passes "
                         "`./scripts/validate-pr-template.sh`."
                     ),
                 ),
@@ -1596,6 +1608,28 @@ def main(argv: list[str] | None = None) -> int:
             )
             if finding is not None:
                 findings.append(finding)
+            if args.pr_body_file.strip():
+                finding = run_step(
+                    StepDefinition(
+                        name="PR-template format validation (provided PR body)",
+                        command=(
+                            "bash",
+                            "./scripts/validate-pr-template.sh",
+                            str(Path(args.pr_body_file).expanduser().resolve()),
+                        ),
+                        failure_summary=(
+                            "The provided PR body does not satisfy the template "
+                            "validation contract."
+                        ),
+                        remediation=(
+                            "Update the provided PR body so it passes "
+                            "`./scripts/validate-pr-template.sh`."
+                        ),
+                    ),
+                    cwd=repo_root,
+                )
+                if finding is not None:
+                    findings.append(finding)
 
     docker_build_findings: list[Finding] = []
     production_group_results: dict[str, str] = {}

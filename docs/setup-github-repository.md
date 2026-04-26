@@ -31,6 +31,10 @@ If you prefer to configure the repository manually via the GitHub Settings UI, e
     - `Python Code Quality (Lint & Format)`
     - `Architectural Boundary Tests`
     - `PR Template Conformance`
+    - `Production Docs Contract`
+    - `Production Docker Build Parity`
+    - `Production Runtime Proofs`
+    - `Internal Production Gate — Docker Parity & Recovery Proofs`
 - **Human approvals are an operator policy choice:** If you want a human in the loop, require `1` approval. If you want autonomous merge after CI passes, set the required approvals to `0`, but keep the status checks and PR review process intact in the workflow.
 - **Include Administrators:** Enforce these rules for repository administrators as well, because the Personal Access Token (PAT) used by the AI usually has admin/write privileges.
 
