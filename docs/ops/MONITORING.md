@@ -42,7 +42,7 @@ Supported surfaces:
 
 - `LLMClientFactory.get_startup_report()` now includes `request_diagnostics` beside `request_quota_policy` and `role_request_policies`.
 - `scripts/work-issue.py` prints the same immediate-limiter summary at startup and after execution.
-- `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json` remains the shared backing file for the live limiter and now carries additive telemetry counters.
+- `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json` remains the shared backing file for the live limiter and quota broker, including shared concurrency-lease state plus additive request-path telemetry counters.
 
 These signals are additive request-path diagnostics only. They must not be confused with the manager-backed readiness/status authority described elsewhere in this document.
 
@@ -68,7 +68,7 @@ These signals are additive request-path diagnostics only. They must not be confu
 
 Interpretation guidance:
 
-- High `total_queue_wait_seconds` with low upstream time means the workspace is mostly waiting for shared local budget.
+- High `total_queue_wait_seconds` with low upstream time means the workspace is mostly waiting for shared local budget. After the `#141` brokered-admission slice, that queue time may come from request-slot pacing, waiting for a shared concurrency lease, or both.
 - High upstream time with low queue wait means provider/model latency is the likely bottleneck.
 - Non-zero `retry_after_event_count` means the provider asked callers to back off.
 - Non-zero `cooldown_event_count` / `total_cooldown_seconds` means the shared limiter propagated that backoff to the whole workspace.

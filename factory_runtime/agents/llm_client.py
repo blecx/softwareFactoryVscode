@@ -24,6 +24,10 @@ from factory_runtime.agents.tooling.llm_quota_policy import (
     load_llm_config,
     resolve_role_quota_policy,
 )
+from factory_runtime.agents.tooling.quota_broker import (
+    AdmissionReservation,
+    QuotaBroker,
+)
 from factory_runtime.secret_safety import (
     is_blank_or_placeholder,
     production_runtime_mode_enabled,
@@ -138,6 +142,7 @@ class _RateLimitedAsyncHTTPClient(httpx.AsyncClient):
         self,
         *,
         throttle: _LLMRequestThrottle,
+        broker: QuotaBroker,
         role: str,
         lane: str = "foreground",
         sleeper: Callable[[float], Awaitable[None]] = asyncio.sleep,
@@ -145,36 +150,25 @@ class _RateLimitedAsyncHTTPClient(httpx.AsyncClient):
     ):
         super().__init__(**client_kwargs)
         self._throttle = throttle
-        self._role = (role or "coding").strip().lower() or "coding"
-        self._lane = _normalize_throttle_lane(lane)
-        self._shared_channel = _build_shared_throttle_channel(self._role, self._lane)
+        self._broker = broker
         self._sleeper = sleeper
 
-    async def _acquire_request_slot(self) -> float:
-        if api_throttle.shared_throttle_supported():
-            wait_seconds = api_throttle.reserve_api_slot(
-                channel=self._shared_channel,
-                role=self._role,
-            )
-            if wait_seconds > 0:
-                await self._sleeper(wait_seconds)
-            return wait_seconds
-
-        return await self._throttle.acquire()
+    async def _reserve_request_admission(self) -> AdmissionReservation:
+        return await self._broker.reserve_request_admission(
+            local_fallback=self._throttle.acquire,
+            sleeper=self._sleeper,
+        )
 
     def _apply_shared_penalty(self, response: httpx.Response) -> float | None:
         retry_after_seconds = _extract_retry_after_seconds(response)
         if response.status_code != 429 and retry_after_seconds is None:
             return None
 
-        return api_throttle.apply_rate_limit_penalty(
-            channel=self._shared_channel,
-            penalty_seconds=retry_after_seconds,
-            role=self._role,
-        )
+        return self._broker.apply_rate_limit_penalty(retry_after_seconds)
 
     async def send(self, request, **kwargs):
-        queue_wait_seconds = await self._acquire_request_slot()
+        admission = await self._reserve_request_admission()
+        queue_wait_seconds = admission.queue_wait_seconds
         upstream_started_at = time.monotonic()
         status_code: int | None = None
         retry_after_seconds: float | None = None
@@ -186,8 +180,8 @@ class _RateLimitedAsyncHTTPClient(httpx.AsyncClient):
             return response
         finally:
             upstream_elapsed_seconds = time.monotonic() - upstream_started_at
-            api_throttle.record_request_outcome(
-                channel=self._shared_channel,
+            self._broker.release_admission(admission)
+            self._broker.record_request_outcome(
                 queue_wait_seconds=queue_wait_seconds,
                 upstream_processing_seconds=upstream_elapsed_seconds,
                 status_code=status_code,
@@ -269,8 +263,14 @@ class LLMClientFactory:
             role_config=role_config,
             lane=lane,
         )
+        broker = QuotaBroker.for_role(
+            role,
+            role_config=role_config,
+            lane=lane,
+        )
         return _RateLimitedAsyncHTTPClient(
             throttle=throttle,
+            broker=broker,
             role=role,
             lane=lane,
         )

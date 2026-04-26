@@ -17,6 +17,7 @@ from factory_runtime.agents.tooling.llm_quota_policy import (
     resolve_quota_policy,
     resolve_role_quota_policy,
 )
+from factory_runtime.agents.tooling.quota_broker import QuotaBroker
 
 
 def _clear_quota_env(monkeypatch) -> None:
@@ -28,6 +29,9 @@ def _clear_quota_env(monkeypatch) -> None:
         "WORK_ISSUE_RPS_JITTER",
         "WORK_ISSUE_MAX_THROTTLE_WAIT_SECONDS",
         "WORK_ISSUE_RATE_LIMIT_COOLDOWN_SECONDS",
+        "WORK_ISSUE_CONCURRENCY_LEASE_LIMIT",
+        "WORK_ISSUE_CONCURRENCY_LEASE_TTL_SECONDS",
+        "WORK_ISSUE_CONCURRENCY_LEASE_POLL_SECONDS",
         "WORK_ISSUE_QUOTA_ROLE",
         "WORK_ISSUE_API_THROTTLE_STATE_FILE",
         "WORK_ISSUE_API_THROTTLE_LOCK_FILE",
@@ -40,6 +44,7 @@ def _make_policy(
     quota_ceiling_rps: float = 0.50,
     foreground_lane_rps: float = 0.35,
     reserve_lane_rps: float = 0.15,
+    concurrency_lease_limit: int = 2,
 ) -> LLMQuotaPolicy:
     return LLMQuotaPolicy(
         provider="github",
@@ -48,6 +53,7 @@ def _make_policy(
         quota_bucket="github-openai-mini",
         quota_source="model-family-fallback",
         quota_ceiling_rps=quota_ceiling_rps,
+        concurrency_lease_limit=concurrency_lease_limit,
         foreground_share=0.70,
         reserve_share=0.30,
         foreground_lane_rps=foreground_lane_rps,
@@ -56,6 +62,15 @@ def _make_policy(
         max_wait_seconds=180.0,
         rate_limit_cooldown_seconds=45.0,
     )
+
+
+def _make_broker(
+    policy: LLMQuotaPolicy,
+    *,
+    role: str = "coding",
+    lane: str = "foreground",
+) -> QuotaBroker:
+    return QuotaBroker(role=role, lane=lane, policy=policy)
 
 
 def test_resolve_quota_policy_uses_model_family_bucket_and_7030_split(
@@ -72,6 +87,7 @@ def test_resolve_quota_policy_uses_model_family_bucket_and_7030_split(
     assert policy.quota_bucket == "github-openai-mini"
     assert policy.quota_source == "model-family-fallback"
     assert policy.quota_ceiling_rps == pytest.approx(0.50)
+    assert policy.concurrency_lease_limit == 2
     assert policy.foreground_share == pytest.approx(0.70)
     assert policy.reserve_share == pytest.approx(0.30)
     assert policy.foreground_lane_rps == pytest.approx(0.35)
@@ -117,6 +133,7 @@ def test_resolve_quota_policy_honors_legacy_foreground_override(monkeypatch) -> 
     assert policy.quota_bucket == "legacy-foreground-override"
     assert policy.quota_source == "WORK_ISSUE_MAX_RPS"
     assert policy.quota_ceiling_rps == pytest.approx(0.30)
+    assert policy.concurrency_lease_limit == 1
     assert policy.foreground_lane_rps == pytest.approx(0.21)
     assert policy.reserve_lane_rps == pytest.approx(0.09)
 
@@ -155,11 +172,13 @@ def test_rate_limited_http_client_uses_shared_workspace_slot(monkeypatch) -> Non
     )
 
     throttle = _LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0)
+    broker = _make_broker(_make_policy(concurrency_lease_limit=0))
     monkeypatch.setattr(throttle, "acquire", _fake_acquire)
 
     async def _run_test() -> httpx.Response:
         client = _RateLimitedAsyncHTTPClient(
             throttle=throttle,
+            broker=broker,
             role="coding",
             sleeper=_fake_sleep,
             transport=httpx.MockTransport(
@@ -220,12 +239,14 @@ def test_rate_limited_http_client_shares_state_across_new_clients(
         )
         first_client = _RateLimitedAsyncHTTPClient(
             throttle=_LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0),
+            broker=_make_broker(_make_policy()),
             role="coding",
             sleeper=_record_first_sleep,
             transport=transport,
         )
         second_client = _RateLimitedAsyncHTTPClient(
             throttle=_LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0),
+            broker=_make_broker(_make_policy()),
             role="coding",
             sleeper=_record_second_sleep,
             transport=transport,
@@ -267,10 +288,12 @@ def test_rate_limited_http_client_applies_shared_penalty_on_retry_after(
         )
         or float(penalty_seconds or 0.0),
     )
+    broker = _make_broker(_make_policy(concurrency_lease_limit=0))
 
     async def _run_test() -> httpx.Response:
         client = _RateLimitedAsyncHTTPClient(
             throttle=_LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0),
+            broker=broker,
             role="coding",
             transport=httpx.MockTransport(
                 lambda request: httpx.Response(
@@ -491,6 +514,7 @@ def test_startup_report_exposes_request_quota_policy(monkeypatch) -> None:
     report = LLMClientFactory.get_startup_report()
 
     assert report["request_quota_policy"]["quota_bucket"] == "github-openai-mini"
+    assert report["request_quota_policy"]["concurrency_lease_limit"] == 2
     assert report["request_throttle"]["max_rps"] == pytest.approx(0.35)
     assert report["request_diagnostics"]["summary"]["request_count"] == 2
     assert report["request_diagnostics"]["summary"]["time_breakdown_seconds"] == {
