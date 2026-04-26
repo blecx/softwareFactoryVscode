@@ -706,6 +706,10 @@ def test_install_doc_locks_practical_per_workspace_baseline():
         "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
         in install_doc
     )
+    assert (
+        "--mode production --production-group <docs-contract|docker-builds|runtime-proofs>"
+        in install_doc
+    )
     assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in install_doc
     assert "stop_cleanup_retains_images_and_supports_restart" in install_doc
     assert "Still deferred after this readiness pass:" in install_doc
@@ -865,6 +869,9 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
         "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
         in cheat_sheet
     )
+    assert "--mode production --production-group docs-contract" in cheat_sheet
+    assert "--mode production --production-group docker-builds" in cheat_sheet
+    assert "--mode production --production-group runtime-proofs" in cheat_sheet
     assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in cheat_sheet
     assert "supported baseline" in cheat_sheet
     assert "Still deferred after this readiness pass:" in cheat_sheet
@@ -2140,6 +2147,174 @@ def test_local_ci_parity_production_mode_writes_signoff_bundle_and_tracks_green_
     )
     assert history["current_streak"]["count"] == 2
     assert len(history["runs"]) == 2
+
+
+def test_local_ci_parity_production_diagnostic_group_docs_contract_only(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    call_order: list[str] = []
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCS_CONTRACT)
+        or [],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_build_validation",
+        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCKER_BUILDS)
+        or [],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: call_order.append(
+            module.PRODUCTION_GROUP_RUNTIME_PROOFS
+        )
+        or [],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--production-group",
+            module.PRODUCTION_GROUP_DOCS_CONTRACT,
+        ]
+    )
+
+    assert exit_code == 0
+    assert call_order == [module.PRODUCTION_GROUP_DOCS_CONTRACT]
+    assert not (tmp_path / ".tmp" / "production-readiness" / "latest.json").exists()
+
+
+def test_local_ci_parity_production_aggregate_runs_named_groups_in_canonical_order(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    call_order: list[str] = []
+
+    for relative_path in module.PRODUCTION_READINESS_REQUIRED_DOCS:
+        doc_path = tmp_path / relative_path
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        doc_path.write_text(f"# {relative_path}\n", encoding="utf-8")
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCS_CONTRACT)
+        or [],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_build_validation",
+        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCKER_BUILDS)
+        or [],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: call_order.append(
+            module.PRODUCTION_GROUP_RUNTIME_PROOFS
+        )
+        or [],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+
+    assert exit_code == 0
+    assert call_order == list(module.PRODUCTION_GROUP_ORDER)
+    latest_report = json.loads(
+        (tmp_path / ".tmp" / "production-readiness" / "latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert latest_report["production_groups_executed"] == list(
+        module.PRODUCTION_GROUP_ORDER
+    )
+
+
+def test_local_ci_parity_diagnostic_group_run_keeps_aggregate_bundle_continuity(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+
+    for relative_path in module.PRODUCTION_READINESS_REQUIRED_DOCS:
+        doc_path = tmp_path / relative_path
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        doc_path.write_text(f"# {relative_path}\n", encoding="utf-8")
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(module, "run_docker_build_validation", lambda repo_root: [])
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: [],
+    )
+
+    aggregate_exit = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    assert aggregate_exit == 0
+
+    latest_path = tmp_path / ".tmp" / "production-readiness" / "latest.json"
+    aggregate_latest = json.loads(latest_path.read_text(encoding="utf-8"))
+
+    diagnostic_exit = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--production-group",
+            module.PRODUCTION_GROUP_DOCS_CONTRACT,
+        ]
+    )
+    assert diagnostic_exit == 0
+
+    diagnostic_latest = json.loads(latest_path.read_text(encoding="utf-8"))
+    assert diagnostic_latest == aggregate_latest
 
 
 def test_local_ci_parity_production_mode_missing_docker_cli_mentions_canonical_command(

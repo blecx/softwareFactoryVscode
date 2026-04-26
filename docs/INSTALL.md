@@ -132,6 +132,7 @@ For local validation, keep the two parity paths distinct:
 
 - `./.venv/bin/python ./scripts/local_ci_parity.py` is the default faster local precheck.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical internal production-readiness gate, surfaced in CI as `Internal Production Gate — Docker Parity & Recovery Proofs`, and includes blocking Docker image builds, the promoted Docker E2E runtime proof lane (including backup/restore roundtrip evidence), required internal-production docs/runbooks presence checks, and a concise sign-off bundle under `.tmp/production-readiness/`.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group <docs-contract|docker-builds|runtime-proofs>` runs one named production-only diagnostic slice at a time without redefining readiness authority; these diagnostic runs are for targeted replay and do **not** refresh the canonical sign-off bundle.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout` replays that same production gate from a clean git worktree after `./setup.sh`, which is the closest local match to GitHub Actions when you want merge-grade parity evidence before pushing.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains available as a compatibility alias when you only need the Docker build expansion path without the promoted Docker E2E lane.
 
