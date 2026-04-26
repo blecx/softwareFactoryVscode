@@ -24,6 +24,7 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
 ## 🚦 Immediate LLM quota policy
 
 - The immediate LLM limiter now chooses a shared workspace quota bucket from the active provider/model family instead of hard-coding one ultra-conservative global default.
+- This section documents the bounded immediate-repair baseline from umbrella `#139`; the long-term multi-requester quota-governance contract now lives in `docs/architecture/ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md` and `factory_runtime/agents/tooling/quota_governance.py`.
 - Current GitHub Models fallbacks are intentionally modest and split into a shared **70% foreground lane / 30% reserve lane**:
   - `gpt-4o-mini` / `gpt-4.1-mini` families → `0.50 RPS` ceiling (`0.35` foreground / `0.15` reserve)
   - `gpt-4o` / `gpt-4.1` families → `0.30 RPS` ceiling (`0.21` foreground / `0.09` reserve)
@@ -33,6 +34,7 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
   - `WORK_ISSUE_FOREGROUND_SHARE`
   - `WORK_ISSUE_RESERVE_SHARE`
 - Live parent-agent and subagent LLM clients now reserve slots from the same workspace-owned throttle state under `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json`, guarded by `.copilot/softwareFactoryVscode/.tmp/api-throttle.lock`, so a fresh client instance cannot quietly sprint past the shared budget.
+- The long-term contract keeps those shared lanes as delegated workspace/run/requester budget partitions, not per-process entitlements and not a second runtime-truth surface.
 - Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket and see whether time is being burned in queue wait, upstream processing, retry-after hints, or shared cooldown windows.
 - `scripts/work-issue.py` now prints the same limiter summary at startup and after execution, including work-issue retry/backoff totals for the current run.
 
