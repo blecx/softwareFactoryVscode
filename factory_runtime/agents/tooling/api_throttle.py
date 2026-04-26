@@ -5,6 +5,8 @@ import re
 import time
 from pathlib import Path
 
+from factory_runtime.agents.tooling.llm_quota_policy import resolve_role_quota_policy
+
 try:
     import fcntl
 except ImportError:  # pragma: no cover
@@ -23,24 +25,42 @@ def _clamp(value: float, min_value: float, max_value: float) -> float:
     return max(min_value, min(max_value, value))
 
 
-def _resolve_max_rps() -> float:
-    value = _parse_float_env("WORK_ISSUE_MAX_RPS", 0.10)
-    return max(0.0, value)
+def _resolve_role() -> str:
+    value = (os.environ.get("WORK_ISSUE_QUOTA_ROLE") or "coding").strip().lower()
+    return value or "coding"
+
+
+def _resolve_lane(channel: str) -> str:
+    normalized = (channel or "llm").strip().lower()
+    if (
+        normalized == "reserve"
+        or normalized.endswith(":reserve")
+        or normalized.endswith(".reserve")
+    ):
+        return "reserve"
+    return "foreground"
+
+
+def _resolve_max_rps(channel: str = "llm") -> float:
+    policy = resolve_role_quota_policy(role=_resolve_role())
+    if _resolve_lane(channel) == "reserve":
+        return max(0.0, policy.reserve_lane_rps)
+    return max(0.0, policy.foreground_lane_rps)
 
 
 def _resolve_jitter_ratio() -> float:
-    value = _parse_float_env("WORK_ISSUE_RPS_JITTER", 0.25)
-    return _clamp(value, 0.0, 1.0)
+    policy = resolve_role_quota_policy(role=_resolve_role())
+    return _clamp(policy.jitter_ratio, 0.0, 1.0)
 
 
 def _resolve_max_wait_seconds() -> float:
-    value = _parse_float_env("WORK_ISSUE_MAX_THROTTLE_WAIT_SECONDS", 180.0)
-    return max(1.0, value)
+    policy = resolve_role_quota_policy(role=_resolve_role())
+    return max(1.0, policy.max_wait_seconds)
 
 
 def _resolve_rate_limit_cooldown_seconds() -> float:
-    value = _parse_float_env("WORK_ISSUE_RATE_LIMIT_COOLDOWN_SECONDS", 45.0)
-    return max(1.0, value)
+    policy = resolve_role_quota_policy(role=_resolve_role())
+    return max(1.0, policy.rate_limit_cooldown_seconds)
 
 
 def _state_path() -> Path:
@@ -86,7 +106,7 @@ def reserve_api_slot(channel: str = "llm") -> float:
     the next API call.
     """
 
-    max_rps = _resolve_max_rps()
+    max_rps = _resolve_max_rps(channel)
     if max_rps <= 0:
         return 0.0
 

@@ -292,6 +292,14 @@ FACTORY_SHARED_SERVICE_MODE=per-workspace
 # FACTORY_SHARED_MEMORY_URL=http://shared-memory.internal:3030
 # FACTORY_SHARED_AGENT_BUS_URL=http://shared-bus.internal:3031
 # FACTORY_SHARED_APPROVAL_GATE_URL=http://shared-approval.internal:8001
+
+# Optional immediate LLM quota tuning
+# The default immediate limiter is provider/model aware and computes a shared
+# 70% foreground lane plus 30% reserve lane inside the workspace. Only set
+# these when you need a stricter local override.
+# WORK_ISSUE_QUOTA_CEILING_RPS=0.50
+# WORK_ISSUE_FOREGROUND_SHARE=0.70
+# WORK_ISSUE_RESERVE_SHARE=0.30
 ```
 
 The bootstrap step also generates `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`.
