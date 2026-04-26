@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
+import httpx
 import pytest
 
-from factory_runtime.agents.llm_client import LLMClientFactory
+from factory_runtime.agents.llm_client import (
+    LLMClientFactory,
+    _LLMRequestThrottle,
+    _RateLimitedAsyncHTTPClient,
+)
 from factory_runtime.agents.tooling import api_throttle
 from factory_runtime.agents.tooling.llm_quota_policy import (
     LLMQuotaPolicy,
@@ -23,8 +29,33 @@ def _clear_quota_env(monkeypatch) -> None:
         "WORK_ISSUE_MAX_THROTTLE_WAIT_SECONDS",
         "WORK_ISSUE_RATE_LIMIT_COOLDOWN_SECONDS",
         "WORK_ISSUE_QUOTA_ROLE",
+        "WORK_ISSUE_API_THROTTLE_STATE_FILE",
+        "WORK_ISSUE_API_THROTTLE_LOCK_FILE",
     ):
         monkeypatch.delenv(name, raising=False)
+
+
+def _make_policy(
+    *,
+    quota_ceiling_rps: float = 0.50,
+    foreground_lane_rps: float = 0.35,
+    reserve_lane_rps: float = 0.15,
+) -> LLMQuotaPolicy:
+    return LLMQuotaPolicy(
+        provider="github",
+        model="openai/gpt-4o-mini",
+        model_family="openai/gpt-4o-mini",
+        quota_bucket="github-openai-mini",
+        quota_source="model-family-fallback",
+        quota_ceiling_rps=quota_ceiling_rps,
+        foreground_share=0.70,
+        reserve_share=0.30,
+        foreground_lane_rps=foreground_lane_rps,
+        reserve_lane_rps=reserve_lane_rps,
+        jitter_ratio=0.10,
+        max_wait_seconds=180.0,
+        rate_limit_cooldown_seconds=45.0,
+    )
 
 
 def test_resolve_quota_policy_uses_model_family_bucket_and_7030_split(
@@ -92,21 +123,7 @@ def test_resolve_quota_policy_honors_legacy_foreground_override(monkeypatch) -> 
 
 def test_api_throttle_distinguishes_foreground_and_reserve_lanes(monkeypatch) -> None:
     _clear_quota_env(monkeypatch)
-    policy = LLMQuotaPolicy(
-        provider="github",
-        model="openai/gpt-4o-mini",
-        model_family="openai/gpt-4o-mini",
-        quota_bucket="github-openai-mini",
-        quota_source="model-family-fallback",
-        quota_ceiling_rps=0.50,
-        foreground_share=0.70,
-        reserve_share=0.30,
-        foreground_lane_rps=0.35,
-        reserve_lane_rps=0.15,
-        jitter_ratio=0.10,
-        max_wait_seconds=180.0,
-        rate_limit_cooldown_seconds=45.0,
-    )
+    policy = _make_policy()
     monkeypatch.setattr(
         api_throttle,
         "resolve_role_quota_policy",
@@ -115,6 +132,164 @@ def test_api_throttle_distinguishes_foreground_and_reserve_lanes(monkeypatch) ->
 
     assert api_throttle._resolve_max_rps("llm") == pytest.approx(0.35)
     assert api_throttle._resolve_max_rps("llm.reserve") == pytest.approx(0.15)
+
+
+def test_rate_limited_http_client_uses_shared_workspace_slot(monkeypatch) -> None:
+    _clear_quota_env(monkeypatch)
+
+    slot_calls: list[tuple[str, str | None]] = []
+    local_acquires: list[str] = []
+    sleep_calls: list[float] = []
+
+    async def _fake_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    async def _fake_acquire() -> None:
+        local_acquires.append("local")
+
+    monkeypatch.setattr(api_throttle, "shared_throttle_supported", lambda: True)
+    monkeypatch.setattr(
+        api_throttle,
+        "reserve_api_slot",
+        lambda channel="llm", role=None: slot_calls.append((channel, role)) or 0.25,
+    )
+
+    throttle = _LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0)
+    monkeypatch.setattr(throttle, "acquire", _fake_acquire)
+
+    async def _run_test() -> httpx.Response:
+        client = _RateLimitedAsyncHTTPClient(
+            throttle=throttle,
+            role="coding",
+            sleeper=_fake_sleep,
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(200, json={"ok": True})
+            ),
+        )
+
+        try:
+            return await client.get("https://example.test/models")
+        finally:
+            await client.aclose()
+
+    response = asyncio.run(_run_test())
+
+    assert response.status_code == 200
+    assert slot_calls == [("llm:coding", "coding")]
+    assert sleep_calls == [pytest.approx(0.25)]
+    assert local_acquires == []
+
+
+def test_rate_limited_http_client_shares_state_across_new_clients(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    _clear_quota_env(monkeypatch)
+    monkeypatch.setenv(
+        "WORK_ISSUE_API_THROTTLE_STATE_FILE",
+        str(tmp_path / "api-throttle-state.json"),
+    )
+    monkeypatch.setenv(
+        "WORK_ISSUE_API_THROTTLE_LOCK_FILE",
+        str(tmp_path / "api-throttle.lock"),
+    )
+    monkeypatch.setattr(
+        api_throttle,
+        "resolve_role_quota_policy",
+        lambda role="coding": _make_policy(
+            quota_ceiling_rps=3.0,
+            foreground_lane_rps=2.0,
+            reserve_lane_rps=1.0,
+        ),
+    )
+    monkeypatch.setattr(api_throttle.random, "uniform", lambda start, stop: 0.0)
+    monkeypatch.setattr(api_throttle.time, "time", lambda: 100.0)
+
+    first_sleep_calls: list[float] = []
+    second_sleep_calls: list[float] = []
+
+    async def _record_first_sleep(seconds: float) -> None:
+        first_sleep_calls.append(seconds)
+
+    async def _record_second_sleep(seconds: float) -> None:
+        second_sleep_calls.append(seconds)
+
+    async def _run_test() -> tuple[httpx.Response, httpx.Response]:
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(200, json={"ok": True})
+        )
+        first_client = _RateLimitedAsyncHTTPClient(
+            throttle=_LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0),
+            role="coding",
+            sleeper=_record_first_sleep,
+            transport=transport,
+        )
+        second_client = _RateLimitedAsyncHTTPClient(
+            throttle=_LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0),
+            role="coding",
+            sleeper=_record_second_sleep,
+            transport=transport,
+        )
+
+        try:
+            first_response = await first_client.get("https://example.test/models")
+            second_response = await second_client.get("https://example.test/models")
+            return first_response, second_response
+        finally:
+            await first_client.aclose()
+            await second_client.aclose()
+
+    first_response, second_response = asyncio.run(_run_test())
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert first_sleep_calls == []
+    assert second_sleep_calls == [pytest.approx(0.5)]
+
+
+def test_rate_limited_http_client_applies_shared_penalty_on_retry_after(
+    monkeypatch,
+) -> None:
+    _clear_quota_env(monkeypatch)
+
+    penalty_calls: list[tuple[str, float | None, str | None]] = []
+    monkeypatch.setattr(api_throttle, "shared_throttle_supported", lambda: True)
+    monkeypatch.setattr(
+        api_throttle,
+        "reserve_api_slot",
+        lambda channel="llm", role=None: 0.0,
+    )
+    monkeypatch.setattr(
+        api_throttle,
+        "apply_rate_limit_penalty",
+        lambda channel="llm", penalty_seconds=None, role=None: penalty_calls.append(
+            (channel, penalty_seconds, role)
+        )
+        or float(penalty_seconds or 0.0),
+    )
+
+    async def _run_test() -> httpx.Response:
+        client = _RateLimitedAsyncHTTPClient(
+            throttle=_LLMRequestThrottle(max_rps=100.0, jitter_ratio=0.0),
+            role="coding",
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    429,
+                    headers={"Retry-After": "7"},
+                    text="rate limit",
+                )
+            ),
+        )
+
+        try:
+            return await client.get("https://example.test/models")
+        finally:
+            await client.aclose()
+
+    response = asyncio.run(_run_test())
+
+    assert response.status_code == 429
+    assert penalty_calls == [("llm:coding", 7.0, "coding")]
 
 
 def test_startup_report_exposes_request_quota_policy(monkeypatch) -> None:

@@ -300,6 +300,9 @@ FACTORY_SHARED_SERVICE_MODE=per-workspace
 # WORK_ISSUE_QUOTA_CEILING_RPS=0.50
 # WORK_ISSUE_FOREGROUND_SHARE=0.70
 # WORK_ISSUE_RESERVE_SHARE=0.30
+# Live LLM clients share workspace-global limiter state at:
+# .copilot/softwareFactoryVscode/.tmp/api-throttle-state.json
+# .copilot/softwareFactoryVscode/.tmp/api-throttle.lock
 ```
 
 The bootstrap step also generates `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`.
