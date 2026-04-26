@@ -2942,12 +2942,29 @@ class MCPRuntimeManager:
             )
 
     def _restore_bundle_file(self, source_path: Path, destination_path: Path) -> None:
-        destination_path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path = destination_path.with_name(
             destination_path.name + ".restore-tmp"
         )
-        shutil.copy2(source_path, temporary_path)
-        temporary_path.replace(destination_path)
+        for attempt in range(2):
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            if temporary_path.exists():
+                temporary_path.unlink()
+            try:
+                shutil.copyfile(source_path, temporary_path)
+                temporary_path.replace(destination_path)
+                return
+            except FileNotFoundError as exc:
+                if temporary_path.exists():
+                    temporary_path.unlink()
+                if attempt == 0 and str(exc.filename or "").strip() == str(
+                    temporary_path
+                ):
+                    continue
+                raise
+            except Exception:
+                if temporary_path.exists():
+                    temporary_path.unlink()
+                raise
 
     def _resolve_restore_boundary_timestamp(
         self,
@@ -3031,7 +3048,14 @@ class MCPRuntimeManager:
             for instance_dir in (instance_memory_dir, instance_bus_dir):
                 if instance_dir.exists() and instance_dir.is_dir():
                     shutil.rmtree(instance_dir, ignore_errors=True)
-                    print(f"🧹 Erased data directory {instance_dir}")
+                    if instance_dir.exists():
+                        print(
+                            "⚠️ Could not fully erase data directory "
+                            f"{instance_dir}; stale bind-mounted contents may "
+                            "remain until the host regains write access."
+                        )
+                    else:
+                        print(f"🧹 Erased data directory {instance_dir}")
         except Exception as exc:  # noqa: BLE001
             print(f"⚠️ Could not fully erase configured data directories: {exc}")
 
@@ -3899,6 +3923,7 @@ class MCPRuntimeManager:
         docker_available: bool,
         installed: bool,
     ) -> RuntimeLifecycleState:
+        persisted_degraded = persisted_runtime_state in {"failed", "degraded"}
         if not installed:
             return RuntimeLifecycleState.RUNTIME_DELETED
         if persisted_runtime_state == RuntimeLifecycleState.RUNTIME_DELETED.value:
@@ -3909,16 +3934,20 @@ class MCPRuntimeManager:
             return RuntimeLifecycleState.REPAIRING
         if persisted_runtime_state == RuntimeLifecycleState.SUSPENDED.value:
             return RuntimeLifecycleState.SUSPENDED
-        if persisted_runtime_state in {"failed", "degraded"}:
-            return RuntimeLifecycleState.DEGRADED
         if not docker_available:
+            if persisted_degraded:
+                return RuntimeLifecycleState.DEGRADED
             return (
                 RuntimeLifecycleState.RUNNING
                 if persisted_runtime_state == "running"
                 else RuntimeLifecycleState.STOPPED
             )
         if not services:
-            return RuntimeLifecycleState.STOPPED
+            return (
+                RuntimeLifecycleState.DEGRADED
+                if persisted_degraded
+                else RuntimeLifecycleState.STOPPED
+            )
 
         non_external = [
             record
@@ -3930,7 +3959,11 @@ class MCPRuntimeManager:
         if all(
             record.status == ServiceInstanceStatus.MISSING for record in non_external
         ):
-            return RuntimeLifecycleState.STOPPED
+            return (
+                RuntimeLifecycleState.DEGRADED
+                if persisted_degraded
+                else RuntimeLifecycleState.STOPPED
+            )
         if any(
             record.status
             in {ServiceInstanceStatus.DEGRADED, ServiceInstanceStatus.MISSING}
@@ -3941,7 +3974,11 @@ class MCPRuntimeManager:
             record.status == ServiceInstanceStatus.RUNNING for record in non_external
         ):
             return RuntimeLifecycleState.RUNNING
-        return RuntimeLifecycleState.STOPPED
+        return (
+            RuntimeLifecycleState.DEGRADED
+            if persisted_degraded
+            else RuntimeLifecycleState.STOPPED
+        )
 
     def _build_runtime_config_from_snapshot(
         self,

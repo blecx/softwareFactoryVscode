@@ -1524,6 +1524,11 @@ def test_local_ci_parity_production_mode_runs_blocking_docker_build_parity(
         "run_docker_e2e_validation",
         _fake_run_docker_e2e_validation,
     )
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: [],
+    )
 
     exit_code = module.main(
         [
@@ -1588,6 +1593,11 @@ def test_local_ci_parity_production_mode_reports_docker_build_failures_as_blocki
         module,
         "run_docker_e2e_validation",
         _fake_run_docker_e2e_validation,
+    )
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: [],
     )
 
     exit_code = module.main(
@@ -1682,7 +1692,8 @@ def test_local_ci_parity_production_mode_reports_docker_e2e_failures_as_blocking
                 name="Docker E2E runtime proof lane",
                 summary=(
                     "The promoted Docker E2E runtime proof lane reported failures "
-                    "for the blocking strict-tenant and stop/cleanup scenarios."
+                    "for at least one of the blocking strict-tenant, stop/cleanup, "
+                    "and backup/restore scenarios."
                 ),
                 remediation="Investigate the promoted Docker E2E scenarios and rerun production parity.",
                 command=(
@@ -1699,6 +1710,11 @@ def test_local_ci_parity_production_mode_reports_docker_e2e_failures_as_blocking
                 returncode=1,
             )
         ],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: [],
     )
 
     exit_code = module.main(
@@ -1766,6 +1782,224 @@ def test_run_docker_e2e_validation_sets_env_and_selected_pytest_filter(
     assert call["capture_output"] is True
     assert call["text"] is True
     assert call["run_docker_e2e"] == "1"
+    transcript = (
+        tmp_path
+        / ".tmp"
+        / "production-readiness"
+        / module.DOCKER_E2E_LATEST_LOG_FILENAME
+    )
+    assert transcript.exists()
+    transcript_text = transcript.read_text(encoding="utf-8")
+    assert module.DOCKER_E2E_TEST_FILE in transcript_text
+    assert "Exit code: 0" in transcript_text
+
+
+def test_run_docker_bind_mount_ownership_parity_probe_reports_host_mapped_writes(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    probe_root = tmp_path / ".tmp" / "production-readiness" / "docker-bind-mount-parity"
+    cleanup_commands: list[tuple[str, ...]] = []
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        if "chown -R" in command_tuple[-1]:
+            cleanup_commands.append(command_tuple)
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                0,
+                stdout="",
+                stderr="",
+            )
+
+        nested_dir = probe_root / "nested"
+        nested_dir.mkdir(parents=True, exist_ok=True)
+        (nested_dir / "from-container").write_text("ok\n", encoding="utf-8")
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    finding = module.run_docker_bind_mount_ownership_parity_probe(tmp_path)
+
+    assert finding is not None
+    assert finding.name == "Docker bind-mount ownership parity"
+    assert "differ from GitHub-hosted runners" in finding.summary
+    assert (
+        cleanup_commands
+    ), "probe cleanup must restore writable ownership after the probe"
+    transcript = (
+        tmp_path
+        / ".tmp"
+        / "production-readiness"
+        / module.DOCKER_BIND_MOUNT_PARITY_LOG_FILENAME
+    )
+    assert transcript.exists()
+
+
+def test_run_docker_bind_mount_ownership_parity_probe_accepts_non_writable_nested_paths(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    probe_root = tmp_path / ".tmp" / "production-readiness" / "docker-bind-mount-parity"
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        if "chown -R" in command_tuple[-1]:
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                0,
+                stdout="",
+                stderr="",
+            )
+
+        nested_dir = probe_root / "nested"
+        nested_dir.mkdir(parents=True, exist_ok=True)
+        (nested_dir / "from-container").write_text("ok\n", encoding="utf-8")
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    real_access = module.os.access
+
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/docker")
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(
+        module.os,
+        "access",
+        lambda path, mode: (
+            False
+            if str(path).startswith(str(probe_root / "nested"))
+            else real_access(path, mode)
+        ),
+    )
+
+    finding = module.run_docker_bind_mount_ownership_parity_probe(tmp_path)
+
+    assert finding is None
+
+
+def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+    snapshot_path = tmp_path / "fresh-checkout"
+    snapshot_path.mkdir(parents=True, exist_ok=True)
+    calls: list[tuple[tuple[str, ...], Path]] = []
+
+    monkeypatch.setattr(
+        module,
+        "create_fresh_checkout_snapshot",
+        lambda repo_root, *, head_rev: snapshot_path,
+    )
+    monkeypatch.setattr(
+        module, "resolve_head_revision", lambda repo_root, head_rev: "deadbeef"
+    )
+    monkeypatch.setattr(
+        module, "worktree_has_uncommitted_changes", lambda repo_root: True
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_bind_mount_ownership_parity_probe",
+        lambda repo_root: None,
+    )
+
+    def _fake_run_command(command, *, cwd):
+        command_tuple = tuple(command)
+        calls.append((command_tuple, cwd))
+        return subprocess.CompletedProcess(
+            list(command_tuple), 0, stdout="ok\n", stderr=""
+        )
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--fresh-checkout",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert calls[0] == (("bash", "./setup.sh"), snapshot_path)
+    child_command, child_cwd = calls[1]
+    assert child_cwd == snapshot_path
+    assert child_command[:2] == ("./.venv/bin/python", "./scripts/local_ci_parity.py")
+    assert "--fresh-checkout" not in child_command
+    assert "--python" in child_command
+    assert "./.venv/bin/python" in child_command
+    assert "snapshot_path=" in captured.out
+    assert "committed HEAD only" in captured.out
+
+
+def test_local_ci_parity_fresh_checkout_production_mode_blocks_on_docker_ownership_gap(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    monkeypatch.setattr(
+        module,
+        "run_docker_bind_mount_ownership_parity_probe",
+        lambda repo_root: module.Finding(
+            severity="error",
+            name="Docker bind-mount ownership parity",
+            summary=(
+                "Local Docker bind-mount ownership semantics differ from "
+                "GitHub-hosted runners."
+            ),
+            remediation=(
+                "Run exact fresh-checkout parity on a rootful Docker daemon/context."
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        module,
+        "create_fresh_checkout_snapshot",
+        lambda repo_root, *, head_rev: (_ for _ in ()).throw(
+            AssertionError(
+                "fresh-checkout snapshot must not be created after a parity gap"
+            )
+        ),
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--fresh-checkout",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "[ERROR] Docker bind-mount ownership parity" in captured.out
+    assert "rootful Docker daemon/context" in captured.out
 
 
 def test_production_readiness_docs_name_promoted_docker_e2e_gate():
@@ -1780,7 +2014,126 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
     )
     assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in readiness_doc
     assert "stop_cleanup_retains_images_and_supports_restart" in readiness_doc
+    assert (
+        "backup_restore_roundtrip_recovers_state_and_runtime_contract" in readiness_doc
+    )
     assert "activate_switch_back_keeps_one_active_workspace" in readiness_doc
+    assert ".tmp/production-readiness/latest.md" in readiness_doc
+    assert "three consecutive clean runs" in readiness_doc
+    assert "--fresh-checkout" in readiness_doc
+
+
+def test_local_ci_parity_production_mode_reports_missing_required_docs_as_blocking(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(module, "run_docker_build_validation", lambda repo_root: [])
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: [],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "[ERROR] Required internal-production docs/runbooks" in captured.out
+    assert "docs/PRODUCTION-READINESS.md" in captured.out
+    assert "docs/ops/BACKUP-RESTORE.md" in captured.out
+
+
+def test_local_ci_parity_production_mode_writes_signoff_bundle_and_tracks_green_streak(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    for relative_path in module.PRODUCTION_READINESS_REQUIRED_DOCS:
+        doc_path = tmp_path / relative_path
+        doc_path.parent.mkdir(parents=True, exist_ok=True)
+        doc_path.write_text(f"# {relative_path}\n", encoding="utf-8")
+
+    def _fake_run_command(command, *, cwd):
+        del command, cwd
+        return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(module, "run_docker_build_validation", lambda repo_root: [])
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: [],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    assert exit_code == 0
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    latest_report = json.loads(
+        (tmp_path / ".tmp" / "production-readiness" / "latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    latest_summary = (
+        tmp_path / ".tmp" / "production-readiness" / "latest.md"
+    ).read_text(encoding="utf-8")
+    history = json.loads(
+        (tmp_path / ".tmp" / "production-readiness" / "history.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert latest_report["scope"] == module.PRODUCTION_READINESS_SCOPE
+    assert latest_report["status"] == "pass"
+    assert latest_report["green_run"] is True
+    assert latest_report["current_green_streak"] == 2
+    assert (
+        latest_report["final_signoff_status"] == "pending-three-consecutive-green-runs"
+    )
+    assert "Consecutive clean runs: `2/3`" in latest_summary
+    assert "Internal production-readiness sign-off" in captured.out
+    assert history["current_streak"]["count"] == 2
+    assert len(history["runs"]) == 2
 
 
 def test_local_ci_parity_production_mode_missing_docker_cli_mentions_canonical_command(
@@ -1796,6 +2149,11 @@ def test_local_ci_parity_production_mode_missing_docker_cli_mentions_canonical_c
 
     monkeypatch.setattr(module, "run_command", _fake_run_command)
     monkeypatch.setattr(module.shutil, "which", lambda name: None)
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: [],
+    )
 
     exit_code = module.main(
         [

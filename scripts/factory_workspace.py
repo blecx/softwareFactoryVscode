@@ -28,6 +28,7 @@ REGISTRY_VERSION = 1
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
 WORKSPACE_TEMPLATE_FILENAME = "workspace.code-workspace.template"
 PORT_BLOCK_STRIDE = 100
+DEFAULT_COMPOSE_PROJECT_PREFIX_MAX = 40
 DEFAULT_WORKSPACE_FOLDERS = [
     {"name": "Host Project (Root)", "path": "."},
     {"name": "AI Agent Factory", "path": FACTORY_DIRNAME},
@@ -62,6 +63,8 @@ SHARED_TOPOLOGY_MODE = "shared"
 RUNTIME_MODE_ENV_KEY = "FACTORY_RUNTIME_MODE"
 DEVELOPMENT_RUNTIME_MODE = "development"
 PRODUCTION_RUNTIME_MODE = "production"
+HOST_UID_ENV_KEY = "FACTORY_HOST_UID"
+HOST_GID_ENV_KEY = "FACTORY_HOST_GID"
 TENANCY_MODE_ENV_KEY = "FACTORY_TENANCY_MODE"
 COMPATIBILITY_TENANCY_MODE = "compatibility"
 PROMOTED_SHARED_TENANCY_MODE = "shared"
@@ -154,6 +157,8 @@ MANAGED_ENV_KEYS = [
     "COMPOSE_PROJECT_NAME",
     "FACTORY_DIR",
     "FACTORY_DATA_DIR",
+    HOST_UID_ENV_KEY,
+    HOST_GID_ENV_KEY,
     "FACTORY_INSTANCE_ID",
     "FACTORY_PORT_INDEX",
     RUNTIME_MODE_ENV_KEY,
@@ -235,6 +240,24 @@ def parse_env_file(path: Path) -> dict[str, str]:
 def write_env_file(path: Path, values: dict[str, str]) -> None:
     lines = [f"{key}={value}" for key, value in values.items()]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _resolve_host_posix_id(getter_name: str) -> str:
+    getter = getattr(os, getter_name, None)
+    if not callable(getter):
+        return "0"
+    try:
+        return str(int(getter()))
+    except (OSError, TypeError, ValueError):
+        return "0"
+
+
+def current_host_uid() -> str:
+    return _resolve_host_posix_id("getuid")
+
+
+def current_host_gid() -> str:
+    return _resolve_host_posix_id("getgid")
 
 
 def slugify_identifier(value: str) -> str:
@@ -333,6 +356,22 @@ def ports_available(ports: dict[str, int]) -> bool:
 def derive_instance_id(target_dir: Path) -> str:
     digest = hashlib.sha1(str(target_dir).encode("utf-8")).hexdigest()[:12]
     return f"factory-{digest}"
+
+
+def default_compose_project_name(
+    project_workspace_id: str, factory_instance_id: str
+) -> str:
+    workspace_slug = slugify_identifier(project_workspace_id)
+    workspace_prefix = (
+        workspace_slug[:DEFAULT_COMPOSE_PROJECT_PREFIX_MAX].rstrip("-") or "workspace"
+    )
+    instance_slug = slugify_identifier(factory_instance_id)
+    instance_suffix = instance_slug.removeprefix("factory-") or instance_slug
+    if not instance_suffix:
+        instance_suffix = hashlib.sha1(factory_instance_id.encode("utf-8")).hexdigest()[
+            :12
+        ]
+    return f"factory_{workspace_prefix}-{instance_suffix[:12]}"
 
 
 def build_mcp_server_urls(ports: dict[str, int]) -> dict[str, str]:
@@ -833,7 +872,8 @@ def build_runtime_config(
         existing_env.get(
             "COMPOSE_PROJECT_NAME",
             existing_manifest.get(
-                "compose_project_name", f"factory_{project_workspace_id}"
+                "compose_project_name",
+                default_compose_project_name(project_workspace_id, factory_instance_id),
             ),
         )
     )
@@ -941,6 +981,8 @@ def build_runtime_config(
         "FACTORY_DATA_DIR": existing_env.get(
             "FACTORY_DATA_DIR", str(resolved_factory / "data")
         ),
+        HOST_UID_ENV_KEY: current_host_uid(),
+        HOST_GID_ENV_KEY: current_host_gid(),
         "FACTORY_INSTANCE_ID": factory_instance_id,
         "FACTORY_PORT_INDEX": str(port_index),
         RUNTIME_MODE_ENV_KEY: normalize_runtime_mode(
