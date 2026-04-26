@@ -123,6 +123,16 @@ class RequesterQuotaPolicy:
 
 
 @dataclass(frozen=True, slots=True)
+class QuotaFairnessPolicy:
+    """Fairness and shared-feedback rules for requester scheduling."""
+
+    requester_priority: tuple[RequesterClass, ...]
+    subagent_max_parallelism_per_run: int
+    shared_feedback_scope: str
+    reserve_lane_starvation_protection: bool
+
+
+@dataclass(frozen=True, slots=True)
 class QuotaGovernanceContract:
     """Long-term quota-governance contract for provider-facing LLM access."""
 
@@ -133,6 +143,7 @@ class QuotaGovernanceContract:
     budget_hierarchy: tuple[QuotaBudgetLevel, ...]
     lane_allocations: tuple[QuotaLaneAllocation, ...]
     requester_policies: tuple[RequesterQuotaPolicy, ...]
+    fairness_policy: QuotaFairnessPolicy | None = None
     notes: tuple[str, ...] = ()
 
     def get_lane_allocation(
@@ -158,6 +169,24 @@ class QuotaGovernanceContract:
             if policy.requester_class == candidate:
                 return policy
         raise KeyError(f"Unknown requester class: {candidate}")
+
+    def get_requester_priority(
+        self,
+        requester_class: RequesterClass | str,
+    ) -> int:
+        candidate = (
+            requester_class
+            if isinstance(requester_class, RequesterClass)
+            else RequesterClass(str(requester_class))
+        )
+        if self.fairness_policy is None:
+            return len(RequesterClass)
+        for index, fairness_candidate in enumerate(
+            self.fairness_policy.requester_priority
+        ):
+            if fairness_candidate == candidate:
+                return index
+        return len(self.fairness_policy.requester_priority)
 
     def as_dict(self) -> dict[str, Any]:
         return serialize_quota_contract_value(self)
@@ -318,6 +347,17 @@ def build_default_quota_governance_contract(
                     "it."
                 ),
             ),
+        ),
+        fairness_policy=QuotaFairnessPolicy(
+            requester_priority=(
+                RequesterClass.INTERACTIVE,
+                RequesterClass.PARENT_RUN,
+                RequesterClass.SUBAGENT,
+                RequesterClass.BACKGROUND,
+            ),
+            subagent_max_parallelism_per_run=1,
+            shared_feedback_scope="provider-model-family-lane",
+            reserve_lane_starvation_protection=True,
         ),
         notes=(
             "This contract defines authority and inheritance only; fairness "

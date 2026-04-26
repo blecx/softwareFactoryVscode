@@ -58,6 +58,18 @@ def test_default_quota_governance_contract_defines_authority_and_hierarchy() -> 
     assert contract.provider_budget.requests_per_second_ceiling == pytest.approx(0.50)
     assert contract.provider_budget.token_quota_per_minute is None
     assert contract.provider_budget.concurrency_lease_limit == 2
+    assert contract.fairness_policy is not None
+    assert contract.fairness_policy.requester_priority == (
+        RequesterClass.INTERACTIVE,
+        RequesterClass.PARENT_RUN,
+        RequesterClass.SUBAGENT,
+        RequesterClass.BACKGROUND,
+    )
+    assert contract.fairness_policy.subagent_max_parallelism_per_run == 1
+    assert (
+        contract.fairness_policy.shared_feedback_scope == "provider-model-family-lane"
+    )
+    assert contract.fairness_policy.reserve_lane_starvation_protection is True
 
 
 def test_subagent_requesters_inherit_parent_run_budget() -> None:
@@ -69,11 +81,15 @@ def test_subagent_requesters_inherit_parent_run_budget() -> None:
 
     assert interactive.parent_budget_scope == QuotaBudgetScope.WORKSPACE
     assert interactive.default_lane == QuotaLane.FOREGROUND
+    assert contract.get_requester_priority(RequesterClass.INTERACTIVE) == 0
+    assert contract.get_requester_priority(RequesterClass.PARENT_RUN) == 1
     assert subagent.parent_budget_scope == QuotaBudgetScope.RUN
     assert subagent.default_lane == QuotaLane.FOREGROUND
     assert subagent.inherits_parent_budget is True
     assert subagent.may_open_independent_provider_budget is False
+    assert contract.get_requester_priority(RequesterClass.SUBAGENT) == 2
     assert background.default_lane == QuotaLane.RESERVE
+    assert contract.get_requester_priority(RequesterClass.BACKGROUND) == 3
 
 
 def test_contract_serialization_preserves_lane_split_and_dimensions() -> None:
@@ -92,4 +108,15 @@ def test_contract_serialization_preserves_lane_split_and_dimensions() -> None:
     assert lanes["reserve"]["share"] == pytest.approx(0.30)
     assert lanes["reserve"]["request_rate_rps"] == pytest.approx(0.15)
     assert lanes["reserve"]["receives_reserved_capacity"] is True
+    assert payload["fairness_policy"] == {
+        "requester_priority": [
+            "interactive",
+            "parent-run",
+            "subagent",
+            "background",
+        ],
+        "subagent_max_parallelism_per_run": 1,
+        "shared_feedback_scope": "provider-model-family-lane",
+        "reserve_lane_starvation_protection": True,
+    }
     assert "per-process" in payload["notes"][1]

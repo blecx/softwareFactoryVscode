@@ -257,6 +257,10 @@ class LLMClientFactory:
         role: str,
         role_config: Optional[dict] = None,
         lane: str = "foreground",
+        requester_class: str | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        requester_id: str | None = None,
     ) -> httpx.AsyncClient:
         throttle = LLMClientFactory._get_shared_request_throttle(
             role,
@@ -267,6 +271,10 @@ class LLMClientFactory:
             role,
             role_config=role_config,
             lane=lane,
+            requester_class=requester_class,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            requester_id=requester_id,
         )
         return _RateLimitedAsyncHTTPClient(
             throttle=throttle,
@@ -442,7 +450,14 @@ class LLMClientFactory:
         return LLMClientFactory._default_role_models.get(role, "openai/gpt-4o-mini")
 
     @staticmethod
-    def create_client_for_role(role: str, lane: str = "foreground") -> AsyncOpenAI:
+    def create_client_for_role(
+        role: str,
+        lane: str = "foreground",
+        requester_class: str | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        requester_id: str | None = None,
+    ) -> AsyncOpenAI:
         """Create an OpenAI-compatible async client for a given role.
 
         Supported:
@@ -483,6 +498,10 @@ class LLMClientFactory:
                         role,
                         role_config=role_config,
                         lane=lane,
+                        requester_class=requester_class,
+                        run_id=run_id,
+                        parent_run_id=parent_run_id,
+                        requester_id=requester_id,
                     ),
                 )
             return AsyncOpenAI(
@@ -492,6 +511,10 @@ class LLMClientFactory:
                     role,
                     role_config=role_config,
                     lane=lane,
+                    requester_class=requester_class,
+                    run_id=run_id,
+                    parent_run_id=parent_run_id,
+                    requester_id=requester_id,
                 ),
             )
 
@@ -504,6 +527,10 @@ class LLMClientFactory:
     def create_github_client(
         api_key: Optional[str] = None,
         lane: str = "foreground",
+        requester_class: str | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        requester_id: str | None = None,
     ) -> AsyncOpenAI:
         """
         Create OpenAI client configured for GitHub Models.
@@ -530,6 +557,10 @@ class LLMClientFactory:
             http_client=LLMClientFactory._create_rate_limited_http_client(
                 "coding",
                 lane=lane,
+                requester_class=requester_class,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                requester_id=requester_id,
             ),
         )
 
