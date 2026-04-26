@@ -13,6 +13,7 @@ import importlib
 import json
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import time
@@ -105,6 +106,8 @@ BACKUP_BUNDLES_DIRNAME = "backups"
 BACKUP_BUNDLE_PREFIX = "backup-"
 BACKUP_MANIFEST_FILENAME = "bundle-manifest.json"
 BACKUP_CHECKSUMS_FILENAME = "checksums.sha256"
+_SQLITE_BACKUP_ARTIFACTS = {"memory-db", "agent-bus-db"}
+_SQLITE_SIDE_CAR_SUFFIXES = ("-wal", "-shm")
 _RESTORE_REQUIRED_ARTIFACTS = {
     "memory-db",
     "agent-bus-db",
@@ -1129,7 +1132,11 @@ class MCPRuntimeManager:
             for logical_name, source_path, relative_path in copy_specs:
                 destination = bundle_dir / relative_path
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_path, destination)
+                self._copy_backup_artifact(
+                    logical_name,
+                    source_path,
+                    destination,
+                )
                 artifact_specs.append(
                     {
                         "logical_name": logical_name,
@@ -2330,6 +2337,60 @@ class MCPRuntimeManager:
         candidate.mkdir(parents=True, exist_ok=False)
         return candidate
 
+    def _copy_backup_artifact(
+        self,
+        logical_name: str,
+        source_path: Path,
+        destination_path: Path,
+    ) -> None:
+        if logical_name in _SQLITE_BACKUP_ARTIFACTS:
+            try:
+                self._snapshot_sqlite_database(source_path, destination_path)
+                return
+            except sqlite3.DatabaseError:
+                if destination_path.exists():
+                    destination_path.unlink()
+                self._remove_sqlite_sidecars(destination_path)
+
+        shutil.copy2(source_path, destination_path)
+
+    def _snapshot_sqlite_database(
+        self,
+        source_path: Path,
+        destination_path: Path,
+    ) -> None:
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        if destination_path.exists():
+            destination_path.unlink()
+        self._remove_sqlite_sidecars(destination_path)
+
+        source_connection = sqlite3.connect(str(source_path))
+        try:
+            destination_connection = sqlite3.connect(str(destination_path))
+            try:
+                source_connection.backup(destination_connection)
+                destination_connection.execute("PRAGMA journal_mode=DELETE;")
+                destination_connection.commit()
+            finally:
+                destination_connection.close()
+        finally:
+            source_connection.close()
+
+        try:
+            shutil.copystat(source_path, destination_path)
+        except OSError:
+            pass
+
+    def _remove_sqlite_sidecars(self, database_path: Path) -> None:
+        if database_path.suffix != ".db":
+            return
+        for suffix in _SQLITE_SIDE_CAR_SUFFIXES:
+            sidecar_path = database_path.with_name(database_path.name + suffix)
+            try:
+                sidecar_path.unlink()
+            except FileNotFoundError:
+                continue
+
     def _load_restore_bundle_manifest(self, bundle_dir: Path) -> dict[str, Any]:
         if not bundle_dir.exists() or not bundle_dir.is_dir():
             raise RuntimeError(
@@ -2947,6 +3008,7 @@ class MCPRuntimeManager:
         )
         for attempt in range(2):
             destination_path.parent.mkdir(parents=True, exist_ok=True)
+            self._remove_sqlite_sidecars(destination_path)
             if temporary_path.exists():
                 temporary_path.unlink()
             try:
