@@ -36,6 +36,19 @@ FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND = (
 DOCKER_BUILD_COMPATIBILITY_ALIAS = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build"
 )
+PRODUCTION_GROUP_AGGREGATE = "aggregate"
+PRODUCTION_GROUP_DOCS_CONTRACT = "docs-contract"
+PRODUCTION_GROUP_DOCKER_BUILDS = "docker-builds"
+PRODUCTION_GROUP_RUNTIME_PROOFS = "runtime-proofs"
+PRODUCTION_GROUP_ORDER = (
+    PRODUCTION_GROUP_DOCS_CONTRACT,
+    PRODUCTION_GROUP_DOCKER_BUILDS,
+    PRODUCTION_GROUP_RUNTIME_PROOFS,
+)
+PRODUCTION_GROUP_CHOICES = (
+    PRODUCTION_GROUP_AGGREGATE,
+    *PRODUCTION_GROUP_ORDER,
+)
 DOCKER_E2E_TEST_FILE = "tests/test_throwaway_runtime_docker.py"
 PRODUCTION_READINESS_SCOPE = "internal-self-hosted-production"
 PRODUCTION_READINESS_REQUIRED_GREEN_RUNS = 3
@@ -121,6 +134,8 @@ def build_rerun_command(args: argparse.Namespace) -> str:
     ]
     if args.mode != STANDARD_MODE:
         command.extend(["--mode", args.mode])
+        for group in args.production_group:
+            command.extend(["--production-group", group])
     elif args.include_docker_build:
         command.append("--include-docker-build")
     if args.fresh_checkout:
@@ -132,6 +147,25 @@ def build_rerun_command(args: argparse.Namespace) -> str:
     if args.skip_pr_template_check:
         command.append("--skip-pr-template-check")
     return format_command(command)
+
+
+def resolve_production_group_selection(
+    args: argparse.Namespace,
+) -> tuple[bool, tuple[str, ...]]:
+    if args.mode != PRODUCTION_MODE and args.production_group:
+        raise ValueError(
+            "`--production-group` is only supported with `--mode production`."
+        )
+
+    requested = args.production_group or [PRODUCTION_GROUP_AGGREGATE]
+    deduped_requested = list(dict.fromkeys(requested))
+    if PRODUCTION_GROUP_AGGREGATE in deduped_requested:
+        return True, PRODUCTION_GROUP_ORDER
+
+    selected = tuple(
+        group for group in PRODUCTION_GROUP_ORDER if group in deduped_requested
+    )
+    return False, selected
 
 
 def _current_host_posix_id(getter_name: str) -> int | None:
@@ -1178,6 +1212,8 @@ def write_production_readiness_bundle(
     base_rev: str,
     head_rev: str,
     findings: Sequence[Finding],
+    production_groups_executed: Sequence[str],
+    production_group_results: dict[str, str],
 ) -> ProductionReadinessBundle:
     bundle_root = repo_root / PRODUCTION_READINESS_BUNDLE_SUBDIR
     runs_dir = bundle_root / "runs"
@@ -1250,6 +1286,8 @@ def write_production_readiness_bundle(
         "findings": findings_payload,
         "required_docs": list(PRODUCTION_READINESS_REQUIRED_DOCS),
         "docker_e2e_tests": list(PRODUCTION_DOCKER_E2E_TEST_NAMES),
+        "production_groups_executed": list(production_groups_executed),
+        "production_group_results": dict(production_group_results),
         "run_directory": str(run_directory),
         "latest_report_path": str(latest_report_path),
         "latest_summary_path": str(latest_summary_path),
@@ -1369,6 +1407,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--production-group",
+        action="append",
+        choices=PRODUCTION_GROUP_CHOICES,
+        default=[],
+        help=(
+            "In production mode, select one or more named production-only check "
+            "groups. Defaults to `aggregate`, which runs docs-contract, "
+            "docker-builds, and runtime-proofs in canonical order and emits the "
+            "canonical sign-off bundle."
+        ),
+    )
+    parser.add_argument(
         "--fresh-checkout",
         action="store_true",
         help=(
@@ -1382,6 +1432,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    try:
+        aggregate_production_mode, production_groups = (
+            resolve_production_group_selection(args)
+        )
+    except ValueError as exc:
+        print(f"❌ {exc}")
+        return 2
+
     repo_root = Path(args.repo_root).expanduser().resolve()
     head_rev = resolve_head_revision(repo_root, args.head_rev)
     base_rev = resolve_base_rev(
@@ -1405,6 +1463,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"base_rev={base_rev}")
     print(f"head_rev={head_rev}")
     print(f"mode={args.mode}")
+    if args.mode == PRODUCTION_MODE:
+        production_group_mode = (
+            PRODUCTION_GROUP_AGGREGATE if aggregate_production_mode else "diagnostic"
+        )
+        print(
+            "production_groups="
+            f"{','.join(production_groups)} (mode={production_group_mode})"
+        )
 
     if args.mode == PRODUCTION_MODE and not os.getenv("GITHUB_ACTIONS", "").strip():
         print(
@@ -1531,11 +1597,41 @@ def main(argv: list[str] | None = None) -> int:
             if finding is not None:
                 findings.append(finding)
 
-    if args.mode == PRODUCTION_MODE:
-        findings.extend(run_required_documentation_validation(repo_root))
-
     docker_build_findings: list[Finding] = []
-    if docker_build_requested(args):
+    production_group_results: dict[str, str] = {}
+
+    if args.mode == PRODUCTION_MODE:
+        for group in production_groups:
+            group_findings: list[Finding] = []
+            if group == PRODUCTION_GROUP_DOCS_CONTRACT:
+                group_findings = run_required_documentation_validation(repo_root)
+            elif group == PRODUCTION_GROUP_DOCKER_BUILDS:
+                group_findings = run_docker_build_validation(repo_root)
+                docker_build_findings = group_findings
+            elif group == PRODUCTION_GROUP_RUNTIME_PROOFS:
+                if aggregate_production_mode and any(
+                    finding.severity == "error" for finding in docker_build_findings
+                ):
+                    print(
+                        "\nℹ️ Skipping Docker E2E runtime proof lane until Docker "
+                        "image build parity is green."
+                    )
+                    production_group_results[group] = "skipped-docker-build-errors"
+                    continue
+                group_findings = run_docker_e2e_validation(
+                    repo_root,
+                    python_executable=args.python,
+                )
+
+            findings.extend(group_findings)
+            if any(finding.severity == "error" for finding in group_findings):
+                production_group_results[group] = "fail"
+            elif any(finding.severity == "warning" for finding in group_findings):
+                production_group_results[group] = "warn"
+            else:
+                production_group_results[group] = "pass"
+
+    elif docker_build_requested(args):
         docker_build_findings = run_docker_build_validation(repo_root)
         findings.extend(docker_build_findings)
     else:
@@ -1562,34 +1658,33 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
 
-    if args.mode == PRODUCTION_MODE:
-        if any(finding.severity == "error" for finding in docker_build_findings):
-            print(
-                "\nℹ️ Skipping Docker E2E runtime proof lane until Docker image "
-                "build parity is green."
-            )
-        else:
-            findings.extend(
-                run_docker_e2e_validation(
-                    repo_root,
-                    python_executable=args.python,
-                )
-            )
-
     print_findings_report(findings)
     print_improvement_plan(findings, rerun_command=build_rerun_command(args))
 
     if args.mode == PRODUCTION_MODE:
-        production_bundle = write_production_readiness_bundle(
-            repo_root,
-            base_rev=base_rev,
-            head_rev=head_rev,
-            findings=findings,
-        )
-        print_production_readiness_bundle_summary(
-            production_bundle,
-            repo_root=repo_root,
-        )
+        if aggregate_production_mode:
+            production_bundle = write_production_readiness_bundle(
+                repo_root,
+                base_rev=base_rev,
+                head_rev=head_rev,
+                findings=findings,
+                production_groups_executed=production_groups,
+                production_group_results=production_group_results,
+            )
+            print_production_readiness_bundle_summary(
+                production_bundle,
+                repo_root=repo_root,
+            )
+        else:
+            selected_groups = ", ".join(production_groups)
+            print(
+                "\nℹ️ Production diagnostic-group run completed for "
+                f"`{selected_groups}`. "
+                "The canonical `.tmp/production-readiness/` sign-off bundle is "
+                "not refreshed in diagnostic mode; run "
+                f"`{CANONICAL_PRODUCTION_PARITY_COMMAND}` to refresh canonical "
+                "aggregate evidence."
+            )
 
     error_count = sum(1 for finding in findings if finding.severity == "error")
     warning_count = sum(1 for finding in findings if finding.severity == "warning")

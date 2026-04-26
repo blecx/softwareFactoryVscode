@@ -167,6 +167,11 @@ resume-unsafe, and manual recovery cases.
 # Canonical internal production gate — Docker parity & recovery proofs (blocking Docker image builds + promoted Docker E2E runtime proofs + sign-off bundle)
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
 
+# Diagnostic production-group replay surfaces (do not refresh canonical sign-off bundle)
+./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group docs-contract
+./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group docker-builds
+./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group runtime-proofs
+
 # Focused long-term quota-governance load / contention evidence
 ./.venv/bin/pytest tests/test_quota_load_validation.py tests/test_quota_broker.py tests/test_llm_quota_policy.py -q
 
