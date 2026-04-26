@@ -387,6 +387,7 @@ def _print_llm_request_diagnostics(
     request_policy = report.get("request_quota_policy") or {}
     request_diagnostics = report.get("request_diagnostics") or {}
     summary = request_diagnostics.get("summary") or {}
+    lease_scopes = request_diagnostics.get("concurrency_leases") or {}
 
     if not request_policy and not request_diagnostics:
         return
@@ -432,6 +433,32 @@ def _print_llm_request_diagnostics(
             f"Cooldowns: {summary.get('cooldown_event_count', 0)} event(s) / "
             f"{_format_seconds(summary.get('total_cooldown_seconds', 0.0))}"
         )
+        print(
+            "  "
+            f"Lease fairness: {summary.get('lease_grant_count', 0)} grant(s) / "
+            f"{summary.get('lease_denial_count', 0)} denial(s) / "
+            f"{summary.get('lease_wait_event_count', 0)} queued lease wait(s)"
+        )
+        print(
+            "  "
+            f"Saturation: {summary.get('saturated_lease_scope_count', 0)} active saturated scope(s) / "
+            f"max queue depth {summary.get('max_waiter_count', 0)} / "
+            f"oldest waiter {_format_seconds(summary.get('oldest_waiter_seconds_max', 0.0))}"
+        )
+        hottest_scope = None
+        hottest_waiters = -1
+        for scope_name, scope_summary in lease_scopes.items():
+            waiter_count = int(scope_summary.get("waiter_count", 0) or 0)
+            if waiter_count > hottest_waiters:
+                hottest_scope = scope_name
+                hottest_waiters = waiter_count
+        if hottest_scope and hottest_waiters >= 0:
+            print(
+                "  "
+                f"Top contested lease scope: {hottest_scope} "
+                f"({hottest_waiters} current waiter(s), "
+                f"{lease_scopes[hottest_scope].get('saturation_event_count', 0)} saturation event(s))"
+            )
 
     if retry_summary is not None:
         print(

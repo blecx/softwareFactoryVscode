@@ -65,6 +65,14 @@ These signals are additive request-path diagnostics only. They must not be confu
 - `cooldown_event_count`
 - `total_cooldown_seconds`
 - `rate_limit_response_count`
+- `lease_grant_count`
+- `lease_denial_count`
+- `lease_wait_event_count`
+- `saturation_event_count`
+- `waiter_count`
+- `max_waiter_count`
+- `saturated_lease_scope_count`
+- `oldest_waiter_seconds_max`
 - `time_breakdown_seconds`
 
 `request_diagnostics.channels` keeps the same metrics per shared channel such as `llm:planning`, `llm:coding`, and reserve-lane variants, and now also includes:
@@ -79,10 +87,17 @@ These signals are additive request-path diagnostics only. They must not be confu
 
 - `lease_limit`
 - `active_lease_count`
+- `lease_grant_count`
+- `lease_denial_count`
 - `lease_wait_event_count`
+- `saturation_event_count`
 - `priority_wait_event_count`
 - `subagent_parallelism_cap_hits`
 - `waiter_count`
+- `max_waiter_count`
+- `oldest_waiter_seconds`
+- `saturated`
+- `saturation_ratio`
 
 Interpretation guidance:
 
@@ -93,6 +108,21 @@ Interpretation guidance:
 - Non-zero counters in `request_diagnostics.shared_scopes` confirm that provider feedback is being shared across requester roles instead of staying trapped in one channel.
 - Non-zero `priority_wait_event_count` means a higher-priority interactive/parent-run waiter was preserved ahead of a lower-priority queued requester.
 - Non-zero `subagent_parallelism_cap_hits` means one parent lineage tried to open additional child leases beyond the allowed bounded parallelism and the broker refused to treat those children as unrelated first-class requesters.
+- High `max_waiter_count` or `oldest_waiter_seconds_max` means lease contention is building faster than the active bucket can drain it, even if upstream latency is modest.
+- Non-zero `lease_denial_count` is expected during controlled contention runs; interpret it as evidence that requesters had to queue for shared lease capacity, not as a terminal request failure.
+- Non-zero `saturation_event_count`, or any lease scope reporting `saturated = true`, means the shared concurrency ceiling is currently the main throttle point for that requester budget.
+
+## Controlled quota-governance load evidence
+
+Use these commands when you need a repeatable, repo-owned proof that the long-term brokered quota-governance architecture is exposing queue depth, wait time, and saturation correctly. This is intentionally separate from the immediate-repair limiter guidance from `#138/#139`.
+
+```bash
+# Focused quota-governance observability + contention proof
+./.venv/bin/pytest tests/test_quota_load_validation.py tests/test_quota_broker.py tests/test_llm_quota_policy.py -q
+
+# Canonical repo-wide validation gate before PR merge readiness
+./.venv/bin/python ./scripts/local_ci_parity.py
+```
 
 ## Top-level JSON shape
 
