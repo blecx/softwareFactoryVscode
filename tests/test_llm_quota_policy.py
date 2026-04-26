@@ -292,8 +292,161 @@ def test_rate_limited_http_client_applies_shared_penalty_on_retry_after(
     assert penalty_calls == [("llm:coding", 7.0, "coding")]
 
 
+def test_api_throttle_diagnostics_capture_queue_wait_retry_and_cooldown(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    _clear_quota_env(monkeypatch)
+    monkeypatch.setenv(
+        "WORK_ISSUE_API_THROTTLE_STATE_FILE",
+        str(tmp_path / "api-throttle-state.json"),
+    )
+    monkeypatch.setenv(
+        "WORK_ISSUE_API_THROTTLE_LOCK_FILE",
+        str(tmp_path / "api-throttle.lock"),
+    )
+    monkeypatch.setattr(api_throttle.time, "time", lambda: 250.0)
+
+    api_throttle.record_request_outcome(
+        channel="llm:coding",
+        queue_wait_seconds=0.5,
+        upstream_processing_seconds=1.25,
+        status_code=429,
+        retry_after_seconds=7.0,
+    )
+    api_throttle.apply_rate_limit_penalty(
+        channel="llm:coding",
+        penalty_seconds=7.0,
+        role="coding",
+    )
+
+    diagnostics = api_throttle.get_throttle_diagnostics()
+    summary = diagnostics["summary"]
+    channel = diagnostics["channels"]["llm:coding"]
+
+    assert diagnostics["shared_throttle_supported"] is True
+    assert summary["request_count"] == 1
+    assert summary["total_queue_wait_seconds"] == pytest.approx(0.5)
+    assert summary["total_upstream_processing_seconds"] == pytest.approx(1.25)
+    assert summary["retry_after_event_count"] == 1
+    assert summary["total_retry_after_seconds"] == pytest.approx(7.0)
+    assert summary["cooldown_event_count"] == 1
+    assert summary["total_cooldown_seconds"] == pytest.approx(7.0)
+    assert summary["time_breakdown_seconds"] == {
+        "queue_wait": pytest.approx(0.5),
+        "upstream_processing": pytest.approx(1.25),
+        "retry_after": pytest.approx(7.0),
+        "cooldown": pytest.approx(7.0),
+    }
+    assert channel["last_status_code"] == 429
+    assert channel["rate_limit_response_count"] == 1
+
+
+def test_immediate_policy_throughput_improves_over_legacy_defaults(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    _clear_quota_env(monkeypatch)
+    monkeypatch.setattr(api_throttle.random, "uniform", lambda start, stop: 0.0)
+    monkeypatch.setattr(api_throttle.time, "time", lambda: 100.0)
+
+    def _simulate_burst(policy: LLMQuotaPolicy, prefix: str) -> dict:
+        state_file = tmp_path / f"{prefix}-state.json"
+        lock_file = tmp_path / f"{prefix}.lock"
+        monkeypatch.setenv("WORK_ISSUE_API_THROTTLE_STATE_FILE", str(state_file))
+        monkeypatch.setenv("WORK_ISSUE_API_THROTTLE_LOCK_FILE", str(lock_file))
+        monkeypatch.setattr(
+            api_throttle,
+            "resolve_role_quota_policy",
+            lambda role="coding": policy,
+        )
+        for _ in range(3):
+            wait_seconds = api_throttle.reserve_api_slot("llm:coding", role="coding")
+            api_throttle.record_request_outcome(
+                channel="llm:coding",
+                queue_wait_seconds=wait_seconds,
+                upstream_processing_seconds=0.05,
+                status_code=200,
+            )
+        return api_throttle.get_throttle_diagnostics()
+
+    immediate = _simulate_burst(_make_policy(), "immediate")
+    legacy = _simulate_burst(
+        _make_policy(
+            quota_ceiling_rps=0.042857,
+            foreground_lane_rps=0.03,
+            reserve_lane_rps=0.012857,
+        ),
+        "legacy",
+    )
+
+    assert immediate["summary"]["request_count"] == 3
+    assert legacy["summary"]["request_count"] == 3
+    assert (
+        immediate["summary"]["total_queue_wait_seconds"]
+        < legacy["summary"]["total_queue_wait_seconds"]
+    )
+    assert immediate["summary"]["retry_after_event_count"] == 0
+    assert immediate["summary"]["cooldown_event_count"] == 0
+    assert legacy["summary"]["retry_after_event_count"] == 0
+    assert legacy["summary"]["cooldown_event_count"] == 0
+
+
 def test_startup_report_exposes_request_quota_policy(monkeypatch) -> None:
     _clear_quota_env(monkeypatch)
+    monkeypatch.setattr(
+        api_throttle,
+        "get_throttle_diagnostics",
+        lambda channel_prefix="llm:": {
+            "shared_throttle_supported": True,
+            "state_path": ".copilot/softwareFactoryVscode/.tmp/api-throttle-state.json",
+            "lock_path": ".copilot/softwareFactoryVscode/.tmp/api-throttle.lock",
+            "summary": {
+                "request_count": 2,
+                "queue_wait_event_count": 1,
+                "total_queue_wait_seconds": 0.5,
+                "avg_queue_wait_seconds": 0.25,
+                "max_queue_wait_seconds": 0.5,
+                "total_upstream_processing_seconds": 1.5,
+                "avg_upstream_processing_seconds": 0.75,
+                "retry_after_event_count": 1,
+                "total_retry_after_seconds": 7.0,
+                "cooldown_event_count": 1,
+                "total_cooldown_seconds": 7.0,
+                "rate_limit_response_count": 1,
+                "time_breakdown_seconds": {
+                    "queue_wait": 0.5,
+                    "upstream_processing": 1.5,
+                    "retry_after": 7.0,
+                    "cooldown": 7.0,
+                },
+            },
+            "channels": {
+                "llm:coding": {
+                    "request_count": 2,
+                    "queue_wait_event_count": 1,
+                    "total_queue_wait_seconds": 0.5,
+                    "avg_queue_wait_seconds": 0.25,
+                    "max_queue_wait_seconds": 0.5,
+                    "last_queue_wait_seconds": 0.5,
+                    "total_upstream_processing_seconds": 1.5,
+                    "avg_upstream_processing_seconds": 0.75,
+                    "last_upstream_processing_seconds": 1.0,
+                    "retry_after_event_count": 1,
+                    "total_retry_after_seconds": 7.0,
+                    "last_retry_after_seconds": 7.0,
+                    "cooldown_event_count": 1,
+                    "total_cooldown_seconds": 7.0,
+                    "last_cooldown_seconds": 7.0,
+                    "rate_limit_response_count": 1,
+                    "last_status_code": 429,
+                    "next_allowed_ts": 0.0,
+                    "updated_at": 0.0,
+                    "last_request_finished_at": 0.0,
+                }
+            },
+        },
+    )
     monkeypatch.setattr(
         LLMClientFactory,
         "get_config_path",
@@ -339,6 +492,13 @@ def test_startup_report_exposes_request_quota_policy(monkeypatch) -> None:
 
     assert report["request_quota_policy"]["quota_bucket"] == "github-openai-mini"
     assert report["request_throttle"]["max_rps"] == pytest.approx(0.35)
+    assert report["request_diagnostics"]["summary"]["request_count"] == 2
+    assert report["request_diagnostics"]["summary"]["time_breakdown_seconds"] == {
+        "queue_wait": pytest.approx(0.5),
+        "upstream_processing": pytest.approx(1.5),
+        "retry_after": pytest.approx(7.0),
+        "cooldown": pytest.approx(7.0),
+    }
     assert (
         report["role_request_policies"]["planning"]["quota_bucket"]
         == "github-openai-standard"

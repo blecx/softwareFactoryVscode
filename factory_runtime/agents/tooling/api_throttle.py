@@ -25,6 +25,24 @@ def _clamp(value: float, min_value: float, max_value: float) -> float:
     return max(min_value, min(max_value, value))
 
 
+def _coerce_float(value: object, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_int(value: object, default: int = 0) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _round_metric(value: float) -> float:
+    return round(max(0.0, float(value)), 6)
+
+
 def shared_throttle_supported() -> bool:
     return fcntl is not None
 
@@ -106,6 +124,280 @@ def _save_state(path: Path, state: dict) -> None:
     temp_path = path.with_suffix(path.suffix + ".tmp")
     temp_path.write_text(json.dumps(state), encoding="utf-8")
     temp_path.replace(path)
+
+
+def _ensure_channel_state(state: dict, channel: str) -> dict:
+    channels = state.get("channels")
+    if not isinstance(channels, dict):
+        channels = {}
+        state["channels"] = channels
+
+    channel_state = channels.get(channel)
+    if not isinstance(channel_state, dict):
+        channel_state = {}
+        channels[channel] = channel_state
+
+    return channel_state
+
+
+def _summarize_channel(channel_state: dict) -> dict:
+    request_count = max(0, _coerce_int(channel_state.get("request_count"), 0))
+    total_queue_wait_seconds = _round_metric(
+        _coerce_float(channel_state.get("total_queue_wait_seconds"), 0.0)
+    )
+    total_upstream_processing_seconds = _round_metric(
+        _coerce_float(channel_state.get("total_upstream_processing_seconds"), 0.0)
+    )
+    total_retry_after_seconds = _round_metric(
+        _coerce_float(channel_state.get("total_retry_after_seconds"), 0.0)
+    )
+    total_cooldown_seconds = _round_metric(
+        _coerce_float(channel_state.get("total_cooldown_seconds"), 0.0)
+    )
+    avg_queue_wait_seconds = (
+        _round_metric(total_queue_wait_seconds / request_count)
+        if request_count
+        else 0.0
+    )
+    avg_upstream_processing_seconds = (
+        _round_metric(total_upstream_processing_seconds / request_count)
+        if request_count
+        else 0.0
+    )
+
+    return {
+        "request_count": request_count,
+        "queue_wait_event_count": max(
+            0, _coerce_int(channel_state.get("queue_wait_event_count"), 0)
+        ),
+        "total_queue_wait_seconds": total_queue_wait_seconds,
+        "avg_queue_wait_seconds": avg_queue_wait_seconds,
+        "max_queue_wait_seconds": _round_metric(
+            _coerce_float(channel_state.get("max_queue_wait_seconds"), 0.0)
+        ),
+        "last_queue_wait_seconds": _round_metric(
+            _coerce_float(channel_state.get("last_queue_wait_seconds"), 0.0)
+        ),
+        "total_upstream_processing_seconds": total_upstream_processing_seconds,
+        "avg_upstream_processing_seconds": avg_upstream_processing_seconds,
+        "last_upstream_processing_seconds": _round_metric(
+            _coerce_float(
+                channel_state.get("last_upstream_processing_seconds"),
+                0.0,
+            )
+        ),
+        "retry_after_event_count": max(
+            0, _coerce_int(channel_state.get("retry_after_event_count"), 0)
+        ),
+        "total_retry_after_seconds": total_retry_after_seconds,
+        "last_retry_after_seconds": _round_metric(
+            _coerce_float(channel_state.get("last_retry_after_seconds"), 0.0)
+        ),
+        "cooldown_event_count": max(
+            0, _coerce_int(channel_state.get("cooldown_event_count"), 0)
+        ),
+        "total_cooldown_seconds": total_cooldown_seconds,
+        "last_cooldown_seconds": _round_metric(
+            _coerce_float(channel_state.get("last_cooldown_seconds"), 0.0)
+        ),
+        "rate_limit_response_count": max(
+            0, _coerce_int(channel_state.get("rate_limit_response_count"), 0)
+        ),
+        "last_status_code": channel_state.get("last_status_code"),
+        "next_allowed_ts": _round_metric(
+            _coerce_float(channel_state.get("next_allowed_ts"), 0.0)
+        ),
+        "updated_at": _round_metric(
+            _coerce_float(channel_state.get("updated_at"), 0.0)
+        ),
+        "last_request_finished_at": _round_metric(
+            _coerce_float(channel_state.get("last_request_finished_at"), 0.0)
+        ),
+    }
+
+
+def _load_state_snapshot() -> dict:
+    state_path = _state_path()
+    lock_path = _lock_path()
+
+    if not shared_throttle_supported():
+        return _load_state(state_path)
+
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_SH)
+        state = _load_state(state_path)
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    return state
+
+
+def get_throttle_diagnostics(channel_prefix: str = "llm:") -> dict:
+    state = _load_state_snapshot()
+    channels = state.get("channels")
+    if not isinstance(channels, dict):
+        channels = {}
+
+    selected_channels = {
+        name: value
+        for name, value in channels.items()
+        if isinstance(name, str)
+        and isinstance(value, dict)
+        and (not channel_prefix or name.startswith(channel_prefix))
+    }
+    channel_metrics = {
+        name: _summarize_channel(channel_state)
+        for name, channel_state in selected_channels.items()
+    }
+
+    summary = {
+        "channel_count": len(channel_metrics),
+        "request_count": 0,
+        "queue_wait_event_count": 0,
+        "total_queue_wait_seconds": 0.0,
+        "total_upstream_processing_seconds": 0.0,
+        "retry_after_event_count": 0,
+        "total_retry_after_seconds": 0.0,
+        "cooldown_event_count": 0,
+        "total_cooldown_seconds": 0.0,
+        "rate_limit_response_count": 0,
+        "max_queue_wait_seconds": 0.0,
+    }
+    for channel_summary in channel_metrics.values():
+        summary["request_count"] += channel_summary["request_count"]
+        summary["queue_wait_event_count"] += channel_summary["queue_wait_event_count"]
+        summary["total_queue_wait_seconds"] += channel_summary[
+            "total_queue_wait_seconds"
+        ]
+        summary["total_upstream_processing_seconds"] += channel_summary[
+            "total_upstream_processing_seconds"
+        ]
+        summary["retry_after_event_count"] += channel_summary["retry_after_event_count"]
+        summary["total_retry_after_seconds"] += channel_summary[
+            "total_retry_after_seconds"
+        ]
+        summary["cooldown_event_count"] += channel_summary["cooldown_event_count"]
+        summary["total_cooldown_seconds"] += channel_summary["total_cooldown_seconds"]
+        summary["rate_limit_response_count"] += channel_summary[
+            "rate_limit_response_count"
+        ]
+        summary["max_queue_wait_seconds"] = max(
+            summary["max_queue_wait_seconds"],
+            channel_summary["max_queue_wait_seconds"],
+        )
+
+    request_count = summary["request_count"]
+    summary["total_queue_wait_seconds"] = _round_metric(
+        summary["total_queue_wait_seconds"]
+    )
+    summary["total_upstream_processing_seconds"] = _round_metric(
+        summary["total_upstream_processing_seconds"]
+    )
+    summary["total_retry_after_seconds"] = _round_metric(
+        summary["total_retry_after_seconds"]
+    )
+    summary["total_cooldown_seconds"] = _round_metric(summary["total_cooldown_seconds"])
+    summary["max_queue_wait_seconds"] = _round_metric(summary["max_queue_wait_seconds"])
+    summary["avg_queue_wait_seconds"] = (
+        _round_metric(summary["total_queue_wait_seconds"] / request_count)
+        if request_count
+        else 0.0
+    )
+    summary["avg_upstream_processing_seconds"] = (
+        _round_metric(summary["total_upstream_processing_seconds"] / request_count)
+        if request_count
+        else 0.0
+    )
+    summary["time_breakdown_seconds"] = {
+        "queue_wait": summary["total_queue_wait_seconds"],
+        "upstream_processing": summary["total_upstream_processing_seconds"],
+        "retry_after": summary["total_retry_after_seconds"],
+        "cooldown": summary["total_cooldown_seconds"],
+    }
+
+    return {
+        "shared_throttle_supported": shared_throttle_supported(),
+        "state_path": str(_state_path()),
+        "lock_path": str(_lock_path()),
+        "summary": summary,
+        "channels": channel_metrics,
+    }
+
+
+def record_request_outcome(
+    channel: str = "llm",
+    *,
+    queue_wait_seconds: float = 0.0,
+    upstream_processing_seconds: float = 0.0,
+    status_code: int | None = None,
+    retry_after_seconds: float | None = None,
+) -> None:
+    state_path = _state_path()
+    lock_path = _lock_path()
+
+    now = time.time()
+
+    def _mutate(state: dict) -> dict:
+        channel_state = _ensure_channel_state(state, channel)
+        request_count = _coerce_int(channel_state.get("request_count"), 0) + 1
+        queue_wait_seconds_value = _round_metric(queue_wait_seconds)
+        upstream_processing_seconds_value = _round_metric(upstream_processing_seconds)
+
+        channel_state["request_count"] = request_count
+        channel_state["total_queue_wait_seconds"] = _round_metric(
+            _coerce_float(channel_state.get("total_queue_wait_seconds"), 0.0)
+            + queue_wait_seconds_value
+        )
+        channel_state["last_queue_wait_seconds"] = queue_wait_seconds_value
+        if queue_wait_seconds_value > 0:
+            channel_state["queue_wait_event_count"] = (
+                _coerce_int(channel_state.get("queue_wait_event_count"), 0) + 1
+            )
+        channel_state["max_queue_wait_seconds"] = _round_metric(
+            max(
+                _coerce_float(channel_state.get("max_queue_wait_seconds"), 0.0),
+                queue_wait_seconds_value,
+            )
+        )
+        channel_state["total_upstream_processing_seconds"] = _round_metric(
+            _coerce_float(
+                channel_state.get("total_upstream_processing_seconds"),
+                0.0,
+            )
+            + upstream_processing_seconds_value
+        )
+        channel_state["last_upstream_processing_seconds"] = (
+            upstream_processing_seconds_value
+        )
+        if status_code is not None:
+            channel_state["last_status_code"] = int(status_code)
+            if int(status_code) == 429:
+                channel_state["rate_limit_response_count"] = (
+                    _coerce_int(channel_state.get("rate_limit_response_count"), 0) + 1
+                )
+        if retry_after_seconds is not None and retry_after_seconds > 0:
+            retry_after_value = _round_metric(retry_after_seconds)
+            channel_state["retry_after_event_count"] = (
+                _coerce_int(channel_state.get("retry_after_event_count"), 0) + 1
+            )
+            channel_state["total_retry_after_seconds"] = _round_metric(
+                _coerce_float(channel_state.get("total_retry_after_seconds"), 0.0)
+                + retry_after_value
+            )
+            channel_state["last_retry_after_seconds"] = retry_after_value
+
+        channel_state["last_request_finished_at"] = _round_metric(now)
+        channel_state["updated_at"] = _round_metric(now)
+        return state
+
+    if not shared_throttle_supported():
+        state = _mutate(_load_state(state_path))
+        _save_state(state_path, state)
+        return
+
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+        state = _mutate(_load_state(state_path))
+        _save_state(state_path, state)
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def reserve_api_slot(channel: str = "llm", role: str | None = None) -> float:
@@ -214,13 +506,7 @@ def apply_rate_limit_penalty(
     with lock_path.open("a+", encoding="utf-8") as lock_file:
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
         state = _load_state(state_path)
-        channels = state.get("channels")
-        if not isinstance(channels, dict):
-            channels = {}
-
-        channel_state = channels.get(channel)
-        if not isinstance(channel_state, dict):
-            channel_state = {}
+        channel_state = _ensure_channel_state(state, channel)
 
         next_allowed_ts = channel_state.get("next_allowed_ts", 0.0)
         try:
@@ -229,9 +515,14 @@ def apply_rate_limit_penalty(
             next_allowed_ts = 0.0
 
         channel_state["next_allowed_ts"] = max(next_allowed_ts, now + cooldown)
-        channel_state["updated_at"] = now
-        channels[channel] = channel_state
-        state["channels"] = channels
+        channel_state["cooldown_event_count"] = (
+            _coerce_int(channel_state.get("cooldown_event_count"), 0) + 1
+        )
+        channel_state["total_cooldown_seconds"] = _round_metric(
+            _coerce_float(channel_state.get("total_cooldown_seconds"), 0.0) + cooldown
+        )
+        channel_state["last_cooldown_seconds"] = _round_metric(cooldown)
+        channel_state["updated_at"] = _round_metric(now)
         _save_state(state_path, state)
         fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 

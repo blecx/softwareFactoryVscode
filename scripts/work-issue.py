@@ -33,6 +33,7 @@ async def main():
 
     # Import after venv re-exec so dependencies are available
     from factory_runtime.agents.agent_registry import create_issue_agent
+    from factory_runtime.agents.llm_client import LLMClientFactory
     from scripts.work_issue_split import generate_split_issue_stubs
 
     parser = argparse.ArgumentParser(
@@ -194,6 +195,11 @@ Token Budget Mode:
 
     _ensure_github_models_token()
 
+    _print_llm_request_diagnostics(
+        LLMClientFactory.get_startup_report(),
+        stage="startup",
+    )
+
     # Check prerequisites
     if not _check_prerequisites():
         exit_code = 1
@@ -231,6 +237,15 @@ Token Budget Mode:
 
         max_attempts = int(os.environ.get("WORK_ISSUE_RATE_LIMIT_RETRIES", "4"))
         base_delay = int(os.environ.get("WORK_ISSUE_RATE_LIMIT_DELAY", "120"))
+        retry_summary = {
+            "operation": "planning" if args.plan_only else "execution",
+            "max_attempts": max_attempts,
+            "base_delay_seconds": base_delay,
+            "retry_count": 0,
+            "total_delay_seconds": 0.0,
+            "last_delay_seconds": 0.0,
+            "attempts_used": 0,
+        }
 
         if args.plan_only:
             _ = await _run_with_rate_limit_retry(
@@ -238,6 +253,12 @@ Token Budget Mode:
                 max_attempts=max_attempts,
                 base_delay=base_delay,
                 operation="planning",
+                retry_summary=retry_summary,
+            )
+            _print_llm_request_diagnostics(
+                LLMClientFactory.get_startup_report(),
+                stage="plan-only complete",
+                retry_summary=retry_summary,
             )
             print(
                 "✅ Plan-only complete: planning finished (no repo changes executed)."
@@ -249,6 +270,13 @@ Token Budget Mode:
             max_attempts=max_attempts,
             base_delay=base_delay,
             operation="execution",
+            retry_summary=retry_summary,
+        )
+
+        _print_llm_request_diagnostics(
+            LLMClientFactory.get_startup_report(),
+            stage="execution complete",
+            retry_summary=retry_summary,
         )
 
         if (
@@ -303,14 +331,21 @@ Token Budget Mode:
 
 
 async def _run_with_rate_limit_retry(
-    func, max_attempts: int, base_delay: int, operation: str
+    func,
+    max_attempts: int,
+    base_delay: int,
+    operation: str,
+    retry_summary: dict | None = None,
 ):
     """Retry a coroutine on rate-limit errors with exponential backoff."""
     attempt = 1
     delay = base_delay
     while True:
         try:
-            return await func()
+            result = await func()
+            if retry_summary is not None:
+                retry_summary["attempts_used"] = attempt
+            return result
         except Exception as exc:  # pragma: no cover - defensive guard
             message = str(exc).lower()
             is_rate_limit = any(
@@ -322,8 +357,14 @@ async def _run_with_rate_limit_retry(
                     "429",
                 ]
             )
+            if retry_summary is not None:
+                retry_summary["attempts_used"] = attempt
             if not is_rate_limit or attempt >= max_attempts:
                 raise
+            if retry_summary is not None:
+                retry_summary["retry_count"] += 1
+                retry_summary["last_delay_seconds"] = float(delay)
+                retry_summary["total_delay_seconds"] += float(delay)
             print(
                 f"⚠️  Rate limit hit during {operation} (attempt {attempt}/{max_attempts}). "
                 f"Retrying in {delay}s..."
@@ -331,6 +372,73 @@ async def _run_with_rate_limit_retry(
             await asyncio.sleep(delay)
             delay *= 2
             attempt += 1
+
+
+def _format_seconds(value: float) -> str:
+    return f"{float(value):.3f}s"
+
+
+def _print_llm_request_diagnostics(
+    report: dict,
+    *,
+    stage: str,
+    retry_summary: dict | None = None,
+) -> None:
+    request_policy = report.get("request_quota_policy") or {}
+    request_diagnostics = report.get("request_diagnostics") or {}
+    summary = request_diagnostics.get("summary") or {}
+
+    if not request_policy and not request_diagnostics:
+        return
+
+    print(f"📈 Immediate LLM limiter diagnostics ({stage})")
+    if request_policy:
+        print(
+            "  "
+            f"Quota bucket: {request_policy.get('quota_bucket', 'unknown')} | "
+            f"ceiling={request_policy.get('quota_ceiling_rps', 0.0)} RPS | "
+            f"lanes={request_policy.get('foreground_lane_rps', 0.0)} foreground / "
+            f"{request_policy.get('reserve_lane_rps', 0.0)} reserve"
+        )
+
+    if request_diagnostics:
+        shared_status = (
+            "workspace-global file-backed state"
+            if request_diagnostics.get("shared_throttle_supported")
+            else "process-local fallback"
+        )
+        print(f"  Shared limiter mode: {shared_status}")
+        state_path = request_diagnostics.get("state_path")
+        if state_path:
+            print(f"  Shared state path: {state_path}")
+
+        print(
+            "  "
+            f"Queue wait: {_format_seconds(summary.get('total_queue_wait_seconds', 0.0))} "
+            f"across {summary.get('queue_wait_event_count', 0)} queued request(s)"
+        )
+        print(
+            "  "
+            f"Upstream processing: {_format_seconds(summary.get('total_upstream_processing_seconds', 0.0))} "
+            f"across {summary.get('request_count', 0)} completed request(s)"
+        )
+        print(
+            "  "
+            f"Retry-after hints: {summary.get('retry_after_event_count', 0)} event(s) / "
+            f"{_format_seconds(summary.get('total_retry_after_seconds', 0.0))}"
+        )
+        print(
+            "  "
+            f"Cooldowns: {summary.get('cooldown_event_count', 0)} event(s) / "
+            f"{_format_seconds(summary.get('total_cooldown_seconds', 0.0))}"
+        )
+
+    if retry_summary is not None:
+        print(
+            "  "
+            f"Work-issue retries: {retry_summary.get('retry_count', 0)} event(s) / "
+            f"{_format_seconds(retry_summary.get('total_delay_seconds', 0.0))} backoff"
+        )
 
 
 def _persist_split_drafts(issue_number: int, drafts: Sequence) -> None:

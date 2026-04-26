@@ -27,6 +27,52 @@ These commands stay grounded in the authoritative manager-backed snapshot/readin
 - `preflight --json` is the preferred first diagnostic query when you need to know whether the runtime is ready, needs ramp-up, is degraded, or is drifting.
 - `status --json` includes the same readiness vocabulary plus the current runtime state, active-workspace facts, rebuild hinting, and install metadata that operators typically need during triage.
 
+## Immediate LLM limiter telemetry (additive surface)
+
+The immediate LLM limiter emits **workspace-local request telemetry** through existing repo-owned surfaces, but this telemetry is **not** a second runtime-truth authority.
+
+Use it to answer performance questions such as:
+
+- Is time being spent waiting for a shared request slot?
+- Is time being spent upstream at the provider?
+- Did the provider return `Retry-After` hints?
+- How often did the shared limiter apply cooldown windows?
+
+Supported surfaces:
+
+- `LLMClientFactory.get_startup_report()` now includes `request_diagnostics` beside `request_quota_policy` and `role_request_policies`.
+- `scripts/work-issue.py` prints the same immediate-limiter summary at startup and after execution.
+- `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json` remains the shared backing file for the live limiter and now carries additive telemetry counters.
+
+These signals are additive request-path diagnostics only. They must not be confused with the manager-backed readiness/status authority described elsewhere in this document.
+
+### Immediate limiter telemetry fields
+
+`request_diagnostics.summary` includes:
+
+- `request_count`
+- `queue_wait_event_count`
+- `total_queue_wait_seconds`
+- `avg_queue_wait_seconds`
+- `max_queue_wait_seconds`
+- `total_upstream_processing_seconds`
+- `avg_upstream_processing_seconds`
+- `retry_after_event_count`
+- `total_retry_after_seconds`
+- `cooldown_event_count`
+- `total_cooldown_seconds`
+- `rate_limit_response_count`
+- `time_breakdown_seconds`
+
+`request_diagnostics.channels` keeps the same metrics per shared channel such as `llm:planning`, `llm:coding`, and reserve-lane variants.
+
+Interpretation guidance:
+
+- High `total_queue_wait_seconds` with low upstream time means the workspace is mostly waiting for shared local budget.
+- High upstream time with low queue wait means provider/model latency is the likely bottleneck.
+- Non-zero `retry_after_event_count` means the provider asked callers to back off.
+- Non-zero `cooldown_event_count` / `total_cooldown_seconds` means the shared limiter propagated that backoff to the whole workspace.
+
 ## Top-level JSON shape
 
 Both commands emit one JSON object with these stable top-level sections:
