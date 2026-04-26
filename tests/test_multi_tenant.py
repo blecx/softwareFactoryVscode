@@ -5,6 +5,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from factory_runtime.apps.mcp import sqlite_permissions
 from factory_runtime.apps.mcp.agent_bus.bus import AgentBus
 from factory_runtime.apps.mcp.memory.store import MemoryStore
 from factory_runtime.shared_tenancy import TenantIdentityError
@@ -863,6 +864,85 @@ def test_memory_store_creates_parent_directory_for_file_backed_database(tmp_path
         assert len(store.get_recent_lessons(limit=10, project_id="tenant-6")) == 1
     finally:
         store.close()
+
+
+def test_memory_store_realigns_sqlite_bind_mount_to_host_uid_gid(
+    tmp_path: Path,
+    monkeypatch,
+):
+    db_path = tmp_path / "nested" / "memory.db"
+    observed_calls: list[tuple[str, Path, int, int] | tuple[str, Path, int]] = []
+
+    def _record_chown(path, uid, gid):
+        observed_calls.append(("chown", Path(path), uid, gid))
+
+    def _record_chmod(path, mode):
+        observed_calls.append(("chmod", Path(path), mode))
+
+    monkeypatch.setenv("FACTORY_HOST_UID", "1234")
+    monkeypatch.setenv("FACTORY_HOST_GID", "5678")
+    monkeypatch.setattr(sqlite_permissions.os, "chown", _record_chown)
+    monkeypatch.setattr(sqlite_permissions.os, "chmod", _record_chmod)
+
+    store = MemoryStore(db_path=str(db_path))
+    try:
+        store.store_lesson(
+            issue_number=7,
+            outcome="success",
+            summary="Host UID/GID remains writable",
+            learnings=["sqlite bind mounts are realigned for backup/restore"],
+            project_id="tenant-7",
+        )
+    finally:
+        store.close()
+
+    assert ("chown", db_path.parent, 1234, 5678) in observed_calls
+    assert (
+        "chmod",
+        db_path.parent,
+        sqlite_permissions.DIRECTORY_MODE,
+    ) in observed_calls
+    assert ("chown", db_path, 1234, 5678) in observed_calls
+    assert ("chmod", db_path, sqlite_permissions.FILE_MODE) in observed_calls
+
+
+def test_agent_bus_realigns_sqlite_bind_mount_to_host_uid_gid(
+    tmp_path: Path,
+    monkeypatch,
+):
+    db_path = tmp_path / "nested" / "agent_bus.db"
+    observed_calls: list[tuple[str, Path, int, int] | tuple[str, Path, int]] = []
+
+    def _record_chown(path, uid, gid):
+        observed_calls.append(("chown", Path(path), uid, gid))
+
+    def _record_chmod(path, mode):
+        observed_calls.append(("chmod", Path(path), mode))
+
+    monkeypatch.setenv("FACTORY_HOST_UID", "2468")
+    monkeypatch.setenv("FACTORY_HOST_GID", "1357")
+    monkeypatch.setattr(sqlite_permissions.os, "chown", _record_chown)
+    monkeypatch.setattr(sqlite_permissions.os, "chmod", _record_chmod)
+
+    bus = AgentBus(db_path=str(db_path))
+    try:
+        run_id = bus.create_run(
+            issue_number=11,
+            repo="blecx/softwareFactoryVscode",
+            project_id="tenant-11",
+        )
+        assert run_id
+    finally:
+        bus.close()
+
+    assert ("chown", db_path.parent, 2468, 1357) in observed_calls
+    assert (
+        "chmod",
+        db_path.parent,
+        sqlite_permissions.DIRECTORY_MODE,
+    ) in observed_calls
+    assert ("chown", db_path, 2468, 1357) in observed_calls
+    assert ("chmod", db_path, sqlite_permissions.FILE_MODE) in observed_calls
 
 
 def test_memory_store_partitions_relationships_and_audit_by_tenant():

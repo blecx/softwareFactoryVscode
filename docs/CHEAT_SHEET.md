@@ -139,7 +139,7 @@ resume-unsafe, and manual recovery cases.
 # Default faster local parity baseline (Docker build parity stays a warning-only skip here)
 ./.venv/bin/python ./scripts/local_ci_parity.py
 
-# Canonical production-grade parity command (blocking Docker image builds + promoted Docker E2E runtime proofs)
+# Canonical internal production-readiness gate (blocking Docker image builds + promoted Docker E2E runtime proofs + sign-off bundle)
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
 
 # Compatibility alias for the Docker build expansion path only (no promoted Docker E2E lane)
@@ -181,13 +181,16 @@ RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "a
 ```
 
 This evidence bundle proves the practical baseline plus the promoted production
-gate for `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
-and `test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`.
+gate for `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`,
+`test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart`, and
+`test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_contract`.
 The extra `RUN_DOCKER_E2E=1` command keeps
 `test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace`
 available as targeted supplemental evidence when multi-workspace activation
 truth matters. It does **not** silently promote every future runtime-management
 idea into the supported baseline.
+
+Each canonical `--mode production` run also refreshes `.tmp/production-readiness/latest.md`, `.tmp/production-readiness/latest.json`, and `.tmp/production-readiness/history.json` so operators can track the required three consecutive clean runs for final internal sign-off.
 
 Still deferred after this readiness pass:
 

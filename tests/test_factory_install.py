@@ -451,7 +451,12 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
         ).read_text(encoding="utf-8")
     )
     assert runtime_manifest["factory_version"] == RELEASE_VERSION
-    assert runtime_manifest["compose_project_name"] == f"factory_{target_repo.name}"
+    assert runtime_manifest["compose_project_name"] == (
+        factory_workspace.default_compose_project_name(
+            str(runtime_manifest["project_workspace_id"]),
+            str(runtime_manifest["factory_instance_id"]),
+        )
+    )
     port_context7 = runtime_manifest["ports"]["PORT_CONTEXT7"]
     port_bash = runtime_manifest["ports"]["PORT_BASH"]
     assert f"PORT_CONTEXT7={port_context7}" in factory_env
@@ -485,6 +490,58 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     assert not (target_repo / ".tmp" / "softwareFactoryVscode").exists()
     assert not (target_repo / ".factory.env").exists()
     assert not (target_repo / ".factory.lock.json").exists()
+
+
+def test_build_runtime_config_uses_unique_compose_projects_for_same_basename(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    canonical_settings = (
+        REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json"
+    ).read_text(encoding="utf-8")
+
+    def _build_config(target_repo: Path) -> Any:
+        factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+        (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+        (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+            canonical_settings,
+            encoding="utf-8",
+        )
+        return factory_workspace.build_runtime_config(
+            target_repo,
+            factory_dir=factory_dir,
+            registry_path=registry_path,
+        )
+
+    target_repo_a = tmp_path / "group-a" / "throwaway-target"
+    target_repo_b = tmp_path / "group-b" / "throwaway-target"
+
+    config_a = _build_config(target_repo_a)
+    factory_workspace.sync_runtime_artifacts(config_a, registry_path=registry_path)
+    config_b = _build_config(target_repo_b)
+
+    assert config_a.project_workspace_id == "throwaway-target"
+    assert config_b.project_workspace_id == "throwaway-target"
+    assert config_a.factory_instance_id != config_b.factory_instance_id
+    assert config_a.compose_project_name != config_b.compose_project_name
+    assert config_a.compose_project_name == (
+        factory_workspace.default_compose_project_name(
+            config_a.project_workspace_id,
+            config_a.factory_instance_id,
+        )
+    )
+    assert config_b.compose_project_name == (
+        factory_workspace.default_compose_project_name(
+            config_b.project_workspace_id,
+            config_b.factory_instance_id,
+        )
+    )
+    assert config_a.compose_project_name.startswith("factory_throwaway-target-")
+    assert config_b.compose_project_name.startswith("factory_throwaway-target-")
 
 
 def test_resolve_version_label_prefers_release_file_for_head_ref(
@@ -2909,6 +2966,30 @@ def test_activate_workspace_recovers_effective_ports_from_runtime_metadata_when_
     assert (
         refreshed_manifest["mcp_servers"]["bashGateway"]["url"]
         == config.mcp_server_urls["bashGateway"]
+    )
+
+
+def test_build_runtime_config_records_host_uid_gid_in_managed_env(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+
+    assert (
+        config.env_values[factory_workspace.HOST_UID_ENV_KEY]
+        == factory_workspace.current_host_uid()
+    )
+    assert (
+        config.env_values[factory_workspace.HOST_GID_ENV_KEY]
+        == factory_workspace.current_host_gid()
     )
 
 
@@ -6754,6 +6835,31 @@ def test_runtime_compose_interservice_urls_use_fixed_internal_ports() -> None:
     )
 
 
+def test_runtime_compose_selected_bind_mount_services_run_as_host_uid_gid() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+    expected = "${FACTORY_HOST_UID:-0}:${FACTORY_HOST_GID:-0}"
+
+    assert "user" not in services.get("mcp-memory", {})
+    assert services.get("agent-worker", {}).get("user") == expected
+    assert "user" not in services.get("mcp-agent-bus", {})
+
+
+def test_runtime_compose_sqlite_services_receive_host_uid_gid_env() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+
+    memory_env = services.get("mcp-memory", {}).get("environment", {})
+    bus_env = services.get("mcp-agent-bus", {}).get("environment", {})
+
+    assert memory_env.get("FACTORY_HOST_UID") == "${FACTORY_HOST_UID:-0}"
+    assert memory_env.get("FACTORY_HOST_GID") == "${FACTORY_HOST_GID:-0}"
+    assert bus_env.get("FACTORY_HOST_UID") == "${FACTORY_HOST_UID:-0}"
+    assert bus_env.get("FACTORY_HOST_GID") == "${FACTORY_HOST_GID:-0}"
+
+
 def test_runtime_compose_agent_worker_has_healthcheck() -> None:
     compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
     data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
@@ -8313,20 +8419,26 @@ def test_adr_011_agent_worker_liveness_contract_exists() -> None:
     ), "ADR-011 must reference the run-queue entrypoint"
 
 
-def test_ci_workflow_has_container_build_job() -> None:
-    """Finding #7 — CI must have a job that validates Dockerfiles build successfully."""
+def test_ci_workflow_has_internal_production_readiness_job() -> None:
+    """Finding #7 — CI must use the canonical production gate with Node 24-compatible action majors."""
     ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
     text = ci_file.read_text(encoding="utf-8")
     assert (
-        "container-build" in text or "docker build" in text.lower()
-    ), "CI workflow must have a container-build or Docker build validation job"
+        "production-readiness" in text or "Internal Production Readiness Gate" in text
+    ), "CI workflow must have a canonical internal production-readiness job"
     assert (
         "--mode production" in text
-    ), "CI container-build job must invoke the canonical production parity command"
-    # Confirm it loops over all Dockerfiles
+    ), "CI production-readiness job must invoke the canonical production gate command"
     assert (
         "docker/*/Dockerfile" in text or "Dockerfile" in text
-    ), "CI container-build job must reference Dockerfiles"
+    ), "CI production-readiness job must retain Docker build parity coverage"
+    assert "actions/checkout@v6" in text
+    assert "actions/setup-python@v6" in text
+    assert "actions/upload-artifact@v7" in text
+    assert "actions/checkout@v4" not in text
+    assert "actions/setup-python@v5" not in text
+    assert "actions/upload-artifact@v4" not in text
+    assert ".tmp/production-readiness/" in text
 
 
 def test_workspace_sensitive_tasks_use_surface_guard() -> None:

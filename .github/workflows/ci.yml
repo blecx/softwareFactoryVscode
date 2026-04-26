@@ -9,12 +9,12 @@ jobs:
     name: "Python Code Quality (Lint & Format)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.13
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -56,7 +56,7 @@ jobs:
     name: "Architectural Boundary Tests"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run isolated integration test
         run: chmod +x ./tests/run-integration-test.sh && ./tests/run-integration-test.sh
 
@@ -65,20 +65,20 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Validate PR Template Formatting
         run: chmod +x ./scripts/validate-pr-template.sh && ./scripts/validate-pr-template.sh "${{ github.workspace }}/.github/pull_request_template.md"
 
-  container-build:
-    name: "Docker Image Build Validation"
+  production-readiness:
+    name: "Internal Production Readiness Gate"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.13
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.13"
 
@@ -86,9 +86,18 @@ jobs:
         run: |
           bash ./setup.sh
 
-      - name: Run production-grade parity command
+      - name: Run canonical internal production-readiness gate
         run: |
-          # The canonical production parity command performs blocking builds for
-          # every tracked docker/*/Dockerfile target and runs the promoted
-          # Docker E2E runtime proof lane.
+          # The canonical internal production-readiness gate performs blocking
+          # Dockerfile builds, the promoted Docker E2E runtime proofs (including
+          # backup/restore roundtrip evidence), required docs/runbook presence
+          # checks, and emits a concise sign-off bundle under .tmp.
           ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+
+      - name: Upload production-readiness evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-readiness-bundle
+          path: .tmp/production-readiness/
+          if-no-files-found: warn
