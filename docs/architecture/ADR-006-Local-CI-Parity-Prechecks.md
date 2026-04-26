@@ -37,7 +37,8 @@ We mandate **local CI-parity prechecks** before remote validation is used as a m
 
 ### 3. Local/CI Boundary Must Be Explicit
 
-- **Rule:** Docker image build validation remains part of CI through the canonical internal production-readiness lane (`production-readiness`) and may be optional in default local prechecks due host/runtime constraints.
+- **Rule:** CI may expose diagnosable production-only jobs (for example docs-contract, docker-build parity, and runtime proofs), but the canonical internal production-readiness lane (`production-readiness`) remains the final aggregate readiness authority.
+- **Rule:** Docker image build validation remains part of the required CI production path (diagnostic lanes plus canonical aggregate gate) and may be optional in default local prechecks due host/runtime constraints.
 - **Rule:** If Docker build parity is skipped by default, the workflow/docs MUST state that boundary explicitly and provide an opt-in local path.
 - **Rule:** The documented opt-in path for local container-build parity is `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build`.
 - **Rule:** When merge-grade confidence depends on GitHub's fresh checkout + bootstrap semantics, the local workflow MUST expose an exact parity replay path that starts from a clean git checkout/worktree, runs `./setup.sh`, and then replays the canonical gate.
