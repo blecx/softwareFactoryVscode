@@ -6846,6 +6846,20 @@ def test_runtime_compose_selected_bind_mount_services_run_as_host_uid_gid() -> N
     assert "user" not in services.get("mcp-agent-bus", {})
 
 
+def test_runtime_compose_sqlite_services_receive_host_uid_gid_env() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    services = data.get("services", {})
+
+    memory_env = services.get("mcp-memory", {}).get("environment", {})
+    bus_env = services.get("mcp-agent-bus", {}).get("environment", {})
+
+    assert memory_env.get("FACTORY_HOST_UID") == "${FACTORY_HOST_UID:-0}"
+    assert memory_env.get("FACTORY_HOST_GID") == "${FACTORY_HOST_GID:-0}"
+    assert bus_env.get("FACTORY_HOST_UID") == "${FACTORY_HOST_UID:-0}"
+    assert bus_env.get("FACTORY_HOST_GID") == "${FACTORY_HOST_GID:-0}"
+
+
 def test_runtime_compose_agent_worker_has_healthcheck() -> None:
     compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
     data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
