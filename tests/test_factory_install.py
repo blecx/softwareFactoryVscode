@@ -451,7 +451,12 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
         ).read_text(encoding="utf-8")
     )
     assert runtime_manifest["factory_version"] == RELEASE_VERSION
-    assert runtime_manifest["compose_project_name"] == f"factory_{target_repo.name}"
+    assert runtime_manifest["compose_project_name"] == (
+        factory_workspace.default_compose_project_name(
+            str(runtime_manifest["project_workspace_id"]),
+            str(runtime_manifest["factory_instance_id"]),
+        )
+    )
     port_context7 = runtime_manifest["ports"]["PORT_CONTEXT7"]
     port_bash = runtime_manifest["ports"]["PORT_BASH"]
     assert f"PORT_CONTEXT7={port_context7}" in factory_env
@@ -485,6 +490,58 @@ def test_install_factory_bootstraps_target_and_generates_workspace(
     assert not (target_repo / ".tmp" / "softwareFactoryVscode").exists()
     assert not (target_repo / ".factory.env").exists()
     assert not (target_repo / ".factory.lock.json").exists()
+
+
+def test_build_runtime_config_uses_unique_compose_projects_for_same_basename(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    canonical_settings = (
+        REPO_ROOT / ".copilot" / "config" / "vscode-agent-settings.json"
+    ).read_text(encoding="utf-8")
+
+    def _build_config(target_repo: Path) -> Any:
+        factory_dir = target_repo / ".copilot/softwareFactoryVscode"
+        (factory_dir / ".copilot" / "config").mkdir(parents=True, exist_ok=True)
+        (factory_dir / ".copilot" / "config" / "vscode-agent-settings.json").write_text(
+            canonical_settings,
+            encoding="utf-8",
+        )
+        return factory_workspace.build_runtime_config(
+            target_repo,
+            factory_dir=factory_dir,
+            registry_path=registry_path,
+        )
+
+    target_repo_a = tmp_path / "group-a" / "throwaway-target"
+    target_repo_b = tmp_path / "group-b" / "throwaway-target"
+
+    config_a = _build_config(target_repo_a)
+    factory_workspace.sync_runtime_artifacts(config_a, registry_path=registry_path)
+    config_b = _build_config(target_repo_b)
+
+    assert config_a.project_workspace_id == "throwaway-target"
+    assert config_b.project_workspace_id == "throwaway-target"
+    assert config_a.factory_instance_id != config_b.factory_instance_id
+    assert config_a.compose_project_name != config_b.compose_project_name
+    assert config_a.compose_project_name == (
+        factory_workspace.default_compose_project_name(
+            config_a.project_workspace_id,
+            config_a.factory_instance_id,
+        )
+    )
+    assert config_b.compose_project_name == (
+        factory_workspace.default_compose_project_name(
+            config_b.project_workspace_id,
+            config_b.factory_instance_id,
+        )
+    )
+    assert config_a.compose_project_name.startswith("factory_throwaway-target-")
+    assert config_b.compose_project_name.startswith("factory_throwaway-target-")
 
 
 def test_resolve_version_label_prefers_release_file_for_head_ref(
@@ -6778,15 +6835,15 @@ def test_runtime_compose_interservice_urls_use_fixed_internal_ports() -> None:
     )
 
 
-def test_runtime_compose_bind_mount_services_run_as_host_uid_gid() -> None:
+def test_runtime_compose_selected_bind_mount_services_run_as_host_uid_gid() -> None:
     compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
     data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
     services = data.get("services", {})
     expected = "${FACTORY_HOST_UID:-0}:${FACTORY_HOST_GID:-0}"
 
     assert services.get("mcp-memory", {}).get("user") == expected
-    assert services.get("mcp-agent-bus", {}).get("user") == expected
     assert services.get("agent-worker", {}).get("user") == expected
+    assert "user" not in services.get("mcp-agent-bus", {})
 
 
 def test_runtime_compose_agent_worker_has_healthcheck() -> None:

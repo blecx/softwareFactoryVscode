@@ -28,6 +28,7 @@ REGISTRY_VERSION = 1
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
 WORKSPACE_TEMPLATE_FILENAME = "workspace.code-workspace.template"
 PORT_BLOCK_STRIDE = 100
+DEFAULT_COMPOSE_PROJECT_PREFIX_MAX = 40
 DEFAULT_WORKSPACE_FOLDERS = [
     {"name": "Host Project (Root)", "path": "."},
     {"name": "AI Agent Factory", "path": FACTORY_DIRNAME},
@@ -355,6 +356,22 @@ def ports_available(ports: dict[str, int]) -> bool:
 def derive_instance_id(target_dir: Path) -> str:
     digest = hashlib.sha1(str(target_dir).encode("utf-8")).hexdigest()[:12]
     return f"factory-{digest}"
+
+
+def default_compose_project_name(
+    project_workspace_id: str, factory_instance_id: str
+) -> str:
+    workspace_slug = slugify_identifier(project_workspace_id)
+    workspace_prefix = (
+        workspace_slug[:DEFAULT_COMPOSE_PROJECT_PREFIX_MAX].rstrip("-") or "workspace"
+    )
+    instance_slug = slugify_identifier(factory_instance_id)
+    instance_suffix = instance_slug.removeprefix("factory-") or instance_slug
+    if not instance_suffix:
+        instance_suffix = hashlib.sha1(factory_instance_id.encode("utf-8")).hexdigest()[
+            :12
+        ]
+    return f"factory_{workspace_prefix}-{instance_suffix[:12]}"
 
 
 def build_mcp_server_urls(ports: dict[str, int]) -> dict[str, str]:
@@ -855,7 +872,8 @@ def build_runtime_config(
         existing_env.get(
             "COMPOSE_PROJECT_NAME",
             existing_manifest.get(
-                "compose_project_name", f"factory_{project_workspace_id}"
+                "compose_project_name",
+                default_compose_project_name(project_workspace_id, factory_instance_id),
             ),
         )
     )
