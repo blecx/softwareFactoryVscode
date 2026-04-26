@@ -25,7 +25,16 @@ def _clamp(value: float, min_value: float, max_value: float) -> float:
     return max(min_value, min(max_value, value))
 
 
-def _resolve_role() -> str:
+def shared_throttle_supported() -> bool:
+    return fcntl is not None
+
+
+def _resolve_role(role: str | None = None) -> str:
+    if role is not None:
+        value = role.strip().lower()
+        if value:
+            return value
+
     value = (os.environ.get("WORK_ISSUE_QUOTA_ROLE") or "coding").strip().lower()
     return value or "coding"
 
@@ -41,25 +50,25 @@ def _resolve_lane(channel: str) -> str:
     return "foreground"
 
 
-def _resolve_max_rps(channel: str = "llm") -> float:
-    policy = resolve_role_quota_policy(role=_resolve_role())
+def _resolve_max_rps(channel: str = "llm", role: str | None = None) -> float:
+    policy = resolve_role_quota_policy(role=_resolve_role(role))
     if _resolve_lane(channel) == "reserve":
         return max(0.0, policy.reserve_lane_rps)
     return max(0.0, policy.foreground_lane_rps)
 
 
-def _resolve_jitter_ratio() -> float:
-    policy = resolve_role_quota_policy(role=_resolve_role())
+def _resolve_jitter_ratio(role: str | None = None) -> float:
+    policy = resolve_role_quota_policy(role=_resolve_role(role))
     return _clamp(policy.jitter_ratio, 0.0, 1.0)
 
 
-def _resolve_max_wait_seconds() -> float:
-    policy = resolve_role_quota_policy(role=_resolve_role())
+def _resolve_max_wait_seconds(role: str | None = None) -> float:
+    policy = resolve_role_quota_policy(role=_resolve_role(role))
     return max(1.0, policy.max_wait_seconds)
 
 
-def _resolve_rate_limit_cooldown_seconds() -> float:
-    policy = resolve_role_quota_policy(role=_resolve_role())
+def _resolve_rate_limit_cooldown_seconds(role: str | None = None) -> float:
+    policy = resolve_role_quota_policy(role=_resolve_role(role))
     return max(1.0, policy.rate_limit_cooldown_seconds)
 
 
@@ -99,25 +108,25 @@ def _save_state(path: Path, state: dict) -> None:
     temp_path.replace(path)
 
 
-def reserve_api_slot(channel: str = "llm") -> float:
+def reserve_api_slot(channel: str = "llm", role: str | None = None) -> float:
     """Reserve the next outbound API slot across parallel processes.
 
     Returns the number of seconds the caller should wait before making
     the next API call.
     """
 
-    max_rps = _resolve_max_rps(channel)
+    max_rps = _resolve_max_rps(channel, role=role)
     if max_rps <= 0:
         return 0.0
 
     min_interval = 1.0 / max_rps
-    jitter_ratio = _resolve_jitter_ratio()
-    max_wait_seconds = _resolve_max_wait_seconds()
+    jitter_ratio = _resolve_jitter_ratio(role=role)
+    max_wait_seconds = _resolve_max_wait_seconds(role=role)
 
     state_path = _state_path()
     lock_path = _lock_path()
 
-    if fcntl is None:
+    if not shared_throttle_supported():
         return 0.0
 
     now = time.time()
@@ -181,7 +190,9 @@ def extract_retry_after_seconds(text: str) -> float | None:
 
 
 def apply_rate_limit_penalty(
-    channel: str = "llm", penalty_seconds: float | None = None
+    channel: str = "llm",
+    penalty_seconds: float | None = None,
+    role: str | None = None,
 ) -> float:
     """Set a shared cooldown window after rate-limit responses.
 
@@ -190,13 +201,13 @@ def apply_rate_limit_penalty(
     cooldown = (
         penalty_seconds
         if penalty_seconds is not None and penalty_seconds > 0
-        else _resolve_rate_limit_cooldown_seconds()
+        else _resolve_rate_limit_cooldown_seconds(role=role)
     )
 
     state_path = _state_path()
     lock_path = _lock_path()
 
-    if fcntl is None:
+    if not shared_throttle_supported():
         return cooldown
 
     now = time.time()
