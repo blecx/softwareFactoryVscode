@@ -16,6 +16,13 @@ from typing import Awaitable, Callable, Dict, Optional
 import httpx
 from openai import AsyncOpenAI
 
+from factory_runtime.agents.tooling.llm_quota_policy import (
+    LLMQuotaPolicy,
+    get_llm_config_path,
+    get_llm_role_config,
+    load_llm_config,
+    resolve_role_quota_policy,
+)
 from factory_runtime.secret_safety import (
     is_blank_or_placeholder,
     production_runtime_mode_enabled,
@@ -106,8 +113,7 @@ class LLMClientFactory:
     """Factory for creating LLM clients based on configuration."""
 
     _cached_github_token: Optional[str] = None
-    _shared_request_throttle: Optional[_LLMRequestThrottle] = None
-    _shared_request_throttle_key: Optional[tuple[float, float]] = None
+    _shared_request_throttles: Dict[tuple[str, float, float], _LLMRequestThrottle] = {}
     _default_role_models = {
         # gpt-5.2 does not exist on GitHub Models; use gpt-4o as the capable default.
         "planning": "openai/gpt-4o",
@@ -128,35 +134,41 @@ class LLMClientFactory:
     @staticmethod
     def _get_rps_settings() -> tuple[float, float]:
         """Return max-RPS and jitter ratio for LLM requests."""
-        max_rps = LLMClientFactory._parse_positive_float(
-            os.environ.get("WORK_ISSUE_MAX_RPS", "0.2"),
-            0.2,
-        )
-        jitter_ratio = LLMClientFactory._parse_positive_float(
-            os.environ.get("WORK_ISSUE_RPS_JITTER", "0.1"),
-            0.1,
-        )
-        jitter_ratio = min(max(jitter_ratio, 0.0), 1.0)
-        return max_rps, jitter_ratio
+        policy = LLMClientFactory._get_request_policy("coding")
+        return policy.foreground_lane_rps, policy.jitter_ratio
 
     @staticmethod
-    def _get_shared_request_throttle() -> _LLMRequestThrottle:
-        key = LLMClientFactory._get_rps_settings()
-        if (
-            LLMClientFactory._shared_request_throttle is None
-            or LLMClientFactory._shared_request_throttle_key != key
-        ):
-            max_rps, jitter_ratio = key
-            LLMClientFactory._shared_request_throttle = _LLMRequestThrottle(
-                max_rps=max_rps,
-                jitter_ratio=jitter_ratio,
+    def _get_request_policy(
+        role: str,
+        role_config: Optional[dict] = None,
+    ) -> LLMQuotaPolicy:
+        return resolve_role_quota_policy(role, config=role_config)
+
+    @staticmethod
+    def _get_shared_request_throttle(
+        role: str,
+        role_config: Optional[dict] = None,
+    ) -> _LLMRequestThrottle:
+        policy = LLMClientFactory._get_request_policy(role, role_config=role_config)
+        key = (role, policy.foreground_lane_rps, policy.jitter_ratio)
+        throttle = LLMClientFactory._shared_request_throttles.get(key)
+        if throttle is None:
+            throttle = _LLMRequestThrottle(
+                max_rps=policy.foreground_lane_rps,
+                jitter_ratio=policy.jitter_ratio,
             )
-            LLMClientFactory._shared_request_throttle_key = key
-        return LLMClientFactory._shared_request_throttle
+            LLMClientFactory._shared_request_throttles[key] = throttle
+        return throttle
 
     @staticmethod
-    def _create_rate_limited_http_client() -> httpx.AsyncClient:
-        throttle = LLMClientFactory._get_shared_request_throttle()
+    def _create_rate_limited_http_client(
+        role: str,
+        role_config: Optional[dict] = None,
+    ) -> httpx.AsyncClient:
+        throttle = LLMClientFactory._get_shared_request_throttle(
+            role,
+            role_config=role_config,
+        )
         return _RateLimitedAsyncHTTPClient(throttle=throttle)
 
     @staticmethod
@@ -221,42 +233,12 @@ class LLMClientFactory:
         3) configs/llm.json (local override; should remain gitignored)
         4) configs/llm.default.json (repo default)
         """
-        env_path = (
-            Path(str(p)).expanduser()
-            if (p := (os.environ.get("LLM_CONFIG_PATH") or "").strip())
-            else None
-        )
-        if env_path is not None:
-            resolved = env_path if env_path.is_absolute() else Path.cwd() / env_path
-            if resolved.exists():
-                return resolved
-            raise FileNotFoundError(
-                f"LLM_CONFIG_PATH was set but file does not exist: {resolved}"
-            )
-
-        docker_path = Path("/config/llm.json")
-        if docker_path.exists():
-            return docker_path
-
-        config_path = Path("configs/llm.json")
-        if config_path.exists():
-            return config_path
-
-        config_path = Path("configs/llm.default.json")
-        if config_path.exists():
-            return config_path
-
-        raise FileNotFoundError(
-            "No LLM configuration found. Set LLM_CONFIG_PATH, create configs/llm.json, or use configs/llm.default.json"
-        )
+        return get_llm_config_path()
 
     @staticmethod
     def load_config() -> dict:
         """Load LLM configuration from configs/llm.json or default."""
-        config_path = LLMClientFactory.get_config_path()
-
-        with open(config_path) as f:
-            return json.load(f)
+        return load_llm_config()
 
     @staticmethod
     def get_model_roles() -> Dict[str, str]:
@@ -296,27 +278,37 @@ class LLMClientFactory:
         models = LLMClientFactory.get_model_roles()
 
         role_endpoints = {}
+        role_request_policies = {}
         for role in ["planning", "coding", "review"]:
             try:
                 role_cfg = LLMClientFactory.get_role_config(role)
                 role_endpoints[role] = {
                     "provider": role_cfg.get("provider", ""),
-                    "base_url": role_cfg.get("base_url", ""),
+                    "base_url": role_cfg.get("base_url", role_cfg.get("api_base", "")),
                     "azure_endpoint": role_cfg.get("azure_endpoint", ""),
                 }
+                role_request_policies[role] = LLMClientFactory._get_request_policy(
+                    role,
+                    role_config=role_cfg,
+                ).to_dict()
             except Exception:
                 role_endpoints[role] = {}
-        max_rps, jitter_ratio = LLMClientFactory._get_rps_settings()
+                role_request_policies[role] = {}
+        coding_policy = role_request_policies.get("coding") or {}
+        max_rps = coding_policy.get("foreground_lane_rps", 0.0)
+        jitter_ratio = coding_policy.get("jitter_ratio", 0.0)
         return {
             "config_path": config_path,
             "provider": config.get("provider", ""),
-            "configured_base_url": config.get("base_url", ""),
+            "configured_base_url": config.get("base_url", config.get("api_base", "")),
             "models": models,
             "request_throttle": {
                 "max_rps": max_rps,
                 "jitter_ratio": jitter_ratio,
             },
+            "request_quota_policy": coding_policy,
             "role_endpoints": role_endpoints,
+            "role_request_policies": role_request_policies,
         }
 
     @staticmethod
@@ -328,24 +320,7 @@ class LLMClientFactory:
         - prefixed keys: planning_model, planning_provider, planning_base_url, ...
         - fallback to top-level keys.
         """
-        config = LLMClientFactory.load_config()
-
-        roles = config.get("roles")
-        if isinstance(roles, dict) and isinstance(roles.get(role), dict):
-            merged = dict(config)
-            merged.update(roles.get(role, {}))
-            merged.pop("roles", None)
-            return merged
-
-        prefix = f"{role}_"
-        role_overrides = {
-            k[len(prefix) :]: v
-            for k, v in config.items()
-            if isinstance(k, str) and k.startswith(prefix)
-        }
-        merged = dict(config)
-        merged.update(role_overrides)
-        return merged
+        return get_llm_role_config(role)
 
     @staticmethod
     def get_model_id_for_role(role: str) -> str:
@@ -364,7 +339,7 @@ class LLMClientFactory:
         """
         role_config = LLMClientFactory.get_role_config(role)
         provider = (role_config.get("provider") or "").lower()
-        base_url = role_config.get("base_url") or ""
+        base_url = role_config.get("base_url") or role_config.get("api_base") or ""
         api_key = role_config.get("api_key") or ""
 
         # Allow secrets via environment variables (preferred; avoids writing configs/llm.json).
@@ -393,12 +368,18 @@ class LLMClientFactory:
                 return AsyncOpenAI(
                     base_url=os.getenv("MOCK_LLM_URL", "http://localhost:9090/v1"),
                     api_key="sk-dummy-test",
-                    http_client=LLMClientFactory._create_rate_limited_http_client(),
+                    http_client=LLMClientFactory._create_rate_limited_http_client(
+                        role,
+                        role_config=role_config,
+                    ),
                 )
             return AsyncOpenAI(
                 base_url="https://models.github.ai/inference",
                 api_key=api_key,
-                http_client=LLMClientFactory._create_rate_limited_http_client(),
+                http_client=LLMClientFactory._create_rate_limited_http_client(
+                    role,
+                    role_config=role_config,
+                ),
             )
 
         # Everything else is intentionally unsupported in this repo.
@@ -430,7 +411,7 @@ class LLMClientFactory:
         return AsyncOpenAI(
             base_url="https://models.github.ai/inference",
             api_key=api_key,
-            http_client=LLMClientFactory._create_rate_limited_http_client(),
+            http_client=LLMClientFactory._create_rate_limited_http_client("coding"),
         )
 
     @staticmethod
