@@ -33,7 +33,8 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
   - `WORK_ISSUE_FOREGROUND_SHARE`
   - `WORK_ISSUE_RESERVE_SHARE`
 - Live parent-agent and subagent LLM clients now reserve slots from the same workspace-owned throttle state under `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json`, guarded by `.copilot/softwareFactoryVscode/.tmp/api-throttle.lock`, so a fresh client instance cannot quietly sprint past the shared budget.
-- Startup diagnostics now expose `request_quota_policy` and `role_request_policies` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket without spelunking through env vars like caffeinated archaeologists.
+- Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket and see whether time is being burned in queue wait, upstream processing, retry-after hints, or shared cooldown windows.
+- `scripts/work-issue.py` now prints the same limiter summary at startup and after execution, including work-issue retry/backoff totals for the current run.
 
 ## 💻 Lifecycle commands
 
