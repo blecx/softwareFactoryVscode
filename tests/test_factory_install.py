@@ -6841,7 +6841,7 @@ def test_runtime_compose_selected_bind_mount_services_run_as_host_uid_gid() -> N
     services = data.get("services", {})
     expected = "${FACTORY_HOST_UID:-0}:${FACTORY_HOST_GID:-0}"
 
-    assert services.get("mcp-memory", {}).get("user") == expected
+    assert "user" not in services.get("mcp-memory", {})
     assert services.get("agent-worker", {}).get("user") == expected
     assert "user" not in services.get("mcp-agent-bus", {})
 
