@@ -57,9 +57,13 @@ class PlannerAgent:
             {"role": "system", "content": _SYSTEM_PROMPT}
         ]
 
-    async def _init_llm(self) -> "AsyncOpenAI":
+    async def _init_llm(self, run_id: str | None = None) -> "AsyncOpenAI":
         if not self._llm:
-            self._llm = LLMClientFactory.create_client_for_role("planning")
+            self._llm = LLMClientFactory.create_client_for_role(
+                "planning",
+                requester_class="parent-run",
+                run_id=run_id,
+            )
             self._model = LLMClientFactory.get_model_id_for_role("planning")
         return self._llm
 
@@ -70,7 +74,7 @@ class PlannerAgent:
             "bus_set_status", {"run_id": run_id, "status": "planning"}
         )
 
-        llm = await self._init_llm()
+        llm = await self._init_llm(run_id)
 
         memory_context = ""
         if similar_issues:

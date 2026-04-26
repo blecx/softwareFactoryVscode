@@ -34,11 +34,15 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
   - `WORK_ISSUE_FOREGROUND_SHARE`
   - `WORK_ISSUE_RESERVE_SHARE`
 - `#141` layers a workspace-scoped quota broker on top of that same shared baseline. Live parent-agent and subagent LLM clients now enter one brokered admission path that reserves both request-rate slots and shared provider/model-family concurrency leases before an outbound provider call is sent.
+- `#142` extends that broker with requester-lineage fairness and shared provider-feedback handling. Parent-run LLM clients now carry their `run_id` into quota admission, subagents consume the same parent lineage instead of opening independent provider budget, and queued parent-run / interactive waiters take priority over queued child/background traffic when shared capacity returns.
+- Child fan-out is intentionally bounded: one parent lineage can hold only one active shared subagent concurrency lease at a time, so a burst of child calls cannot quietly multiply into unrelated provider entitlement.
 - The broker still stores its shared state under `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json`, guarded by `.copilot/softwareFactoryVscode/.tmp/api-throttle.lock`, so a fresh client instance cannot quietly sprint past the shared budget or bypass the shared in-flight lease ceiling.
 - Current default shared concurrency lease ceilings are intentionally conservative: GitHub mini buckets default to `2` shared in-flight leases, while the other current GitHub buckets default to `1`. Override them only when you have a measured reason:
   - `WORK_ISSUE_CONCURRENCY_LEASE_LIMIT`
+- Provider `Retry-After` / `429` feedback now lands in a shared provider/model-family/lane scope, so every requester in that budget observes the same cooldown instead of only the role that first triggered the backoff.
 - The long-term contract keeps those shared lanes as delegated workspace/run/requester budget partitions, not per-process entitlements and not a second runtime-truth surface.
-- Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket (including `concurrency_lease_limit`) and see whether time is being burned in queue wait, upstream processing, retry-after hints, or shared cooldown windows.
+- Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket (including `concurrency_lease_limit`) and see whether time is being burned in queue wait, upstream processing, retry-after hints, shared cooldown windows, or fairness protections such as `priority_wait_event_count` / `subagent_parallelism_cap_hits`.
+- `request_diagnostics.channels` now include requester-class evidence (`last_requester_class`, `last_lineage_id`, `requester_class_counts`), while `request_diagnostics.shared_scopes` and `request_diagnostics.concurrency_leases` expose the shared feedback scope and lineage-fairness lease counters directly.
 - `scripts/work-issue.py` now prints the same limiter summary at startup and after execution, including work-issue retry/backoff totals for the current run.
 
 ## 💻 Lifecycle commands

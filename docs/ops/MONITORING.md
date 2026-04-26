@@ -37,6 +37,9 @@ Use it to answer performance questions such as:
 - Is time being spent upstream at the provider?
 - Did the provider return `Retry-After` hints?
 - How often did the shared limiter apply cooldown windows?
+- Which requester classes are currently consuming the shared quota budget?
+- Are parent-run / interactive waiters being protected from queued child traffic?
+- Did lineage fairness cap subagent fan-out for one parent run?
 
 Supported surfaces:
 
@@ -64,7 +67,22 @@ These signals are additive request-path diagnostics only. They must not be confu
 - `rate_limit_response_count`
 - `time_breakdown_seconds`
 
-`request_diagnostics.channels` keeps the same metrics per shared channel such as `llm:planning`, `llm:coding`, and reserve-lane variants.
+`request_diagnostics.channels` keeps the same metrics per shared channel such as `llm:planning`, `llm:coding`, and reserve-lane variants, and now also includes:
+
+- `last_requester_class`
+- `last_lineage_id`
+- `requester_class_counts`
+
+`request_diagnostics.shared_scopes` aggregates the same queue / retry-after / cooldown counters at the shared provider/model-family/lane scope that all requesters observe.
+
+`request_diagnostics.concurrency_leases` now exposes lease-fairness counters such as:
+
+- `lease_limit`
+- `active_lease_count`
+- `lease_wait_event_count`
+- `priority_wait_event_count`
+- `subagent_parallelism_cap_hits`
+- `waiter_count`
 
 Interpretation guidance:
 
@@ -72,6 +90,9 @@ Interpretation guidance:
 - High upstream time with low queue wait means provider/model latency is the likely bottleneck.
 - Non-zero `retry_after_event_count` means the provider asked callers to back off.
 - Non-zero `cooldown_event_count` / `total_cooldown_seconds` means the shared limiter propagated that backoff to the whole workspace.
+- Non-zero counters in `request_diagnostics.shared_scopes` confirm that provider feedback is being shared across requester roles instead of staying trapped in one channel.
+- Non-zero `priority_wait_event_count` means a higher-priority interactive/parent-run waiter was preserved ahead of a lower-priority queued requester.
+- Non-zero `subagent_parallelism_cap_hits` means one parent lineage tried to open additional child leases beyond the allowed bounded parallelism and the broker refused to treat those children as unrelated first-class requesters.
 
 ## Top-level JSON shape
 

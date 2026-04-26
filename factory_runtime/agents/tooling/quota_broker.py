@@ -17,6 +17,7 @@ from factory_runtime.agents.tooling.llm_quota_policy import (
     LLMQuotaPolicy,
     resolve_role_quota_policy,
 )
+from factory_runtime.agents.tooling.quota_governance import RequesterClass
 
 _DEFAULT_CONCURRENCY_LEASE_POLL_SECONDS = 0.05
 
@@ -50,6 +51,47 @@ def _resolve_concurrency_poll_seconds() -> float:
     return max(0.01, value)
 
 
+def _normalize_requester_class(
+    requester_class: RequesterClass | str | None,
+    *,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+) -> str:
+    candidate = str(requester_class or "").strip().lower()
+    if candidate:
+        try:
+            return RequesterClass(candidate).value
+        except ValueError:
+            pass
+
+    if parent_run_id:
+        return RequesterClass.SUBAGENT.value
+    if run_id:
+        return RequesterClass.PARENT_RUN.value
+    return RequesterClass.INTERACTIVE.value
+
+
+def _build_lineage_id(
+    requester_class: str,
+    *,
+    run_id: str | None = None,
+    parent_run_id: str | None = None,
+) -> str:
+    normalized_run_id = (run_id or "").strip()
+    normalized_parent_run_id = (parent_run_id or "").strip()
+    if requester_class == RequesterClass.SUBAGENT.value and normalized_parent_run_id:
+        return normalized_parent_run_id
+    if normalized_run_id:
+        return normalized_run_id
+    if normalized_parent_run_id:
+        return normalized_parent_run_id
+    return "workspace"
+
+
+def _build_feedback_scope(policy: LLMQuotaPolicy, lane: str = "foreground") -> str:
+    return f"{_build_lease_scope(policy)}:{_normalize_lane(lane)}"
+
+
 @dataclass(frozen=True, slots=True)
 class ConcurrencyLease:
     """One granted shared concurrency lease."""
@@ -67,6 +109,9 @@ class AdmissionReservation:
     rate_limit_wait_seconds: float
     concurrency_wait_seconds: float
     concurrency_lease: ConcurrencyLease | None = None
+    requester_class: str = RequesterClass.INTERACTIVE.value
+    lineage_id: str = "workspace"
+    shared_feedback_scope: str | None = None
 
 
 class QuotaBroker:
@@ -78,14 +123,35 @@ class QuotaBroker:
         role: str,
         lane: str,
         policy: LLMQuotaPolicy,
+        requester_class: RequesterClass | str | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        requester_id: str | None = None,
     ):
         normalized_role = (role or "coding").strip().lower() or "coding"
         normalized_lane = _normalize_lane(lane)
         self.role = normalized_role
         self.lane = normalized_lane
         self.policy = policy
+        self.requester_class = _normalize_requester_class(
+            requester_class,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+        )
+        self.run_id = (run_id or "").strip() or None
+        self.parent_run_id = (parent_run_id or "").strip() or None
+        self.lineage_id = _build_lineage_id(
+            self.requester_class,
+            run_id=self.run_id,
+            parent_run_id=self.parent_run_id,
+        )
         self.request_channel = _build_request_channel(normalized_role, normalized_lane)
         self.lease_scope = _build_lease_scope(policy)
+        self.feedback_scope = _build_feedback_scope(policy, normalized_lane)
+        normalized_requester_id = (requester_id or "").strip()
+        self.requester_id = normalized_requester_id or (
+            f"{self.requester_class}:{self.role}:{self.lineage_id}:broker-{id(self)}"
+        )
         self._concurrency_poll_seconds = _resolve_concurrency_poll_seconds()
 
     @classmethod
@@ -95,11 +161,19 @@ class QuotaBroker:
         *,
         role_config: Mapping[str, object] | None = None,
         lane: str = "foreground",
+        requester_class: RequesterClass | str | None = None,
+        run_id: str | None = None,
+        parent_run_id: str | None = None,
+        requester_id: str | None = None,
     ) -> "QuotaBroker":
         return cls(
             role=role,
             lane=lane,
             policy=resolve_role_quota_policy(role, config=role_config),
+            requester_class=requester_class,
+            run_id=run_id,
+            parent_run_id=parent_run_id,
+            requester_id=requester_id,
         )
 
     def _try_reserve_concurrency_lease(
@@ -114,6 +188,9 @@ class QuotaBroker:
             role=self.role,
             limit=lease_limit,
             holder=f"{self.request_channel}:pid-{os.getpid()}",
+            requester_class=self.requester_class,
+            lineage_id=self.lineage_id,
+            requester_id=self.requester_id,
         )
         if lease_id:
             return (
@@ -141,11 +218,15 @@ class QuotaBroker:
                 rate_limit_wait_seconds=fallback_wait,
                 concurrency_wait_seconds=0.0,
                 concurrency_lease=None,
+                requester_class=self.requester_class,
+                lineage_id=self.lineage_id,
+                shared_feedback_scope=self.feedback_scope,
             )
 
         rate_limit_wait_seconds = api_throttle.reserve_api_slot(
             channel=self.request_channel,
             role=self.role,
+            shared_scope=self.feedback_scope,
         )
         if rate_limit_wait_seconds > 0:
             await sleeper(rate_limit_wait_seconds)
@@ -172,6 +253,9 @@ class QuotaBroker:
             rate_limit_wait_seconds=rate_limit_wait_seconds,
             concurrency_wait_seconds=concurrency_wait_seconds,
             concurrency_lease=concurrency_lease,
+            requester_class=self.requester_class,
+            lineage_id=self.lineage_id,
+            shared_feedback_scope=self.feedback_scope,
         )
 
     def release_admission(self, reservation: AdmissionReservation | None) -> None:
@@ -187,6 +271,7 @@ class QuotaBroker:
             channel=self.request_channel,
             penalty_seconds=penalty_seconds,
             role=self.role,
+            shared_scope=self.feedback_scope,
         )
 
     def record_request_outcome(
@@ -203,4 +288,7 @@ class QuotaBroker:
             upstream_processing_seconds=upstream_processing_seconds,
             status_code=status_code,
             retry_after_seconds=retry_after_seconds,
+            shared_scope=self.feedback_scope,
+            requester_class=self.requester_class,
+            lineage_id=self.lineage_id,
         )
