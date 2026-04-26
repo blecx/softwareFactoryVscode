@@ -659,6 +659,10 @@ def test_setup_repo_doc_matches_current_ci_checks():
     assert "Python Code Quality (Lint & Format)" in setup_doc
     assert "Architectural Boundary Tests" in setup_doc
     assert "PR Template Conformance" in setup_doc
+    assert "Production Docs Contract" in setup_doc
+    assert "Production Docker Build Parity" in setup_doc
+    assert "Production Runtime Proofs" in setup_doc
+    assert "Internal Production Gate — Docker Parity & Recovery Proofs" in setup_doc
 
 
 def test_integration_regression_script_uses_repo_local_tmp_guardrail():
@@ -2028,6 +2032,10 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
     assert ".tmp/production-readiness/latest.md" in readiness_doc
     assert "three consecutive clean runs" in readiness_doc
     assert "--fresh-checkout" in readiness_doc
+    assert "Production Docs Contract" in readiness_doc
+    assert "Production Docker Build Parity" in readiness_doc
+    assert "Production Runtime Proofs" in readiness_doc
+    assert "Internal Production Gate — Docker Parity & Recovery Proofs" in readiness_doc
 
 
 def test_local_ci_parity_production_mode_reports_missing_required_docs_as_blocking(
@@ -2198,6 +2206,85 @@ def test_local_ci_parity_production_diagnostic_group_docs_contract_only(
     assert exit_code == 0
     assert call_order == [module.PRODUCTION_GROUP_DOCS_CONTRACT]
     assert not (tmp_path / ".tmp" / "production-readiness" / "latest.json").exists()
+
+
+def test_local_ci_parity_production_groups_only_skips_default_prechecks(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    call_order: list[str] = []
+    executed_commands: list[tuple[str, ...]] = []
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        executed_commands.append(command_tuple)
+        return subprocess.CompletedProcess(
+            list(command_tuple), 0, stdout="ok\n", stderr=""
+        )
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCS_CONTRACT)
+        or [],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_build_validation",
+        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCKER_BUILDS)
+        or [],
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        lambda repo_root, *, python_executable: call_order.append(
+            module.PRODUCTION_GROUP_RUNTIME_PROOFS
+        )
+        or [],
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--production-group",
+            module.PRODUCTION_GROUP_DOCS_CONTRACT,
+            "--production-groups-only",
+        ]
+    )
+
+    assert exit_code == 0
+    assert call_order == [module.PRODUCTION_GROUP_DOCS_CONTRACT]
+    assert not any(command[1:3] == ("-m", "black") for command in executed_commands)
+    assert not any(command[1:3] == ("-m", "pytest") for command in executed_commands)
+
+
+def test_local_ci_parity_rejects_production_groups_only_in_standard_mode(
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--production-groups-only",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "only supported with `--mode production`" in captured.out
 
 
 def test_local_ci_parity_production_aggregate_runs_named_groups_in_canonical_order(

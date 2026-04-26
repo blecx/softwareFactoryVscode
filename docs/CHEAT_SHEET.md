@@ -42,7 +42,7 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
 - Provider `Retry-After` / `429` feedback now lands in a shared provider/model-family/lane scope, so every requester in that budget observes the same cooldown instead of only the role that first triggered the backoff.
 - `#143` adds operator-visible load/saturation telemetry for the long-term brokered architecture. `request_diagnostics.summary` now exposes `lease_grant_count`, `lease_denial_count`, `lease_wait_event_count`, `saturation_event_count`, `waiter_count`, `max_waiter_count`, `saturated_lease_scope_count`, and `oldest_waiter_seconds_max` so contention can be audited without inventing a second monitoring stack.
 - The long-term contract keeps those shared lanes as delegated workspace/run/requester budget partitions, not per-process entitlements and not a second runtime-truth surface.
-- Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket (including `concurrency_lease_limit`) and see whether time is being burned in queue wait, upstream processing, retry-after hints, shared cooldown windows, or fairness protections such as `priority_wait_event_count` / `subagent_parallelism_cap_hits`.
+- Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket (including `concurrency_lease_limit`) and see whether time is being burned in queue wait, upstream processing, retry-after hints, shared cooldown win dows, or fairness protections such as `priority_wait_event_count` / `subagent_parallelism_cap_hits`.
 - `request_diagnostics.channels` now include requester-class evidence (`last_requester_class`, `last_lineage_id`, `requester_class_counts`), while `request_diagnostics.shared_scopes` and `request_diagnostics.concurrency_leases` expose the shared feedback scope and lineage-fairness lease counters directly, including `max_waiter_count`, `oldest_waiter_seconds`, `lease_denial_count`, `saturation_event_count`, `saturated`, and `saturation_ratio`.
 - `scripts/work-issue.py` now prints the same limiter summary at startup and after execution, including work-issue retry/backoff totals for the current run.
 
@@ -166,6 +166,12 @@ resume-unsafe, and manual recovery cases.
 
 # Canonical internal production gate — Docker parity & recovery proofs (blocking Docker image builds + promoted Docker E2E runtime proofs + sign-off bundle)
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+
+# CI exposes diagnosable production jobs first, then the canonical aggregate gate:
+# - Production Docs Contract
+# - Production Docker Build Parity
+# - Production Runtime Proofs
+# - Internal Production Gate — Docker Parity & Recovery Proofs
 
 # Diagnostic production-group replay surfaces (do not refresh canonical sign-off bundle)
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group docs-contract
