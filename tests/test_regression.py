@@ -924,6 +924,8 @@ def test_adr_014_clarifies_current_suspend_boundary() -> None:
         / "ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md"
     ).read_text(encoding="utf-8")
 
+    assert "## Status" in adr_014
+    assert "Accepted" in adr_014
     assert "`suspended` is a supported bounded lifecycle state" in adr_014
     assert "MUST present" in adr_014
     assert "`resume-safe`, `resume-unsafe`, or `manual-recovery-required`" in adr_014
@@ -994,6 +996,10 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
     assert "ADR-008" in architecture_doc
     assert "Per `ADR-013`" in architecture_doc
     assert (
+        "Accepted runtime contracts live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, `ADR-010`, and `ADR-014`."
+        in architecture_doc
+    )
+    assert (
         "The authoritative architectural definition of `active` lives in `ADR-009`"
         in architecture_doc
     )
@@ -1005,7 +1011,7 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
     )
 
     assert (
-        "Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, and `ADR-010`."
+        "Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, `ADR-010`, and `ADR-014`."
         in plan_doc
     )
     assert "maintained architecture synthesis" in plan_doc
