@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Historical sequencing plan with the ADR-008 rollout fulfilled on default branch
 
 This document is a sequencing plan, not the normative source of architecture
 truth. Per `ADR-013`, accepted ADRs define architecture guardrails and

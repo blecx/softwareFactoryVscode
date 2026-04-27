@@ -650,6 +650,52 @@ def test_chat_session_troubleshooting_report_records_program_closeout() -> None:
     assert "scripts/noninteractive_gh.py" in report
 
 
+def test_historical_plans_and_reports_are_explicitly_labeled_before_any_archive_move() -> (
+    None
+):
+    repo_root = Path(__file__).parent.parent
+    harness_plan = (
+        repo_root / "docs" / "HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+    harness_backlog = (
+        repo_root / "docs" / "HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md"
+    ).read_text(encoding="utf-8")
+    runtime_mitigation = (
+        repo_root / "docs" / "MCP-RUNTIME-MITIGATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+    report = (repo_root / "docs" / "CHAT-SESSION-TROUBLESHOOTING-REPORT.md").read_text(
+        encoding="utf-8"
+    )
+    multi_workspace_plan = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Historical sequencing / completed mitigation history" in harness_plan
+    assert (
+        "retained for traceability rather than as a living implementation plan"
+        in harness_plan
+    )
+    assert "Historical sequencing / completed delivery backlog" in harness_backlog
+    assert (
+        "retained for traceability after the namespace migration backlog landed on `main`"
+        in harness_backlog
+    )
+    assert "Historical sequencing / completed mitigation history" in runtime_mitigation
+    assert "rather than a current execution plan" in runtime_mitigation
+    assert "Historical closure record" in report
+    assert (
+        "not a living workflow specification or the current authority source for issue execution"
+        in report
+    )
+    assert (
+        "Historical sequencing plan with the ADR-008 rollout fulfilled on default branch"
+        in multi_workspace_plan
+    )
+
+
 def test_setup_repo_doc_matches_current_ci_checks():
     repo_root = Path(__file__).parent.parent
     setup_doc = (repo_root / "docs" / "setup-github-repository.md").read_text(

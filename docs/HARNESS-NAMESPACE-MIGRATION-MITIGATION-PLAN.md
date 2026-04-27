@@ -1,5 +1,9 @@
 # Harness Namespace Migration Mitigation Plan
 
+## Status
+
+Historical sequencing / completed mitigation history. The namespace-first migration described here has been delivered on `main`, so this document is retained for traceability rather than as a living implementation plan. Use `docs/HARNESS-INTEGRATION-SPEC.md`, `docs/INSTALL.md`, and accepted ADRs for the current contract.
+
 This plan turns the namespace-first direction from `ADR-012` and `docs/HARNESS-INTEGRATION-SPEC.md` into a staged mitigation sequence.
 
 It is intentionally **findings-driven** rather than implementation-first. The goal is to reduce architectural drift, preserve updateability, and move from the current hidden-tree installer toward a `.copilot`-first and `.github`-second integration model without breaking existing host repositories.

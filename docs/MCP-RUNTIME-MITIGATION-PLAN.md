@@ -1,5 +1,9 @@
 # MCP Runtime Mitigation Plan
 
+## Status
+
+Historical sequencing / completed mitigation history. The supported readiness baseline closed the robustness gaps tracked here, so this file remains as traceability and closeout context rather than a current execution plan. Use `docs/PRODUCTION-READINESS.md`, `docs/PRODUCTION-READINESS-PLAN.md`, accepted ADRs, and verified code for the current contract.
+
 This plan replaces the earlier implementation-first checklist with a findings-driven mitigation sequence.
 The fresh throwaway install path is green, but the review found remaining robustness gaps in:
 
