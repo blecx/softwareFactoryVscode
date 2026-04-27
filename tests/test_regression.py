@@ -743,8 +743,8 @@ def test_readme_tracks_version_aware_copilot_setup():
     repo_root = Path(__file__).parent.parent
     readme = (repo_root / "README.md").read_text(encoding="utf-8")
 
-    assert "**Latest release:** `2.5`" in readme
-    assert ".github/releases/v2.5.md" in readme
+    assert "**Latest release:** `2.6`" in readme
+    assert ".github/releases/v2.6.md" in readme
     assert "VS Code `1.116+`" in readme
     assert "GitHub Copilot is built in" in readme
     assert "Older VS Code releases" in readme
