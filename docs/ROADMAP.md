@@ -1,5 +1,14 @@
 # Active roadmap summary
 
+## Status
+
+Active roadmap for the current documentation/readiness direction inside the
+released `2.6` guardrails.
+
+Use this page for high-level routing and current direction. Use umbrella issue
+`#163`, linked child issues/PRs, and `docs/README.md` for the detailed
+active-vs-historical classification of planning documents.
+
 This page is the current high-level roadmap for `softwareFactoryVscode`.
 
 It exists to separate **active direction** from **historical implementation plans**.

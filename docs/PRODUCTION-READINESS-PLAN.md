@@ -1,5 +1,14 @@
 # Internal Production Readiness Plan
 
+## Status
+
+Active supporting plan for the current internal, self-hosted readiness program.
+
+This document sequences remaining readiness work within the released `2.6`
+guardrails. It is not an ADR, not a release surface, and not permission to
+broaden the supported production boundary beyond `docs/PRODUCTION-READINESS.md`,
+accepted ADRs, and verified implementation.
+
 This plan defines the work required to make `softwareFactoryVscode` production ready for **internal, self-hosted use**.
 
 It is designed to be detailed enough to split directly into GitHub issues and execute without inventing missing scope later.
