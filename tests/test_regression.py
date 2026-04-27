@@ -745,6 +745,7 @@ def test_readme_tracks_version_aware_copilot_setup():
 
     assert "**Latest release:** `2.6`" in readme
     assert ".github/releases/v2.6.md" in readme
+    assert "docs/README.md" in readme
     assert "VS Code `1.116+`" in readme
     assert "GitHub Copilot is built in" in readme
     assert "Older VS Code releases" in readme
@@ -752,6 +753,32 @@ def test_readme_tracks_version_aware_copilot_setup():
     assert "GitHub Pull Requests and Issues extension" in readme
     assert "not required for Copilot chat, inline suggestions, or agents" in readme
     assert "promoted Docker E2E runtime proof lane" in readme
+
+
+def test_docs_readme_routes_audiences_without_competing_authority():
+    repo_root = Path(__file__).parent.parent
+    docs_readme = (repo_root / "docs" / "README.md").read_text(encoding="utf-8")
+
+    assert "# Documentation index" in docs_readme
+    assert "accepted ADRs are the normative architecture source" in docs_readme
+    assert "do not override accepted ADRs" in docs_readme
+    assert "## Start here by audience" in docs_readme
+    assert "../README.md" in docs_readme
+    assert "HANDOUT.md" in docs_readme
+    assert "INSTALL.md" in docs_readme
+    assert "CHEAT_SHEET.md" in docs_readme
+    assert "WORK-ISSUE-WORKFLOW.md" in docs_readme
+    assert "setup-github-repository.md" in docs_readme
+    assert "architecture/INDEX.md" in docs_readme
+    assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in docs_readme
+    assert (
+        "ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-"
+        "Governance.md" in docs_readme
+    )
+    assert "https://github.com/blecx/softwareFactoryVscode/issues/163" in docs_readme
+    assert "PRODUCTION-READINESS-PLAN.md" in docs_readme
+    assert "## Historical and reference material" in docs_readme
+    assert "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md" in docs_readme
 
 
 def test_release_bump_guardrails_define_current_release_sync_and_quality_bar():

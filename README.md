@@ -72,6 +72,7 @@ the canonical installer/update flow to apply a safe refresh when needed.
 
 Once installed, check out our user guides to learn how to operate the factory effectively:
 
+- **[Documentation Index](docs/README.md):** Audience-based routing to user, operator, maintainer, architecture, roadmap, and reference materials.
 - **[User Handout](docs/HANDOUT.md):** A detailed overview of concepts and workflows.
 - **[Cheat Sheet](docs/CHEAT_SHEET.md):** Quick reference for common tasks and CLI commands.
 - **[Issue Workflow](docs/WORK-ISSUE-WORKFLOW.md):** Learn how to work through issues using Copilot agents.
