@@ -773,6 +773,7 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "maintainer/GUARDRAILS.md" in docs_readme
     assert "maintainer/AGENT-ENFORCEMENT-MAP.md" in docs_readme
     assert "architecture/INDEX.md" in docs_readme
+    assert "architecture/ADR-INDEX.md" in docs_readme
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in docs_readme
     assert (
         "ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-"
@@ -1155,6 +1156,7 @@ def test_architecture_index_clarifies_authority_and_duplicate_adr_007_numbering(
         encoding="utf-8"
     )
 
+    assert "ADR-INDEX.md" in index_doc
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in index_doc
     assert "Accepted ADRs" in index_doc
     assert "Maintained synthesis" in index_doc
@@ -1164,6 +1166,35 @@ def test_architecture_index_clarifies_authority_and_duplicate_adr_007_numbering(
     assert "ADR-007-Multi-Workspace-and-Shared-Services.md" in index_doc
     assert "historical traceability" in index_doc
     assert "two active ADR-007 authority sources" in index_doc
+
+
+def test_adr_catalog_summarizes_current_architecture_authority() -> None:
+    repo_root = Path(__file__).parent.parent
+    adr_index = (repo_root / "docs" / "architecture" / "ADR-INDEX.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "# ADR catalog" in adr_index
+    assert "complements [`INDEX.md`](INDEX.md)" in adr_index
+    assert "accepted ADRs are the normative architecture source" in adr_index
+    assert "## Status summary" in adr_index
+    assert "| Accepted ADRs | 15 |" in adr_index
+    assert "| Superseded historical ADR notes | 1 |" in adr_index
+    assert "| Proposed ADRs | 0 |" in adr_index
+    assert "## Accepted ADR catalog" in adr_index
+    assert "ADR-001-AI-Workflow-Guardrails.md" in adr_index
+    assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in adr_index
+    assert (
+        "ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-"
+        "Governance.md" in adr_index
+    )
+    assert (
+        "ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md"
+        in adr_index
+    )
+    assert "## Historical note on duplicate ADR-007 numbering" in adr_index
+    assert "ADR-007-Multi-Workspace-and-Shared-Services.md" in adr_index
+    assert "must not be used as a current architecture authority" in adr_index
 
 
 def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():

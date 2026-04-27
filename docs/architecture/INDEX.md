@@ -4,6 +4,9 @@ This file is a lightweight entrypoint for `docs/architecture/`. It helps readers
 find the right document type quickly; it does not create a competing authority
 source.
 
+For a compact list of the accepted ADRs and their current statuses, use
+[`ADR-INDEX.md`](ADR-INDEX.md).
+
 ## How to read this directory
 
 1. Start with `ADR-013-Architecture-Authority-and-Plan-Separation.md` for the
@@ -26,6 +29,8 @@ source.
 
 ## Quick starting points
 
+- Read [`ADR-INDEX.md`](ADR-INDEX.md) when you want a compact accepted-ADR
+  catalog with one-line summaries and current status counts.
 - Read `ADR-013-Architecture-Authority-and-Plan-Separation.md` first when you
   need to decide which document is authoritative.
 - Read accepted `ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md`,
