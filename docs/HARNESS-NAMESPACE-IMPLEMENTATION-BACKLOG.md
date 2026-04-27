@@ -1,5 +1,9 @@
 # Harness Namespace Implementation Backlog
 
+## Status
+
+Historical sequencing / completed delivery backlog. The phases below are retained for traceability after the namespace migration backlog landed on `main`; use current issues/PRs, `docs/HARNESS-INTEGRATION-SPEC.md`, and `docs/INSTALL.md` for active work.
+
 This backlog translates the namespace migration mitigation plan into concrete implementation phases.
 
 It is intentionally execution-oriented: each phase lists the goal, likely files to change, dependency order, open questions, Definition of Done (DoD), and review criteria.

@@ -1,5 +1,9 @@
 # Chat session troubleshooting report
 
+## Status
+
+Historical closure record. This report is retained for traceability and final closeout evidence for umbrella issue `#61`; it is not a living workflow specification or the current authority source for issue execution.
+
 This document is the repo-owned problem inventory and closure record for umbrella issue `#61`.
 
 It captures the workflow failures that motivated the hardening program and records the final default-branch recheck after child issues `#62`-`#65` landed.
