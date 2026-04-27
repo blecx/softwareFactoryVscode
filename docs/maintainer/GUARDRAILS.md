@@ -1,0 +1,38 @@
+# Maintainer guardrail catalog
+
+This page helps maintainers find the current enforcement surfaces across the repository.
+It is an index/reference, not a competing normative authority.
+Accepted ADRs, repository instructions, templates, workflow modules, and configuration files remain the real source of truth.
+
+## How to use this catalog
+
+- Start with the guardrail family that matches your question.
+- Follow the linked source files before changing behavior, wording, or workflow expectations.
+- If two surfaces appear to overlap, prefer accepted ADRs for architecture authority, templates for issue/PR structure, workflow modules for issue execution, and concrete config/scripts for approval behavior.
+
+## Guardrail family map
+
+| Guardrail family | Start here | What it governs | Use this when |
+| --- | --- | --- | --- |
+| Architecture authority and terminology | [`../architecture/INDEX.md`](../architecture/INDEX.md), [`../architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md`](../architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md), accepted `../architecture/ADR-*.md` files | Which documents are normative, which notes are historical/supporting, and which accepted architecture decisions remain binding | You need to answer “which document actually wins?” before editing docs, runtime contracts, or workflow language |
+| Runtime lifecycle and current released operating contract | [`../architecture/ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md`](../architecture/ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md), [`../PRODUCTION-READINESS.md`](../PRODUCTION-READINESS.md), [`../HARNESS-INTEGRATION-SPEC.md`](../HARNESS-INTEGRATION-SPEC.md) | Runtime lifecycle, readiness, projection, and install/update boundaries that the released `2.6` story depends on | A change touches runtime/readiness wording, companion install behavior, or the current production/readiness contract |
+| Repository-wide Copilot instructions and tool-routing guardrails | [`../../.github/copilot-instructions.md`](../../.github/copilot-instructions.md), [`../WORK-ISSUE-WORKFLOW.md`](../WORK-ISSUE-WORKFLOW.md) | Global chat-agent rules, MCP-first tool routing, checkpoint discipline, release-bump guardrails, ADR awareness, and the canonical issue → PR → merge path | You need the broadest repository policy for how agents should behave before reaching for workflow-specific files |
+| Canonical workflow modules in `.copilot/skills/*` | [`../../.copilot/skills/resolve-issue-workflow/SKILL.md`](../../.copilot/skills/resolve-issue-workflow/SKILL.md), [`../../.copilot/skills/pr-merge-workflow/SKILL.md`](../../.copilot/skills/pr-merge-workflow/SKILL.md), [`../../.copilot/skills/approved-plan-execution-workflow/SKILL.md`](../../.copilot/skills/approved-plan-execution-workflow/SKILL.md), [`../../.copilot/skills/interruption-recovery-workflow/SKILL.md`](../../.copilot/skills/interruption-recovery-workflow/SKILL.md) | The canonical implementation/merge/recovery mechanics for repository issue execution | You are changing or reviewing the actual workflow rules behind `resolve-issue`, `pr-merge`, `execute-approved-plan`, or interruption recovery |
+| Chat-agent discovery wrappers in `.github/agents/*` | [`../../.github/agents/resolve-issue.md`](../../.github/agents/resolve-issue.md), [`../../.github/agents/pr-merge.md`](../../.github/agents/pr-merge.md), [`../../.github/agents/execute-approved-plan.md`](../../.github/agents/execute-approved-plan.md), [`../../.github/agents/queue-backend.md`](../../.github/agents/queue-backend.md), [`../../.github/agents/queue-phase-2.md`](../../.github/agents/queue-phase-2.md), [`../../.github/agents/Plan.md`](../../.github/agents/Plan.md) | Maintainer-visible entrypoints and discovery wrappers for the canonical workflows | You need to know which maintainer-facing agent entrypoint exists or whether a workflow wrapper still matches its canonical skill source |
+| Prompt entrypoints in `.github/prompts/*` | [`../../.github/prompts/execute-github-issues-in-order.prompt.md`](../../.github/prompts/execute-github-issues-in-order.prompt.md), [`../../.github/prompts/resume-after-interruption.prompt.md`](../../.github/prompts/resume-after-interruption.prompt.md) | Prompt-time workflow entrypoints for ordered issue execution and interruption-safe recovery | You are reviewing prompt workflow wording, interruption recovery prompts, or prompt-to-workflow routing |
+| Template discipline for issues and PRs | [`../../.github/ISSUE_TEMPLATE/feature_request.yml`](../../.github/ISSUE_TEMPLATE/feature_request.yml), [`../../.github/ISSUE_TEMPLATE/bug_report.yml`](../../.github/ISSUE_TEMPLATE/bug_report.yml), [`../../.github/pull_request_template.md`](../../.github/pull_request_template.md), [`../architecture/ADR-005-Strong-Templating-Enforcement.md`](../architecture/ADR-005-Strong-Templating-Enforcement.md), [`../../scripts/validate-pr-template.sh`](../../scripts/validate-pr-template.sh) | Mandatory issue/PR structure, template rejection behavior, and local PR-template validation | You are checking whether a request/PR is structurally valid or changing template-enforcement behavior |
+| CI-parity and validation guardrails | [`../../.github/workflows/ci.yml`](../../.github/workflows/ci.yml), [`../architecture/ADR-006-Local-CI-Parity-Prechecks.md`](../architecture/ADR-006-Local-CI-Parity-Prechecks.md), [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py), [`../../tests/run-integration-test.sh`](../../tests/run-integration-test.sh) | The minimum local validation contract that must be run before PR handoff/merge | You need to answer “what must pass locally before GitHub CI/merge?” |
+| Approval profiles and workspace command policy | [`../../.vscode/tasks.json`](../../.vscode/tasks.json), [`../../scripts/setup-low-approval.sh`](../../scripts/setup-low-approval.sh), [`../../scripts/setup-vscode-agent-settings.py`](../../scripts/setup-vscode-agent-settings.py), [`../../configs/bash_gateway_policy.default.yml`](../../configs/bash_gateway_policy.default.yml) | Workspace approval-profile setup, agent-settings projection, and default bash-gateway script policy | You are adjusting approval posture, workspace command auto-approval, or the repo’s default bash-gateway allowlist |
+
+## Fast lookup
+
+- **Architecture or documentation authority drift:** start with `ADR-013` and the accepted ADRs in `docs/architecture/`.
+- **Issue/PR execution behavior:** start with `docs/WORK-ISSUE-WORKFLOW.md` and the relevant `.copilot/skills/*` module.
+- **Issue or PR structure requirements:** start with `.github/ISSUE_TEMPLATE/*`, `.github/pull_request_template.md`, and `scripts/validate-pr-template.sh`.
+- **Local-vs-remote validation expectations:** start with `.github/workflows/ci.yml`, `ADR-006`, and `scripts/local_ci_parity.py`.
+- **Approval profiles or workspace tool policy:** start with `.vscode/tasks.json`, `scripts/setup-low-approval.sh`, `scripts/setup-vscode-agent-settings.py`, and `configs/bash_gateway_policy.default.yml`.
+
+## Scope note
+
+This catalog deliberately does **not** restate every workflow rule or flatten all enforcement surfaces into one pseudo-spec.
+Use it to find the right source file quickly, then edit that source directly.

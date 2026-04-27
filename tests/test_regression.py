@@ -770,6 +770,7 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "CHEAT_SHEET.md" in docs_readme
     assert "WORK-ISSUE-WORKFLOW.md" in docs_readme
     assert "setup-github-repository.md" in docs_readme
+    assert "maintainer/GUARDRAILS.md" in docs_readme
     assert "architecture/INDEX.md" in docs_readme
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in docs_readme
     assert (
@@ -781,6 +782,32 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "PRODUCTION-READINESS-PLAN.md" in docs_readme
     assert "## Historical and reference material" in docs_readme
     assert "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md" in docs_readme
+
+
+def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
+    repo_root = Path(__file__).parent.parent
+    catalog = (repo_root / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "# Maintainer guardrail catalog" in catalog
+    assert "index/reference" in catalog
+    assert "not a competing normative authority" in catalog
+    assert "docs/WORK-ISSUE-WORKFLOW.md" in catalog
+    assert ".github/copilot-instructions.md" in catalog
+    assert ".copilot/skills/*" in catalog
+    assert ".github/agents/*" in catalog
+    assert ".github/prompts/*" in catalog
+    assert ".github/ISSUE_TEMPLATE/feature_request.yml" in catalog
+    assert ".github/ISSUE_TEMPLATE/bug_report.yml" in catalog
+    assert ".github/pull_request_template.md" in catalog
+    assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in catalog
+    assert "ADR-005-Strong-Templating-Enforcement.md" in catalog
+    assert "ADR-006-Local-CI-Parity-Prechecks.md" in catalog
+    assert ".github/workflows/ci.yml" in catalog
+    assert "configs/bash_gateway_policy.default.yml" in catalog
+    assert "scripts/setup-low-approval.sh" in catalog
+    assert "scripts/setup-vscode-agent-settings.py" in catalog
 
 
 def test_docs_roadmap_separates_current_direction_from_historical_plans():
