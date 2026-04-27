@@ -772,6 +772,8 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "setup-github-repository.md" in docs_readme
     assert "maintainer/GUARDRAILS.md" in docs_readme
     assert "maintainer/AGENT-ENFORCEMENT-MAP.md" in docs_readme
+    assert "maintainer/PROMPT-WORKFLOWS.md" in docs_readme
+    assert "maintainer/APPROVAL-PROFILES.md" in docs_readme
     assert "architecture/INDEX.md" in docs_readme
     assert "architecture/ADR-INDEX.md" in docs_readme
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in docs_readme
@@ -800,7 +802,9 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert ".github/copilot-instructions.md" in catalog
     assert ".copilot/skills/*" in catalog
     assert ".github/agents/*" in catalog
+    assert "PROMPT-WORKFLOWS.md" in catalog
     assert ".github/prompts/*" in catalog
+    assert "APPROVAL-PROFILES.md" in catalog
     assert ".github/ISSUE_TEMPLATE/feature_request.yml" in catalog
     assert ".github/ISSUE_TEMPLATE/bug_report.yml" in catalog
     assert ".github/pull_request_template.md" in catalog
@@ -811,6 +815,45 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert "configs/bash_gateway_policy.default.yml" in catalog
     assert "scripts/setup-low-approval.sh" in catalog
     assert "scripts/setup-vscode-agent-settings.py" in catalog
+
+
+def test_maintainer_prompt_and_approval_reference_pages_track_current_sources():
+    repo_root = Path(__file__).parent.parent
+    prompt_reference = (
+        repo_root / "docs" / "maintainer" / "PROMPT-WORKFLOWS.md"
+    ).read_text(encoding="utf-8")
+    approval_reference = (
+        repo_root / "docs" / "maintainer" / "APPROVAL-PROFILES.md"
+    ).read_text(encoding="utf-8")
+
+    assert "# Prompt workflow reference" in prompt_reference
+    assert "index/reference" in prompt_reference
+    assert "not a competing normative authority" in prompt_reference
+    assert "execute-github-issues-in-order.prompt.md" in prompt_reference
+    assert "resume-after-interruption.prompt.md" in prompt_reference
+    assert ".tmp/github-issue-queue-state.md" in prompt_reference
+    assert ".tmp/interruption-recovery-snapshot.md" in prompt_reference
+    assert "resolve-issue" in prompt_reference
+    assert "pr-merge" in prompt_reference
+    assert "execute-approved-plan" in prompt_reference
+    assert "WORK-ISSUE-WORKFLOW.md" in prompt_reference
+    assert "copilot-instructions.md" in prompt_reference
+
+    assert "# Approval profiles reference" in approval_reference
+    assert "index/reference" in approval_reference
+    assert "not a competing normative authority" in approval_reference
+    assert "vscode-approval-profiles.json" in approval_reference
+    assert "chat.tools.subagent.autoApprove" in approval_reference
+    assert "chat.tools.terminal.autoApprove" in approval_reference
+    assert "safe" in approval_reference
+    assert "trusted-workflow" in approval_reference
+    assert "low-friction" in approval_reference
+    assert "Configure Approval Profile (Safe)" in approval_reference
+    assert "Configure Approval Profile (Trusted Workflow)" in approval_reference
+    assert "Configure Approval Profile (Low-Friction)" in approval_reference
+    assert "setup-low-approval.sh" in approval_reference
+    assert "setup-vscode-agent-settings.py" in approval_reference
+    assert "bash_gateway_policy.default.yml" in approval_reference
 
 
 def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sources():

@@ -31,6 +31,8 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 - [`COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md) — high-level explanation of why this repository exists and how the Factory fits into a host repo.
 - [`maintainer/GUARDRAILS.md`](maintainer/GUARDRAILS.md) — maintainer-facing catalog of current guardrail families, enforcement surfaces, and where to look before changing workflow behavior.
 - [`maintainer/AGENT-ENFORCEMENT-MAP.md`](maintainer/AGENT-ENFORCEMENT-MAP.md) — workflow-specific map from the major agents/prompts to the skills, templates, checkpoints, and ADRs that actually constrain them.
+- [`maintainer/PROMPT-WORKFLOWS.md`](maintainer/PROMPT-WORKFLOWS.md) — maintainer-facing reference for the prompt workflow entrypoints and how they route back into the canonical workflow graph.
+- [`maintainer/APPROVAL-PROFILES.md`](maintainer/APPROVAL-PROFILES.md) — maintainer-facing reference for the current approval profiles, their posture, and the source files that actually define them.
 
 ### Architecture and guardrails
 
