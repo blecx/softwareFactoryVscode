@@ -30,6 +30,7 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 - [`HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md) — install/update contract and ownership boundaries.
 - [`COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md) — high-level explanation of why this repository exists and how the Factory fits into a host repo.
 - [`maintainer/GUARDRAILS.md`](maintainer/GUARDRAILS.md) — maintainer-facing catalog of current guardrail families, enforcement surfaces, and where to look before changing workflow behavior.
+- [`maintainer/AGENT-ENFORCEMENT-MAP.md`](maintainer/AGENT-ENFORCEMENT-MAP.md) — workflow-specific map from the major agents/prompts to the skills, templates, checkpoints, and ADRs that actually constrain them.
 
 ### Architecture and guardrails
 
