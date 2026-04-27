@@ -48,6 +48,22 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 - [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md) — current shipped readiness contract.
 - [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) — current readiness sequencing plan within the released guardrails.
 
+### Planning document classification matrix
+
+Accepted ADRs and current contract documents are intentionally not listed in
+this table because they remain normative authority sources rather than
+roadmap/plan status entries.
+
+| Document | Classification | Use it for |
+| --- | --- | --- |
+| [`ROADMAP.md`](ROADMAP.md) | Active roadmap | Current high-level direction, routing, and boundaries for active documentation/readiness work. |
+| [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | Active supporting plan | Current readiness sequencing within the shipped `2.6` guardrails and the scope defined by `PRODUCTION-READINESS.md`. |
+| [`HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical sequencing | Trace the delivered namespace migration and mitigation work without treating it as a current execution plan. |
+| [`HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) | Historical sequencing | Review the completed migration backlog and phased delivery notes for repository archaeology only. |
+| [`MCP-RUNTIME-MITIGATION-PLAN.md`](MCP-RUNTIME-MITIGATION-PLAN.md) | Historical sequencing | Trace the closed runtime/readiness mitigation program and its closeout context. |
+| [`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`](architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md) | Historical sequencing | Review runtime-manager rollout history, delivered baseline notes, and deferred-scope markers. |
+| [`architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md`](architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md) | Historical sequencing | Review the fulfilled ADR-008 rollout sequencing and practical-baseline hardening history. |
+
 ### Historical and reference material
 
 Start with the audience routes above before opening sequencing/history docs.

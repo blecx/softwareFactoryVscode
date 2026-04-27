@@ -830,6 +830,26 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "ROADMAP.md" in docs_readme
     assert "https://github.com/blecx/softwareFactoryVscode/issues/163" in docs_readme
     assert "PRODUCTION-READINESS-PLAN.md" in docs_readme
+    assert "## Planning document classification matrix" in docs_readme
+    assert (
+        "Accepted ADRs and current contract documents are intentionally not listed"
+        in docs_readme
+    )
+    assert "[`ROADMAP.md`](ROADMAP.md) | Active roadmap |" in docs_readme
+    assert (
+        "[`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | "
+        "Active supporting plan |" in docs_readme
+    )
+    assert (
+        "[`HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`]"
+        "(HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical "
+        "sequencing |" in docs_readme
+    )
+    assert (
+        "[`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`]"
+        "(architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md) | Historical "
+        "sequencing |" in docs_readme
+    )
     assert "## Historical and reference material" in docs_readme
     assert "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md" in docs_readme
 
@@ -936,15 +956,42 @@ def test_docs_roadmap_separates_current_direction_from_historical_plans():
     roadmap = (repo_root / "docs" / "ROADMAP.md").read_text(encoding="utf-8")
 
     assert "# Active roadmap summary" in roadmap
+    assert "## Status" in roadmap
+    assert "Active roadmap for the current documentation/readiness direction" in roadmap
     assert "current high-level roadmap" in roadmap
     assert "historical implementation plans" in roadmap
     assert "accepted ADRs remain the authority" in roadmap
     assert "released `2.6` story remains intact" in roadmap
     assert "umbrella issue `#163`" in roadmap
+    assert "active-vs-historical classification of planning documents" in roadmap
     assert "PRODUCTION-READINESS.md" in roadmap
     assert "PRODUCTION-READINESS-PLAN.md" in roadmap
     assert "not the default current roadmap" in roadmap
     assert "MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md" in roadmap
+
+
+def test_production_readiness_plan_is_marked_as_active_supporting_plan() -> None:
+    repo_root = Path(__file__).parent.parent
+    plan_doc = (repo_root / "docs" / "PRODUCTION-READINESS-PLAN.md").read_text(
+        encoding="utf-8"
+    )
+    normalized_plan_doc = " ".join(plan_doc.split())
+
+    assert "# Internal Production Readiness Plan" in plan_doc
+    assert "## Status" in plan_doc
+    assert (
+        "Active supporting plan for the current internal, self-hosted readiness "
+        "program" in normalized_plan_doc
+    )
+    assert (
+        "remaining readiness work within the released `2.6` guardrails"
+        in normalized_plan_doc
+    )
+    assert "It is not an ADR, not a release surface" in normalized_plan_doc
+    assert (
+        "not permission to broaden the supported production boundary"
+        in normalized_plan_doc
+    )
 
 
 def test_release_bump_guardrails_define_current_release_sync_and_quality_bar():
