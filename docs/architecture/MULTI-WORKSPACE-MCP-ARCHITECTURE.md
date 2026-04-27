@@ -7,7 +7,8 @@ Maintained synthesis
 This document is a maintained architecture synthesis. It is not a replacement for the ADRs.
 
 - Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, while this document explains and synthesizes them.
-- Accepted runtime contracts live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, `ADR-010`, and `ADR-014`.
+- Accepted runtime contracts live in `ADR-012`, accepted `ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md`, `ADR-008`, `ADR-009`, and `ADR-010`.
+- `ADR-007-Multi-Workspace-and-Shared-Services.md` is a superseded historical note retained for traceability; it is not a second active ADR-007 authority source.
 - Hybrid-tenancy promotion rules now live in accepted `ADR-008`; the current default branch satisfies those rules for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`, while workspace-scoped services remain isolated by default.
 - This document explains how those decisions fit together, maps them onto the current codebase, and keeps future-work boundaries explicit.
 

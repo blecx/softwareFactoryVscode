@@ -924,8 +924,6 @@ def test_adr_014_clarifies_current_suspend_boundary() -> None:
         / "ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md"
     ).read_text(encoding="utf-8")
 
-    assert "## Status" in adr_014
-    assert "Accepted" in adr_014
     assert "`suspended` is a supported bounded lifecycle state" in adr_014
     assert "MUST present" in adr_014
     assert "`resume-safe`, `resume-unsafe`, or `manual-recovery-required`" in adr_014
@@ -996,9 +994,10 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
     assert "ADR-008" in architecture_doc
     assert "Per `ADR-013`" in architecture_doc
     assert (
-        "Accepted runtime contracts live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, `ADR-010`, and `ADR-014`."
+        "accepted `ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md`"
         in architecture_doc
     )
+    assert "not a second active ADR-007 authority source" in architecture_doc
     assert (
         "The authoritative architectural definition of `active` lives in `ADR-009`"
         in architecture_doc
@@ -1011,9 +1010,10 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
     )
 
     assert (
-        "Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, `ADR-010`, and `ADR-014`."
-        in plan_doc
+        "ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md" in plan_doc
     )
+    assert "superseded historical note" in plan_doc
+    assert "second active ADR-007 authority source" in plan_doc
     assert "maintained architecture synthesis" in plan_doc
     assert "Per `ADR-013`" in plan_doc
     assert (
@@ -1021,6 +1021,23 @@ def test_multi_workspace_architecture_docs_capture_current_authority():
         in plan_doc
     )
     assert "the ADR-008 rollout tracked here is now fulfilled on" in plan_doc
+
+
+def test_architecture_index_clarifies_authority_and_duplicate_adr_007_numbering():
+    repo_root = Path(__file__).parent.parent
+    index_doc = (repo_root / "docs" / "architecture" / "INDEX.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in index_doc
+    assert "Accepted ADRs" in index_doc
+    assert "Maintained synthesis" in index_doc
+    assert (
+        "ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md" in index_doc
+    )
+    assert "ADR-007-Multi-Workspace-and-Shared-Services.md" in index_doc
+    assert "historical traceability" in index_doc
+    assert "two active ADR-007 authority sources" in index_doc
 
 
 def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
@@ -1041,6 +1058,8 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
     assert "## Status" in superseded_adr
     assert "Superseded" in superseded_adr
     assert "MUST NOT be used as a normative architecture source" in superseded_adr
+    assert "historical traceability" in superseded_adr
+    assert "active ADR-007 authority source" in superseded_adr
 
     assert "## Immediate Stabilization Rework Order" in plan_doc
     assert "## Execution Guardrails for This Rework" in plan_doc
@@ -1084,6 +1103,7 @@ def test_stabilization_plan_and_superseded_tenancy_draft_are_explicit():
     assert "### Track 1: Promotion boundary and shared-mode contract" in plan_doc
     assert "### Track 8: Final promotion gate" in plan_doc
     assert "Only after the rollout criteria are verified" in plan_doc
+    assert "duplicate ADR-007 filename" in plan_doc
 
 
 def test_mcp_runtime_manager_plan_is_explicitly_non_normative():
