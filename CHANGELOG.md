@@ -9,7 +9,85 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Unreleased Summary
 
-No unreleased changes recorded yet after `2.5`.
+No unreleased changes recorded yet after `2.6`.
+
+## [2.6] — 2026-04-27
+
+### Summary for 2.6
+
+Release 2.6 is a production-readiness and quota-governance release built on
+the fulfilled 2.5 shared-service baseline. The factory now has a bounded MCP
+runtime manager contract for lifecycle-sensitive operations, an internal
+production gate that bundles blocking Docker build parity with promoted runtime
+recovery proof, and a supported day-two operator surface for backup, restore,
+diagnostics, and incident response. The release also adds provider-aware quota
+governance with workspace-global coordination, fairness feedback, and load
+validation, while splitting production CI into diagnosable groups without
+weakening the aggregate sign-off path.
+
+### Added in 2.6
+
+- **MCP runtime manager contract** — `factory_runtime/mcp_runtime/` plus
+  related `scripts/factory_stack.py`, verification, and workflow updates now
+  provide a single runtime snapshot, bounded suspend/resume semantics, repair
+  flows, and cleanup parity for lifecycle-sensitive operations.
+- **Internal production readiness surface** — the repo now ships a fail-closed
+  internal production mode, blocking Docker build parity, promoted Docker E2E
+  runtime proofs, supported backup/restore commands, machine-readable runtime
+  diagnostics, and incident-response/day-two operator runbooks.
+- **Quota governance stack** — provider-aware quota policy, workspace-global
+  coordination, limiter telemetry, hierarchical budget definitions,
+  admission-control leasing, requester-lineage fairness, and load validation
+  now give the LLM/request path an explicit governed budget contract.
+- **Diagnosable production CI groups** — production parity can now run as
+  `docs-contract`, `docker-builds`, and `runtime-proofs` slices while the
+  canonical aggregate `--mode production` gate remains the final readiness
+  authority.
+
+### Fixed in 2.6
+
+- **Runtime backup/restore truth** — WAL-backed restore bundles, host-writable
+  runtime data, SQLite bind mounts, runtime permissions, and throwaway parity
+  collisions are now handled consistently enough for repeatable recovery proof.
+- **Production parity/reporting sharp edges** — CI naming, local-vs-GitHub
+  parity messaging, and temporary-file handling are now clearer and less
+  failure-prone for operators and automation.
+- **Architecture reference drift** — ADR-014 acceptance and ADR-007 discovery
+  guidance now point reviewers and agents at the correct authority sources.
+
+### Changed in 2.6
+
+- **Production-readiness sign-off** — `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`
+  is now the canonical internal production gate, and the CI workflow exposes
+  the same gate through diagnosable component jobs plus the final aggregate
+  readiness lane.
+- **Runtime lifecycle discipline** — status, preflight, verification,
+  activate/deactivate, suspend/resume, and repair flows now rely on one
+  bounded runtime-manager contract instead of loosely coordinated checks.
+- **Post-promotion focus** — shared multi-tenant promotion remains fulfilled on
+  `main`; this release shifts the roadmap emphasis toward runtime operations,
+  recovery evidence, and quota governance rather than reopening the already
+  closed promotion claim.
+
+### Operational Notes for 2.6
+
+- The default supported operator path remains the namespace-first,
+  per-workspace runtime opened via `software-factory.code-workspace`.
+- Shared multi-tenant promotion for `mcp-memory`, `mcp-agent-bus`, and
+  `approval-gate` stays fulfilled on `main`; 2.6 hardens the surrounding
+  runtime, production, and quota-governance surfaces.
+- The canonical local production sign-off is
+  `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`.
+- Standard `./.venv/bin/python ./scripts/local_ci_parity.py` runs still skip
+  Docker image builds by default and report that boundary as a warning.
+- Supported day-two operations now include backup/restore proof, incident
+  response guidance, and machine-readable diagnostics instead of relying on
+  ad-hoc recovery steps.
+- Release validation for 2.6 passed through three consecutive
+  `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` runs
+  (`current_green_streak=3/3`, `final_signoff=ready`) plus the post-commit
+  `scripts/verify_release_docs.py` and
+  `scripts/factory_release.py write-manifest --check` guardrails.
 
 ## [2.5] — 2026-04-20
 
