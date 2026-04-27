@@ -397,6 +397,15 @@ def create_release_policy_repo(path: Path, *, version: str = "2.2") -> None:
     (path / ".github" / "releases").mkdir(parents=True, exist_ok=True)
     (path / "manifests").mkdir(parents=True, exist_ok=True)
     (path / "VERSION").write_text(f"{version}\n", encoding="utf-8")
+    (path / "README.md").write_text(
+        "# Software Factory for VS Code\n\n"
+        "## Current Release\n\n"
+        f"- **Latest release:** `{version}`\n"
+        f"- **Release notes for GitHub:** [`.github/releases/v{version}.md`](.github/releases/v{version}.md)\n"
+        "- **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
+        "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n",
+        encoding="utf-8",
+    )
     (path / "CHANGELOG.md").write_text(
         "# Changelog\n\n" f"## [{version}] — 2026-04-10\n\n" f"Release {version}.\n",
         encoding="utf-8",
@@ -673,7 +682,7 @@ def test_verify_release_docs_skips_when_version_is_unchanged(
     assert "VERSION is unchanged" in output
 
 
-def test_verify_release_docs_requires_changelog_release_notes_and_manifest(
+def test_verify_release_docs_requires_changelog_release_notes_manifest_and_readme(
     tmp_path: Path,
     capsys,
 ) -> None:
@@ -689,6 +698,7 @@ def test_verify_release_docs_requires_changelog_release_notes_and_manifest(
     output = capsys.readouterr().out
 
     assert exit_code == 1
+    assert "README.md" in output
     assert "CHANGELOG.md" in output
     assert ".github/releases/v2.3.md" in output
     assert "manifests/release-manifest.json" in output
@@ -707,6 +717,15 @@ def test_verify_release_docs_passes_for_complete_release_bump(
         "No unreleased changes.\n\n"
         "## [2.3] — 2026-04-10\n\n"
         "Release 2.3.\n",
+        encoding="utf-8",
+    )
+    (repo / "README.md").write_text(
+        "# Software Factory for VS Code\n\n"
+        "## Current Release\n\n"
+        "- **Latest release:** `2.3`\n"
+        "- **Release notes for GitHub:** [`.github/releases/v2.3.md`](.github/releases/v2.3.md)\n"
+        "- **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
+        "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n",
         encoding="utf-8",
     )
     (repo / ".github" / "releases" / "v2.3.md").write_text(
@@ -734,7 +753,61 @@ def test_verify_release_docs_passes_for_complete_release_bump(
     output = capsys.readouterr().out
 
     assert exit_code == 0
-    assert "includes changelog, release notes, and refreshed release metadata" in output
+    assert "keeps README current-release surfaces" in output
+
+
+def test_verify_release_docs_requires_readme_current_release_sync(
+    tmp_path: Path,
+    capsys,
+) -> None:
+    repo = tmp_path / "release-policy-repo"
+    create_release_policy_repo(repo)
+    (repo / "VERSION").write_text("2.3\n", encoding="utf-8")
+    (repo / "CHANGELOG.md").write_text(
+        "# Changelog\n\n"
+        "## [Unreleased]\n\n"
+        "No unreleased changes.\n\n"
+        "## [2.3] — 2026-04-10\n\n"
+        "Release 2.3.\n",
+        encoding="utf-8",
+    )
+    (repo / "README.md").write_text(
+        "# Software Factory for VS Code\n\n"
+        "## Current Release\n\n"
+        "- **Latest release:** `2.2`\n"
+        "- **Release notes for GitHub:** [`.github/releases/v2.2.md`](.github/releases/v2.2.md)\n"
+        "- **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
+        "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n\n"
+        "Release checklist refreshed, but the public current-release section is still stale.\n",
+        encoding="utf-8",
+    )
+    (repo / ".github" / "releases" / "v2.3.md").write_text(
+        "# Software Factory for VS Code 2.3\n\n"
+        "Release 2.3 notes.\n\n"
+        "## Delivery status snapshot\n\n"
+        "| Scope | Status | Why it matters |\n"
+        "| --- | --- | --- |\n"
+        "| Practical per-workspace baseline | Fulfilled | Stable baseline ships now. |\n"
+        "| Shared multi-tenant promotion (ADR-008 accepted) | Open | Safe optimization work stays gated. |\n"
+        "| Whole implementation roadmap | Open | The release does not overclaim final completion. |\n",
+        encoding="utf-8",
+    )
+    factory_release.write_release_manifest_file(
+        repo,
+        repo_url="https://github.com/blecx/softwareFactoryVscode.git",
+        source_ref="main",
+    )
+    git("add", ".", cwd=repo)
+    git("commit", "-m", "Prepare incomplete release 2.3", cwd=repo)
+
+    exit_code = verify_release_docs.main(
+        ["--repo-root", str(repo), "--base-rev", "HEAD^", "--head-rev", "HEAD"]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 1
+    assert "README.md" in output
+    assert "Current Release" in output
 
 
 def test_verify_release_docs_requires_delivery_status_snapshot(
