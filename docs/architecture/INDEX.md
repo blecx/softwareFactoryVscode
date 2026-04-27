@@ -18,8 +18,8 @@ source.
 
 | Document class | Status marker | Use it for | Examples |
 | --- | --- | --- | --- |
-| Accepted ADRs | `Accepted` | Normative architecture guardrails and terminology | `ADR-001` to `ADR-006`, `ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md`, `ADR-008` to `ADR-013`, `ADR-015` |
-| Proposed ADRs | `Proposed` | Draft architectural direction under review; not yet normative | `ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md` |
+| Accepted ADRs | `Accepted` | Normative architecture guardrails and terminology | `ADR-001` to `ADR-006`, `ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md`, `ADR-008` to `ADR-015` |
+| Proposed ADRs | `Proposed` | Draft architectural direction under review; not yet normative | None currently listed in this index. |
 | Superseded historical ADRs | `Superseded` | Historical traceability only; never a current authority source | `ADR-007-Multi-Workspace-and-Shared-Services.md` |
 | Supporting architecture synthesis | `Maintained synthesis` | Cross-ADR explanation that defers to accepted ADRs | `MULTI-WORKSPACE-MCP-ARCHITECTURE.md` |
 | Supporting implementation plans | `Proposed` or historical sequencing status | Sequencing, rollout, and hardening context within accepted ADR boundaries | `MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md`, `MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md` |
@@ -32,8 +32,9 @@ source.
   `ADR-008-Hybrid-Tenancy-Model-for-MCP-Services.md`,
   `ADR-009-Active-Workspace-Registry-and-Lifecycle-Management.md`,
   `ADR-010-Workspace-Cleanup-and-Registry-Reconciliation.md`, and
-  `ADR-012-Copilot-First-Namespaced-Harness-Integration.md` for the current
-  multi-workspace runtime contract.
+  `ADR-012-Copilot-First-Namespaced-Harness-Integration.md`, and
+  `ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md`
+  for the current multi-workspace runtime contract.
 - Read `MULTI-WORKSPACE-MCP-ARCHITECTURE.md` for a maintained, non-normative
   synthesis of how the accepted ADRs fit together.
 - Read the implementation plans for sequencing history, rollout notes, and

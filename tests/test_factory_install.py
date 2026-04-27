@@ -398,12 +398,16 @@ def create_release_policy_repo(path: Path, *, version: str = "2.2") -> None:
     (path / "manifests").mkdir(parents=True, exist_ok=True)
     (path / "VERSION").write_text(f"{version}\n", encoding="utf-8")
     (path / "README.md").write_text(
-        "# Software Factory for VS Code\n\n"
-        "## Current Release\n\n"
-        f"- **Latest release:** `{version}`\n"
-        f"- **Release notes for GitHub:** [`.github/releases/v{version}.md`](.github/releases/v{version}.md)\n"
-        "- **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
-        "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n",
+        (
+            "# Software Factory for VS Code\n\n"
+            "## Current Release\n\n"
+            f"- **Latest release:** `{version}`\n"
+            f"- **Release notes for GitHub:** "
+            f"[`.github/releases/v{version}.md`](.github/releases/v{version}.md)\n"
+            "- **Machine-readable release metadata:** "
+            "[`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
+            "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n"
+        ),
         encoding="utf-8",
     )
     (path / "CHANGELOG.md").write_text(
@@ -720,12 +724,16 @@ def test_verify_release_docs_passes_for_complete_release_bump(
         encoding="utf-8",
     )
     (repo / "README.md").write_text(
-        "# Software Factory for VS Code\n\n"
-        "## Current Release\n\n"
-        "- **Latest release:** `2.3`\n"
-        "- **Release notes for GitHub:** [`.github/releases/v2.3.md`](.github/releases/v2.3.md)\n"
-        "- **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
-        "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n",
+        (
+            "# Software Factory for VS Code\n\n"
+            "## Current Release\n\n"
+            "- **Latest release:** `2.3`\n"
+            "- **Release notes for GitHub:** "
+            "[`.github/releases/v2.3.md`](.github/releases/v2.3.md)\n"
+            "- **Machine-readable release metadata:** "
+            "[`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
+            "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n"
+        ),
         encoding="utf-8",
     )
     (repo / ".github" / "releases" / "v2.3.md").write_text(
@@ -772,13 +780,17 @@ def test_verify_release_docs_requires_readme_current_release_sync(
         encoding="utf-8",
     )
     (repo / "README.md").write_text(
-        "# Software Factory for VS Code\n\n"
-        "## Current Release\n\n"
-        "- **Latest release:** `2.2`\n"
-        "- **Release notes for GitHub:** [`.github/releases/v2.2.md`](.github/releases/v2.2.md)\n"
-        "- **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
-        "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n\n"
-        "Release checklist refreshed, but the public current-release section is still stale.\n",
+        (
+            "# Software Factory for VS Code\n\n"
+            "## Current Release\n\n"
+            "- **Latest release:** `2.2`\n"
+            "- **Release notes for GitHub:** "
+            "[`.github/releases/v2.2.md`](.github/releases/v2.2.md)\n"
+            "- **Machine-readable release metadata:** "
+            "[`manifests/release-manifest.json`](manifests/release-manifest.json)\n"
+            "- **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)\n\n"
+            "Release checklist refreshed, but the public current-release section is still stale.\n"
+        ),
         encoding="utf-8",
     )
     (repo / ".github" / "releases" / "v2.3.md").write_text(

@@ -128,7 +128,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if readme_path.as_posix() not in changed:
         violations.append(
-            f"VERSION changed, but `{readme_path.as_posix()}` was not updated to keep the public current-release section in sync."
+            (
+                f"VERSION changed, but `{readme_path.as_posix()}` was not updated "
+                "to keep the public current-release section in sync."
+            )
         )
     else:
         readme_text = git_show(repo_root, args.head_rev, readme_path)
@@ -138,7 +141,12 @@ def main(argv: list[str] | None = None) -> int:
             expected_release_notes=expected_release_notes,
         ):
             violations.append(
-                f"`{readme_path.as_posix()}` must keep `{README_CURRENT_RELEASE_HEADING}` in sync with release `{head_version}` and link to `{expected_release_notes.as_posix()}`."
+                (
+                    f"`{readme_path.as_posix()}` must keep "
+                    f"`{README_CURRENT_RELEASE_HEADING}` in sync with release "
+                    f"`{head_version}` and link to "
+                    f"`{expected_release_notes.as_posix()}`."
+                )
             )
 
     if manifest_path.as_posix() not in changed:
