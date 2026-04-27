@@ -4,7 +4,21 @@
 
 Proposed
 
-This document is a sequencing plan, not the normative source of architecture truth. Per `ADR-013`, accepted ADRs define architecture guardrails and terminology, architecture synthesis documents may explain but not override them, and plans remain authoritative only for sequencing and hardening work. Accepted runtime contracts now live in `ADR-012`, `ADR-007`, `ADR-008`, `ADR-009`, `ADR-010`, and `ADR-014`. `ADR-008` is now accepted and defines the hybrid-tenancy guardrails; this plan sequences the remaining rollout work required before shared-service promotion can be described as fulfilled in releases or operator guidance. `MULTI-WORKSPACE-MCP-ARCHITECTURE.md` is a maintained architecture synthesis that explains how those decisions fit together and maps them onto the current codebase. When this plan or that synthesis lags, the accepted ADRs and verified code are the source of truth.
+This document is a sequencing plan, not the normative source of architecture
+truth. Per `ADR-013`, accepted ADRs define architecture guardrails and
+terminology, architecture synthesis documents may explain but not override them,
+and plans remain authoritative only for sequencing and hardening work. Accepted
+runtime contracts now live in `ADR-012`, accepted
+`ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md`, `ADR-008`,
+`ADR-009`, and `ADR-010`. `ADR-007-Multi-Workspace-and-Shared-Services.md` is
+retained only as a superseded historical note for traceability; it is not a
+second active ADR-007 authority source. `ADR-008` is now accepted and defines
+the hybrid-tenancy guardrails; this plan sequences the remaining rollout work
+required before shared-service promotion can be described as fulfilled in
+releases or operator guidance. `MULTI-WORKSPACE-MCP-ARCHITECTURE.md` is a
+maintained architecture synthesis that explains how those decisions fit
+together and maps them onto the current codebase. When this plan or that
+synthesis lags, the accepted ADRs and verified code are the source of truth.
 
 Status note (2026-04-19): the ADR-008 rollout tracked here is now fulfilled on
 `main` through PRs #53, #54, #55, #56, #57, #58, and #59. The sections below
@@ -69,7 +83,7 @@ This section answers two review questions explicitly:
 #### 5. Stale tenancy architecture doublette
 
 - **Status:** Resolved at the documentation and review-authority layer.
-- **Mitigation:** the legacy duplicate ADR is explicitly marked superseded and non-normative, and the maintained architecture/plan docs now point back to the accepted ADR set rather than treating the stale draft as current truth.
+- **Mitigation:** the legacy duplicate ADR-007 filename is explicitly marked superseded and non-normative, the duplicate numbering is retained only for historical traceability, and the maintained architecture/plan docs now point back to the accepted ADR set rather than treating the stale draft as current truth.
 - **Verification:** `tests/test_regression.py` checks the superseded ADR wording and the plan structure.
 
 ### Explicitly not resolved or promoted by this rework
