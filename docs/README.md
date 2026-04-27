@@ -35,6 +35,7 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 ### Architecture and guardrails
 
 - [`architecture/INDEX.md`](architecture/INDEX.md) — architecture directory entrypoint and authority map.
+- [`architecture/ADR-INDEX.md`](architecture/ADR-INDEX.md) — compact accepted-ADR catalog and status summary for faster architecture discovery.
 - [`architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md`](architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md) — document-authority hierarchy.
 - [`architecture/ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md`](architecture/ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md) — current runtime lifecycle, prompt coordination, and resource-governance contract.
 
