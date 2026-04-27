@@ -11,6 +11,7 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 
 ### New readers and evaluators
 
+- [`WHY-SOFTWARE-FACTORY.md`](WHY-SOFTWARE-FACTORY.md) — canonical explanation of why the project exists, who it helps, and what it explicitly is not trying to be.
 - [`../README.md`](../README.md) — repository entrypoint, current release, and top-level orientation.
 - [`HANDOUT.md`](HANDOUT.md) — guided overview of the Software Factory model and workflows.
 - [`INSTALL.md`](INSTALL.md) — installation, update, and operator setup instructions.

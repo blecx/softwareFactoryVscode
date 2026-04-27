@@ -4,8 +4,11 @@ This document explains what `softwareFactoryVscode` is supposed to be, why it ex
 
 It is intentionally more human-readable than an ADR. The ADR defines the rules; this document explains the reasoning.
 
+For the shorter public-facing intent/goals/non-goals summary, start with `docs/WHY-SOFTWARE-FACTORY.md`.
+
 See also:
 
+- `docs/WHY-SOFTWARE-FACTORY.md`
 - `docs/architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md`
 - `docs/architecture/ADR-004-Host-Project-Isolation.md`
 - `docs/HARNESS-INTEGRATION-SPEC.md`

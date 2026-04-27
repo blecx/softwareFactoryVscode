@@ -70,6 +70,10 @@ the canonical installer/update flow to apply a safe refresh when needed.
 
 ### Documentation Router
 
+If you want the shortest public explanation of **why** this project exists,
+who it helps, and what it is **not** trying to be, start with
+**[Why Software Factory exists](docs/WHY-SOFTWARE-FACTORY.md)**.
+
 If you open only one follow-up page after this README, start with the
 **[Documentation Index](docs/README.md)**. It routes new readers, operators,
 maintainers, and architecture reviewers to the right surface without making
@@ -77,6 +81,7 @@ historical sequencing plans the default first stop.
 
 Start with the route that matches your goal:
 
+- **Understand the project intent and non-goals:** [Why Software Factory exists](docs/WHY-SOFTWARE-FACTORY.md)
 - **Install or refresh a workspace:** [Installation Guide](docs/INSTALL.md)
 - **Get a guided onboarding pass:** [User Handout](docs/HANDOUT.md)
 - **Jump to the short operational version:** [Cheat Sheet](docs/CHEAT_SHEET.md)
