@@ -33,10 +33,12 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 ## 5. Release Bump Discipline
 
 - Treat `VERSION` as the canonical release marker.
-- If you change `VERSION`, you must also update `CHANGELOG.md`, create or update the matching GitHub release notes file at `.github/releases/v<version>.md`, and refresh `manifests/release-manifest.json`.
+- If you change `VERSION`, you must also update `README.md` `## Current Release`, `CHANGELOG.md`, create or update the matching GitHub release notes file at `.github/releases/v<version>.md`, and refresh `manifests/release-manifest.json`.
 - Do **not** update changelog or release notes for ordinary commits unless the user asks for it or `VERSION` changes.
 - When preparing a release bump, ensure the changelog contains a dedicated `## [<version>]` section and the GitHub release notes explicitly mention the same version.
 - GitHub release notes should include a `## Delivery status snapshot` table summarizing what the release fulfills, what remains open, and why that boundary matters.
+- **Definition of Done:** A release bump is done only when all current-release surfaces (`VERSION`, `README.md` `## Current Release`, `CHANGELOG.md`, `.github/releases/v<version>.md`, and `manifests/release-manifest.json`) agree on the same version, the post-commit release checks pass, and the published GitHub release is cut from the checked-in notes.
+- **Quality metric:** Treat release-quality as `current-release surface consistency = 100%` plus `release guardrail pass rate = 100%`; older version strings may remain only in explicit historical sections/files, never on public current-release surfaces.
 
 ## 6. Natural-Language Workflow Alias Routing
 

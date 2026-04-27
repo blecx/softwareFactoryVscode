@@ -754,6 +754,29 @@ def test_readme_tracks_version_aware_copilot_setup():
     assert "promoted Docker E2E runtime proof lane" in readme
 
 
+def test_release_bump_guardrails_define_current_release_sync_and_quality_bar():
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    template = (repo_root / ".github" / "releases" / "TEMPLATE.md").read_text(
+        encoding="utf-8"
+    )
+    skill = (
+        repo_root / ".copilot" / "skills" / "release-bump-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert "README.md" in instructions
+    assert "Definition of Done" in instructions
+    assert "Quality metric" in instructions
+    assert "## Current Release" in skill
+    assert "## Definition of done" in skill
+    assert "## Quality metrics" in skill
+    assert "current-release surface consistency" in skill
+    assert "README.md" in template
+    assert "Current Release" in template
+
+
 def test_tests_readme_maps_practical_baseline_coverage_surfaces():
     repo_root = Path(__file__).parent.parent
     tests_readme = (repo_root / "tests" / "README.md").read_text(encoding="utf-8")

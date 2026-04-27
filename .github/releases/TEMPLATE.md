@@ -73,4 +73,5 @@ groundwork`.
 - Suggested tag: `v[version]`
 - Canonical release marker: `VERSION`
 - Machine-readable release source of truth: `manifests/release-manifest.json`
+- Public current-release surface: `README.md` `## Current Release` should reference `[version]` and `.github/releases/v[version].md`
 - Detailed release history: `CHANGELOG.md`

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Enforce release documentation updates when VERSION changes."""
+"""Enforce release-documentation and current-release updates when VERSION changes."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from pathlib import Path
 RELEASE_STATUS_HEADING = "## Delivery status snapshot"
 RELEASE_STATUS_TABLE_HEADER = "| Scope | Status | Why it matters |"
 RELEASE_STATUS_TABLE_DIVIDER = "| --- | --- | --- |"
+README_CURRENT_RELEASE_HEADING = "## Current Release"
 
 
 def run_git(
@@ -49,6 +50,17 @@ def has_release_status_snapshot(release_notes_text: str) -> bool:
     return all(marker in release_notes_text for marker in required_markers)
 
 
+def readme_current_release_matches(
+    readme_text: str, *, version: str, expected_release_notes: Path
+) -> bool:
+    required_markers = (
+        README_CURRENT_RELEASE_HEADING,
+        f"**Latest release:** `{version}`",
+        expected_release_notes.as_posix(),
+    )
+    return all(marker in readme_text for marker in required_markers)
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Require changelog and release notes when VERSION changes."
@@ -65,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
     version_path = Path("VERSION")
     changelog_path = Path("CHANGELOG.md")
     manifest_path = Path("manifests") / "release-manifest.json"
+    readme_path = Path("README.md")
 
     base_version = git_show(repo_root, args.base_rev, version_path).strip()
     head_version = git_show(repo_root, args.head_rev, version_path).strip()
@@ -113,6 +126,21 @@ def main(argv: list[str] | None = None) -> int:
                 "stay explicit."
             )
 
+    if readme_path.as_posix() not in changed:
+        violations.append(
+            f"VERSION changed, but `{readme_path.as_posix()}` was not updated to keep the public current-release section in sync."
+        )
+    else:
+        readme_text = git_show(repo_root, args.head_rev, readme_path)
+        if not readme_current_release_matches(
+            readme_text,
+            version=head_version,
+            expected_release_notes=expected_release_notes,
+        ):
+            violations.append(
+                f"`{readme_path.as_posix()}` must keep `{README_CURRENT_RELEASE_HEADING}` in sync with release `{head_version}` and link to `{expected_release_notes.as_posix()}`."
+            )
+
     if manifest_path.as_posix() not in changed:
         violations.append(
             f"VERSION changed, but `{manifest_path.as_posix()}` was not refreshed."
@@ -140,14 +168,14 @@ def main(argv: list[str] | None = None) -> int:
         for violation in violations:
             print(f"- {violation}")
         print(
-            "Release-number increases must update CHANGELOG.md, the matching "
-            "GitHub release notes file, and the machine-readable release manifest."
+            "Release-number increases must update README.md current-release surfaces, CHANGELOG.md, "
+            "the matching GitHub release notes file, and the machine-readable release manifest."
         )
         return 1
 
     print(
-        f"✅ Release bump from `{base_version}` to `{head_version}` includes changelog, "
-        "release notes, and refreshed release metadata."
+        f"✅ Release bump from `{base_version}` to `{head_version}` keeps README current-release surfaces, "
+        "changelog, release notes, and refreshed release metadata in sync."
     )
     return 0
 
