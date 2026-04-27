@@ -771,6 +771,7 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "WORK-ISSUE-WORKFLOW.md" in docs_readme
     assert "setup-github-repository.md" in docs_readme
     assert "maintainer/GUARDRAILS.md" in docs_readme
+    assert "maintainer/AGENT-ENFORCEMENT-MAP.md" in docs_readme
     assert "architecture/INDEX.md" in docs_readme
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in docs_readme
     assert (
@@ -793,6 +794,7 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert "# Maintainer guardrail catalog" in catalog
     assert "index/reference" in catalog
     assert "not a competing normative authority" in catalog
+    assert "AGENT-ENFORCEMENT-MAP.md" in catalog
     assert "docs/WORK-ISSUE-WORKFLOW.md" in catalog
     assert ".github/copilot-instructions.md" in catalog
     assert ".copilot/skills/*" in catalog
@@ -808,6 +810,35 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert "configs/bash_gateway_policy.default.yml" in catalog
     assert "scripts/setup-low-approval.sh" in catalog
     assert "scripts/setup-vscode-agent-settings.py" in catalog
+
+
+def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sources():
+    repo_root = Path(__file__).parent.parent
+    enforcement_map = (
+        repo_root / "docs" / "maintainer" / "AGENT-ENFORCEMENT-MAP.md"
+    ).read_text(encoding="utf-8")
+
+    assert "# Agent enforcement map" in enforcement_map
+    assert "not a competing normative authority" in enforcement_map
+    assert "create-issue" in enforcement_map
+    assert "resolve-issue" in enforcement_map
+    assert "pr-merge" in enforcement_map
+    assert "execute-approved-plan" in enforcement_map
+    assert "queue-backend" in enforcement_map
+    assert "queue-phase-2" in enforcement_map
+    assert "Plan" in enforcement_map
+    assert "execute-github-issues-in-order.prompt.md" in enforcement_map
+    assert "resume-after-interruption.prompt.md" in enforcement_map
+    assert ".github/ISSUE_TEMPLATE/feature_request.yml" in enforcement_map
+    assert ".github/ISSUE_TEMPLATE/bug_report.yml" in enforcement_map
+    assert ".github/pull_request_template.md" in enforcement_map
+    assert ".tmp/github-issue-queue-state.md" in enforcement_map
+    assert "ADR-001-AI-Workflow-Guardrails.md" in enforcement_map
+    assert "ADR-005-Strong-Templating-Enforcement.md" in enforcement_map
+    assert "ADR-006-Local-CI-Parity-Prechecks.md" in enforcement_map
+    assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in enforcement_map
+    assert "WORK-ISSUE-WORKFLOW.md" in enforcement_map
+    assert ".github/copilot-instructions.md" in enforcement_map
 
 
 def test_docs_roadmap_separates_current_direction_from_historical_plans():
