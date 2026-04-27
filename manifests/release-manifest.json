@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-04-20T06:43:02+02:00",
+  "generated_at": "2026-04-27T12:30:07+02:00",
   "source": {
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "default_branch": "main",
@@ -9,36 +9,36 @@
   },
   "latest": {
     "schema_version": 1,
-    "version_core": "2.5",
-    "normalized_version": "2.5.0",
-    "display_version": "2.5+117.g9d11140",
+    "version_core": "2.6",
+    "normalized_version": "2.6.0",
+    "display_version": "2.6+171.g7e741f7",
     "channel": "stable",
-    "build_number": 117,
-    "commit_sha": "9d1114079d2ccc08ef8fd7255b788e3c2e36d713",
-    "commit_short": "9d11140",
+    "build_number": 171,
+    "commit_sha": "7e741f7e5e6fcdd8d0040cc36423ee44cee92e1c",
+    "commit_short": "7e741f7",
     "version_tag": "",
     "source_ref": "main",
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "manifest_path": "manifests/release-manifest.json",
     "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
-    "generated_at": "2026-04-20T06:43:02+02:00"
+    "generated_at": "2026-04-27T12:30:07+02:00"
   },
   "channels": {
     "stable": {
       "schema_version": 1,
-      "version_core": "2.5",
-      "normalized_version": "2.5.0",
-      "display_version": "2.5+117.g9d11140",
+      "version_core": "2.6",
+      "normalized_version": "2.6.0",
+      "display_version": "2.6+171.g7e741f7",
       "channel": "stable",
-      "build_number": 117,
-      "commit_sha": "9d1114079d2ccc08ef8fd7255b788e3c2e36d713",
-      "commit_short": "9d11140",
+      "build_number": 171,
+      "commit_sha": "7e741f7e5e6fcdd8d0040cc36423ee44cee92e1c",
+      "commit_short": "7e741f7",
       "version_tag": "",
       "source_ref": "main",
       "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
       "manifest_path": "manifests/release-manifest.json",
       "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
-      "generated_at": "2026-04-20T06:43:02+02:00"
+      "generated_at": "2026-04-27T12:30:07+02:00"
     }
   },
   "update_policy": {
