@@ -745,6 +745,7 @@ def test_readme_tracks_version_aware_copilot_setup():
 
     assert "**Latest release:** `2.6`" in readme
     assert ".github/releases/v2.6.md" in readme
+    assert "docs/ROADMAP.md" in readme
     assert "docs/README.md" in readme
     assert "VS Code `1.116+`" in readme
     assert "GitHub Copilot is built in" in readme
@@ -775,10 +776,27 @@ def test_docs_readme_routes_audiences_without_competing_authority():
         "ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-"
         "Governance.md" in docs_readme
     )
+    assert "ROADMAP.md" in docs_readme
     assert "https://github.com/blecx/softwareFactoryVscode/issues/163" in docs_readme
     assert "PRODUCTION-READINESS-PLAN.md" in docs_readme
     assert "## Historical and reference material" in docs_readme
     assert "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md" in docs_readme
+
+
+def test_docs_roadmap_separates_current_direction_from_historical_plans():
+    repo_root = Path(__file__).parent.parent
+    roadmap = (repo_root / "docs" / "ROADMAP.md").read_text(encoding="utf-8")
+
+    assert "# Active roadmap summary" in roadmap
+    assert "current high-level roadmap" in roadmap
+    assert "historical implementation plans" in roadmap
+    assert "accepted ADRs remain the authority" in roadmap
+    assert "released `2.6` story remains intact" in roadmap
+    assert "umbrella issue `#163`" in roadmap
+    assert "PRODUCTION-READINESS.md" in roadmap
+    assert "PRODUCTION-READINESS-PLAN.md" in roadmap
+    assert "not the default current roadmap" in roadmap
+    assert "MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md" in roadmap
 
 
 def test_release_bump_guardrails_define_current_release_sync_and_quality_bar():
