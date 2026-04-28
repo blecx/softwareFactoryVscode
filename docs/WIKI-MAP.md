@@ -1,16 +1,16 @@
 # Wiki export map
 
-This page records the stable source-to-target map for a later GitHub Wiki
-export. It is a planning/reference aid, not a competing authority surface.
+This page records the stable source-to-target map for the live GitHub Wiki
+projection and future resync passes. It is a planning/reference aid, not a competing authority surface.
 
 Per
 [`ADR-013-Architecture-Authority-and-Plan-Separation.md`](architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md),
-accepted ADRs remain the normative architecture source, and repo file paths remain the canonical documentation source even if a later issue exports selected copies to the wiki.
+accepted ADRs remain the normative architecture source, and repo file paths remain the canonical documentation source even when approved slices publish selected projections to the wiki.
 
 ## Export policy defaults
 
-- Only material explicitly marked **Wiki-safe** below is eligible for a later
-  wiki export by default. Unlisted material stays repo-only until this map is
+- Only material explicitly marked **Wiki-safe** below is eligible for live wiki
+  publication by default. Unlisted material stays repo-only until this map is
   updated in a future approved slice.
 - Wiki pages are reader-facing projections. They should link back to the source
   repository files and must not weaken the authority hierarchy documented in
@@ -19,8 +19,8 @@ accepted ADRs remain the normative architecture source, and repo file paths rema
   material, redirect notes, and sequencing-heavy plans stay repo-only.
 - Historical or superseded architecture notes stay repo-only even when they
   live under `docs/architecture/`.
-- No actual wiki migration happens in this slice; this page only defines the
-  later export policy.
+- The live wiki and every future resync pass must consume this map rather than
+  re-deciding publication scope ad hoc.
 
 ## Wiki-safe export targets
 
@@ -46,7 +46,7 @@ accepted ADRs remain the normative architecture source, and repo file paths rema
 | Source doc or scope | Export status | Why it stays repo-only |
 | --- | --- | --- |
 | [`README.md`](../README.md) | Repo-only | Repository landing page, current-release surface, and GitHub entrypoint; do not create a competing wiki source for release truth. |
-| [`docs/WIKI-MAP.md`](WIKI-MAP.md) | Repo-only | Maintainer-facing export policy/control file for later migration work. |
+| [`docs/WIKI-MAP.md`](WIKI-MAP.md) | Repo-only | Maintainer-facing publication-policy/control file for live wiki and future resync work. |
 | [`docs/ROADMAP.md`](ROADMAP.md) | Repo-only | Active repository direction and delivery routing rather than stable operator/reference material. |
 | [`docs/PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | Repo-only | Active supporting plan and sequencing surface, not the readiness authority. |
 | [`docs/WORK-ISSUE-WORKFLOW.md`](WORK-ISSUE-WORKFLOW.md) and [`docs/setup-github-repository.md`](setup-github-repository.md) | Repo-only | Repository-specific GitHub workflow and protection setup instructions. |
@@ -55,5 +55,5 @@ accepted ADRs remain the normative architecture source, and repo file paths rema
 | [`docs/CHAT-SESSION-TROUBLESHOOTING-REPORT.md`](CHAT-SESSION-TROUBLESHOOTING-REPORT.md), [`docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md), [`docs/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md), and [`docs/MCP-RUNTIME-MITIGATION-PLAN.md`](MCP-RUNTIME-MITIGATION-PLAN.md) | Repo-only | Historical redirect or closure-note surfaces that point back to the archive/history path. |
 | [`docs/architecture/MULTI-WORKSPACE-MCP-ARCHITECTURE.md`](architecture/MULTI-WORKSPACE-MCP-ARCHITECTURE.md), `docs/architecture/*IMPLEMENTATION-PLAN*.md`, and [`docs/architecture/ADR-007-Multi-Workspace-and-Shared-Services.md`](architecture/ADR-007-Multi-Workspace-and-Shared-Services.md) | Repo-only | Non-normative synthesis, sequencing, or superseded history; keeping them repo-only avoids shadow-architecture or stale-plan publication. |
 
-Later wiki-migration work should consume this map rather than re-deciding
-publication scope ad hoc.
+Live wiki publication and later resync work should consume this map rather than
+re-deciding publication scope ad hoc.
