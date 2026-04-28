@@ -166,6 +166,9 @@ resume-unsafe, and manual recovery cases.
 
 ### Day-two runbooks
 
+When [`README.md`](../README.md) or [`HANDOUT.md`](HANDOUT.md) sends you from
+overview to action, these are the canonical operator runbooks:
+
 - [`docs/ops/INCIDENT-RESPONSE.md`](ops/INCIDENT-RESPONSE.md) — diagnosis/action/validation/escalation playbooks for startup failure, degraded services, config drift, shared mode, backup/restore, and update failure.
 - [`docs/ops/MONITORING.md`](ops/MONITORING.md) — machine-readable field reference for `preflight --json` and `status --json`.
 - [`docs/ops/BACKUP-RESTORE.md`](ops/BACKUP-RESTORE.md) — supported backup/restore preconditions, bundle contents, and roundtrip contract.

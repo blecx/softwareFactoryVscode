@@ -89,6 +89,19 @@ After startup, you can run:
 
 These verifier commands use the same manager-backed readiness vocabulary as `preflight` and `status`. Any extra endpoint probes are additive evidence only, so the verifier can deepen the diagnosis without inventing a second runtime-truth authority.
 
+### 5.5 Use the operator runbooks when you need concrete action
+
+When you move from overview to action, go straight to these runbooks instead of
+searching around the docs tree:
+
+- [`docs/ops/MONITORING.md`](ops/MONITORING.md) — machine-readable diagnostics,
+  `preflight --json` / `status --json` field guidance, and monitoring intent.
+- [`docs/ops/INCIDENT-RESPONSE.md`](ops/INCIDENT-RESPONSE.md) — the supported
+  day-two decision tree for startup failure, degraded services, config drift,
+  suspend/resume, and escalation.
+- [`docs/ops/BACKUP-RESTORE.md`](ops/BACKUP-RESTORE.md) — the supported
+  backup/restore preconditions and bounded recovery roundtrip.
+
 ## 🧠 Service model in plain English
 
 This handout keeps the short operator summary. For the full ADR-008 rollout
