@@ -45,7 +45,7 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 ### Roadmap and active delivery tracking
 
 - [`ROADMAP.md`](ROADMAP.md) — active/current roadmap summary that separates current direction from historical implementation plans.
-- [Umbrella issue `#163`](https://github.com/blecx/softwareFactoryVscode/issues/163) — approved documentation completion program and remaining child slices.
+- [Closed umbrella issue `#163`](https://github.com/blecx/softwareFactoryVscode/issues/163) — completion record and linked child issues/PRs for the documentation-stabilization program that delivered the current structure.
 - [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md) — current shipped readiness contract.
 - [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) — current readiness sequencing plan within the released guardrails.
 - [`archive/README.md`](archive/README.md) — archive index for clearly historical top-level plans and reports that are no longer part of the default current reader path.
