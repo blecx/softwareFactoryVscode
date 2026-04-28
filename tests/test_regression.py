@@ -983,6 +983,12 @@ def test_docs_wiki_map_defines_conservative_export_targets() -> None:
     assert "Getting Started" in wiki_map
     assert "HANDOUT.md" in wiki_map
     assert "INSTALL.md" in wiki_map
+    assert "Tutorials" in wiki_map
+    assert "Install a New Project" in wiki_map
+    assert "First Runtime Startup and Preflight" in wiki_map
+    assert "Day-to-Day Operator Loop" in wiki_map
+    assert "Examples" in wiki_map
+    assert "FAQ" in wiki_map
     assert "CHEAT_SHEET.md" in wiki_map
     assert "PRODUCTION-READINESS.md" in wiki_map
     assert "ops/MONITORING.md" in wiki_map
@@ -1030,6 +1036,12 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "Getting Started",
         "Install and Update",
         "Operator Handout",
+        "Tutorials",
+        "Install a New Project",
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Examples",
+        "FAQ",
     ]
 
     home_page = manifest["pages"][0]
@@ -1039,6 +1051,9 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "Getting Started",
         "Install and Update",
         "Operator Handout",
+        "Tutorials",
+        "Examples",
+        "FAQ",
     ]
 
     sidebar_page = manifest["pages"][1]
@@ -1049,6 +1064,7 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
     assert sidebar_page["route_groups"] == [
         "Evaluate",
         "Get started",
+        "Learn by doing",
         "Use and operate",
         "Understand the architecture",
     ]
@@ -1078,6 +1094,53 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
 
     handout_page = manifest["pages"][6]
     assert handout_page["canonical_sources"] == ["docs/HANDOUT.md"]
+
+    tutorials_page = manifest["pages"][7]
+    assert tutorials_page["canonical_sources"] == [
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md",
+        "docs/CHEAT_SHEET.md",
+    ]
+    assert tutorials_page["primary_routes"] == [
+        "Install a New Project",
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Examples",
+        "FAQ",
+    ]
+
+    install_tutorial_page = manifest["pages"][8]
+    assert install_tutorial_page["canonical_sources"] == [
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md",
+    ]
+
+    startup_tutorial_page = manifest["pages"][9]
+    assert startup_tutorial_page["canonical_sources"] == [
+        "docs/HANDOUT.md",
+        "docs/INSTALL.md",
+        "docs/CHEAT_SHEET.md",
+    ]
+
+    operator_loop_page = manifest["pages"][10]
+    assert operator_loop_page["canonical_sources"] == [
+        "docs/HANDOUT.md",
+        "docs/CHEAT_SHEET.md",
+    ]
+
+    examples_page = manifest["pages"][11]
+    assert examples_page["canonical_sources"] == [
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md",
+        "docs/CHEAT_SHEET.md",
+    ]
+
+    faq_page = manifest["pages"][12]
+    assert faq_page["canonical_sources"] == [
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md",
+        "docs/CHEAT_SHEET.md",
+    ]
 
     flattened_sources = {
         source for page in manifest["pages"] for source in page["canonical_sources"]

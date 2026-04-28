@@ -32,7 +32,10 @@
         "Why Software Factory",
         "Getting Started",
         "Install and Update",
-        "Operator Handout"
+        "Operator Handout",
+        "Tutorials",
+        "Examples",
+        "FAQ"
       ],
       "audience": [
         "evaluators",
@@ -55,6 +58,7 @@
       "route_groups": [
         "Evaluate",
         "Get started",
+        "Learn by doing",
         "Use and operate",
         "Understand the architecture"
       ],
@@ -128,6 +132,98 @@
         "operators"
       ],
       "note": "Guided first-run operator flow projected from the canonical handout."
+    },
+    {
+      "wiki_page": "Tutorials",
+      "page_type": "tutorial-index",
+      "status": "live",
+      "canonical_sources": [
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md",
+        "docs/CHEAT_SHEET.md"
+      ],
+      "primary_routes": [
+        "Install a New Project",
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Examples",
+        "FAQ"
+      ],
+      "audience": [
+        "evaluators",
+        "operators"
+      ],
+      "note": "Scenario-driven landing page for the published tutorial track, examples, and FAQ." 
+    },
+    {
+      "wiki_page": "Install a New Project",
+      "page_type": "tutorial",
+      "status": "live",
+      "canonical_sources": [
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Step-by-step tutorial for creating a new repository install and opening the generated workspace."
+    },
+    {
+      "wiki_page": "First Runtime Startup and Preflight",
+      "page_type": "tutorial",
+      "status": "live",
+      "canonical_sources": [
+        "docs/HANDOUT.md",
+        "docs/INSTALL.md",
+        "docs/CHEAT_SHEET.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Step-by-step tutorial for checking preflight state, starting the runtime explicitly, and verifying the result."
+    },
+    {
+      "wiki_page": "Day-to-Day Operator Loop",
+      "page_type": "tutorial",
+      "status": "live",
+      "canonical_sources": [
+        "docs/HANDOUT.md",
+        "docs/CHEAT_SHEET.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Repeat-operator walkthrough for checking state, switching focus, and choosing the right lifecycle action."
+    },
+    {
+      "wiki_page": "Examples",
+      "page_type": "examples",
+      "status": "live",
+      "canonical_sources": [
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md",
+        "docs/CHEAT_SHEET.md"
+      ],
+      "audience": [
+        "evaluators",
+        "operators"
+      ],
+      "note": "Scenario-style entry points that cluster current supported workflows without expanding the authority surface."
+    },
+    {
+      "wiki_page": "FAQ",
+      "page_type": "faq",
+      "status": "live",
+      "canonical_sources": [
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md",
+        "docs/CHEAT_SHEET.md"
+      ],
+      "audience": [
+        "evaluators",
+        "operators"
+      ],
+      "note": "High-signal questions and answers distilled from the supported operator docs."
     }
   ]
 }
