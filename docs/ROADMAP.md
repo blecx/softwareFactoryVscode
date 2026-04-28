@@ -5,9 +5,10 @@
 Active roadmap for the current documentation/readiness direction inside the
 released `2.6` guardrails.
 
-Use this page for high-level routing and current direction. Use umbrella issue
-`#163`, linked child issues/PRs, and `docs/README.md` for the detailed
-active-vs-historical classification of planning documents.
+Use this page for high-level routing and current direction. Use `docs/README.md`
+for the current active-vs-historical classification of planning documents, and
+use the closed umbrella issue `#163` plus its linked child issues/PRs for the
+completion record behind the documentation stabilization work.
 
 This page is the current high-level roadmap for `softwareFactoryVscode`.
 
@@ -30,21 +31,24 @@ The released `2.6` story remains intact:
 
 ## Active directions
 
-### 1. Finish documentation completion without rewriting history
+### 1. Preserve the completed documentation stabilization work without rewriting history
 
-The currently approved documentation-completion program is tracked under
-[umbrella issue `#163`](https://github.com/blecx/softwareFactoryVscode/issues/163).
+The documentation-completion program tracked under the now-closed
+[umbrella issue `#163`](https://github.com/blecx/softwareFactoryVscode/issues/163)
+is complete.
 
-The active direction for that queue is to:
+The current direction after that delivery is to:
 
 - keep public entrypoints easy to navigate;
-- add missing maintainer reference pages and discoverability aids;
-- classify older plans, mitigation notes, and closure reports honestly before
-  any archive move; and
-- prepare replacement navigation before archive or wiki-export cleanup slices.
+- preserve the maintainer reference pages and discoverability aids that were
+  added in that slice;
+- keep older plans, mitigation notes, and closure reports classified honestly;
+  and
+- treat any future archive or wiki-export cleanup as a separately approved
+  follow-on slice rather than silently reopening the completed queue.
 
-Use umbrella issue `#163`, its linked child issues, and the linked PRs for
-day-to-day sequencing details rather than turning this page into a backlog dump.
+Use umbrella issue `#163`, its linked child issues, and the linked PRs for the
+delivery record rather than turning this page into a live backlog dump.
 
 ### 2. Keep runtime/readiness work bounded by the current contract
 
