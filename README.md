@@ -109,6 +109,9 @@ For deeper maintainer and reference reading:
 - **Maintainer setup and repository context:** [Copilot Harness Model](docs/COPILOT-HARNESS-MODEL.md)
   and [GitHub repository setup guide](docs/setup-github-repository.md)
 - **Internal readiness contract:** [Internal Production Readiness Contract](docs/PRODUCTION-READINESS.md)
+- **Day-two operator runbooks:** [Monitoring](docs/ops/MONITORING.md),
+  [Incident Response](docs/ops/INCIDENT-RESPONSE.md), and
+  [Backup / Restore](docs/ops/BACKUP-RESTORE.md)
 
 Historical sequencing and migration plans remain available through
 `docs/README.md` when you need repository archaeology, but they are

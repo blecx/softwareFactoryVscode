@@ -834,6 +834,29 @@ def test_primary_docs_use_summary_plus_linking_for_distinct_roles():
     assert "for the full install/update/readiness authority" in cheat_sheet
 
 
+def test_overview_docs_route_to_operator_runbooks() -> None:
+    repo_root = Path(__file__).parent.parent
+    readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
+    cheat_sheet = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(encoding="utf-8")
+
+    assert "docs/ops/MONITORING.md" in readme
+    assert "docs/ops/INCIDENT-RESPONSE.md" in readme
+    assert "docs/ops/BACKUP-RESTORE.md" in readme
+
+    assert "When you move from overview to action" in handout
+    assert "ops/MONITORING.md" in handout
+    assert "ops/INCIDENT-RESPONSE.md" in handout
+    assert "ops/BACKUP-RESTORE.md" in handout
+
+    assert (
+        "When [`README.md`](../README.md) or [`HANDOUT.md`](HANDOUT.md)" in cheat_sheet
+    )
+    assert "ops/MONITORING.md" in cheat_sheet
+    assert "ops/INCIDENT-RESPONSE.md" in cheat_sheet
+    assert "ops/BACKUP-RESTORE.md" in cheat_sheet
+
+
 def test_docs_readme_routes_audiences_without_competing_authority():
     repo_root = Path(__file__).parent.parent
     docs_readme = (repo_root / "docs" / "README.md").read_text(encoding="utf-8")
