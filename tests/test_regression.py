@@ -975,7 +975,9 @@ def test_docs_wiki_map_defines_conservative_export_targets() -> None:
     assert "repo file paths remain the canonical documentation source" in wiki_map
     assert "Only material explicitly marked **Wiki-safe**" in wiki_map
     assert "Unlisted material stays repo-only" in wiki_map
-    assert "No actual wiki migration happens in this slice" in wiki_map
+    assert (
+        "The live wiki and every future resync pass must consume this map" in wiki_map
+    )
     assert "[`docs/README.md`](README.md) | `Home`" in wiki_map
     assert "WHY-SOFTWARE-FACTORY.md" in wiki_map
     assert "HANDOUT.md" in wiki_map
@@ -993,6 +995,61 @@ def test_docs_wiki_map_defines_conservative_export_targets() -> None:
     assert "WORK-ISSUE-WORKFLOW.md" in wiki_map
     assert "MULTI-WORKSPACE-MCP-ARCHITECTURE.md" in wiki_map
     assert "ADR-007-Multi-Workspace-and-Shared-Services.md" in wiki_map
+
+
+def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> None:
+    repo_root = Path(__file__).parent.parent
+    manifest = json.loads(
+        (repo_root / "manifests" / "wiki-projection-manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert manifest["schema_version"] == 1
+    assert manifest["publication_boundary"]["path"] == "docs/WIKI-MAP.md"
+    assert manifest["publication_boundary"]["audience"] == "repo-maintainer"
+    assert manifest["authority"]["wiki_role"] == "reader-facing projection"
+    assert (
+        manifest["authority"]["canonical_source"] == "repository docs and accepted ADRs"
+    )
+    assert manifest["authority"]["top_level_readme_policy"] == "repo-only"
+    assert manifest["page_chrome"]["requires_canonical_source"] is True
+    assert manifest["page_chrome"]["requires_last_synced_from"] is True
+    assert manifest["page_chrome"]["requires_projection_note"] is True
+    assert manifest["page_chrome"]["bootstrap_artifacts"] == [
+        "Home",
+        "_Sidebar",
+        "_Footer",
+    ]
+
+    page_names = [page["wiki_page"] for page in manifest["pages"]]
+    assert page_names == ["Home", "_Sidebar", "_Footer"]
+
+    home_page = manifest["pages"][0]
+    assert home_page["canonical_sources"] == ["docs/README.md"]
+
+    sidebar_page = manifest["pages"][1]
+    assert sidebar_page["canonical_sources"] == [
+        "docs/README.md",
+        "docs/WIKI-MAP.md",
+    ]
+    assert sidebar_page["route_groups"] == [
+        "Evaluate",
+        "Use and operate",
+        "Understand the architecture",
+    ]
+
+    footer_page = manifest["pages"][2]
+    assert footer_page["canonical_sources"] == [
+        "docs/WIKI-MAP.md",
+        "docs/architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md",
+    ]
+
+    flattened_sources = {
+        source for page in manifest["pages"] for source in page["canonical_sources"]
+    }
+    assert "README.md" not in flattened_sources
+    assert "docs/WORK-ISSUE-WORKFLOW.md" not in flattened_sources
 
 
 def test_docs_archive_index_routes_first_pass_historical_docs() -> None:

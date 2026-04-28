@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "publication_boundary": {
+    "path": "docs/WIKI-MAP.md",
+    "audience": "repo-maintainer",
+    "policy": "Only sources marked Wiki-safe in docs/WIKI-MAP.md may be projected into the live GitHub wiki."
+  },
+  "authority": {
+    "wiki_role": "reader-facing projection",
+    "canonical_source": "repository docs and accepted ADRs",
+    "top_level_readme_policy": "repo-only"
+  },
+  "page_chrome": {
+    "requires_canonical_source": true,
+    "requires_last_synced_from": true,
+    "requires_projection_note": true,
+    "bootstrap_artifacts": [
+      "Home",
+      "_Sidebar",
+      "_Footer"
+    ]
+  },
+  "pages": [
+    {
+      "wiki_page": "Home",
+      "page_type": "summary",
+      "status": "live",
+      "canonical_sources": [
+        "docs/README.md"
+      ],
+      "audience": [
+        "evaluators",
+        "operators",
+        "architecture-readers"
+      ],
+      "note": "Evaluator-first landing page derived from the documentation index."
+    },
+    {
+      "wiki_page": "_Sidebar",
+      "page_type": "navigation",
+      "status": "live",
+      "canonical_sources": [
+        "docs/README.md",
+        "docs/WIKI-MAP.md"
+      ],
+      "audience": [
+        "all"
+      ],
+      "route_groups": [
+        "Evaluate",
+        "Use and operate",
+        "Understand the architecture"
+      ],
+      "note": "Audience-first navigation that may point to canonical repo docs until deeper wiki pages are published."
+    },
+    {
+      "wiki_page": "_Footer",
+      "page_type": "authority-note",
+      "status": "live",
+      "canonical_sources": [
+        "docs/WIKI-MAP.md",
+        "docs/architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md"
+      ],
+      "audience": [
+        "all"
+      ],
+      "note": "Shared projection and authority reminder rendered on every published wiki page."
+    }
+  ]
+}
