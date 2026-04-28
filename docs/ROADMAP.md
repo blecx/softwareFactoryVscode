@@ -85,9 +85,10 @@ This page does **not** mean the repository is reopening or weakening:
 Historical or sequencing-heavy documents remain available when you need
 traceability, but they are not the default current roadmap:
 
-- [`HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md)
-- [`HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md)
-- [`MCP-RUNTIME-MITIGATION-PLAN.md`](MCP-RUNTIME-MITIGATION-PLAN.md)
+- [`archive/README.md`](archive/README.md) for the first-pass archive index and redirect path to archived top-level plans/reports
+- [`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md)
+- [`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md)
+- [`archive/MCP-RUNTIME-MITIGATION-PLAN.md`](archive/MCP-RUNTIME-MITIGATION-PLAN.md)
 - [`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`](architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md)
 - [`architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md`](architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md)
 

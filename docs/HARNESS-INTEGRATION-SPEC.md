@@ -8,7 +8,7 @@ See also:
 
 - `docs/architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md`
 - `docs/COPILOT-HARNESS-MODEL.md`
-- `docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`
+- `docs/archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`
 - `docs/INSTALL.md`
 
 ## Purpose
@@ -200,5 +200,5 @@ The mitigation and backlog documents record the migration rationale, the staged 
 
 See:
 
-- `docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`
-- `docs/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`
+- `docs/archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`
+- `docs/archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`
