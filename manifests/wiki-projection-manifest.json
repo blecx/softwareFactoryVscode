@@ -28,12 +28,18 @@
       "canonical_sources": [
         "docs/README.md"
       ],
+      "primary_routes": [
+        "Why Software Factory",
+        "Getting Started",
+        "Install and Update",
+        "Operator Handout"
+      ],
       "audience": [
         "evaluators",
         "operators",
         "architecture-readers"
       ],
-      "note": "Evaluator-first landing page derived from the documentation index."
+      "note": "Evaluator-first landing page derived from the documentation index and updated to route directly to the published onboarding pages."
     },
     {
       "wiki_page": "_Sidebar",
@@ -48,10 +54,11 @@
       ],
       "route_groups": [
         "Evaluate",
+        "Get started",
         "Use and operate",
         "Understand the architecture"
       ],
-      "note": "Audience-first navigation that may point to canonical repo docs until deeper wiki pages are published."
+      "note": "Audience-first navigation that routes to published onboarding pages first and falls back to canonical repo docs beyond the current wiki slice."
     },
     {
       "wiki_page": "_Footer",
@@ -65,6 +72,62 @@
         "all"
       ],
       "note": "Shared projection and authority reminder rendered on every published wiki page."
+    },
+    {
+      "wiki_page": "Why Software Factory",
+      "page_type": "orientation",
+      "status": "live",
+      "canonical_sources": [
+        "docs/WHY-SOFTWARE-FACTORY.md"
+      ],
+      "audience": [
+        "evaluators",
+        "operators"
+      ],
+      "note": "Public intent, goals, and non-goals overview projected from the canonical why-page."
+    },
+    {
+      "wiki_page": "Getting Started",
+      "page_type": "router",
+      "status": "live",
+      "canonical_sources": [
+        "docs/WHY-SOFTWARE-FACTORY.md",
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md"
+      ],
+      "primary_routes": [
+        "Install and Update",
+        "Operator Handout"
+      ],
+      "audience": [
+        "evaluators",
+        "operators"
+      ],
+      "note": "Wiki-native onboarding router built only from already wiki-safe evaluator and operator sources."
+    },
+    {
+      "wiki_page": "Install and Update",
+      "page_type": "installation-guide",
+      "status": "live",
+      "canonical_sources": [
+        "docs/INSTALL.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Condensed install/update projection that links back to the canonical long-form install authority."
+    },
+    {
+      "wiki_page": "Operator Handout",
+      "page_type": "operator-guide",
+      "status": "live",
+      "canonical_sources": [
+        "docs/HANDOUT.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Guided first-run operator flow projected from the canonical handout."
     }
   ]
 }
