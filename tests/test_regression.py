@@ -628,11 +628,13 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "heredoc-based Python command" in resolve_skill
 
 
-def test_chat_session_troubleshooting_report_records_program_closeout() -> None:
+def test_archived_chat_session_troubleshooting_report_preserves_program_closeout() -> (
+    None
+):
     repo_root = Path(__file__).parent.parent
-    report = (repo_root / "docs" / "CHAT-SESSION-TROUBLESHOOTING-REPORT.md").read_text(
-        encoding="utf-8"
-    )
+    report = (
+        repo_root / "docs" / "archive" / "CHAT-SESSION-TROUBLESHOOTING-REPORT.md"
+    ).read_text(encoding="utf-8")
 
     assert "# Chat session troubleshooting report" in report
     assert "umbrella issue `#61`" in report
@@ -650,22 +652,23 @@ def test_chat_session_troubleshooting_report_records_program_closeout() -> None:
     assert "scripts/noninteractive_gh.py" in report
 
 
-def test_historical_plans_and_reports_are_explicitly_labeled_before_any_archive_move() -> (
-    None
-):
+def test_archived_historical_plans_and_reports_preserve_labeled_content() -> None:
     repo_root = Path(__file__).parent.parent
     harness_plan = (
-        repo_root / "docs" / "HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md"
+        repo_root
+        / "docs"
+        / "archive"
+        / "HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md"
     ).read_text(encoding="utf-8")
     harness_backlog = (
-        repo_root / "docs" / "HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md"
+        repo_root / "docs" / "archive" / "HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md"
     ).read_text(encoding="utf-8")
     runtime_mitigation = (
-        repo_root / "docs" / "MCP-RUNTIME-MITIGATION-PLAN.md"
+        repo_root / "docs" / "archive" / "MCP-RUNTIME-MITIGATION-PLAN.md"
     ).read_text(encoding="utf-8")
-    report = (repo_root / "docs" / "CHAT-SESSION-TROUBLESHOOTING-REPORT.md").read_text(
-        encoding="utf-8"
-    )
+    report = (
+        repo_root / "docs" / "archive" / "CHAT-SESSION-TROUBLESHOOTING-REPORT.md"
+    ).read_text(encoding="utf-8")
     multi_workspace_plan = (
         repo_root
         / "docs"
@@ -694,6 +697,45 @@ def test_historical_plans_and_reports_are_explicitly_labeled_before_any_archive_
         "Historical sequencing plan with the ADR-008 rollout fulfilled on default branch"
         in multi_workspace_plan
     )
+
+
+def test_redirect_notes_remain_at_former_historical_doc_paths() -> None:
+    repo_root = Path(__file__).parent.parent
+    chat_report = (
+        repo_root / "docs" / "CHAT-SESSION-TROUBLESHOOTING-REPORT.md"
+    ).read_text(encoding="utf-8")
+    harness_plan = (
+        repo_root / "docs" / "HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md"
+    ).read_text(encoding="utf-8")
+    harness_backlog = (
+        repo_root / "docs" / "HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md"
+    ).read_text(encoding="utf-8")
+    runtime_plan = (repo_root / "docs" / "MCP-RUNTIME-MITIGATION-PLAN.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "# Archived: Chat session troubleshooting report" in chat_report
+    assert "archive/CHAT-SESSION-TROUBLESHOOTING-REPORT.md" in chat_report
+    assert "WORK-ISSUE-WORKFLOW.md" in chat_report
+    assert "archive/README.md" in chat_report
+
+    assert "# Archived: Harness Namespace Migration Mitigation Plan" in harness_plan
+    assert "archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md" in harness_plan
+    assert "HARNESS-INTEGRATION-SPEC.md" in harness_plan
+    assert "INSTALL.md" in harness_plan
+    assert "architecture/ADR-INDEX.md" in harness_plan
+
+    assert "# Archived: Harness Namespace Implementation Backlog" in harness_backlog
+    assert "archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md" in harness_backlog
+    assert "HARNESS-INTEGRATION-SPEC.md" in harness_backlog
+    assert "INSTALL.md" in harness_backlog
+    assert "archive/README.md" in harness_backlog
+
+    assert "# Archived: MCP Runtime Mitigation Plan" in runtime_plan
+    assert "archive/MCP-RUNTIME-MITIGATION-PLAN.md" in runtime_plan
+    assert "PRODUCTION-READINESS.md" in runtime_plan
+    assert "PRODUCTION-READINESS-PLAN.md" in runtime_plan
+    assert "architecture/ADR-INDEX.md" in runtime_plan
 
 
 def test_setup_repo_doc_matches_current_ci_checks():
@@ -885,6 +927,7 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "ROADMAP.md" in docs_readme
     assert "https://github.com/blecx/softwareFactoryVscode/issues/163" in docs_readme
     assert "PRODUCTION-READINESS-PLAN.md" in docs_readme
+    assert "archive/README.md" in docs_readme
     assert "## Planning document classification matrix" in docs_readme
     assert (
         "Accepted ADRs and current contract documents are intentionally not listed"
@@ -896,9 +939,19 @@ def test_docs_readme_routes_audiences_without_competing_authority():
         "Active supporting plan |" in docs_readme
     )
     assert (
-        "[`HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`]"
-        "(HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical "
+        "[`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`]"
+        "(archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical "
         "sequencing |" in docs_readme
+    )
+    assert (
+        "[`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`]"
+        "(archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) | Historical "
+        "sequencing |" in docs_readme
+    )
+    assert (
+        "[`archive/MCP-RUNTIME-MITIGATION-PLAN.md`]"
+        "(archive/MCP-RUNTIME-MITIGATION-PLAN.md) | Historical sequencing |"
+        in docs_readme
     )
     assert (
         "[`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`]"
@@ -906,7 +959,26 @@ def test_docs_readme_routes_audiences_without_competing_authority():
         "sequencing |" in docs_readme
     )
     assert "## Historical and reference material" in docs_readme
+    assert "archive/CHAT-SESSION-TROUBLESHOOTING-REPORT.md" in docs_readme
     assert "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md" in docs_readme
+
+
+def test_docs_archive_index_routes_first_pass_historical_docs() -> None:
+    repo_root = Path(__file__).parent.parent
+    archive_readme = (repo_root / "docs" / "archive" / "README.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "# Documentation archive" in archive_readme
+    assert "traceability" in archive_readme
+    assert "not a competing current-authority surface" in archive_readme
+    assert "../README.md" in archive_readme
+    assert "../ROADMAP.md" in archive_readme
+    assert "CHAT-SESSION-TROUBLESHOOTING-REPORT.md" in archive_readme
+    assert "HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md" in archive_readme
+    assert "HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md" in archive_readme
+    assert "MCP-RUNTIME-MITIGATION-PLAN.md" in archive_readme
+    assert "Historical architecture plans under [`../architecture/`]" in archive_readme
 
 
 def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
@@ -1022,6 +1094,8 @@ def test_docs_roadmap_separates_current_direction_from_historical_plans():
     assert "PRODUCTION-READINESS.md" in roadmap
     assert "PRODUCTION-READINESS-PLAN.md" in roadmap
     assert "not the default current roadmap" in roadmap
+    assert "archive/README.md" in roadmap
+    assert "archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md" in roadmap
     assert "MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md" in roadmap
 
 

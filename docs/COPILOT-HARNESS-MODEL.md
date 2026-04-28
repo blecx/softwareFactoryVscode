@@ -12,7 +12,7 @@ See also:
 - `docs/architecture/ADR-012-Copilot-First-Namespaced-Harness-Integration.md`
 - `docs/architecture/ADR-004-Host-Project-Isolation.md`
 - `docs/HARNESS-INTEGRATION-SPEC.md`
-- `docs/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`
+- `docs/archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`
 - `docs/INSTALL.md`
 
 ## What `softwareFactoryVscode` is
