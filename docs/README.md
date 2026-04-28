@@ -47,6 +47,7 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 - [Umbrella issue `#163`](https://github.com/blecx/softwareFactoryVscode/issues/163) — approved documentation completion program and remaining child slices.
 - [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md) — current shipped readiness contract.
 - [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) — current readiness sequencing plan within the released guardrails.
+- [`archive/README.md`](archive/README.md) — archive index for clearly historical top-level plans and reports that are no longer part of the default current reader path.
 
 ### Planning document classification matrix
 
@@ -58,9 +59,9 @@ roadmap/plan status entries.
 | --- | --- | --- |
 | [`ROADMAP.md`](ROADMAP.md) | Active roadmap | Current high-level direction, routing, and boundaries for active documentation/readiness work. |
 | [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | Active supporting plan | Current readiness sequencing within the shipped `2.6` guardrails and the scope defined by `PRODUCTION-READINESS.md`. |
-| [`HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical sequencing | Trace the delivered namespace migration and mitigation work without treating it as a current execution plan. |
-| [`HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) | Historical sequencing | Review the completed migration backlog and phased delivery notes for repository archaeology only. |
-| [`MCP-RUNTIME-MITIGATION-PLAN.md`](MCP-RUNTIME-MITIGATION-PLAN.md) | Historical sequencing | Trace the closed runtime/readiness mitigation program and its closeout context. |
+| [`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical sequencing | Trace the delivered namespace migration and mitigation work without treating it as a current execution plan. |
+| [`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) | Historical sequencing | Review the completed migration backlog and phased delivery notes for repository archaeology only. |
+| [`archive/MCP-RUNTIME-MITIGATION-PLAN.md`](archive/MCP-RUNTIME-MITIGATION-PLAN.md) | Historical sequencing | Trace the closed runtime/readiness mitigation program and its closeout context. |
 | [`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`](architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md) | Historical sequencing | Review runtime-manager rollout history, delivered baseline notes, and deferred-scope markers. |
 | [`architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md`](architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md) | Historical sequencing | Review the fulfilled ADR-008 rollout sequencing and practical-baseline hardening history. |
 
@@ -68,8 +69,9 @@ roadmap/plan status entries.
 
 Start with the audience routes above before opening sequencing/history docs.
 
-- [`CHAT-SESSION-TROUBLESHOOTING-REPORT.md`](CHAT-SESSION-TROUBLESHOOTING-REPORT.md) — troubleshooting and closure reference.
-- [`HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) — namespace migration sequencing history.
-- [`HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) — migration backlog and phased delivery notes.
-- [`MCP-RUNTIME-MITIGATION-PLAN.md`](MCP-RUNTIME-MITIGATION-PLAN.md) — runtime mitigation planning reference.
+- [`archive/README.md`](archive/README.md) — archive index for the first pass of archived top-level plans and reports.
+- [`archive/CHAT-SESSION-TROUBLESHOOTING-REPORT.md`](archive/CHAT-SESSION-TROUBLESHOOTING-REPORT.md) — troubleshooting and closure reference.
+- [`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) — namespace migration sequencing history.
+- [`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) — migration backlog and phased delivery notes.
+- [`archive/MCP-RUNTIME-MITIGATION-PLAN.md`](archive/MCP-RUNTIME-MITIGATION-PLAN.md) — runtime mitigation planning reference.
 - [`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`](architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md) and [`architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md`](architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md) — implementation sequencing history that remains subordinate to accepted ADRs.
