@@ -43,11 +43,11 @@ To use the Software Factory, you need the following:
 
 **Configuring Copilot for the Factory:**
 
-1. **VS Code `1.116+`** — GitHub Copilot is built in. Open the Copilot status item, choose `Use AI Features`, and sign in.
-2. **Older VS Code releases** — install the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) first, then sign in.
-3. Sign in with a GitHub account that has Copilot access. If you do not already have a paid plan, eligible users can be enrolled in **Copilot Free** during setup.
-4. _(Optional for custom endpoint/model setups)_ If your environment layers a custom endpoint on top of Copilot, configure `github.copilot.advanced` in `settings.json` or use a compatible proxy setup after sign-in.
-5. _(Optional)_ Install the [GitHub Pull Requests and Issues extension](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-pull-request-github) only if you want GitHub PR/issue UI inside VS Code. It is separate from Copilot and not required for the Factory's core AI workflows.
+- **VS Code `1.116+`** — GitHub Copilot is built in. Open the Copilot status item, choose `Use AI Features`, and sign in.
+- **Older VS Code releases** — install the [GitHub Copilot extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot) first, then sign in.
+- Sign in with a GitHub account that has Copilot access. If you do not already have a paid plan, eligible users can be enrolled in **Copilot Free** during setup.
+- The [GitHub Pull Requests and Issues extension](https://marketplace.visualstudio.com/items?itemName=GitHub.vscode-pull-request-github) remains optional and is not required for the Factory's core AI workflows.
+- For the full editor-side setup details, version-specific caveats, and custom endpoint/model notes, continue with [`docs/INSTALL.md`](docs/INSTALL.md) or the guided [`docs/HANDOUT.md`](docs/HANDOUT.md).
 
 For the official editor-side guidance behind this version split, see the [VS Code 1.116 release notes](https://code.visualstudio.com/updates/v1_116) and the [Copilot setup guide](https://code.visualstudio.com/docs/copilot/setup).
 
@@ -83,13 +83,20 @@ If you open only one follow-up page after this README, start with the
 maintainers, and architecture reviewers to the right surface without making
 historical sequencing plans the default first stop.
 
+The four primary docs split responsibilities on purpose:
+
+- **This `README.md`** — project/release orientation and high-level routing.
+- **[`docs/INSTALL.md`](docs/INSTALL.md)** — full install/update/readiness authority.
+- **[`docs/HANDOUT.md`](docs/HANDOUT.md)** — guided first-run operator walkthrough.
+- **[`docs/CHEAT_SHEET.md`](docs/CHEAT_SHEET.md)** — terse task and command reference.
+
 Start with the route that matches your goal:
 
 - **Understand the project intent and non-goals:** [Why Software Factory exists](docs/WHY-SOFTWARE-FACTORY.md)
 - **See the active/current roadmap summary:** [Active roadmap summary](docs/ROADMAP.md)
-- **Install or refresh a workspace:** [Installation Guide](docs/INSTALL.md)
-- **Get a guided onboarding pass:** [User Handout](docs/HANDOUT.md)
-- **Jump to the short operational version:** [Cheat Sheet](docs/CHEAT_SHEET.md)
+- **Install or refresh a workspace with full setup/readiness detail:** [Installation Guide](docs/INSTALL.md)
+- **Get a guided first-run operator pass:** [User Handout](docs/HANDOUT.md)
+- **Jump to the short day-to-day task/command version:** [Cheat Sheet](docs/CHEAT_SHEET.md)
 - **Work issues through the canonical Copilot flow:** [Issue Workflow](docs/WORK-ISSUE-WORKFLOW.md)
 
 For deeper maintainer and reference reading:
