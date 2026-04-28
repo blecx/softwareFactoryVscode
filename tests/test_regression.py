@@ -989,6 +989,11 @@ def test_docs_wiki_map_defines_conservative_export_targets() -> None:
     assert "Day-to-Day Operator Loop" in wiki_map
     assert "Examples" in wiki_map
     assert "FAQ" in wiki_map
+    assert "Operator Cheat Sheet" in wiki_map
+    assert "Internal Production Readiness Contract" in wiki_map
+    assert "Operator Runbook - Monitoring" in wiki_map
+    assert "Operator Runbook - Incident Response" in wiki_map
+    assert "Operator Runbook - Backup and Restore" in wiki_map
     assert "CHEAT_SHEET.md" in wiki_map
     assert "PRODUCTION-READINESS.md" in wiki_map
     assert "ops/MONITORING.md" in wiki_map
@@ -1042,6 +1047,11 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "Day-to-Day Operator Loop",
         "Examples",
         "FAQ",
+        "Operator Cheat Sheet",
+        "Operator Runbook - Monitoring",
+        "Operator Runbook - Incident Response",
+        "Operator Runbook - Backup and Restore",
+        "Internal Production Readiness Contract",
     ]
 
     home_page = manifest["pages"][0]
@@ -1140,6 +1150,27 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "docs/INSTALL.md",
         "docs/HANDOUT.md",
         "docs/CHEAT_SHEET.md",
+    ]
+
+    cheat_sheet_page = manifest["pages"][13]
+    assert cheat_sheet_page["canonical_sources"] == ["docs/CHEAT_SHEET.md"]
+
+    monitoring_runbook_page = manifest["pages"][14]
+    assert monitoring_runbook_page["canonical_sources"] == ["docs/ops/MONITORING.md"]
+
+    incident_runbook_page = manifest["pages"][15]
+    assert incident_runbook_page["canonical_sources"] == [
+        "docs/ops/INCIDENT-RESPONSE.md"
+    ]
+
+    backup_restore_runbook_page = manifest["pages"][16]
+    assert backup_restore_runbook_page["canonical_sources"] == [
+        "docs/ops/BACKUP-RESTORE.md"
+    ]
+
+    readiness_contract_page = manifest["pages"][17]
+    assert readiness_contract_page["canonical_sources"] == [
+        "docs/PRODUCTION-READINESS.md"
     ]
 
     flattened_sources = {
