@@ -42,7 +42,7 @@
         "operators",
         "architecture-readers"
       ],
-      "note": "Evaluator-first landing page derived from the documentation index and updated to route directly to the published onboarding pages."
+      "note": "Evaluator-first landing page derived from the documentation index and updated to route directly to the published onboarding, tutorial, and operator-reference pages."
     },
     {
       "wiki_page": "_Sidebar",
@@ -62,7 +62,7 @@
         "Use and operate",
         "Understand the architecture"
       ],
-      "note": "Audience-first navigation that routes to published onboarding pages first and falls back to canonical repo docs beyond the current wiki slice."
+      "note": "Audience-first navigation that routes to published onboarding, tutorial, and operator-reference pages first and falls back to canonical repo docs beyond the current wiki slice."
     },
     {
       "wiki_page": "_Footer",
@@ -153,7 +153,7 @@
         "evaluators",
         "operators"
       ],
-      "note": "Scenario-driven landing page for the published tutorial track, examples, and FAQ." 
+      "note": "Scenario-driven landing page for the published tutorial track, examples, and FAQ."
     },
     {
       "wiki_page": "Install a New Project",
@@ -224,6 +224,67 @@
         "operators"
       ],
       "note": "High-signal questions and answers distilled from the supported operator docs."
+    },
+    {
+      "wiki_page": "Operator Cheat Sheet",
+      "page_type": "operator-reference",
+      "status": "live",
+      "canonical_sources": [
+        "docs/CHEAT_SHEET.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Dense operator quick-reference page projected from the canonical cheat sheet."
+    },
+    {
+      "wiki_page": "Operator Runbook - Monitoring",
+      "page_type": "runbook",
+      "status": "live",
+      "canonical_sources": [
+        "docs/ops/MONITORING.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Machine-readable monitoring and diagnostics runbook projected from the canonical monitoring guide."
+    },
+    {
+      "wiki_page": "Operator Runbook - Incident Response",
+      "page_type": "runbook",
+      "status": "live",
+      "canonical_sources": [
+        "docs/ops/INCIDENT-RESPONSE.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Day-two incident-response decision tree projected from the canonical incident-response guide."
+    },
+    {
+      "wiki_page": "Operator Runbook - Backup and Restore",
+      "page_type": "runbook",
+      "status": "live",
+      "canonical_sources": [
+        "docs/ops/BACKUP-RESTORE.md"
+      ],
+      "audience": [
+        "operators"
+      ],
+      "note": "Bounded backup/restore recovery runbook projected from the canonical backup-and-restore guide."
+    },
+    {
+      "wiki_page": "Internal Production Readiness Contract",
+      "page_type": "readiness-contract",
+      "status": "live",
+      "canonical_sources": [
+        "docs/PRODUCTION-READINESS.md"
+      ],
+      "audience": [
+        "operators",
+        "reference-readers"
+      ],
+      "note": "Operator-facing production-boundary and sign-off contract projected from the canonical readiness authority."
     }
   ]
 }
