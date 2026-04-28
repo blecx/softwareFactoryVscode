@@ -913,6 +913,7 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "CHEAT_SHEET.md" in docs_readme
     assert "WORK-ISSUE-WORKFLOW.md" in docs_readme
     assert "setup-github-repository.md" in docs_readme
+    assert "WIKI-MAP.md" in docs_readme
     assert "maintainer/GUARDRAILS.md" in docs_readme
     assert "maintainer/AGENT-ENFORCEMENT-MAP.md" in docs_readme
     assert "maintainer/PROMPT-WORKFLOWS.md" in docs_readme
@@ -961,6 +962,37 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "## Historical and reference material" in docs_readme
     assert "archive/CHAT-SESSION-TROUBLESHOOTING-REPORT.md" in docs_readme
     assert "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md" in docs_readme
+
+
+def test_docs_wiki_map_defines_conservative_export_targets() -> None:
+    repo_root = Path(__file__).parent.parent
+    wiki_map = (repo_root / "docs" / "WIKI-MAP.md").read_text(encoding="utf-8")
+
+    assert "# Wiki export map" in wiki_map
+    assert "stable source-to-target map" in wiki_map
+    assert "not a competing authority surface" in wiki_map
+    assert "accepted ADRs remain the normative architecture source" in wiki_map
+    assert "repo file paths remain the canonical documentation source" in wiki_map
+    assert "Only material explicitly marked **Wiki-safe**" in wiki_map
+    assert "Unlisted material stays repo-only" in wiki_map
+    assert "No actual wiki migration happens in this slice" in wiki_map
+    assert "[`docs/README.md`](README.md) | `Home`" in wiki_map
+    assert "WHY-SOFTWARE-FACTORY.md" in wiki_map
+    assert "HANDOUT.md" in wiki_map
+    assert "INSTALL.md" in wiki_map
+    assert "CHEAT_SHEET.md" in wiki_map
+    assert "PRODUCTION-READINESS.md" in wiki_map
+    assert "ops/MONITORING.md" in wiki_map
+    assert "architecture/ADR-INDEX.md" in wiki_map
+    assert "Accepted `docs/architecture/ADR-*.md` entries" in wiki_map
+    assert "[`README.md`](../README.md) | Repo-only" in wiki_map
+    assert "ROADMAP.md" in wiki_map
+    assert "PRODUCTION-READINESS-PLAN.md" in wiki_map
+    assert "docs/maintainer/*.md" in wiki_map
+    assert "docs/archive/*.md" in wiki_map
+    assert "WORK-ISSUE-WORKFLOW.md" in wiki_map
+    assert "MULTI-WORKSPACE-MCP-ARCHITECTURE.md" in wiki_map
+    assert "ADR-007-Multi-Workspace-and-Shared-Services.md" in wiki_map
 
 
 def test_docs_archive_index_routes_first_pass_historical_docs() -> None:

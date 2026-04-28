@@ -27,6 +27,7 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 
 - [`WORK-ISSUE-WORKFLOW.md`](WORK-ISSUE-WORKFLOW.md) — canonical issue → PR → merge workflow.
 - [`setup-github-repository.md`](setup-github-repository.md) — repository protection, branch, and CI setup guidance.
+- [`WIKI-MAP.md`](WIKI-MAP.md) — stable wiki export policy and target map for later GitHub Wiki publication work, including which current docs remain repo-only.
 - [`HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md) — install/update contract and ownership boundaries.
 - [`COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md) — high-level explanation of why this repository exists and how the Factory fits into a host repo.
 - [`maintainer/GUARDRAILS.md`](maintainer/GUARDRAILS.md) — maintainer-facing catalog of current guardrail families, enforcement surfaces, and where to look before changing workflow behavior.
