@@ -28,6 +28,7 @@ accepted ADRs remain the normative architecture source, and repo file paths rema
 | --- | --- | --- | --- |
 | [`docs/README.md`](README.md) | `Home` | All readers | Stable audience router for the documentation set. |
 | [`docs/WHY-SOFTWARE-FACTORY.md`](WHY-SOFTWARE-FACTORY.md) | `Why Software Factory` | New readers / evaluators | Public intent/goals/non-goals overview without maintainer-only internals. |
+| Composite onboarding projection assembled from [`docs/WHY-SOFTWARE-FACTORY.md`](WHY-SOFTWARE-FACTORY.md), [`docs/INSTALL.md`](INSTALL.md), and [`docs/HANDOUT.md`](HANDOUT.md) | `Getting Started` | New readers / operators | Concise wiki-native router for first-run onboarding assembled only from already wiki-safe evaluator/operator sources. |
 | [`docs/HANDOUT.md`](HANDOUT.md) | `Operator Handout` | Operators | Guided first-run path for the supported operator workflow. |
 | [`docs/INSTALL.md`](INSTALL.md) | `Install and Update` | Operators | Canonical install/update authority for day-to-day use. |
 | [`docs/CHEAT_SHEET.md`](CHEAT_SHEET.md) | `Operator Cheat Sheet` | Repeat operators | Short operational command/reference surface. |

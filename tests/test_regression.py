@@ -980,6 +980,7 @@ def test_docs_wiki_map_defines_conservative_export_targets() -> None:
     )
     assert "[`docs/README.md`](README.md) | `Home`" in wiki_map
     assert "WHY-SOFTWARE-FACTORY.md" in wiki_map
+    assert "Getting Started" in wiki_map
     assert "HANDOUT.md" in wiki_map
     assert "INSTALL.md" in wiki_map
     assert "CHEAT_SHEET.md" in wiki_map
@@ -1023,10 +1024,22 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
     ]
 
     page_names = [page["wiki_page"] for page in manifest["pages"]]
-    assert page_names == ["Home", "_Sidebar", "_Footer"]
+    assert page_names[:3] == ["Home", "_Sidebar", "_Footer"]
+    assert page_names[3:] == [
+        "Why Software Factory",
+        "Getting Started",
+        "Install and Update",
+        "Operator Handout",
+    ]
 
     home_page = manifest["pages"][0]
     assert home_page["canonical_sources"] == ["docs/README.md"]
+    assert home_page["primary_routes"] == [
+        "Why Software Factory",
+        "Getting Started",
+        "Install and Update",
+        "Operator Handout",
+    ]
 
     sidebar_page = manifest["pages"][1]
     assert sidebar_page["canonical_sources"] == [
@@ -1035,6 +1048,7 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
     ]
     assert sidebar_page["route_groups"] == [
         "Evaluate",
+        "Get started",
         "Use and operate",
         "Understand the architecture",
     ]
@@ -1044,6 +1058,26 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "docs/WIKI-MAP.md",
         "docs/architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md",
     ]
+
+    why_page = manifest["pages"][3]
+    assert why_page["canonical_sources"] == ["docs/WHY-SOFTWARE-FACTORY.md"]
+
+    getting_started_page = manifest["pages"][4]
+    assert getting_started_page["canonical_sources"] == [
+        "docs/WHY-SOFTWARE-FACTORY.md",
+        "docs/INSTALL.md",
+        "docs/HANDOUT.md",
+    ]
+    assert getting_started_page["primary_routes"] == [
+        "Install and Update",
+        "Operator Handout",
+    ]
+
+    install_page = manifest["pages"][5]
+    assert install_page["canonical_sources"] == ["docs/INSTALL.md"]
+
+    handout_page = manifest["pages"][6]
+    assert handout_page["canonical_sources"] == ["docs/HANDOUT.md"]
 
     flattened_sources = {
         source for page in manifest["pages"] for source in page["canonical_sources"]
