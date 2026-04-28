@@ -2,6 +2,11 @@
 
 A quick operator reference for the current namespace-first runtime model.
 
+Use this page when the install already exists and you want the shortest
+task/command lookup. For the first-time guided path, see
+[`HANDOUT.md`](HANDOUT.md); for the full install/update/readiness authority,
+see [`INSTALL.md`](INSTALL.md).
+
 ## 📋 VS Code tasks you will actually use
 
 Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
@@ -16,35 +21,42 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
 
 ## 🤖 AI setup quick note
 
-- **VS Code `1.116+`** — GitHub Copilot is built in; sign in and choose `Use AI Features`.
-- **Older VS Code releases** — install the GitHub Copilot extension first.
-- **All versions** — a GitHub account with Copilot access (paid plan or Copilot Free) is still required.
-- **GitHub Pull Requests and Issues** is optional and only needed for PR/issues UI inside VS Code.
+For first-time editor setup, use [`INSTALL.md`](INSTALL.md) or
+[`HANDOUT.md`](HANDOUT.md). Quick reminder: **VS Code `1.116+`** ships GitHub
+Copilot built in, **Older VS Code releases** still need the GitHub Copilot
+extension, **All versions** still require Copilot access (paid plan or
+Copilot Free), and **GitHub Pull Requests and Issues** is optional.
 
 ## 🚦 Immediate LLM quota policy
 
-- The immediate LLM limiter now chooses a shared workspace quota bucket from the active provider/model family instead of hard-coding one ultra-conservative global default.
-- This section documents the bounded immediate-repair baseline from umbrella `#139`; the long-term multi-requester quota-governance contract now lives in `docs/architecture/ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md` and `factory_runtime/agents/tooling/quota_governance.py`.
-- Current GitHub Models fallbacks are intentionally modest and split into a shared **70% foreground lane / 30% reserve lane**:
-  - `gpt-4o-mini` / `gpt-4.1-mini` families → `0.50 RPS` ceiling (`0.35` foreground / `0.15` reserve)
-  - `gpt-4o` / `gpt-4.1` families → `0.30 RPS` ceiling (`0.21` foreground / `0.09` reserve)
-  - `o1` / `o3` / `o4` reasoning families → `0.15 RPS` ceiling (`0.105` foreground / `0.045` reserve)
-- Override the shared ceiling only when you need a stricter local cap:
+This page keeps the short operator version; the long-term quota-governance
+contract lives in
+`docs/architecture/ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md`
+and `factory_runtime/agents/tooling/quota_governance.py`.
+
+- The immediate LLM limiter chooses a shared workspace quota bucket from the
+  active provider/model family instead of hard-coding one ultra-conservative
+  global default.
+- Current GitHub Models fallbacks are intentionally modest and split into a
+  shared **70% foreground lane / 30% reserve lane**:
+  - `gpt-4o-mini` / `gpt-4.1-mini` families → `0.50 RPS` ceiling (`0.35`
+    foreground / `0.15` reserve)
+  - `gpt-4o` / `gpt-4.1` families → `0.30 RPS` ceiling (`0.21` foreground /
+    `0.09` reserve)
+  - `o1` / `o3` / `o4` reasoning families → `0.15 RPS` ceiling (`0.105`
+    foreground / `0.045` reserve)
+- Override only when you need a stricter local cap:
   - `WORK_ISSUE_QUOTA_CEILING_RPS`
   - `WORK_ISSUE_FOREGROUND_SHARE`
   - `WORK_ISSUE_RESERVE_SHARE`
-- `#141` layers a workspace-scoped quota broker on top of that same shared baseline. Live parent-agent and subagent LLM clients now enter one brokered admission path that reserves both request-rate slots and shared provider/model-family concurrency leases before an outbound provider call is sent.
-- `#142` extends that broker with requester-lineage fairness and shared provider-feedback handling. Parent-run LLM clients now carry their `run_id` into quota admission, subagents consume the same parent lineage instead of opening independent provider budget, and queued parent-run / interactive waiters take priority over queued child/background traffic when shared capacity returns.
-- Child fan-out is intentionally bounded: one parent lineage can hold only one active shared subagent concurrency lease at a time, so a burst of child calls cannot quietly multiply into unrelated provider entitlement.
-- The broker still stores its shared state under `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json`, guarded by `.copilot/softwareFactoryVscode/.tmp/api-throttle.lock`, so a fresh client instance cannot quietly sprint past the shared budget or bypass the shared in-flight lease ceiling.
-- Current default shared concurrency lease ceilings are intentionally conservative: GitHub mini buckets default to `2` shared in-flight leases, while the other current GitHub buckets default to `1`. Override them only when you have a measured reason:
   - `WORK_ISSUE_CONCURRENCY_LEASE_LIMIT`
-- Provider `Retry-After` / `429` feedback now lands in a shared provider/model-family/lane scope, so every requester in that budget observes the same cooldown instead of only the role that first triggered the backoff.
-- `#143` adds operator-visible load/saturation telemetry for the long-term brokered architecture. `request_diagnostics.summary` now exposes `lease_grant_count`, `lease_denial_count`, `lease_wait_event_count`, `saturation_event_count`, `waiter_count`, `max_waiter_count`, `saturated_lease_scope_count`, and `oldest_waiter_seconds_max` so contention can be audited without inventing a second monitoring stack.
-- The long-term contract keeps those shared lanes as delegated workspace/run/requester budget partitions, not per-process entitlements and not a second runtime-truth surface.
-- Startup diagnostics now expose `request_quota_policy`, `role_request_policies`, and `request_diagnostics` via `LLMClientFactory.get_startup_report()` so operators can confirm the effective bucket (including `concurrency_lease_limit`) and see whether time is being burned in queue wait, upstream processing, retry-after hints, shared cooldown win dows, or fairness protections such as `priority_wait_event_count` / `subagent_parallelism_cap_hits`.
-- `request_diagnostics.channels` now include requester-class evidence (`last_requester_class`, `last_lineage_id`, `requester_class_counts`), while `request_diagnostics.shared_scopes` and `request_diagnostics.concurrency_leases` expose the shared feedback scope and lineage-fairness lease counters directly, including `max_waiter_count`, `oldest_waiter_seconds`, `lease_denial_count`, `saturation_event_count`, `saturated`, and `saturation_ratio`.
-- `scripts/work-issue.py` now prints the same limiter summary at startup and after execution, including work-issue retry/backoff totals for the current run.
+- Shared broker state remains in `.copilot/softwareFactoryVscode/.tmp/api-throttle-state.json`
+  and `.copilot/softwareFactoryVscode/.tmp/api-throttle.lock`.
+- Startup diagnostics expose `request_quota_policy`, `role_request_policies`,
+  and `request_diagnostics` through `LLMClientFactory.get_startup_report()`.
+- For the deeper requester-lineage fairness, cooldown sharing, and saturation
+  telemetry details, use `ADR-015` and the implementation module rather than
+  treating this cheat sheet as the authority surface.
 
 ## 💻 Lifecycle commands
 
@@ -210,7 +222,9 @@ python3 scripts/verify_factory_install.py --target ../my-target-project --runtim
 ## ✅ Readiness closeout evidence
 
 Use this bundle when a closeout note needs reproducible proof for the current
-baseline:
+supported baseline. For the fuller closeout snapshot, deferred-scope context,
+and sign-off discipline, see [`INSTALL.md`](INSTALL.md) and
+[`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md).
 
 ```bash
 ./.venv/bin/pytest tests/test_regression.py -v

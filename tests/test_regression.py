@@ -727,6 +727,11 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     repo_root = Path(__file__).parent.parent
     install_doc = (repo_root / "docs" / "INSTALL.md").read_text(encoding="utf-8")
 
+    assert (
+        "Use this guide when you need the full install/update/readiness authority."
+        in install_doc
+    )
+    assert "This page keeps the long-form baseline in one place" in install_doc
     assert "## Supported practical baseline (what this guide promises)" in install_doc
     assert (
         "## Shared multi-tenant promotion gate (how to read release/docs status)"
@@ -799,7 +804,34 @@ def test_readme_tracks_version_aware_copilot_setup():
     assert "Copilot Free" in readme
     assert "GitHub Pull Requests and Issues extension" in readme
     assert "not required for Copilot chat, inline suggestions, or agents" in readme
+    assert "The four primary docs split responsibilities on purpose:" in readme
+    assert "project/release orientation and high-level routing" in readme
+    assert "guided first-run operator walkthrough" in readme
+    assert "terse task and command reference" in readme
     assert "promoted Docker E2E runtime proof lane" in readme
+
+
+def test_primary_docs_use_summary_plus_linking_for_distinct_roles():
+    repo_root = Path(__file__).parent.parent
+    readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    install_doc = (repo_root / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+    handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
+    cheat_sheet = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(encoding="utf-8")
+
+    assert "full install/update/readiness authority" in readme
+    assert (
+        "Use this guide when you need the full install/update/readiness authority."
+        in install_doc
+    )
+    assert "This handout is the guided first-run path" in handout
+    assert "summarizes the deeper install/update/readiness detail" in handout
+    assert "points repeat operators to" in handout
+    assert (
+        "Use this page when the install already exists and you want the shortest"
+        in cheat_sheet
+    )
+    assert "For the first-time guided path" in cheat_sheet
+    assert "for the full install/update/readiness authority" in cheat_sheet
 
 
 def test_docs_readme_routes_audiences_without_competing_authority():
@@ -1079,7 +1111,11 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     repo_root = Path(__file__).parent.parent
     handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
     cheat_sheet = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(encoding="utf-8")
+    normalized_handout = " ".join(handout.split())
+    normalized_cheat_sheet = " ".join(cheat_sheet.split())
 
+    assert "guided first-run path" in handout
+    assert "CHEAT_SHEET.md" in handout
     assert "software-factory.code-workspace" in handout
     assert "factory_stack.py preflight" in handout
     assert "factory_stack.py start --build" in handout
@@ -1087,7 +1123,7 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "workspace.code-workspace" not in handout
     assert "automatically start the background task" not in handout
     assert "advanced groundwork" in handout
-    assert "current default branch now meets this threshold" in handout
+    assert "current default branch now meets this threshold" in normalized_handout
     assert "VS Code `1.116+`" in handout
     assert "GitHub Pull Requests and Issues" in handout
     assert "same manager-backed readiness vocabulary" in handout
@@ -1102,6 +1138,9 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "Still deferred after this readiness pass:" in handout
     assert "dynamic profile expansion during a running prompt" in handout
 
+    assert "shortest task/command lookup" in normalized_cheat_sheet
+    assert "HANDOUT.md" in cheat_sheet
+    assert "INSTALL.md" in cheat_sheet
     assert "factory_stack.py activate" in cheat_sheet
     assert "factory_stack.py preflight" in cheat_sheet
     assert "refreshes generated runtime artifacts" in cheat_sheet
@@ -1111,7 +1150,7 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "PROJECT_WORKSPACE_ID" in cheat_sheet
     assert "stale registry data" not in cheat_sheet
     assert "advanced groundwork" in cheat_sheet
-    assert "current default branch now meets this threshold" in cheat_sheet
+    assert "current default branch now meets this threshold" in normalized_cheat_sheet
     assert "VS Code `1.116+`" in cheat_sheet
     assert "GitHub Pull Requests and Issues" in cheat_sheet
     assert "same manager-backed readiness vocabulary" in cheat_sheet

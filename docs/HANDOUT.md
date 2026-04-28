@@ -4,6 +4,12 @@ Welcome to the **Software Factory for VS Code**. The current supported model is 
 
 > **Architecture note:** The supported install contract is namespace-first: the harness lives under `.copilot/softwareFactoryVscode/`, the operator entrypoint is `software-factory.code-workspace`, and legacy `.softwareFactoryVscode` artifacts are migration leftovers rather than supported runtime surfaces.
 
+This handout is the guided first-run path: it shows the order most operators
+actually follow after opening an installed workspace. It intentionally
+summarizes the deeper install/update/readiness detail in
+[`INSTALL.md`](INSTALL.md) and points repeat operators to
+[`CHEAT_SHEET.md`](CHEAT_SHEET.md) for terse command lookup.
+
 ## 🚀 What you are opening
 
 The generated `software-factory.code-workspace` file is the supported VS Code entrypoint for an installed workspace.
@@ -20,6 +26,9 @@ The runtime contract behind that workspace is generated from:
 - `.copilot/softwareFactoryVscode/.tmp/runtime-manifest.json`
 
 ## 🤖 AI feature setup by VS Code version
+
+This handout keeps the short onboarding version. For the full editor-side setup
+details and version-specific caveats, see [`INSTALL.md`](INSTALL.md).
 
 - **VS Code `1.116+`** ships GitHub Copilot built in. Use the Copilot status item or Accounts menu to sign in and enable AI features.
 - **Older VS Code releases** still need the GitHub Copilot extension installed before the AI workflow in this handout will work.
@@ -82,6 +91,10 @@ These verifier commands use the same manager-backed readiness vocabulary as `pre
 
 ## 🧠 Service model in plain English
 
+This handout keeps the short operator summary. For the full ADR-008 rollout
+vocabulary, evidence threshold, and release/readiness wording rules, see
+[`INSTALL.md`](INSTALL.md) and [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md).
+
 The runtime currently uses a hybrid model:
 
 - **workspace-scoped services** stay isolated per workspace because they depend on one repository root or direct project state
@@ -89,13 +102,11 @@ The runtime currently uses a hybrid model:
 
 That distinction matters: multiple installed workspaces can coexist safely today without pretending every service is already globally shared.
 
-### How to read shared-service rollout status
-
-Release notes and operator docs use the same ADR-008 promotion vocabulary:
-
-- `open` — rollout tracks are still incomplete, so shared promotion remains gated
-- `advanced groundwork` — important rollout slices have landed, but the final promotion gate is still not satisfied
-- `fulfilled` — the current default branch now meets this threshold for `mcp-memory`, `mcp-agent-bus`, and `approval-gate`; shared mode remains deliberate and opt-in rather than mandatory for every workspace
+Release notes and operator docs still use the same ADR-008 promotion
+vocabulary: `open`, `advanced groundwork`, and `fulfilled`. The current
+default branch now meets this threshold for `mcp-memory`, `mcp-agent-bus`, and
+`approval-gate`; shared mode remains deliberate and opt-in rather than
+mandatory for every workspace.
 
 ## 🏁 Internal production contract
 
@@ -107,6 +118,8 @@ use** only.
   operator-facing readiness contract.
 - [`docs/PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) is the
   implementation roadmap for satisfying that contract.
+- This handout is the short operator summary; use those two pages when you need
+  the contract language or the active supporting plan.
 - The readiness baseline described in this handout is necessary, but it is not
   the final production claim. Final sign-off still requires the blocking
   readiness gates and three consecutive clean runs recorded by the canonical
@@ -115,9 +128,11 @@ use** only.
 ## ✅ Readiness closeout boundaries
 
 This handout documents the current default-branch readiness baseline. It does
-not turn every future runtime-manager idea into a supported promise.
+not turn every future runtime-manager idea into a supported promise. For the
+full closeout snapshot, sign-off nuance, and supporting detail, see
+[`INSTALL.md`](INSTALL.md) and [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md).
 
-For reproducible closeout evidence, pair the operator guidance here with:
+For a quick operator proof bundle, pair the guidance here with:
 
 - `./.venv/bin/pytest tests/test_regression.py -v`
 - `./.venv/bin/python ./scripts/local_ci_parity.py`
@@ -128,7 +143,7 @@ For reproducible closeout evidence, pair the operator guidance here with:
 The canonical production-grade parity command now includes the promoted
 strict-tenant and stop/cleanup Docker E2E runtime proofs. Keep the extra
 `RUN_DOCKER_E2E=1` command for targeted scenarios such as explicit
-multi-workspace activation / switch-back evidence.
+multi-workspace activation / switch-back evidence only.
 
 Still deferred after this readiness pass:
 
@@ -152,6 +167,9 @@ Active is an explicit operator choice. It is not a synonym for “owns the defau
 
 Each workspace gets its own effective port block, written into `.copilot/softwareFactoryVscode/.factory.env` and projected into the generated workspace file and runtime manifest.
 
+For the terse lifecycle command list, troubleshooting shortcuts, and cleanup
+matrix, jump to [`CHEAT_SHEET.md`](CHEAT_SHEET.md).
+
 ## 🛑 Shutdown and cleanup
 
 For normal shutdown, use:
@@ -159,4 +177,4 @@ For normal shutdown, use:
 - VS Code task: `🛑 Docker: Stop`
 - CLI: `python3 .copilot/softwareFactoryVscode/scripts/factory_stack.py stop`
 
-Use `cleanup` only when you intentionally want to remove runtime state for the current workspace. Cleanup is deeper than stop: it removes runtime artifacts, registry ownership, and workspace-scoped runtime data, while leaving the installed `.copilot/softwareFactoryVscode/` baseline in place.
+Use `cleanup` only when you intentionally want to remove runtime state for the current workspace. Cleanup is deeper than stop: it removes runtime artifacts, registry ownership, and workspace-scoped runtime data, while leaving the installed `.copilot/softwareFactoryVscode/` baseline in place. For the fuller stop/cleanup/image-retention matrix, see [`CHEAT_SHEET.md`](CHEAT_SHEET.md).
