@@ -1158,6 +1158,11 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "Operator Runbook - Incident Response",
         "Operator Runbook - Backup and Restore",
         "Internal Production Readiness Contract",
+        "Technical Overview",
+        "Copilot Harness Model",
+        "Harness Integration Specification",
+        "Architecture Index",
+        "Architecture ADR Catalog",
     ]
 
     home_page = manifest["pages"][0]
@@ -1170,6 +1175,7 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "Tutorials",
         "Examples",
         "FAQ",
+        "Technical Overview",
     ]
 
     sidebar_page = manifest["pages"][1]
@@ -1278,6 +1284,36 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
     assert readiness_contract_page["canonical_sources"] == [
         "docs/PRODUCTION-READINESS.md"
     ]
+
+    technical_overview_page = manifest["pages"][18]
+    assert technical_overview_page["canonical_sources"] == [
+        "docs/COPILOT-HARNESS-MODEL.md",
+        "docs/HARNESS-INTEGRATION-SPEC.md",
+        "docs/architecture/INDEX.md",
+        "docs/architecture/ADR-INDEX.md",
+    ]
+    assert technical_overview_page["primary_routes"] == [
+        "Copilot Harness Model",
+        "Harness Integration Specification",
+        "Architecture Index",
+        "Architecture ADR Catalog",
+    ]
+
+    harness_model_page = manifest["pages"][19]
+    assert harness_model_page["canonical_sources"] == ["docs/COPILOT-HARNESS-MODEL.md"]
+
+    integration_spec_page = manifest["pages"][20]
+    assert integration_spec_page["canonical_sources"] == [
+        "docs/HARNESS-INTEGRATION-SPEC.md"
+    ]
+
+    architecture_index_page = manifest["pages"][21]
+    assert architecture_index_page["canonical_sources"] == [
+        "docs/architecture/INDEX.md"
+    ]
+
+    adr_catalog_page = manifest["pages"][22]
+    assert adr_catalog_page["canonical_sources"] == ["docs/architecture/ADR-INDEX.md"]
 
     flattened_sources = {
         source for page in manifest["pages"] for source in page["canonical_sources"]

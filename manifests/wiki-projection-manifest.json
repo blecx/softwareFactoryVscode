@@ -35,14 +35,15 @@
         "Operator Handout",
         "Tutorials",
         "Examples",
-        "FAQ"
+        "FAQ",
+        "Technical Overview"
       ],
       "audience": [
         "evaluators",
         "operators",
         "architecture-readers"
       ],
-      "note": "Evaluator-first landing page derived from the documentation index and updated to route directly to the published onboarding, tutorial, and operator-reference pages."
+      "note": "Evaluator-first landing page derived from the documentation index and updated to route directly to the published onboarding, tutorial, operator-reference, and technical discovery pages."
     },
     {
       "wiki_page": "_Sidebar",
@@ -62,7 +63,7 @@
         "Use and operate",
         "Understand the architecture"
       ],
-      "note": "Audience-first navigation that routes to published onboarding, tutorial, and operator-reference pages first and falls back to canonical repo docs beyond the current wiki slice."
+      "note": "Audience-first navigation that routes to published onboarding, tutorial, operator-reference, and technical discovery pages first and falls back to canonical repo docs beyond the current wiki slice."
     },
     {
       "wiki_page": "_Footer",
@@ -285,6 +286,85 @@
         "reference-readers"
       ],
       "note": "Operator-facing production-boundary and sign-off contract projected from the canonical readiness authority."
+    },
+    {
+      "wiki_page": "Technical Overview",
+      "page_type": "technical-router",
+      "status": "live",
+      "canonical_sources": [
+        "docs/COPILOT-HARNESS-MODEL.md",
+        "docs/HARNESS-INTEGRATION-SPEC.md",
+        "docs/architecture/INDEX.md",
+        "docs/architecture/ADR-INDEX.md"
+      ],
+      "primary_routes": [
+        "Copilot Harness Model",
+        "Harness Integration Specification",
+        "Architecture Index",
+        "Architecture ADR Catalog"
+      ],
+      "audience": [
+        "architecture-readers",
+        "maintainers",
+        "reference-readers"
+      ],
+      "note": "Wiki-native technical router that explains the harness model, the integration contract, and how the accepted ADR discovery path works without weakening repo authority."
+    },
+    {
+      "wiki_page": "Copilot Harness Model",
+      "page_type": "technical-model",
+      "status": "live",
+      "canonical_sources": [
+        "docs/COPILOT-HARNESS-MODEL.md"
+      ],
+      "audience": [
+        "architecture-readers",
+        "maintainers",
+        "reference-readers"
+      ],
+      "note": "High-level explainer for what the harness is, why it lives in its own repository, and why namespace-first integration is intentional."
+    },
+    {
+      "wiki_page": "Harness Integration Specification",
+      "page_type": "technical-specification",
+      "status": "live",
+      "canonical_sources": [
+        "docs/HARNESS-INTEGRATION-SPEC.md"
+      ],
+      "audience": [
+        "architecture-readers",
+        "maintainers",
+        "reference-readers"
+      ],
+      "note": "Product-level artifact, install, update, and ownership contract projected from the canonical integration specification."
+    },
+    {
+      "wiki_page": "Architecture Index",
+      "page_type": "architecture-index",
+      "status": "live",
+      "canonical_sources": [
+        "docs/architecture/INDEX.md"
+      ],
+      "audience": [
+        "architecture-readers",
+        "maintainers",
+        "reference-readers"
+      ],
+      "note": "Public architecture entrypoint that explains document classes and keeps accepted ADRs clearly authoritative."
+    },
+    {
+      "wiki_page": "Architecture ADR Catalog",
+      "page_type": "architecture-catalog",
+      "status": "live",
+      "canonical_sources": [
+        "docs/architecture/ADR-INDEX.md"
+      ],
+      "audience": [
+        "architecture-readers",
+        "maintainers",
+        "reference-readers"
+      ],
+      "note": "Compact accepted-ADR discovery page that implements the phase-1 access strategy by linking to the canonical repo ADR files instead of duplicating the whole accepted set as wiki pages."
     }
   ]
 }
