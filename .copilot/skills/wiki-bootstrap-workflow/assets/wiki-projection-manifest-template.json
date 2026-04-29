@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "publication_boundary": {
+    "path": "docs/WIKI-MAP.md",
+    "audience": "repo-maintainer",
+    "policy": "Only sources explicitly approved in docs/WIKI-MAP.md may be projected into the live GitHub wiki."
+  },
+  "authority": {
+    "wiki_role": "reader-facing projection",
+    "canonical_source": "host-owned canonical docs and accepted authority docs",
+    "top_level_readme_policy": "host-defined"
+  },
+  "page_chrome": {
+    "requires_canonical_source": true,
+    "requires_last_synced_from": true,
+    "requires_projection_note": true,
+    "bootstrap_artifacts": [
+      "Home",
+      "_Sidebar",
+      "_Footer"
+    ]
+  },
+  "pages": []
+}

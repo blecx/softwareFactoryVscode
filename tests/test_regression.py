@@ -451,6 +451,101 @@ def test_queue_skills_reference_historical_guardrails():
         assert text.count("ADR-006-Local-CI-Parity-Prechecks.md") == 1
 
 
+def test_wiki_bootstrap_skill_scaffolds_host_owned_starting_surfaces():
+    repo_root = Path(__file__).parent.parent
+    skill_root = repo_root / ".copilot" / "skills" / "wiki-bootstrap-workflow"
+    skill = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+    procedure = (skill_root / "references" / "bootstrap-procedure.md").read_text(
+        encoding="utf-8"
+    )
+    guardrails = (skill_root / "references" / "bootstrap-guardrails.md").read_text(
+        encoding="utf-8"
+    )
+    checklist = (skill_root / "assets" / "bootstrap-intake-checklist.md").read_text(
+        encoding="utf-8"
+    )
+    manifest_template = json.loads(
+        (skill_root / "assets" / "wiki-projection-manifest-template.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    lowered_skill = skill.lower()
+    lowered_procedure = procedure.lower()
+    lowered_guardrails = guardrails.lower()
+    lowered_checklist = checklist.lower()
+
+    assert "docs/wiki-map.md" in lowered_skill
+    assert "manifests/wiki-projection-manifest.json" in skill
+    assert "accepted adrs or equivalent authority docs" in lowered_skill
+    assert "canonical docs" in lowered_skill
+    assert "stop and ask for the missing host context" in lowered_skill
+    assert "publication-policy-authoring skill" in skill
+    assert "wiki-maintenance-workflow" in skill
+    assert "reader-facing projection" in lowered_skill
+
+    assert "bootstrap entry condition" in lowered_procedure
+    assert "create or update flow" in lowered_procedure
+    assert "stop conditions and handoff" in lowered_procedure
+    assert "evidence expectations" in lowered_procedure
+
+    assert "authority input rules" in lowered_guardrails
+    assert "host-owned surface rules" in lowered_guardrails
+    assert "handoff rules" in lowered_guardrails
+    assert "anti-patterns" in lowered_guardrails
+    assert "do not copy another host's page inventory" in lowered_guardrails
+
+    assert "# Wiki bootstrap intake checklist" in checklist
+    assert "docs/WIKI-MAP.md" in checklist
+    assert "manifests/wiki-projection-manifest.json" in checklist
+    assert "Accepted ADRs or equivalent authority docs" in checklist
+    assert "wiki-publication-policy-authoring" in checklist
+    assert "wiki-maintenance-workflow" in checklist
+
+    assert manifest_template["schema_version"] == 1
+    assert manifest_template["publication_boundary"]["path"] == "docs/WIKI-MAP.md"
+    assert manifest_template["authority"]["wiki_role"] == "reader-facing projection"
+    assert manifest_template["page_chrome"]["bootstrap_artifacts"] == [
+        "Home",
+        "_Sidebar",
+        "_Footer",
+    ]
+    assert manifest_template["pages"] == []
+
+    for text in [
+        lowered_skill,
+        lowered_procedure,
+        lowered_guardrails,
+        lowered_checklist,
+        json.dumps(manifest_template).lower(),
+    ]:
+        assert "softwarefactoryvscode" not in text
+
+
+def test_existing_wiki_skills_route_first_time_hosts_to_bootstrap():
+    repo_root = Path(__file__).parent.parent
+    policy_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "wiki-publication-policy-authoring"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    maintenance_skill = (
+        repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    lowered_policy = policy_skill.lower()
+    lowered_maintenance = maintenance_skill.lower()
+
+    assert "wiki-bootstrap-workflow" in lowered_policy
+    assert "wiki-bootstrap-workflow" in lowered_maintenance
+    assert "start with `wiki-bootstrap-workflow`" in policy_skill
+    assert "start with `wiki-bootstrap-workflow`" in maintenance_skill
+    assert "missing, incomplete, or not yet approved" in lowered_policy
+    assert "missing, incomplete, or not yet approved" in lowered_maintenance
+
+
 def test_wiki_maintenance_skill_requires_host_truth_and_shared_assets():
     repo_root = Path(__file__).parent.parent
     skill_root = repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow"
