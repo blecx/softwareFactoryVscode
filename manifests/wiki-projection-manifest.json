@@ -14,20 +14,14 @@
     "requires_canonical_source": true,
     "requires_last_synced_from": true,
     "requires_projection_note": true,
-    "bootstrap_artifacts": [
-      "Home",
-      "_Sidebar",
-      "_Footer"
-    ]
+    "bootstrap_artifacts": ["Home", "_Sidebar", "_Footer"]
   },
   "pages": [
     {
       "wiki_page": "Home",
       "page_type": "summary",
       "status": "live",
-      "canonical_sources": [
-        "docs/PROJECT-OVERVIEW.md"
-      ],
+      "canonical_sources": ["docs/PROJECT-OVERVIEW.md"],
       "primary_routes": [
         "Why Software Factory",
         "Getting Started",
@@ -38,24 +32,15 @@
         "FAQ",
         "Technical Overview"
       ],
-      "audience": [
-        "evaluators",
-        "operators",
-        "architecture-readers"
-      ],
+      "audience": ["evaluators", "operators", "architecture-readers"],
       "note": "Narrative-first landing page derived from the host-owned canonical project overview and used to route readers onward to onboarding, tutorial, operator-reference, and technical discovery pages without turning `docs/README.md` into the wiki authority surface."
     },
     {
       "wiki_page": "_Sidebar",
       "page_type": "navigation",
       "status": "live",
-      "canonical_sources": [
-        "docs/README.md",
-        "docs/WIKI-MAP.md"
-      ],
-      "audience": [
-        "all"
-      ],
+      "canonical_sources": ["docs/README.md", "docs/WIKI-MAP.md"],
+      "audience": ["all"],
       "route_groups": [
         "Evaluate",
         "Get started",
@@ -73,22 +58,15 @@
         "docs/WIKI-MAP.md",
         "docs/architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md"
       ],
-      "audience": [
-        "all"
-      ],
+      "audience": ["all"],
       "note": "Shared projection and authority reminder rendered on every published wiki page."
     },
     {
       "wiki_page": "Why Software Factory",
       "page_type": "orientation",
       "status": "live",
-      "canonical_sources": [
-        "docs/WHY-SOFTWARE-FACTORY.md"
-      ],
-      "audience": [
-        "evaluators",
-        "operators"
-      ],
+      "canonical_sources": ["docs/WHY-SOFTWARE-FACTORY.md"],
+      "audience": ["evaluators", "operators"],
       "note": "Public intent, goals, and non-goals overview projected from the canonical why-page."
     },
     {
@@ -100,38 +78,24 @@
         "docs/INSTALL.md",
         "docs/HANDOUT.md"
       ],
-      "primary_routes": [
-        "Install and Update",
-        "Operator Handout"
-      ],
-      "audience": [
-        "evaluators",
-        "operators"
-      ],
+      "primary_routes": ["Install and Update", "Operator Handout"],
+      "audience": ["evaluators", "operators"],
       "note": "Wiki-native onboarding router built only from already wiki-safe evaluator and operator sources."
     },
     {
       "wiki_page": "Install and Update",
       "page_type": "installation-guide",
       "status": "live",
-      "canonical_sources": [
-        "docs/INSTALL.md"
-      ],
-      "audience": [
-        "operators"
-      ],
+      "canonical_sources": ["docs/INSTALL.md"],
+      "audience": ["operators"],
       "note": "Condensed install/update projection that links back to the canonical long-form install authority."
     },
     {
       "wiki_page": "Operator Handout",
       "page_type": "operator-guide",
       "status": "live",
-      "canonical_sources": [
-        "docs/HANDOUT.md"
-      ],
-      "audience": [
-        "operators"
-      ],
+      "canonical_sources": ["docs/HANDOUT.md"],
+      "audience": ["operators"],
       "note": "Guided first-run operator flow projected from the canonical handout."
     },
     {
@@ -150,23 +114,15 @@
         "Examples",
         "FAQ"
       ],
-      "audience": [
-        "evaluators",
-        "operators"
-      ],
+      "audience": ["evaluators", "operators"],
       "note": "Scenario-driven landing page for the published tutorial track, examples, and FAQ."
     },
     {
       "wiki_page": "Install a New Project",
       "page_type": "tutorial",
       "status": "live",
-      "canonical_sources": [
-        "docs/INSTALL.md",
-        "docs/HANDOUT.md"
-      ],
-      "audience": [
-        "operators"
-      ],
+      "canonical_sources": ["docs/INSTALL.md", "docs/HANDOUT.md"],
+      "audience": ["operators"],
       "note": "Step-by-step tutorial for creating a new repository install and opening the generated workspace."
     },
     {
@@ -178,22 +134,15 @@
         "docs/INSTALL.md",
         "docs/CHEAT_SHEET.md"
       ],
-      "audience": [
-        "operators"
-      ],
+      "audience": ["operators"],
       "note": "Step-by-step tutorial for checking preflight state, starting the runtime explicitly, and verifying the result."
     },
     {
       "wiki_page": "Day-to-Day Operator Loop",
       "page_type": "tutorial",
       "status": "live",
-      "canonical_sources": [
-        "docs/HANDOUT.md",
-        "docs/CHEAT_SHEET.md"
-      ],
-      "audience": [
-        "operators"
-      ],
+      "canonical_sources": ["docs/HANDOUT.md", "docs/CHEAT_SHEET.md"],
+      "audience": ["operators"],
       "note": "Repeat-operator walkthrough for checking state, switching focus, and choosing the right lifecycle action."
     },
     {
@@ -205,10 +154,7 @@
         "docs/HANDOUT.md",
         "docs/CHEAT_SHEET.md"
       ],
-      "audience": [
-        "evaluators",
-        "operators"
-      ],
+      "audience": ["evaluators", "operators"],
       "note": "Scenario-style entry points that cluster current supported workflows without expanding the authority surface."
     },
     {
@@ -220,71 +166,47 @@
         "docs/HANDOUT.md",
         "docs/CHEAT_SHEET.md"
       ],
-      "audience": [
-        "evaluators",
-        "operators"
-      ],
+      "audience": ["evaluators", "operators"],
       "note": "High-signal questions and answers distilled from the supported operator docs."
     },
     {
       "wiki_page": "Operator Cheat Sheet",
       "page_type": "operator-reference",
       "status": "live",
-      "canonical_sources": [
-        "docs/CHEAT_SHEET.md"
-      ],
-      "audience": [
-        "operators"
-      ],
+      "canonical_sources": ["docs/CHEAT_SHEET.md"],
+      "audience": ["operators"],
       "note": "Dense operator quick-reference page projected from the canonical cheat sheet."
     },
     {
       "wiki_page": "Operator Runbook - Monitoring",
       "page_type": "runbook",
       "status": "live",
-      "canonical_sources": [
-        "docs/ops/MONITORING.md"
-      ],
-      "audience": [
-        "operators"
-      ],
+      "canonical_sources": ["docs/ops/MONITORING.md"],
+      "audience": ["operators"],
       "note": "Machine-readable monitoring and diagnostics runbook projected from the canonical monitoring guide."
     },
     {
       "wiki_page": "Operator Runbook - Incident Response",
       "page_type": "runbook",
       "status": "live",
-      "canonical_sources": [
-        "docs/ops/INCIDENT-RESPONSE.md"
-      ],
-      "audience": [
-        "operators"
-      ],
+      "canonical_sources": ["docs/ops/INCIDENT-RESPONSE.md"],
+      "audience": ["operators"],
       "note": "Day-two incident-response decision tree projected from the canonical incident-response guide."
     },
     {
       "wiki_page": "Operator Runbook - Backup and Restore",
       "page_type": "runbook",
       "status": "live",
-      "canonical_sources": [
-        "docs/ops/BACKUP-RESTORE.md"
-      ],
-      "audience": [
-        "operators"
-      ],
+      "canonical_sources": ["docs/ops/BACKUP-RESTORE.md"],
+      "audience": ["operators"],
       "note": "Bounded backup/restore recovery runbook projected from the canonical backup-and-restore guide."
     },
     {
       "wiki_page": "Internal Production Readiness Contract",
       "page_type": "readiness-contract",
       "status": "live",
-      "canonical_sources": [
-        "docs/PRODUCTION-READINESS.md"
-      ],
-      "audience": [
-        "operators",
-        "reference-readers"
-      ],
+      "canonical_sources": ["docs/PRODUCTION-READINESS.md"],
+      "audience": ["operators", "reference-readers"],
       "note": "Operator-facing production-boundary and sign-off contract projected from the canonical readiness authority."
     },
     {
@@ -303,67 +225,39 @@
         "Architecture Index",
         "Architecture ADR Catalog"
       ],
-      "audience": [
-        "architecture-readers",
-        "maintainers",
-        "reference-readers"
-      ],
+      "audience": ["architecture-readers", "maintainers", "reference-readers"],
       "note": "Wiki-native technical router that explains the harness model, the integration contract, and how the accepted ADR discovery path works without weakening repo authority."
     },
     {
       "wiki_page": "Copilot Harness Model",
       "page_type": "technical-model",
       "status": "live",
-      "canonical_sources": [
-        "docs/COPILOT-HARNESS-MODEL.md"
-      ],
-      "audience": [
-        "architecture-readers",
-        "maintainers",
-        "reference-readers"
-      ],
+      "canonical_sources": ["docs/COPILOT-HARNESS-MODEL.md"],
+      "audience": ["architecture-readers", "maintainers", "reference-readers"],
       "note": "High-level explainer for what the harness is, why it lives in its own repository, and why namespace-first integration is intentional."
     },
     {
       "wiki_page": "Harness Integration Specification",
       "page_type": "technical-specification",
       "status": "live",
-      "canonical_sources": [
-        "docs/HARNESS-INTEGRATION-SPEC.md"
-      ],
-      "audience": [
-        "architecture-readers",
-        "maintainers",
-        "reference-readers"
-      ],
+      "canonical_sources": ["docs/HARNESS-INTEGRATION-SPEC.md"],
+      "audience": ["architecture-readers", "maintainers", "reference-readers"],
       "note": "Product-level artifact, install, update, and ownership contract projected from the canonical integration specification."
     },
     {
       "wiki_page": "Architecture Index",
       "page_type": "architecture-index",
       "status": "live",
-      "canonical_sources": [
-        "docs/architecture/INDEX.md"
-      ],
-      "audience": [
-        "architecture-readers",
-        "maintainers",
-        "reference-readers"
-      ],
+      "canonical_sources": ["docs/architecture/INDEX.md"],
+      "audience": ["architecture-readers", "maintainers", "reference-readers"],
       "note": "Public architecture entrypoint that explains document classes and keeps accepted ADRs clearly authoritative."
     },
     {
       "wiki_page": "Architecture ADR Catalog",
       "page_type": "architecture-catalog",
       "status": "live",
-      "canonical_sources": [
-        "docs/architecture/ADR-INDEX.md"
-      ],
-      "audience": [
-        "architecture-readers",
-        "maintainers",
-        "reference-readers"
-      ],
+      "canonical_sources": ["docs/architecture/ADR-INDEX.md"],
+      "audience": ["architecture-readers", "maintainers", "reference-readers"],
       "note": "Compact accepted-ADR discovery page that implements the phase-1 access strategy by linking to the canonical repo ADR files instead of duplicating the whole accepted set as wiki pages."
     }
   ]
