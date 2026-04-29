@@ -1407,6 +1407,10 @@ def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sourc
     assert "# Agent enforcement map" in enforcement_map
     assert "not a competing normative authority" in enforcement_map
     assert "create-issue" in enforcement_map
+    assert "wiki.md" in enforcement_map
+    assert "wiki-publication-policy-authoring" in enforcement_map
+    assert "wiki-maintenance-workflow" in enforcement_map
+    assert "HOST-WIKI-TRUTH-CONTRACT.md" in enforcement_map
     assert "resolve-issue" in enforcement_map
     assert "pr-merge" in enforcement_map
     assert "execute-approved-plan" in enforcement_map
@@ -1425,6 +1429,26 @@ def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sourc
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in enforcement_map
     assert "WORK-ISSUE-WORKFLOW.md" in enforcement_map
     assert ".github/copilot-instructions.md" in enforcement_map
+
+
+def test_wiki_agent_wrapper_stays_thin_and_requires_host_truth():
+    repo_root = Path(__file__).parent.parent
+    wrapper = (repo_root / ".github" / "agents" / "wiki.md").read_text(encoding="utf-8")
+    lowered = wrapper.lower()
+
+    assert "Provides context for the `wiki` AI Agent." in wrapper
+    assert "Routes wiki-policy authoring and wiki-maintenance requests" in wrapper
+    assert "thin discovery wrapper" in lowered
+    assert ".copilot/skills/wiki-publication-policy-authoring/SKILL.md" in wrapper
+    assert ".copilot/skills/wiki-maintenance-workflow/SKILL.md" in wrapper
+    assert "docs/maintainer/HOST-WIKI-TRUTH-CONTRACT.md" in wrapper
+    assert "docs/WIKI-MAP.md" in wrapper
+    assert "manifests/wiki-projection-manifest.json" in wrapper
+    assert "publication-policy-authoring skill" in wrapper
+    assert "issue → PR → merge workflow" in wrapper
+    assert "repo docs canonical" in lowered
+    assert "reader-facing projection" in lowered
+    assert "softwarefactoryvscode" not in lowered
 
 
 def test_docs_roadmap_separates_current_direction_from_historical_plans():
