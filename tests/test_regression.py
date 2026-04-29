@@ -1019,6 +1019,7 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "WORK-ISSUE-WORKFLOW.md" in docs_readme
     assert "setup-github-repository.md" in docs_readme
     assert "maintainer/HOST-WIKI-TRUTH-CONTRACT.md" in docs_readme
+    assert "maintainer/WIKI-PUBLISHING.md" in docs_readme
     assert "WIKI-MAP.md" in docs_readme
     assert "maintainer/GUARDRAILS.md" in docs_readme
     assert "maintainer/AGENT-ENFORCEMENT-MAP.md" in docs_readme
@@ -1364,6 +1365,29 @@ def test_host_wiki_truth_contract_doc_keeps_project_truth_in_host_repo():
     assert "softwarefactoryvscode" not in lowered
 
 
+def test_maintainer_wiki_publishing_runbook_keeps_wiki_repo_first():
+    repo_root = Path(__file__).parent.parent
+    runbook = (repo_root / "docs" / "maintainer" / "WIKI-PUBLISHING.md").read_text(
+        encoding="utf-8"
+    )
+    lowered = runbook.lower()
+
+    assert "# GitHub wiki publishing and validation runbook" in runbook
+    assert "repo-only maintainer runbook" in lowered
+    assert "reader-facing projection" in lowered
+    assert "docs/WIKI-MAP.md" in runbook
+    assert "manifests/wiki-projection-manifest.json" in runbook
+    assert "HOST-WIKI-TRUTH-CONTRACT.md" in runbook
+    assert ".tmp/wiki-launch/live-wiki" in runbook
+    assert (
+        "root checkout on `main` remains reserved as a non-execution surface" in runbook
+    )
+    assert "Restrict editing to collaborators only" in runbook
+    assert "Last synced from" in runbook
+    assert "repo-only leak" in lowered
+    assert "issue → PR → merge" in runbook
+
+
 def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     repo_root = Path(__file__).parent.parent
     catalog = (repo_root / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
@@ -1374,6 +1398,7 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert "index/reference" in catalog
     assert "not a competing normative authority" in catalog
     assert "HOST-WIKI-TRUTH-CONTRACT.md" in catalog
+    assert "WIKI-PUBLISHING.md" in catalog
     assert "AGENT-ENFORCEMENT-MAP.md" in catalog
     assert "docs/WORK-ISSUE-WORKFLOW.md" in catalog
     assert ".github/copilot-instructions.md" in catalog
@@ -1447,6 +1472,7 @@ def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sourc
     assert "wiki-publication-policy-authoring" in enforcement_map
     assert "wiki-maintenance-workflow" in enforcement_map
     assert "HOST-WIKI-TRUTH-CONTRACT.md" in enforcement_map
+    assert "WIKI-PUBLISHING.md" in enforcement_map
     assert "resolve-issue" in enforcement_map
     assert "pr-merge" in enforcement_map
     assert "execute-approved-plan" in enforcement_map
@@ -1478,10 +1504,12 @@ def test_wiki_agent_wrapper_stays_thin_and_requires_host_truth():
     assert ".copilot/skills/wiki-publication-policy-authoring/SKILL.md" in wrapper
     assert ".copilot/skills/wiki-maintenance-workflow/SKILL.md" in wrapper
     assert "docs/maintainer/HOST-WIKI-TRUTH-CONTRACT.md" in wrapper
+    assert "docs/maintainer/WIKI-PUBLISHING.md" in wrapper
     assert "docs/WIKI-MAP.md" in wrapper
     assert "manifests/wiki-projection-manifest.json" in wrapper
     assert "publication-policy-authoring skill" in wrapper
     assert "issue → PR → merge workflow" in wrapper
+    assert "repo-first" in lowered
     assert "repo docs canonical" in lowered
     assert "reader-facing projection" in lowered
     assert "softwarefactoryvscode" not in lowered
