@@ -37,6 +37,9 @@ jobs:
       - name: Enforce release docs when VERSION changes
         run: ./.venv/bin/python ./scripts/verify_release_docs.py --repo-root . --base-rev "$RELEASE_POLICY_BASE" --head-rev HEAD
 
+      - name: Verify Git author identity
+        run: ./.venv/bin/python ./scripts/verify_git_identity.py --repo-root . --head-rev HEAD
+
       - name: Validate release manifest matches current commit
         run: ./.venv/bin/python ./scripts/factory_release.py write-manifest --repo-root . --repo-url https://github.com/blecx/softwareFactoryVscode.git --check
 

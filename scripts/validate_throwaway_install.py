@@ -158,7 +158,7 @@ def create_working_tree_snapshot(source_repo: Path) -> Path:
         ["git", "config", "user.name", "Throwaway Validator"], cwd=snapshot_repo
     )
     run_command(
-        ["git", "config", "user.email", "throwaway-validator@example.invalid"],
+        ["git", "config", "user.email", "throwaway-validator@localhost"],
         cwd=snapshot_repo,
     )
     run_command(["git", "add", "."], cwd=snapshot_repo)
