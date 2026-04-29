@@ -1012,6 +1012,7 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "accepted ADRs are the normative architecture source" in docs_readme
     assert "do not override accepted ADRs" in docs_readme
     assert "## Start here by audience" in docs_readme
+    assert "PROJECT-OVERVIEW.md" in docs_readme
     assert "../README.md" in docs_readme
     assert "HANDOUT.md" in docs_readme
     assert "INSTALL.md" in docs_readme
@@ -1069,6 +1070,29 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "## Historical and reference material" in docs_readme
     assert "archive/CHAT-SESSION-TROUBLESHOOTING-REPORT.md" in docs_readme
     assert "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md" in docs_readme
+
+
+def test_project_overview_doc_establishes_canonical_landing_story() -> None:
+    repo_root = Path(__file__).parent.parent
+    overview = (repo_root / "docs" / "PROJECT-OVERVIEW.md").read_text(encoding="utf-8")
+    docs_readme = (repo_root / "docs" / "README.md").read_text(encoding="utf-8")
+
+    assert "# SoftwareFactoryVscode project overview" in overview
+    assert "enterprise development automation using VS Code and GitHub" in overview
+    assert "agile/spec-driven workflow" in overview
+    assert (
+        "LLM-assisted development, including quality and testing expectations"
+        in overview
+    )
+    assert "from commits to partial projects to entire sprints" in overview
+    assert "under development" in overview
+    assert "reader-facing Wiki `Home` projection" in overview
+    assert "INSTALL.md" in overview
+    assert "HANDOUT.md" in overview
+    assert "COPILOT-HARNESS-MODEL.md" in overview
+    assert "WORK-ISSUE-WORKFLOW.md" in overview
+    assert "WHY-SOFTWARE-FACTORY.md" in overview
+    assert "[`PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md)" in docs_readme
 
 
 def test_docs_wiki_map_defines_conservative_export_targets() -> None:

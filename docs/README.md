@@ -11,6 +11,7 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 
 ### New readers and evaluators
 
+- [`PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) — canonical narrative-first overview of what SoftwareFactoryVscode is trying to automate, how the AI-assisted workflow is meant to work, and where to go next.
 - [`WHY-SOFTWARE-FACTORY.md`](WHY-SOFTWARE-FACTORY.md) — canonical explanation of why the project exists, who it helps, and what it explicitly is not trying to be.
 - [`../README.md`](../README.md) — repository entrypoint, current release, and top-level orientation.
 - [`HANDOUT.md`](HANDOUT.md) — guided overview of the Software Factory model and workflows.
