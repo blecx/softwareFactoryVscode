@@ -14,6 +14,14 @@ The reusable `.copilot` workflow pieces must stay procedural and host-agnostic.
 Host-owned policy/config/content are the only project-specific wiki truth surfaces.
 If a detail is specific to one host project, it belongs in that host repository rather than in reusable `.copilot` instructions.
 
+## Bootstrap before truth exists
+
+When required host-owned wiki truth surfaces are missing, incomplete, or not yet approved, start with the reusable [`wiki-bootstrap-workflow`](../../.copilot/skills/wiki-bootstrap-workflow/SKILL.md) as the pre-truth onboarding step.
+Bootstrap may scaffold or verify the starting surfaces, but it does not replace host-owned authority:
+
+- hand off to `wiki-publication-policy-authoring` once the host can define or revise the wiki-safe versus repo-only boundary;
+- hand off to `wiki-maintenance-workflow` only after the host publication policy, projection config, canonical docs, and authority docs exist and are approved.
+
 ## Ownership split at a glance
 
 | Surface | Owned by | What it decides | What it must not become |
@@ -22,7 +30,7 @@ If a detail is specific to one host project, it belongs in that host repository 
 | [`manifests/wiki-projection-manifest.json`](../../manifests/wiki-projection-manifest.json) | Host repo | Projection config: how approved canonical sources map to wiki pages, navigation, and lifecycle state | A substitute for publication policy or canonical content |
 | Canonical `docs/*.md` pages and accepted ADRs | Host repo | Canonical content and architecture authority | Generated output or wiki-only truth |
 | Live GitHub wiki pages | Generated projection | Reader-facing rendered output | An authority surface or policy source |
-| [`.copilot/skills/wiki-publication-policy-authoring/`](../../.copilot/skills/wiki-publication-policy-authoring/SKILL.md) and [`.copilot/skills/wiki-maintenance-workflow/`](../../.copilot/skills/wiki-maintenance-workflow/SKILL.md) | Reusable workflow layer | General procedure for authoring policy and maintaining projections across projects | A place to store one host's page inventory, policy entries, or canonical content |
+| [`.copilot/skills/wiki-bootstrap-workflow/`](../../.copilot/skills/wiki-bootstrap-workflow/SKILL.md), [`.copilot/skills/wiki-publication-policy-authoring/`](../../.copilot/skills/wiki-publication-policy-authoring/SKILL.md), and [`.copilot/skills/wiki-maintenance-workflow/`](../../.copilot/skills/wiki-maintenance-workflow/SKILL.md) | Reusable workflow layer | General procedure for bootstrapping starting surfaces, authoring policy, and maintaining projections across projects | A place to store one host's page inventory, policy entries, or canonical content |
 
 ## Required host-owned truth surfaces
 
@@ -34,6 +42,7 @@ A future host project should be able to point to all of these files without read
 4. Accepted ADRs or equivalent authority docs — the architectural authority that explains why the hierarchy works this way.
 
 If any of those surfaces are missing, the fix is to author them in the host repo rather than teach `.copilot` new host-specific truth.
+If any of those surfaces are missing, incomplete, or not yet approved, start with bootstrap in the host repo rather than teaching `.copilot` new host-specific truth.
 
 ## Separation rules for future hosts
 
@@ -47,6 +56,7 @@ If any of those surfaces are missing, the fix is to author them in the host repo
 
 Before a future host repo publishes or refreshes wiki pages, confirm that:
 
+- if any required truth surface is still missing or unapproved, bootstrap happens before policy authoring or live wiki maintenance;
 - `docs/WIKI-MAP.md` names the host's wiki-safe and repo-only boundaries;
 - `manifests/wiki-projection-manifest.json` maps only approved canonical sources;
 - canonical docs already contain the wording the wiki should project;
@@ -56,5 +66,6 @@ Before a future host repo publishes or refreshes wiki pages, confirm that:
 ## Use this contract when
 
 - onboarding a future host repo to the reusable wiki workflow stack;
+- deciding whether a future host must bootstrap, author policy, or maintain an existing projection;
 - reviewing whether a wiki-related change belongs in host docs or in reusable `.copilot` procedure;
 - or checking that policy, config, content, and live projection still respect the repo-first authority model.

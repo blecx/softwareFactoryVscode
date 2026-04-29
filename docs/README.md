@@ -28,8 +28,8 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 
 - [`WORK-ISSUE-WORKFLOW.md`](WORK-ISSUE-WORKFLOW.md) — canonical issue → PR → merge workflow.
 - [`setup-github-repository.md`](setup-github-repository.md) — repository protection, branch, and CI setup guidance.
-- [`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`](maintainer/HOST-WIKI-TRUTH-CONTRACT.md) — future-project wiki ownership contract for host policy (`docs/WIKI-MAP.md`), host projection config (`manifests/wiki-projection-manifest.json`), canonical docs, and why `.copilot` stays reusable procedure only.
-- [`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md) — repo-only maintainer runbook for repo-first wiki validation, sync/publishing discipline, and collaborators-only editing checks.
+- [`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`](maintainer/HOST-WIKI-TRUTH-CONTRACT.md) — future-project wiki bootstrap and ownership contract for host policy (`docs/WIKI-MAP.md`), host projection config (`manifests/wiki-projection-manifest.json`), canonical docs, and why `.copilot` stays reusable procedure only.
+- [`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md) — repo-only maintainer runbook for post-truth wiki validation, sync/publishing discipline, and collaborators-only editing checks.
 - [`WIKI-MAP.md`](WIKI-MAP.md) — stable wiki publication policy and live GitHub Wiki target map, including which current docs remain repo-only and why the wiki stays subordinate to repo authority.
 - [`HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md) — install/update contract and ownership boundaries.
 - [`COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md) — high-level explanation of why this repository exists and how the Factory fits into a host repo.
