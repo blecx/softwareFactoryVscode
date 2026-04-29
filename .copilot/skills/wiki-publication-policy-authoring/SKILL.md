@@ -19,6 +19,7 @@ Provide a reusable, host-agnostic workflow for authoring and maintaining host-ow
 ## When Not to Use
 
 - Do not use this to publish or edit live wiki pages directly.
+- Do not use this as the first step when `docs/WIKI-MAP.md` and/or `manifests/wiki-projection-manifest.json` are missing, incomplete, or not yet approved; start with `wiki-bootstrap-workflow` instead.
 - Do not use this to invent host-specific page inventories inside `.copilot`.
 - Do not use this to treat the publication policy file as canonical content or implementation procedure.
 - Do not use this to bypass accepted ADRs or equivalent authority docs that define documentation truth.
@@ -37,6 +38,8 @@ Read the host-owned truth surfaces before drafting or editing the publication po
 - and the host's intended audiences, routing goals, and repo-only constraints.
 
 If the host cannot identify those inputs, stop and ask for the missing host context instead of inventing a publication boundary from reusable defaults.
+
+If the host is still scaffolding those starting surfaces for the first time, hand off to `wiki-bootstrap-workflow` before returning here.
 
 ## Required Sources In This Skill
 

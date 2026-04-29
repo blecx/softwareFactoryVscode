@@ -19,6 +19,7 @@ Provide a reusable, host-agnostic workflow for creating, updating, retiring, and
 ## When Not to Use
 
 - Do not use this to invent or rewrite the host project's publication policy.
+- Do not use this when `docs/WIKI-MAP.md` and/or `manifests/wiki-projection-manifest.json` are missing, incomplete, or not yet approved; start with `wiki-bootstrap-workflow` instead.
 - Do not use this when the host has not defined the publication boundary, projection config, and canonical source docs yet.
 - Do not use this to treat the wiki as canonical source material.
 - Do not use this to bypass the repository's normal issue → PR → merge workflow for host changes.
@@ -37,6 +38,8 @@ Read all host-owned truth surfaces before changing any wiki page:
 - and the host's accepted ADRs or equivalent authority docs that define publication and authority boundaries.
 
 If any required host input is missing or ambiguous, stop and ask the host to author or fix it instead of guessing.
+
+If the host still needs to create those first host-owned starting surfaces, hand off to `wiki-bootstrap-workflow` before returning here.
 
 ## Required Sources In This Skill
 
