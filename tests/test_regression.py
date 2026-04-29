@@ -1109,7 +1109,8 @@ def test_docs_wiki_map_defines_conservative_export_targets() -> None:
     assert (
         "The live wiki and every future resync pass must consume this map" in wiki_map
     )
-    assert "[`docs/README.md`](README.md) | `Home`" in wiki_map
+    assert "[`docs/PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) | `Home`" in wiki_map
+    assert "Narrative-first project landing story for first-time readers" in wiki_map
     assert "WHY-SOFTWARE-FACTORY.md" in wiki_map
     assert "Getting Started" in wiki_map
     assert "HANDOUT.md" in wiki_map
@@ -1191,7 +1192,7 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
     ]
 
     home_page = manifest["pages"][0]
-    assert home_page["canonical_sources"] == ["docs/README.md"]
+    assert home_page["canonical_sources"] == ["docs/PROJECT-OVERVIEW.md"]
     assert home_page["primary_routes"] == [
         "Why Software Factory",
         "Getting Started",
@@ -1202,6 +1203,12 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "FAQ",
         "Technical Overview",
     ]
+    assert (
+        "Narrative-first landing page derived from the host-owned canonical "
+        "project overview" in home_page["note"]
+    )
+    assert "docs/README.md" in home_page["note"]
+    assert "wiki authority surface" in home_page["note"]
 
     sidebar_page = manifest["pages"][1]
     assert sidebar_page["canonical_sources"] == [
@@ -1345,6 +1352,27 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
     }
     assert "README.md" not in flattened_sources
     assert "docs/WORK-ISSUE-WORKFLOW.md" not in flattened_sources
+
+
+def test_home_wiki_projection_uses_project_overview_without_promoting_readme() -> None:
+    repo_root = Path(__file__).parent.parent
+    wiki_map = (repo_root / "docs" / "WIKI-MAP.md").read_text(encoding="utf-8")
+    manifest = json.loads(
+        (repo_root / "manifests" / "wiki-projection-manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    home_page = next(page for page in manifest["pages"] if page["wiki_page"] == "Home")
+
+    assert "[`docs/PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) | `Home`" in wiki_map
+    assert "Narrative-first project landing story for first-time readers" in wiki_map
+    assert "[`README.md`](../README.md) | Repo-only" in wiki_map
+    assert home_page["canonical_sources"] == ["docs/PROJECT-OVERVIEW.md"]
+    assert (
+        "Narrative-first landing page derived from the host-owned canonical "
+        "project overview" in home_page["note"]
+    )
+    assert manifest["authority"]["top_level_readme_policy"] == "repo-only"
 
 
 def test_docs_archive_index_routes_first_pass_historical_docs() -> None:

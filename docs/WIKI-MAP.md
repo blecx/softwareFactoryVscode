@@ -26,7 +26,7 @@ accepted ADRs remain the normative architecture source, and repo file paths rema
 
 | Source doc or scope | Canonical wiki target | Audience | Why it is wiki-safe |
 | --- | --- | --- | --- |
-| [`docs/README.md`](README.md) | `Home` | All readers | Stable audience router for the documentation set. |
+| [`docs/PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) | `Home` | All readers | Narrative-first project landing story for first-time readers while keeping `docs/README.md` as a documentation router rather than the `Home` authority. |
 | [`docs/WHY-SOFTWARE-FACTORY.md`](WHY-SOFTWARE-FACTORY.md) | `Why Software Factory` | New readers / evaluators | Public intent/goals/non-goals overview without maintainer-only internals. |
 | Composite onboarding projection assembled from [`docs/WHY-SOFTWARE-FACTORY.md`](WHY-SOFTWARE-FACTORY.md), [`docs/INSTALL.md`](INSTALL.md), and [`docs/HANDOUT.md`](HANDOUT.md) | `Getting Started` | New readers / operators | Concise wiki-native router for first-run onboarding assembled only from already wiki-safe evaluator/operator sources. |
 | [`docs/HANDOUT.md`](HANDOUT.md) | `Operator Handout` | Operators | Guided first-run path for the supported operator workflow. |

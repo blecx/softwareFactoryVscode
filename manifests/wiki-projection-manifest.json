@@ -26,7 +26,7 @@
       "page_type": "summary",
       "status": "live",
       "canonical_sources": [
-        "docs/README.md"
+        "docs/PROJECT-OVERVIEW.md"
       ],
       "primary_routes": [
         "Why Software Factory",
@@ -43,7 +43,7 @@
         "operators",
         "architecture-readers"
       ],
-      "note": "Evaluator-first landing page derived from the documentation index and updated to route directly to the published onboarding, tutorial, operator-reference, and technical discovery pages."
+      "note": "Narrative-first landing page derived from the host-owned canonical project overview and used to route readers onward to onboarding, tutorial, operator-reference, and technical discovery pages without turning `docs/README.md` into the wiki authority surface."
     },
     {
       "wiki_page": "_Sidebar",
