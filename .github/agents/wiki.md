@@ -28,23 +28,27 @@ This file is a VS Code discovery wrapper. Keep reusable wiki logic in `.copilot/
 ## Routing Decision
 - If the host lacks a publication boundary or needs to revise what is wiki-safe vs repo-only, start with the publication-policy-authoring skill.
 - If the host already has publication policy, projection config, and canonical docs, use the maintenance workflow to create, update, retire, or verify wiki pages.
+- If the host already has approved wiki truth and the task is repo-specific sync, validation, or publication work, read `docs/maintainer/WIKI-PUBLISHING.md` alongside the maintenance workflow before touching the live wiki.
 - If any host-owned policy/config/content source is missing or ambiguous, stop and repair the host truth surfaces before touching live wiki pages.
 
 ## Use This Agent When
 - A user needs one consistent entrypoint for wiki-related workflow routing.
 - A host repo needs to bootstrap or revise `docs/WIKI-MAP.md`-style publication policy.
 - Existing wiki projections need to be created, refreshed, retired, or verified using approved host-owned sources.
+- A maintainer needs the repo-first sync/publishing and verification runbook for an already-approved live wiki projection.
 
 ## Required Sources
 - `.copilot/skills/wiki-publication-policy-authoring/SKILL.md`
 - `.copilot/skills/wiki-maintenance-workflow/SKILL.md`
 - `docs/maintainer/HOST-WIKI-TRUTH-CONTRACT.md`
+- `docs/maintainer/WIKI-PUBLISHING.md`
 - `docs/WIKI-MAP.md`
 - `manifests/wiki-projection-manifest.json`
 - `.copilot/skills/prompt-quality-baseline/SKILL.md`
 
 ## Hard Rules
 - Read the host-owned publication policy, projection config, and canonical docs before publishing or editing wiki content.
+- Use the repo-only maintainer runbook for host-specific sync, validation, and publication steps instead of pushing those steps into reusable `.copilot` skills.
 - Keep repo docs canonical and keep the live GitHub wiki as a reader-facing projection.
 - Use `.tmp/`, never `/tmp`.
 - Route repository implementation changes back through the canonical issue → PR → merge path rather than using this wrapper as a bypass.
