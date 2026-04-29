@@ -27,6 +27,7 @@ DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
 REQUIRED_DEV_TOOL_MODULES = ("black", "flake8", "isort", "pytest")
 STANDARD_MODE = "standard"
 PRODUCTION_MODE = "production"
+GIT_IDENTITY_GUARD_COMMAND = "./scripts/verify_git_identity.py"
 CANONICAL_PRODUCTION_PARITY_COMMAND = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
 )
@@ -626,6 +627,27 @@ def build_release_contract_steps(
     args: argparse.Namespace, *, base_rev: str
 ) -> list[StepDefinition]:
     return [
+        StepDefinition(
+            name="Git author identity guard",
+            command=(
+                args.python,
+                GIT_IDENTITY_GUARD_COMMAND,
+                "--repo-root",
+                ".",
+                "--head-rev",
+                args.head_rev,
+            ),
+            failure_summary=(
+                "Git author identity guard detected blocked placeholder author, "
+                "committer, or co-author metadata."
+            ),
+            remediation=(
+                "Set Git `user.name` / `user.email` to the intended human identity, "
+                "then amend or rewrite the affected commit(s) to remove blocked "
+                "`CI <ci@example.com>` / `CI <ci@localhost>` author, committer, "
+                "and `Co-authored-by` metadata before rerunning the precheck."
+            ),
+        ),
         StepDefinition(
             name="Release docs policy check",
             command=(

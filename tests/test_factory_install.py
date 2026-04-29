@@ -284,7 +284,7 @@ def init_git_repo(path: Path) -> None:
     git("init", cwd=path)
     git("checkout", "-b", "main", cwd=path)
     git("config", "user.name", "Test User", cwd=path)
-    git("config", "user.email", "test@example.com", cwd=path)
+    git("config", "user.email", "test@localhost", cwd=path)
 
 
 def refresh_source_release_manifest(path: Path) -> None:

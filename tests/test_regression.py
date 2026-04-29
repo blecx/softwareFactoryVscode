@@ -2050,6 +2050,20 @@ def _load_local_ci_parity_module():
     return module
 
 
+def _load_verify_git_identity_module():
+    repo_root = Path(__file__).parent.parent
+    verify_identity_path = repo_root / "scripts" / "verify_git_identity.py"
+    spec = importlib.util.spec_from_file_location(
+        "verify_git_identity_module", verify_identity_path
+    )
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_next_pr_resolves_current_backend_repo_and_skips_placeholder_client(
     monkeypatch,
 ):
@@ -2195,6 +2209,139 @@ def test_local_ci_parity_reports_findings_list_and_improvement_plan(
         "finalizing the PR." in captured.out
     )
     assert "would reformat scripts/demo.py" in captured.err
+
+
+def test_local_ci_parity_runs_git_author_identity_guard(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    executed_commands: list[tuple[str, ...]] = []
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        executed_commands.append(command_tuple)
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--skip-integration",
+            "--skip-pr-template-check",
+        ]
+    )
+
+    assert exit_code == 0
+    assert any(
+        command[1] == module.GIT_IDENTITY_GUARD_COMMAND
+        for command in executed_commands
+        if len(command) > 1
+    )
+
+
+def test_verify_git_identity_blocks_head_placeholder_author_and_coauthor(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_verify_git_identity_module()
+
+    def _fake_run_git(repo_root: Path, args: list[str]):
+        del repo_root
+        if args == ["config", "--get", "user.name"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="Cinderella\n", stderr="")
+        if args == ["config", "--get", "user.email"]:
+            return subprocess.CompletedProcess(
+                ["git"],
+                0,
+                stdout="cinderella@localhost\n",
+                stderr="",
+            )
+        if args[0] == "show":
+            return subprocess.CompletedProcess(
+                ["git"],
+                0,
+                stdout=(
+                    "CI\x00ci@example.com\x00CI\x00ci@example.com\x00"
+                    "Fixes #178: add wiki export map\n\n"
+                    "Co-authored-by: CI <ci@example.com>\n"
+                ),
+                stderr="",
+            )
+        raise AssertionError(f"unexpected git command: {args}")
+
+    monkeypatch.setattr(module, "run_git", _fake_run_git)
+
+    exit_code = module.main(["--repo-root", str(tmp_path)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "HEAD author uses a blocked placeholder identity" in captured.out
+    assert "HEAD committer uses a blocked placeholder identity" in captured.out
+    assert "blocked `Co-authored-by` trailer" in captured.out
+    assert "Fix the local Git identity" in captured.out
+
+
+def test_verify_git_identity_blocks_placeholder_git_config(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_verify_git_identity_module()
+
+    def _fake_run_git(repo_root: Path, args: list[str]):
+        del repo_root
+        if args == ["config", "--get", "user.name"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="CI\n", stderr="")
+        if args == ["config", "--get", "user.email"]:
+            return subprocess.CompletedProcess(
+                ["git"],
+                0,
+                stdout="ci@localhost\n",
+                stderr="",
+            )
+        if args[0] == "show":
+            return subprocess.CompletedProcess(
+                ["git"],
+                0,
+                stdout=(
+                    "Cinderella\x00cinderella@localhost\x00"
+                    "Cinderella\x00cinderella@localhost\x00"
+                    "Clean commit message\n"
+                ),
+                stderr="",
+            )
+        raise AssertionError(f"unexpected git command: {args}")
+
+    monkeypatch.setattr(module, "run_git", _fake_run_git)
+
+    exit_code = module.main(["--repo-root", str(tmp_path)])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "Configured Git identity is blocked" in captured.out
+    assert "CI <ci@localhost>" in captured.out
+
+
+def test_ci_workflow_enforces_git_author_identity_guard():
+    repo_root = Path(__file__).parent.parent
+    workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Verify Git author identity" in workflow
+    assert "./scripts/verify_git_identity.py --repo-root . --head-rev HEAD" in workflow
 
 
 def test_local_ci_parity_warnings_do_not_fail_the_standard_precheck(
