@@ -61,7 +61,7 @@ def load_head_metadata(
 ) -> tuple[str, str, str, str, str] | None:
     result = run_git(
         repo_root,
-        ["show", "--quiet", f"--format=%an%x00%ae%x00%cn%x00%ce%x00%B", head_rev],
+        ["show", "--quiet", "--format=%an%x00%ae%x00%cn%x00%ce%x00%B", head_rev],
     )
     if result.returncode != 0:
         return None
