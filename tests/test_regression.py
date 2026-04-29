@@ -1018,6 +1018,7 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "CHEAT_SHEET.md" in docs_readme
     assert "WORK-ISSUE-WORKFLOW.md" in docs_readme
     assert "setup-github-repository.md" in docs_readme
+    assert "maintainer/HOST-WIKI-TRUTH-CONTRACT.md" in docs_readme
     assert "WIKI-MAP.md" in docs_readme
     assert "maintainer/GUARDRAILS.md" in docs_readme
     assert "maintainer/AGENT-ENFORCEMENT-MAP.md" in docs_readme
@@ -1303,6 +1304,30 @@ def test_docs_archive_index_routes_first_pass_historical_docs() -> None:
     assert "Historical architecture plans under [`../architecture/`]" in archive_readme
 
 
+def test_host_wiki_truth_contract_doc_keeps_project_truth_in_host_repo():
+    repo_root = Path(__file__).parent.parent
+    contract = (
+        repo_root / "docs" / "maintainer" / "HOST-WIKI-TRUTH-CONTRACT.md"
+    ).read_text(encoding="utf-8")
+    lowered = contract.lower()
+
+    assert "# Host-owned wiki truth contract" in contract
+    assert (
+        "host-owned policy/config/content are the only project-specific wiki truth surfaces"
+        in lowered
+    )
+    assert "docs/WIKI-MAP.md" in contract
+    assert "manifests/wiki-projection-manifest.json" in contract
+    assert "Canonical `docs/*.md` pages and accepted ADRs" in contract
+    assert ".copilot/skills/wiki-publication-policy-authoring/" in contract
+    assert ".copilot/skills/wiki-maintenance-workflow/" in contract
+    assert "reader-facing projection" in lowered
+    assert "Keep publication policy separate from projection config." in contract
+    assert "Keep projection config separate from canonical content." in contract
+    assert "ADR-013" in contract
+    assert "softwarefactoryvscode" not in lowered
+
+
 def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     repo_root = Path(__file__).parent.parent
     catalog = (repo_root / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
@@ -1312,6 +1337,7 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert "# Maintainer guardrail catalog" in catalog
     assert "index/reference" in catalog
     assert "not a competing normative authority" in catalog
+    assert "HOST-WIKI-TRUTH-CONTRACT.md" in catalog
     assert "AGENT-ENFORCEMENT-MAP.md" in catalog
     assert "docs/WORK-ISSUE-WORKFLOW.md" in catalog
     assert ".github/copilot-instructions.md" in catalog
@@ -1327,6 +1353,7 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert "ADR-005-Strong-Templating-Enforcement.md" in catalog
     assert "ADR-006-Local-CI-Parity-Prechecks.md" in catalog
     assert ".github/workflows/ci.yml" in catalog
+    assert "manifests/wiki-projection-manifest.json" in catalog
     assert "configs/bash_gateway_policy.default.yml" in catalog
     assert "scripts/setup-low-approval.sh" in catalog
     assert "scripts/setup-vscode-agent-settings.py" in catalog
@@ -2312,7 +2339,9 @@ def test_verify_git_identity_blocks_head_placeholder_author_and_coauthor(
     def _fake_run_git(repo_root: Path, args: list[str]):
         del repo_root
         if args == ["config", "--get", "user.name"]:
-            return subprocess.CompletedProcess(["git"], 0, stdout="Cinderella\n", stderr="")
+            return subprocess.CompletedProcess(
+                ["git"], 0, stdout="Cinderella\n", stderr=""
+            )
         if args == ["config", "--get", "user.email"]:
             return subprocess.CompletedProcess(
                 ["git"],
