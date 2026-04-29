@@ -451,6 +451,59 @@ def test_queue_skills_reference_historical_guardrails():
         assert text.count("ADR-006-Local-CI-Parity-Prechecks.md") == 1
 
 
+def test_wiki_maintenance_skill_requires_host_truth_and_shared_assets():
+    repo_root = Path(__file__).parent.parent
+    skill_root = repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow"
+    skill = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+    procedure = (skill_root / "references" / "maintenance-procedure.md").read_text(
+        encoding="utf-8"
+    )
+    metadata = (skill_root / "references" / "wiki-metadata-rules.md").read_text(
+        encoding="utf-8"
+    )
+
+    lowered_skill = skill.lower()
+    lowered_procedure = procedure.lower()
+    lowered_metadata = metadata.lower()
+
+    assert "host-owned publication policy" in lowered_skill
+    assert "host-owned projection config" in lowered_skill
+    assert "canonical host docs" in lowered_skill
+    assert "reader-facing projection" in lowered_skill
+    assert (
+        "stop and ask the host to author or fix it instead of guessing" in lowered_skill
+    )
+
+    assert "create or update flow" in lowered_procedure
+    assert "retire, redirect, or delete flow" in lowered_procedure
+    assert "public-render verification checklist" in lowered_procedure
+
+    assert "canonical-source note" in lowered_metadata
+    assert "projection note" in lowered_metadata
+    assert "sync marker" in lowered_metadata
+
+    asset_paths = [
+        skill_root / "assets" / "shared-pages" / "Home.md",
+        skill_root / "assets" / "shared-pages" / "_Sidebar.md",
+        skill_root / "assets" / "shared-pages" / "_Footer.md",
+        skill_root / "assets" / "retired-page-notice.md",
+    ]
+    for path in asset_paths:
+        text = path.read_text(encoding="utf-8")
+        assert "Canonical source" in text
+        assert "Sync marker" in text
+        assert "softwareFactoryVscode" not in text
+
+    assert "Projection note" in asset_paths[0].read_text(encoding="utf-8")
+    assert "Projection note" in asset_paths[1].read_text(encoding="utf-8")
+    assert "Projection note" in asset_paths[2].read_text(encoding="utf-8")
+    assert "Retired page" in asset_paths[3].read_text(encoding="utf-8")
+
+    assert "softwarefactoryvscode" not in lowered_skill
+    assert "softwarefactoryvscode" not in lowered_procedure
+    assert "softwarefactoryvscode" not in lowered_metadata
+
+
 def test_workflow_skill_instruction_numbering_is_monotonic():
     repo_root = Path(__file__).parent.parent
     issue_creation = (
