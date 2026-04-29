@@ -504,6 +504,58 @@ def test_wiki_maintenance_skill_requires_host_truth_and_shared_assets():
     assert "softwarefactoryvscode" not in lowered_metadata
 
 
+def test_wiki_publication_policy_skill_keeps_host_truth_in_repo():
+    repo_root = Path(__file__).parent.parent
+    skill_root = repo_root / ".copilot" / "skills" / "wiki-publication-policy-authoring"
+    skill = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+    procedure = (skill_root / "references" / "policy-authoring-procedure.md").read_text(
+        encoding="utf-8"
+    )
+    rules = (skill_root / "references" / "publication-boundary-rules.md").read_text(
+        encoding="utf-8"
+    )
+    template = (skill_root / "assets" / "wiki-map-template.md").read_text(
+        encoding="utf-8"
+    )
+
+    lowered_skill = skill.lower()
+    lowered_procedure = procedure.lower()
+    lowered_rules = rules.lower()
+    lowered_template = template.lower()
+
+    assert "docs/wiki-map.md" in lowered_skill
+    assert "project-specific truth in the host repository" in lowered_skill
+    assert "projection config" in lowered_skill
+    assert "canonical docs" in lowered_skill
+    assert "leave live wiki publication to the maintenance workflow" in lowered_skill
+    assert (
+        "stop and ask for the missing host context instead of inventing a publication boundary"
+        in lowered_skill
+    )
+
+    assert "create or update flow" in lowered_procedure
+    assert "host contract shape" in lowered_procedure
+    assert "evidence expectations" in lowered_procedure
+
+    assert "wiki-safe classification rules" in lowered_rules
+    assert "repo-only classification rules" in lowered_rules
+    assert "anti-patterns" in lowered_rules
+    assert (
+        "do not use the publication-policy file as a substitute for projection config"
+        in lowered_rules
+    )
+
+    assert "## Export policy defaults" in template
+    assert "## Wiki-safe export targets" in template
+    assert "## Repo-only surfaces" in template
+    assert "Later wiki-maintenance work should consume this map" in template
+
+    assert "softwarefactoryvscode" not in lowered_skill
+    assert "softwarefactoryvscode" not in lowered_procedure
+    assert "softwarefactoryvscode" not in lowered_rules
+    assert "softwarefactoryvscode" not in lowered_template
+
+
 def test_workflow_skill_instruction_numbering_is_monotonic():
     repo_root = Path(__file__).parent.parent
     issue_creation = (
