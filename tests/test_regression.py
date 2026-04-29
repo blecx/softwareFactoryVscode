@@ -1116,6 +1116,8 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "setup-github-repository.md" in docs_readme
     assert "maintainer/HOST-WIKI-TRUTH-CONTRACT.md" in docs_readme
     assert "maintainer/WIKI-PUBLISHING.md" in docs_readme
+    assert "future-project wiki bootstrap and ownership contract" in docs_readme
+    assert "post-truth wiki validation" in docs_readme
     assert "WIKI-MAP.md" in docs_readme
     assert "maintainer/GUARDRAILS.md" in docs_readme
     assert "maintainer/AGENT-ENFORCEMENT-MAP.md" in docs_readme
@@ -1503,8 +1505,10 @@ def test_host_wiki_truth_contract_doc_keeps_project_truth_in_host_repo():
     assert "docs/WIKI-MAP.md" in contract
     assert "manifests/wiki-projection-manifest.json" in contract
     assert "Canonical `docs/*.md` pages and accepted ADRs" in contract
+    assert ".copilot/skills/wiki-bootstrap-workflow/" in contract
     assert ".copilot/skills/wiki-publication-policy-authoring/" in contract
     assert ".copilot/skills/wiki-maintenance-workflow/" in contract
+    assert "pre-truth onboarding step" in lowered
     assert "reader-facing projection" in lowered
     assert "Keep publication policy separate from projection config." in contract
     assert "Keep projection config separate from canonical content." in contract
@@ -1529,6 +1533,10 @@ def test_maintainer_wiki_publishing_runbook_keeps_wiki_repo_first():
     assert (
         "root checkout on `main` remains reserved as a non-execution surface" in runbook
     )
+    assert (
+        "starts only after the required host-owned truth surfaces already exist "
+        "and are approved" in lowered
+    )
     assert "Restrict editing to collaborators only" in runbook
     assert "Last synced from" in runbook
     assert "repo-only leak" in lowered
@@ -1540,10 +1548,12 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     catalog = (repo_root / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
         encoding="utf-8"
     )
+    lowered = catalog.lower()
 
     assert "# Maintainer guardrail catalog" in catalog
     assert "index/reference" in catalog
     assert "not a competing normative authority" in catalog
+    assert "wiki bootstrap" in lowered
     assert "HOST-WIKI-TRUTH-CONTRACT.md" in catalog
     assert "WIKI-PUBLISHING.md" in catalog
     assert "AGENT-ENFORCEMENT-MAP.md" in catalog
@@ -1616,6 +1626,7 @@ def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sourc
     assert "not a competing normative authority" in enforcement_map
     assert "create-issue" in enforcement_map
     assert "wiki.md" in enforcement_map
+    assert "wiki-bootstrap-workflow" in enforcement_map
     assert "wiki-publication-policy-authoring" in enforcement_map
     assert "wiki-maintenance-workflow" in enforcement_map
     assert "HOST-WIKI-TRUTH-CONTRACT.md" in enforcement_map
@@ -1646,14 +1657,19 @@ def test_wiki_agent_wrapper_stays_thin_and_requires_host_truth():
     lowered = wrapper.lower()
 
     assert "Provides context for the `wiki` AI Agent." in wrapper
-    assert "Routes wiki-policy authoring and wiki-maintenance requests" in wrapper
+    assert (
+        "Routes wiki bootstrap, publication-policy authoring, and "
+        "wiki-maintenance requests" in wrapper
+    )
     assert "thin discovery wrapper" in lowered
+    assert ".copilot/skills/wiki-bootstrap-workflow/SKILL.md" in wrapper
     assert ".copilot/skills/wiki-publication-policy-authoring/SKILL.md" in wrapper
     assert ".copilot/skills/wiki-maintenance-workflow/SKILL.md" in wrapper
     assert "docs/maintainer/HOST-WIKI-TRUTH-CONTRACT.md" in wrapper
     assert "docs/maintainer/WIKI-PUBLISHING.md" in wrapper
     assert "docs/WIKI-MAP.md" in wrapper
     assert "manifests/wiki-projection-manifest.json" in wrapper
+    assert "missing, incomplete, or not yet approved" in wrapper
     assert "publication-policy-authoring skill" in wrapper
     assert "issue → PR → merge workflow" in wrapper
     assert "repo-first" in lowered

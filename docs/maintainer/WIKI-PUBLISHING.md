@@ -2,6 +2,8 @@
 
 This page is a repo-only maintainer runbook for validating and publishing the live GitHub wiki.
 It records the repository-specific sync procedure, not the publication policy, projection config, or canonical content.
+This runbook starts only after the required host-owned truth surfaces already exist and are approved: accepted ADRs or equivalent authority docs, canonical docs, `docs/WIKI-MAP.md`, and `manifests/wiki-projection-manifest.json`.
+If those surfaces are missing or unapproved, return to bootstrap or publication-policy authoring first instead of inventing truth during live wiki publishing.
 
 ## Authority note
 
@@ -12,7 +14,7 @@ The live GitHub wiki remains a reader-facing projection.
 
 ## Use this runbook when
 
-- validating the initial launch or any future resync pass;
+- validating the initial launch or any future resync pass after the required host-owned truth surfaces already exist and are approved;
 - refreshing the live wiki clone under `.tmp/wiki-launch/live-wiki`;
 - confirming that the current published page set still matches approved repo truth;
 - or publishing already-approved wiki changes after the corresponding repo issue → PR → merge slice lands.
@@ -30,6 +32,7 @@ Read these inputs before touching the live wiki:
 ## Repo-first rules
 
 - Land repo-side policy, projection-config, and canonical-content changes first.
+- Do not use this runbook to bootstrap host truth or author the publication boundary from scratch.
 - Treat the live wiki as output; never use it as the source of truth for what should exist.
 - The root checkout on `main` remains reserved as a non-execution surface; do live issue work in dedicated worktrees.
 - Keep the live wiki clone under `.tmp/wiki-launch/live-wiki` and use `.tmp/`, never `/tmp`.
