@@ -11,6 +11,7 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 
 ### New readers and evaluators
 
+- [`PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) — canonical narrative-first overview of what SoftwareFactoryVscode is trying to automate, how the AI-assisted workflow is meant to work, and where to go next.
 - [`WHY-SOFTWARE-FACTORY.md`](WHY-SOFTWARE-FACTORY.md) — canonical explanation of why the project exists, who it helps, and what it explicitly is not trying to be.
 - [`../README.md`](../README.md) — repository entrypoint, current release, and top-level orientation.
 - [`HANDOUT.md`](HANDOUT.md) — guided overview of the Software Factory model and workflows.
@@ -58,15 +59,15 @@ Accepted ADRs and current contract documents are intentionally not listed in
 this table because they remain normative authority sources rather than
 roadmap/plan status entries.
 
-| Document | Classification | Use it for |
-| --- | --- | --- |
-| [`ROADMAP.md`](ROADMAP.md) | Active roadmap | Current high-level direction, routing, and boundaries for active documentation/readiness work. |
-| [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | Active supporting plan | Current readiness sequencing within the shipped `2.6` guardrails and the scope defined by `PRODUCTION-READINESS.md`. |
-| [`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical sequencing | Trace the delivered namespace migration and mitigation work without treating it as a current execution plan. |
-| [`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) | Historical sequencing | Review the completed migration backlog and phased delivery notes for repository archaeology only. |
-| [`archive/MCP-RUNTIME-MITIGATION-PLAN.md`](archive/MCP-RUNTIME-MITIGATION-PLAN.md) | Historical sequencing | Trace the closed runtime/readiness mitigation program and its closeout context. |
-| [`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`](architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md) | Historical sequencing | Review runtime-manager rollout history, delivered baseline notes, and deferred-scope markers. |
-| [`architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md`](architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md) | Historical sequencing | Review the fulfilled ADR-008 rollout sequencing and practical-baseline hardening history. |
+| Document                                                                                                             | Classification         | Use it for                                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [`ROADMAP.md`](ROADMAP.md)                                                                                           | Active roadmap         | Current high-level direction, routing, and boundaries for active documentation/readiness work.                       |
+| [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md)                                                       | Active supporting plan | Current readiness sequencing within the shipped `2.6` guardrails and the scope defined by `PRODUCTION-READINESS.md`. |
+| [`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md)   | Historical sequencing  | Trace the delivered namespace migration and mitigation work without treating it as a current execution plan.         |
+| [`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md)         | Historical sequencing  | Review the completed migration backlog and phased delivery notes for repository archaeology only.                    |
+| [`archive/MCP-RUNTIME-MITIGATION-PLAN.md`](archive/MCP-RUNTIME-MITIGATION-PLAN.md)                                   | Historical sequencing  | Trace the closed runtime/readiness mitigation program and its closeout context.                                      |
+| [`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`](architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md) | Historical sequencing  | Review runtime-manager rollout history, delivered baseline notes, and deferred-scope markers.                        |
+| [`architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md`](architecture/MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md) | Historical sequencing  | Review the fulfilled ADR-008 rollout sequencing and practical-baseline hardening history.                            |
 
 ### Historical and reference material
 
