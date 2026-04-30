@@ -68,6 +68,7 @@ Read these inputs before touching the live wiki:
 - Every published wiki page must be allowed by `docs/WIKI-MAP.md`.
 - The live page set should match `manifests/wiki-projection-manifest.json` for the currently expected projection, even when `docs/WIKI-MAP.md` approves a broader future surface.
 - `Home`, `_Sidebar`, and `_Footer` are shared chrome and must stay aligned with the current audience routes.
+- Avoid router-to-router loops and `Home` re-entry. When `Home` or shared navigation already exposes an orientation/router page, downstream tutorial or reference pages should route readers into concrete next actions, deeper references, or canonical repo docs instead of sending them back through that same router layer.
 - Repo-only surfaces such as `README.md`, `docs/maintainer/*.md`, `docs/WORK-ISSUE-WORKFLOW.md`, `docs/setup-github-repository.md`, `docs/ROADMAP.md`, `docs/PRODUCTION-READINESS-PLAN.md`, and `docs/archive/*.md` must not appear as published wiki pages or navigation destinations.
 
 ### 4. Validate page chrome
@@ -87,6 +88,7 @@ Read these inputs before touching the live wiki:
 
 - Only push wiki edits that project already-approved canonical repo content.
 - Direct wiki edits are for projection formatting, navigation, metadata, and bounded publication work, not for inventing new canonical truth.
+- When project naming changes on a published route or page title, update `docs/WIKI-MAP.md`, `manifests/wiki-projection-manifest.json`, and every affected live wiki link in the same slice so labels, slugs, and navigation do not drift apart.
 - If a needed change is really policy or content, update the repo first, merge it, and then resync the wiki.
 
 ### 7. Record bounded evidence
