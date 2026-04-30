@@ -86,12 +86,8 @@ PYTEST_BUNDLE_TO_FILES: dict[str, tuple[str, ...]] = {
         "tests/test_quota_load_validation.py",
         "tests/test_multi_tenant.py",
     ),
-    PYTEST_BUNDLE_RUNTIME_MANAGER: (
-        "tests/test_mcp_runtime_manager.py",
-    ),
-    PYTEST_BUNDLE_RUNTIME_DOCKER: (
-        "tests/test_throwaway_runtime_docker.py",
-    ),
+    PYTEST_BUNDLE_RUNTIME_MANAGER: ("tests/test_mcp_runtime_manager.py",),
+    PYTEST_BUNDLE_RUNTIME_DOCKER: ("tests/test_throwaway_runtime_docker.py",),
     PYTEST_BUNDLE_LEGACY_MISC: (
         "tests/test_legacy_cleanup.py",
         "tests/test_legacy_verification.py",
@@ -207,9 +203,7 @@ def blocking_docker_e2e_guidance() -> str:
     )
 
 
-def _append_watchdog_args(
-    command: list[str], *, watchdog_seconds: int | None
-) -> None:
+def _append_watchdog_args(command: list[str], *, watchdog_seconds: int | None) -> None:
     if watchdog_seconds is None or watchdog_seconds == DEFAULT_WATCHDOG_SECONDS:
         return
     command.extend(["--watchdog-seconds", str(watchdog_seconds)])
@@ -231,15 +225,11 @@ def format_timeout_summary(command: Sequence[str], timeout_seconds: int) -> str:
 
 def resolve_standard_group_selection(args: argparse.Namespace) -> tuple[str, ...]:
     if args.mode != STANDARD_MODE and args.standard_group:
-        raise ValueError(
-            "`--standard-group` is only supported with `--mode standard`."
-        )
+        raise ValueError("`--standard-group` is only supported with `--mode standard`.")
 
     requested = args.standard_group or list(STANDARD_GROUP_ORDER)
     deduped_requested = list(dict.fromkeys(requested))
-    return tuple(
-        group for group in STANDARD_GROUP_ORDER if group in deduped_requested
-    )
+    return tuple(group for group in STANDARD_GROUP_ORDER if group in deduped_requested)
 
 
 def resolve_pytest_bundle_selection(
@@ -1065,7 +1055,12 @@ def build_pytest_steps(
                 ),
                 remediation=(
                     f"Investigate the failing tests in `{bundle_name}` and rerun "
-                    f"`{build_standard_group_replay_command(args, group=STANDARD_GROUP_PYTEST, pytest_bundle=bundle_name)}` once they pass."
+                    "`"
+                    f"{build_standard_group_replay_command(
+                        args,
+                        group=STANDARD_GROUP_PYTEST,
+                        pytest_bundle=bundle_name,
+                    )}` once they pass."
                 ),
                 timeout_remediation=build_pytest_watchdog_remediation(
                     args,
@@ -1129,9 +1124,7 @@ def run_selected_standard_groups(
 
         if group == STANDARD_GROUP_INTEGRATION:
             if args.skip_integration:
-                warning = (
-                    "Integration regression was skipped by request (--skip-integration)."
-                )
+                warning = "Integration regression was skipped by request (--skip-integration)."
                 print(f"\nℹ️ {warning}")
                 findings.append(
                     Finding(
