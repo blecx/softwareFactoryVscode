@@ -1234,6 +1234,15 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "CHEAT_SHEET.md" in docs_readme
     assert "WORK-ISSUE-WORKFLOW.md" in docs_readme
     assert "setup-github-repository.md" in docs_readme
+    assert "Wiki workflow first stops" in docs_readme
+    assert "truth first, post-truth publishing second" in docs_readme
+    assert (
+        "Where does host-owned wiki truth live, and is bootstrap still required?"
+        in docs_readme
+    )
+    assert "../manifests/wiki-projection-manifest.json" in docs_readme
+    assert "Approved truth already exists" in docs_readme
+    assert "publish the live wiki safely" in docs_readme
     assert "maintainer/HOST-WIKI-TRUTH-CONTRACT.md" in docs_readme
     assert "maintainer/WIKI-PUBLISHING.md" in docs_readme
     assert "future-project wiki bootstrap and ownership contract" in docs_readme
@@ -1628,6 +1637,10 @@ def test_host_wiki_truth_contract_doc_keeps_project_truth_in_host_repo():
     assert ".copilot/skills/wiki-bootstrap-workflow/" in contract
     assert ".copilot/skills/wiki-publication-policy-authoring/" in contract
     assert ".copilot/skills/wiki-maintenance-workflow/" in contract
+    assert "where host-owned wiki truth lives" in lowered
+    assert "what order a future host adopts it" in lowered
+    assert "## Adoption order" in contract
+    assert "post-truth validation and publishing runbook" in lowered
     assert "pre-truth onboarding step" in lowered
     assert "reader-facing projection" in lowered
     assert "Keep publication policy separate from projection config." in contract
@@ -1649,6 +1662,11 @@ def test_maintainer_wiki_publishing_runbook_keeps_wiki_repo_first():
     assert "docs/WIKI-MAP.md" in runbook
     assert "manifests/wiki-projection-manifest.json" in runbook
     assert "HOST-WIKI-TRUTH-CONTRACT.md" in runbook
+    assert "approved host truth already exists" in lowered
+    assert "## Entry gate" in runbook
+    assert "host publication boundary" in lowered
+    assert "host projection config" in lowered
+    assert "stop here and return to" in lowered
     assert ".tmp/wiki-launch/live-wiki" in runbook
     assert (
         "root checkout on `main` remains reserved as a non-execution surface" in runbook

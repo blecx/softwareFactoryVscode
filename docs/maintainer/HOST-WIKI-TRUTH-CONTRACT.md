@@ -2,6 +2,7 @@
 
 This page explains which files a future host project owns when it adopts the reusable wiki workflow stack.
 It is a maintainer/reference entrypoint, not a competing authority surface.
+Use this page first when the maintainer question is where host-owned wiki truth lives, what order a future host adopts it, or whether a later wiki lane is allowed to start.
 
 ## Authority note
 
@@ -14,13 +15,13 @@ The reusable `.copilot` workflow pieces must stay procedural and host-agnostic.
 Host-owned policy/config/content are the only project-specific wiki truth surfaces.
 If a detail is specific to one host project, it belongs in that host repository rather than in reusable `.copilot` instructions.
 
-## Bootstrap before truth exists
+## Adoption order
 
-When required host-owned wiki truth surfaces are missing, incomplete, or not yet approved, start with the reusable [`wiki-bootstrap-workflow`](../../.copilot/skills/wiki-bootstrap-workflow/SKILL.md) as the pre-truth onboarding step.
-Bootstrap may scaffold or verify the starting surfaces, but it does not replace host-owned authority:
+Follow this order so host-owned authority exists before any post-truth publishing or live projection work begins:
 
-- hand off to `wiki-publication-policy-authoring` once the host can define or revise the wiki-safe versus repo-only boundary;
-- hand off to `wiki-maintenance-workflow` only after the host publication policy, projection config, canonical docs, and authority docs exist and are approved.
+1. When required host-owned wiki truth surfaces are missing, incomplete, or not yet approved, start with the reusable [`wiki-bootstrap-workflow`](../../.copilot/skills/wiki-bootstrap-workflow/SKILL.md) as the pre-truth onboarding step.
+2. Hand off to [`wiki-publication-policy-authoring`](../../.copilot/skills/wiki-publication-policy-authoring/SKILL.md) once the host can define or revise the wiki-safe versus repo-only boundary in repo-owned truth.
+3. Hand off to [`wiki-maintenance-workflow`](../../.copilot/skills/wiki-maintenance-workflow/SKILL.md) only after the host publication policy, projection config, canonical docs, and authority docs exist and are approved; repo-side maintainers then use [`WIKI-PUBLISHING.md`](WIKI-PUBLISHING.md) as the post-truth validation and publishing runbook.
 
 ## Ownership split at a glance
 
@@ -34,6 +35,8 @@ Bootstrap may scaffold or verify the starting surfaces, but it does not replace 
 
 ## Required host-owned truth surfaces
 
+These are the minimum surfaces a future host should be able to point to before any post-truth publishing lane begins.
+
 A future host project should be able to point to all of these files without reading implementation internals:
 
 1. `docs/WIKI-MAP.md` — the host publication boundary and repo-only rationale.
@@ -41,8 +44,7 @@ A future host project should be able to point to all of these files without read
 3. Canonical `docs/*.md` pages — the source content that the wiki may summarize or project.
 4. Accepted ADRs or equivalent authority docs — the architectural authority that explains why the hierarchy works this way.
 
-If any of those surfaces are missing, the fix is to author them in the host repo rather than teach `.copilot` new host-specific truth.
-If any of those surfaces are missing, incomplete, or not yet approved, start with bootstrap in the host repo rather than teaching `.copilot` new host-specific truth.
+If any of those surfaces are missing, incomplete, or not yet approved, fix that in the host repo first and start with bootstrap there rather than teaching `.copilot` new host-specific truth.
 
 ## Separation rules for future hosts
 
