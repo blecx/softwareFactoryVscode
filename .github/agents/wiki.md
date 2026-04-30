@@ -1,4 +1,5 @@
 ## Objective
+
 Provides context for the `wiki` AI Agent.
 
 ```chatagent
@@ -25,10 +26,16 @@ This file is a VS Code discovery wrapper. Keep reusable wiki logic in `.copilot/
 - **Do not** treat `.copilot` as the owner of project-specific wiki truth.
 - **Do not** create a second repo-change path outside the canonical issue → PR → merge workflow.
 
-## Routing Decision
-- If required host-owned truth surfaces are missing, incomplete, or not yet approved — including authority docs, canonical docs, `docs/WIKI-MAP.md`, or `manifests/wiki-projection-manifest.json` — start with the bootstrap workflow.
-- If the host has the starting surfaces but needs to define or revise what is wiki-safe vs repo-only, use the publication-policy-authoring skill.
-- If the host already has approved publication policy, projection config, and canonical docs, use the maintenance workflow to create, update, retire, or verify wiki pages.
+## Quick chooser
+
+Pick the first matching lane:
+
+| If the host still needs... | Choose | Why |
+| --- | --- | --- |
+| authority docs, canonical docs, `docs/WIKI-MAP.md`, or `manifests/wiki-projection-manifest.json` because they are missing, incomplete, or not yet approved | Bootstrap workflow | establish the required host-owned truth before policy or maintenance work begins |
+| the wiki-safe vs repo-only boundary to be defined or revised after the starting surfaces already exist | publication-policy-authoring skill | decide what may be published without turning the policy into canonical content |
+| approved policy, projection config, and canonical docs, and the task is to create, update, retire, or verify live wiki pages | maintenance workflow | operate the reader-facing projection from approved host truth rather than inventing truth during publication |
+
 - If the host already has approved wiki truth and the task is repo-specific sync, validation, or publication work, read `docs/maintainer/WIKI-PUBLISHING.md` alongside the maintenance workflow before touching the live wiki.
 - If any host-owned truth surface is still ambiguous or unapproved, stop and repair the host truth surfaces before touching live wiki pages.
 

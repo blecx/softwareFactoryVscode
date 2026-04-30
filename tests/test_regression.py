@@ -1757,6 +1757,18 @@ def test_wiki_agent_wrapper_stays_thin_and_requires_host_truth():
     assert "softwarefactoryvscode" not in lowered
 
 
+def test_wiki_agent_wrapper_offers_compact_three_lane_chooser() -> None:
+    repo_root = Path(__file__).parent.parent
+    wrapper = (repo_root / ".github" / "agents" / "wiki.md").read_text(encoding="utf-8")
+
+    assert "## Quick chooser" in wrapper
+    assert "Pick the first matching lane" in wrapper
+    assert "wiki-safe vs repo-only boundary" in wrapper
+    assert "create, update, retire, or verify live wiki pages" in wrapper
+    assert "repo-specific sync, validation, or publication work" in wrapper
+    assert "repair the host truth surfaces before touching live wiki pages" in wrapper
+
+
 def test_docs_roadmap_separates_current_direction_from_historical_plans():
     repo_root = Path(__file__).parent.parent
     roadmap = (repo_root / "docs" / "ROADMAP.md").read_text(encoding="utf-8")
