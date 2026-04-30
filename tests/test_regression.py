@@ -4126,3 +4126,215 @@ def test_local_ci_parity_reports_missing_dev_dependencies_before_quality_steps(
     assert "[ERROR] Pytest suite (tests/)" not in captured.out
     assert not any(command[1:3] == ("-m", "black") for command in executed_commands)
     assert not any(command[1:3] == ("-m", "pytest") for command in executed_commands)
+
+
+def test_local_ci_parity_default_pytest_group_runs_named_bundles_in_order(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    executed_commands: list[tuple[str, ...]] = []
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        executed_commands.append(command_tuple)
+
+        if any("find_spec" in part for part in command_tuple):
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                0,
+                stdout="[]\n",
+                stderr="",
+            )
+
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--standard-group",
+            module.STANDARD_GROUP_PYTEST,
+        ]
+    )
+
+    assert exit_code == 0
+    pytest_commands = [
+        command for command in executed_commands if command[1:3] == ("-m", "pytest")
+    ]
+    assert pytest_commands == [
+        (sys.executable, "-m", "pytest", *module.PYTEST_BUNDLE_TO_FILES[bundle])
+        for bundle in module.PYTEST_BUNDLE_ORDER
+    ]
+
+
+def test_local_ci_parity_standard_group_pytest_bundle_replay_runs_only_selected_bundle(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    executed_commands: list[tuple[str, ...]] = []
+
+    def _fake_run_command(command, *, cwd):
+        del cwd
+        command_tuple = tuple(command)
+        executed_commands.append(command_tuple)
+
+        if any("find_spec" in part for part in command_tuple):
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                0,
+                stdout="[]\n",
+                stderr="",
+            )
+
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--standard-group",
+            module.STANDARD_GROUP_PYTEST,
+            "--pytest-bundle",
+            module.PYTEST_BUNDLE_LEGACY_MISC,
+        ]
+    )
+
+    assert exit_code == 0
+    pytest_commands = [
+        command for command in executed_commands if command[1:3] == ("-m", "pytest")
+    ]
+    assert pytest_commands == [
+        (
+            sys.executable,
+            "-m",
+            "pytest",
+            *module.PYTEST_BUNDLE_TO_FILES[module.PYTEST_BUNDLE_LEGACY_MISC],
+        )
+    ]
+
+
+def test_local_ci_parity_rejects_pytest_bundle_without_pytest_group(
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--pytest-bundle",
+            module.PYTEST_BUNDLE_LEGACY_MISC,
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "--standard-group pytest" in captured.out
+
+
+def test_local_ci_parity_watchdog_timeout_reports_split_replay_guidance(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+    timed_out = False
+
+    def _fake_run_command(command, *, cwd):
+        nonlocal timed_out
+        del cwd
+        command_tuple = tuple(command)
+
+        if any("find_spec" in part for part in command_tuple):
+            return subprocess.CompletedProcess(
+                list(command_tuple),
+                0,
+                stdout="[]\n",
+                stderr="",
+            )
+
+        if command_tuple[1:3] == ("-m", "pytest") and not timed_out:
+            timed_out = True
+            raise module.CommandTimeoutError(
+                command=command_tuple,
+                timeout_seconds=module.DEFAULT_WATCHDOG_SECONDS,
+                stdout="",
+                stderr="",
+            )
+
+        return subprocess.CompletedProcess(
+            list(command_tuple),
+            0,
+            stdout="ok\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module, "run_command", _fake_run_command)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--standard-group",
+            module.STANDARD_GROUP_PYTEST,
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "configured watchdog" in captured.out
+    assert "--standard-group pytest --pytest-bundle" in captured.out
+    assert module.PYTEST_BUNDLE_DOCS_WORKFLOW in captured.out
+
+
+def test_local_ci_parity_rejects_pytest_bundle_with_production_groups_only(
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--production-group",
+            module.PRODUCTION_GROUP_DOCS_CONTRACT,
+            "--production-groups-only",
+            "--pytest-bundle",
+            module.PYTEST_BUNDLE_LEGACY_MISC,
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "only supported in standard mode" in captured.out

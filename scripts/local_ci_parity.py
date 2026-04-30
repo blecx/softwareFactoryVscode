@@ -28,6 +28,8 @@ REQUIRED_DEV_TOOL_MODULES = ("black", "flake8", "isort", "pytest")
 STANDARD_MODE = "standard"
 PRODUCTION_MODE = "production"
 GIT_IDENTITY_GUARD_COMMAND = "./scripts/verify_git_identity.py"
+DEFAULT_WATCHDOG_SECONDS = 45 * 60
+ACTIVE_COMMAND_TIMEOUT_SECONDS: int | None = None
 CANONICAL_PRODUCTION_PARITY_COMMAND = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
 )
@@ -37,6 +39,64 @@ FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND = (
 DOCKER_BUILD_COMPATIBILITY_ALIAS = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build"
 )
+STANDARD_GROUP_RELEASE_CONTRACT = "release-contract"
+STANDARD_GROUP_PYTHON_QUALITY = "python-quality"
+STANDARD_GROUP_PYTEST = "pytest"
+STANDARD_GROUP_INTEGRATION = "integration"
+STANDARD_GROUP_PR_TEMPLATE = "pr-template"
+STANDARD_GROUP_ORDER = (
+    STANDARD_GROUP_RELEASE_CONTRACT,
+    STANDARD_GROUP_PYTHON_QUALITY,
+    STANDARD_GROUP_PYTEST,
+    STANDARD_GROUP_INTEGRATION,
+    STANDARD_GROUP_PR_TEMPLATE,
+)
+STANDARD_GROUP_CHOICES = STANDARD_GROUP_ORDER
+PYTEST_BUNDLE_DOCS_WORKFLOW = "docs-workflow"
+PYTEST_BUNDLE_INSTALL_SURFACE = "install-surface"
+PYTEST_BUNDLE_QUOTA_TENANCY = "quota-tenancy"
+PYTEST_BUNDLE_RUNTIME_MANAGER = "runtime-manager"
+PYTEST_BUNDLE_RUNTIME_DOCKER = "runtime-docker"
+PYTEST_BUNDLE_LEGACY_MISC = "legacy-misc"
+PYTEST_BUNDLE_ORDER = (
+    PYTEST_BUNDLE_DOCS_WORKFLOW,
+    PYTEST_BUNDLE_INSTALL_SURFACE,
+    PYTEST_BUNDLE_QUOTA_TENANCY,
+    PYTEST_BUNDLE_RUNTIME_MANAGER,
+    PYTEST_BUNDLE_RUNTIME_DOCKER,
+    PYTEST_BUNDLE_LEGACY_MISC,
+)
+PYTEST_BUNDLE_TO_FILES: dict[str, tuple[str, ...]] = {
+    PYTEST_BUNDLE_DOCS_WORKFLOW: (
+        "tests/test_regression.py",
+        "tests/test_todo_regression_contract.py",
+        "tests/test_noninteractive_gh.py",
+        "tests/test_recovery_snapshot.py",
+    ),
+    PYTEST_BUNDLE_INSTALL_SURFACE: (
+        "tests/test_factory_install.py",
+        "tests/test_workspace_surface_guard.py",
+        "tests/test_runtime_mode.py",
+        "tests/test_secret_safety.py",
+    ),
+    PYTEST_BUNDLE_QUOTA_TENANCY: (
+        "tests/test_llm_quota_policy.py",
+        "tests/test_quota_broker.py",
+        "tests/test_quota_governance_contract.py",
+        "tests/test_quota_load_validation.py",
+        "tests/test_multi_tenant.py",
+    ),
+    PYTEST_BUNDLE_RUNTIME_MANAGER: (
+        "tests/test_mcp_runtime_manager.py",
+    ),
+    PYTEST_BUNDLE_RUNTIME_DOCKER: (
+        "tests/test_throwaway_runtime_docker.py",
+    ),
+    PYTEST_BUNDLE_LEGACY_MISC: (
+        "tests/test_legacy_cleanup.py",
+        "tests/test_legacy_verification.py",
+    ),
+}
 PRODUCTION_GROUP_AGGREGATE = "aggregate"
 PRODUCTION_GROUP_DOCS_CONTRACT = "docs-contract"
 PRODUCTION_GROUP_DOCKER_BUILDS = "docker-builds"
@@ -84,6 +144,7 @@ class StepDefinition:
     command: tuple[str, ...]
     failure_summary: str
     remediation: str
+    timeout_remediation: str | None = None
 
 
 @dataclass(frozen=True)
@@ -104,6 +165,24 @@ class ProductionReadinessBundle:
     current_green_streak: int
     required_green_runs: int
     final_signoff_status: str
+
+
+class CommandTimeoutError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        command: Sequence[str],
+        timeout_seconds: int,
+        stdout: str | None,
+        stderr: str | None,
+    ) -> None:
+        super().__init__(
+            f"Command timed out after {timeout_seconds} second(s): {format_command(command)}"
+        )
+        self.command = tuple(command)
+        self.timeout_seconds = timeout_seconds
+        self.stdout = stdout or ""
+        self.stderr = stderr or ""
 
 
 def format_command(command: Sequence[str]) -> str:
@@ -128,6 +207,145 @@ def blocking_docker_e2e_guidance() -> str:
     )
 
 
+def _append_watchdog_args(
+    command: list[str], *, watchdog_seconds: int | None
+) -> None:
+    if watchdog_seconds is None or watchdog_seconds == DEFAULT_WATCHDOG_SECONDS:
+        return
+    command.extend(["--watchdog-seconds", str(watchdog_seconds)])
+
+
+def format_timeout_summary(command: Sequence[str], timeout_seconds: int) -> str:
+    minutes, seconds = divmod(timeout_seconds, 60)
+    human_parts: list[str] = []
+    if minutes:
+        human_parts.append(f"{minutes}m")
+    if seconds or not human_parts:
+        human_parts.append(f"{seconds}s")
+    human_window = " ".join(human_parts)
+    return (
+        f"`{format_command(command)}` exceeded the configured watchdog after "
+        f"{timeout_seconds} second(s) ({human_window}) and was terminated."
+    )
+
+
+def resolve_standard_group_selection(args: argparse.Namespace) -> tuple[str, ...]:
+    if args.mode != STANDARD_MODE and args.standard_group:
+        raise ValueError(
+            "`--standard-group` is only supported with `--mode standard`."
+        )
+
+    requested = args.standard_group or list(STANDARD_GROUP_ORDER)
+    deduped_requested = list(dict.fromkeys(requested))
+    return tuple(
+        group for group in STANDARD_GROUP_ORDER if group in deduped_requested
+    )
+
+
+def resolve_pytest_bundle_selection(
+    args: argparse.Namespace,
+    *,
+    selected_standard_groups: Sequence[str],
+) -> tuple[str, ...]:
+    if not args.pytest_bundle:
+        return PYTEST_BUNDLE_ORDER
+
+    if args.mode != STANDARD_MODE:
+        raise ValueError(
+            "`--pytest-bundle` is only supported in standard mode with "
+            "`--standard-group pytest`."
+        )
+
+    if tuple(selected_standard_groups) != (STANDARD_GROUP_PYTEST,):
+        raise ValueError(
+            "`--pytest-bundle` requires exactly `--standard-group pytest` and "
+            "cannot be combined with other standard groups."
+        )
+
+    return (args.pytest_bundle,)
+
+
+def build_standard_group_replay_command(
+    args: argparse.Namespace,
+    *,
+    group: str,
+    pytest_bundle: str | None = None,
+) -> str:
+    command = [
+        "./.venv/bin/python",
+        "./scripts/local_ci_parity.py",
+        "--standard-group",
+        group,
+    ]
+    if pytest_bundle is not None:
+        command.extend(["--pytest-bundle", pytest_bundle])
+    if group == STANDARD_GROUP_PR_TEMPLATE and args.pr_body_file.strip():
+        command.extend(["--pr-body-file", args.pr_body_file.strip()])
+    _append_watchdog_args(command, watchdog_seconds=args.watchdog_seconds)
+    return format_command(command)
+
+
+def build_production_group_replay_command(
+    args: argparse.Namespace,
+    *,
+    group: str,
+) -> str:
+    command = [
+        "./.venv/bin/python",
+        "./scripts/local_ci_parity.py",
+        "--mode",
+        PRODUCTION_MODE,
+        "--production-group",
+        group,
+        "--production-groups-only",
+    ]
+    if args.fresh_checkout:
+        command.append("--fresh-checkout")
+    _append_watchdog_args(command, watchdog_seconds=args.watchdog_seconds)
+    return format_command(command)
+
+
+def build_pytest_watchdog_remediation(
+    args: argparse.Namespace,
+    *,
+    pytest_bundle: str | None = None,
+) -> str:
+    if pytest_bundle is not None:
+        return (
+            "Re-run "
+            f"`{build_standard_group_replay_command(args, group=STANDARD_GROUP_PYTEST, pytest_bundle=pytest_bundle)}` "
+            "to isolate the timed-out pytest bundle."
+        )
+
+    bundle_replays = ", ".join(
+        f"`{build_standard_group_replay_command(args, group=STANDARD_GROUP_PYTEST, pytest_bundle=bundle_name)}`"
+        for bundle_name in PYTEST_BUNDLE_ORDER
+    )
+    return (
+        "Replay the pytest lane as named bundles instead of the full suite in one "
+        f"step. Available bundle replays: {bundle_replays}."
+    )
+
+
+def build_standard_group_watchdog_remediation(
+    args: argparse.Namespace,
+    *,
+    group: str,
+    pytest_bundle: str | None = None,
+) -> str:
+    if group == STANDARD_GROUP_PYTEST:
+        return build_pytest_watchdog_remediation(
+            args,
+            pytest_bundle=pytest_bundle,
+        )
+
+    return (
+        "Re-run "
+        f"`{build_standard_group_replay_command(args, group=group)}` "
+        "to isolate the timed-out standard group."
+    )
+
+
 def build_rerun_command(args: argparse.Namespace) -> str:
     command: list[str] = [
         "./.venv/bin/python",
@@ -137,8 +355,13 @@ def build_rerun_command(args: argparse.Namespace) -> str:
         command.extend(["--mode", args.mode])
         for group in args.production_group:
             command.extend(["--production-group", group])
-    elif args.include_docker_build:
-        command.append("--include-docker-build")
+    else:
+        for group in args.standard_group:
+            command.extend(["--standard-group", group])
+        if args.pytest_bundle:
+            command.extend(["--pytest-bundle", args.pytest_bundle])
+        if args.include_docker_build:
+            command.append("--include-docker-build")
     if args.fresh_checkout:
         command.append("--fresh-checkout")
     if args.pr_body_file.strip():
@@ -149,6 +372,7 @@ def build_rerun_command(args: argparse.Namespace) -> str:
         command.append("--skip-pr-template-check")
     if args.production_groups_only:
         command.append("--production-groups-only")
+    _append_watchdog_args(command, watchdog_seconds=args.watchdog_seconds)
     return format_command(command)
 
 
@@ -222,7 +446,7 @@ def _cleanup_docker_bind_mount_probe(
         )
         try:
             run_command(cleanup_command, cwd=repo_root)
-        except OSError:
+        except (OSError, CommandTimeoutError):
             pass
 
     shutil.rmtree(probe_root, ignore_errors=True)
@@ -279,6 +503,18 @@ def run_docker_bind_mount_ownership_parity_probe(repo_root: Path) -> Finding | N
     try:
         try:
             result = run_command(command, cwd=repo_root)
+        except CommandTimeoutError as exc:
+            emit_captured_output(exc.stdout, exc.stderr)
+            return Finding(
+                severity="error",
+                name="Docker bind-mount ownership parity",
+                summary=format_timeout_summary(exc.command, exc.timeout_seconds),
+                remediation=(
+                    "Fix the local Docker runtime environment, then rerun "
+                    f"`{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}`."
+                ),
+                command=exc.command,
+            )
         except OSError as exc:
             return Finding(
                 severity="error",
@@ -445,8 +681,15 @@ def build_fresh_checkout_command(
 
     if args.mode != STANDARD_MODE:
         command.extend(["--mode", args.mode])
-    elif args.include_docker_build:
-        command.append("--include-docker-build")
+        for group in args.production_group:
+            command.extend(["--production-group", group])
+    else:
+        for group in args.standard_group:
+            command.extend(["--standard-group", group])
+        if args.pytest_bundle:
+            command.extend(["--pytest-bundle", args.pytest_bundle])
+        if args.include_docker_build:
+            command.append("--include-docker-build")
 
     if args.pr_body_file.strip():
         command.extend(["--pr-body-file", args.pr_body_file.strip()])
@@ -454,6 +697,9 @@ def build_fresh_checkout_command(
         command.append("--skip-integration")
     if args.skip_pr_template_check:
         command.append("--skip-pr-template-check")
+    if args.production_groups_only:
+        command.append("--production-groups-only")
+    _append_watchdog_args(command, watchdog_seconds=args.watchdog_seconds)
 
     return tuple(command)
 
@@ -498,7 +744,12 @@ def run_fresh_checkout_validation(
 
     print(f"snapshot_path={snapshot_path}")
 
-    setup_result = run_command(("bash", "./setup.sh"), cwd=snapshot_path)
+    try:
+        setup_result = run_command(("bash", "./setup.sh"), cwd=snapshot_path)
+    except CommandTimeoutError as exc:
+        emit_captured_output(exc.stdout, exc.stderr)
+        print(f"❌ {format_timeout_summary(exc.command, exc.timeout_seconds)}")
+        return 1
     emit_command_output(setup_result)
     if setup_result.returncode != 0:
         print(
@@ -512,7 +763,12 @@ def run_fresh_checkout_validation(
         base_rev=base_rev,
         head_rev=head_rev,
     )
-    child_result = run_command(child_command, cwd=snapshot_path)
+    try:
+        child_result = run_command(child_command, cwd=snapshot_path)
+    except CommandTimeoutError as exc:
+        emit_captured_output(exc.stdout, exc.stderr)
+        print(f"❌ {format_timeout_summary(exc.command, exc.timeout_seconds)}")
+        return 1
     emit_command_output(child_result)
     return child_result.returncode
 
@@ -520,13 +776,22 @@ def run_fresh_checkout_validation(
 def run_command(
     command: Sequence[str], *, cwd: Path
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        list(command),
-        cwd=str(cwd),
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        return subprocess.run(
+            list(command),
+            cwd=str(cwd),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=ACTIVE_COMMAND_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise CommandTimeoutError(
+            command=command,
+            timeout_seconds=ACTIVE_COMMAND_TIMEOUT_SECONDS or DEFAULT_WATCHDOG_SECONDS,
+            stdout=exc.stdout,
+            stderr=exc.stderr,
+        ) from exc
 
 
 def write_command_transcript(
@@ -555,21 +820,34 @@ def write_command_transcript(
     )
 
 
-def emit_command_output(result: subprocess.CompletedProcess[str]) -> None:
-    if result.stdout:
-        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
-    if result.stderr:
+def emit_captured_output(stdout: str | None, stderr: str | None) -> None:
+    if stdout:
+        print(stdout, end="" if stdout.endswith("\n") else "\n")
+    if stderr:
         print(
-            result.stderr,
+            stderr,
             file=sys.stderr,
-            end="" if result.stderr.endswith("\n") else "\n",
+            end="" if stderr.endswith("\n") else "\n",
         )
+
+
+def emit_command_output(result: subprocess.CompletedProcess[str]) -> None:
+    emit_captured_output(result.stdout, result.stderr)
 
 
 def run_step(step: StepDefinition, *, cwd: Path) -> Finding | None:
     print(f"\n▶ {step.name}")
     try:
         result = run_command(step.command, cwd=cwd)
+    except CommandTimeoutError as exc:
+        emit_captured_output(exc.stdout, exc.stderr)
+        return Finding(
+            severity="error",
+            name=step.name,
+            summary=format_timeout_summary(exc.command, exc.timeout_seconds),
+            remediation=step.timeout_remediation or step.remediation,
+            command=exc.command,
+        )
     except OSError as exc:
         return Finding(
             severity="error",
@@ -689,8 +967,12 @@ def build_release_contract_steps(
     ]
 
 
-def build_python_quality_steps(args: argparse.Namespace) -> list[StepDefinition]:
-    return [
+def build_python_quality_steps(
+    args: argparse.Namespace,
+    *,
+    include_pytest: bool = True,
+) -> list[StepDefinition]:
+    steps = [
         StepDefinition(
             name="Black format check",
             command=(
@@ -743,16 +1025,229 @@ def build_python_quality_steps(args: argparse.Namespace) -> list[StepDefinition]
                 "`scripts/`, and `tests/`, then rerun the precheck."
             ),
         ),
-        StepDefinition(
-            name="Pytest suite (tests/)",
-            command=(args.python, "-m", "pytest", "tests/"),
-            failure_summary="The pytest regression suite reported failures.",
-            remediation=(
-                "Investigate the failing tests under `tests/`, fix the root causes, "
-                "and rerun the precheck."
-            ),
-        ),
     ]
+
+    if include_pytest:
+        steps.append(
+            StepDefinition(
+                name="Pytest suite (tests/)",
+                command=(args.python, "-m", "pytest", "tests/"),
+                failure_summary="The pytest regression suite reported failures.",
+                remediation=(
+                    "Investigate the failing tests under `tests/`, fix the root causes, "
+                    "and rerun the precheck."
+                ),
+                timeout_remediation=build_pytest_watchdog_remediation(args),
+            )
+        )
+
+    return steps
+
+
+def build_pytest_steps(
+    args: argparse.Namespace,
+    *,
+    selected_bundles: Sequence[str],
+) -> list[StepDefinition]:
+    steps: list[StepDefinition] = []
+    for bundle_name in selected_bundles:
+        steps.append(
+            StepDefinition(
+                name=f"Pytest bundle ({bundle_name})",
+                command=(
+                    args.python,
+                    "-m",
+                    "pytest",
+                    *PYTEST_BUNDLE_TO_FILES[bundle_name],
+                ),
+                failure_summary=(
+                    f"The pytest bundle `{bundle_name}` reported failures."
+                ),
+                remediation=(
+                    f"Investigate the failing tests in `{bundle_name}` and rerun "
+                    f"`{build_standard_group_replay_command(args, group=STANDARD_GROUP_PYTEST, pytest_bundle=bundle_name)}` once they pass."
+                ),
+                timeout_remediation=build_pytest_watchdog_remediation(
+                    args,
+                    pytest_bundle=bundle_name,
+                ),
+            )
+        )
+    return steps
+
+
+def run_selected_standard_groups(
+    args: argparse.Namespace,
+    *,
+    base_rev: str,
+    repo_root: Path,
+    selected_groups: Sequence[str],
+    selected_pytest_bundles: Sequence[str],
+) -> list[Finding]:
+    findings: list[Finding] = []
+    python_environment_checked = False
+    python_environment_finding: Finding | None = None
+
+    for group in selected_groups:
+        if group == STANDARD_GROUP_RELEASE_CONTRACT:
+            for step in build_release_contract_steps(args, base_rev=base_rev):
+                finding = run_step(step, cwd=repo_root)
+                if finding is not None:
+                    findings.append(finding)
+            continue
+
+        if group in (STANDARD_GROUP_PYTHON_QUALITY, STANDARD_GROUP_PYTEST):
+            if not python_environment_checked:
+                python_environment_checked = True
+                python_environment_finding = run_python_environment_preflight(
+                    args.python,
+                    cwd=repo_root,
+                )
+                if python_environment_finding is not None:
+                    findings.append(python_environment_finding)
+                    print(
+                        "ℹ️ Skipping Python quality/test steps until the selected "
+                        "environment has the required development/test modules."
+                    )
+
+            if python_environment_finding is not None:
+                continue
+
+            if group == STANDARD_GROUP_PYTHON_QUALITY:
+                steps = build_python_quality_steps(args, include_pytest=False)
+            else:
+                steps = build_pytest_steps(
+                    args,
+                    selected_bundles=selected_pytest_bundles,
+                )
+
+            for step in steps:
+                finding = run_step(step, cwd=repo_root)
+                if finding is not None:
+                    findings.append(finding)
+            continue
+
+        if group == STANDARD_GROUP_INTEGRATION:
+            if args.skip_integration:
+                warning = (
+                    "Integration regression was skipped by request (--skip-integration)."
+                )
+                print(f"\nℹ️ {warning}")
+                findings.append(
+                    Finding(
+                        severity="warning",
+                        name="Integration regression",
+                        summary=warning,
+                        remediation=(
+                            "Run the standard precheck again without `--skip-integration` "
+                            "before finalizing the PR."
+                        ),
+                        command=("bash", "./tests/run-integration-test.sh"),
+                    )
+                )
+            else:
+                finding = run_step(
+                    StepDefinition(
+                        name="Integration regression",
+                        command=("bash", "./tests/run-integration-test.sh"),
+                        failure_summary=(
+                            "The integration regression suite reported failures."
+                        ),
+                        remediation=(
+                            "Investigate `./tests/run-integration-test.sh` failures, fix the "
+                            "root cause, and rerun the precheck."
+                        ),
+                        timeout_remediation=build_standard_group_watchdog_remediation(
+                            args,
+                            group=STANDARD_GROUP_INTEGRATION,
+                        ),
+                    ),
+                    cwd=repo_root,
+                )
+                if finding is not None:
+                    findings.append(finding)
+            continue
+
+        if group == STANDARD_GROUP_PR_TEMPLATE:
+            if args.skip_pr_template_check:
+                warning = (
+                    "PR-template validation was skipped by request "
+                    "(--skip-pr-template-check)."
+                )
+                print(f"ℹ️ {warning}")
+                findings.append(
+                    Finding(
+                        severity="warning",
+                        name="PR-template format validation",
+                        summary=warning,
+                        remediation=(
+                            "Run the standard precheck again without `--skip-pr-template-check` "
+                            "before opening or finalizing the PR."
+                        ),
+                        command=(
+                            "bash",
+                            "./scripts/validate-pr-template.sh",
+                            "./.github/pull_request_template.md",
+                        ),
+                    )
+                )
+            else:
+                finding = run_step(
+                    StepDefinition(
+                        name=(
+                            "PR-template format validation "
+                            "(.github/pull_request_template.md)"
+                        ),
+                        command=(
+                            "bash",
+                            "./scripts/validate-pr-template.sh",
+                            "./.github/pull_request_template.md",
+                        ),
+                        failure_summary=(
+                            "The repository PR template does not satisfy the template "
+                            "validation contract."
+                        ),
+                        remediation=(
+                            "Fix `./.github/pull_request_template.md` so it passes "
+                            "`./scripts/validate-pr-template.sh`."
+                        ),
+                        timeout_remediation=build_standard_group_watchdog_remediation(
+                            args,
+                            group=STANDARD_GROUP_PR_TEMPLATE,
+                        ),
+                    ),
+                    cwd=repo_root,
+                )
+                if finding is not None:
+                    findings.append(finding)
+                if args.pr_body_file.strip():
+                    finding = run_step(
+                        StepDefinition(
+                            name="PR-template format validation (provided PR body)",
+                            command=(
+                                "bash",
+                                "./scripts/validate-pr-template.sh",
+                                str(Path(args.pr_body_file).expanduser().resolve()),
+                            ),
+                            failure_summary=(
+                                "The provided PR body does not satisfy the template "
+                                "validation contract."
+                            ),
+                            remediation=(
+                                "Update the provided PR body so it passes "
+                                "`./scripts/validate-pr-template.sh`."
+                            ),
+                            timeout_remediation=build_standard_group_watchdog_remediation(
+                                args,
+                                group=STANDARD_GROUP_PR_TEMPLATE,
+                            ),
+                        ),
+                        cwd=repo_root,
+                    )
+                    if finding is not None:
+                        findings.append(finding)
+
+    return findings
 
 
 def build_standard_steps(
@@ -789,6 +1284,19 @@ def run_python_environment_preflight(
 
     try:
         result = run_command(command, cwd=cwd)
+    except CommandTimeoutError as exc:
+        emit_captured_output(exc.stdout, exc.stderr)
+        return Finding(
+            severity="error",
+            name="Python environment preflight",
+            summary=format_timeout_summary(exc.command, exc.timeout_seconds),
+            remediation=(
+                "Run `./setup.sh` to install runtime and development/test "
+                "dependencies into `.venv`, or point `--python` at a usable "
+                "interpreter and rerun the precheck."
+            ),
+            command=exc.command,
+        )
     except OSError as exc:
         return Finding(
             severity="error",
@@ -967,7 +1475,38 @@ def run_docker_e2e_validation(
             capture_output=True,
             text=True,
             env=env,
+            timeout=ACTIVE_COMMAND_TIMEOUT_SECONDS,
         )
+    except subprocess.TimeoutExpired as exc:
+        replay_command = [
+            "./.venv/bin/python",
+            "./scripts/local_ci_parity.py",
+            "--mode",
+            PRODUCTION_MODE,
+            "--production-group",
+            PRODUCTION_GROUP_RUNTIME_PROOFS,
+            "--production-groups-only",
+        ]
+        _append_watchdog_args(
+            replay_command,
+            watchdog_seconds=ACTIVE_COMMAND_TIMEOUT_SECONDS,
+        )
+        return [
+            Finding(
+                severity="error",
+                name="Docker E2E runtime proof lane",
+                summary=format_timeout_summary(
+                    display_command,
+                    ACTIVE_COMMAND_TIMEOUT_SECONDS or DEFAULT_WATCHDOG_SECONDS,
+                ),
+                remediation=(
+                    "Replay the timed-out Docker E2E group with "
+                    f"`{format_command(replay_command)}` "
+                    "after fixing the underlying runtime or test hang."
+                ),
+                command=display_command,
+            )
+        ]
     except OSError as exc:
         return [
             Finding(
@@ -1394,6 +1933,15 @@ def print_production_readiness_bundle_summary(
     print(f"final_signoff={bundle.final_signoff_status}")
 
 
+def parse_watchdog_seconds(value: str) -> int:
+    parsed = int(value)
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(
+            "`--watchdog-seconds` must be zero or a positive integer."
+        )
+    return parsed
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run local CI-parity checks before PR finalization."
@@ -1443,6 +1991,35 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--standard-group",
+        action="append",
+        choices=STANDARD_GROUP_CHOICES,
+        default=[],
+        help=(
+            "In standard mode, run only one or more named standard precheck groups. "
+            "By default all groups run in canonical order: release-contract, "
+            "python-quality, pytest, integration, and pr-template."
+        ),
+    )
+    parser.add_argument(
+        "--pytest-bundle",
+        choices=PYTEST_BUNDLE_ORDER,
+        default="",
+        help=(
+            "When replaying `--standard-group pytest`, run only the named pytest "
+            "bundle instead of the full bundled pytest lane."
+        ),
+    )
+    parser.add_argument(
+        "--watchdog-seconds",
+        type=parse_watchdog_seconds,
+        default=DEFAULT_WATCHDOG_SECONDS,
+        help=(
+            "Kill any individual validation command that exceeds this watchdog. "
+            "Use 0 to disable the watchdog. Default: 2700 seconds (45 minutes)."
+        ),
+    )
+    parser.add_argument(
         "--production-group",
         action="append",
         choices=PRODUCTION_GROUP_CHOICES,
@@ -1478,9 +2055,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+
+    global ACTIVE_COMMAND_TIMEOUT_SECONDS
+    ACTIVE_COMMAND_TIMEOUT_SECONDS = (
+        args.watchdog_seconds if args.watchdog_seconds > 0 else None
+    )
+
     try:
         aggregate_production_mode, production_groups = (
             resolve_production_group_selection(args)
+        )
+        standard_groups = resolve_standard_group_selection(args)
+        pytest_bundles = resolve_pytest_bundle_selection(
+            args,
+            selected_standard_groups=standard_groups,
         )
     except ValueError as exc:
         print(f"❌ {exc}")
@@ -1509,6 +2097,14 @@ def main(argv: list[str] | None = None) -> int:
     print(f"base_rev={base_rev}")
     print(f"head_rev={head_rev}")
     print(f"mode={args.mode}")
+    if ACTIVE_COMMAND_TIMEOUT_SECONDS is None:
+        print("watchdog_seconds=disabled")
+    else:
+        print(f"watchdog_seconds={ACTIVE_COMMAND_TIMEOUT_SECONDS}")
+    if args.mode == STANDARD_MODE and args.standard_group:
+        print("standard_groups=" f"{','.join(standard_groups)}")
+        if args.pytest_bundle:
+            print("pytest_bundles=" f"{','.join(pytest_bundles)}")
     if args.mode == PRODUCTION_MODE:
         production_group_mode = (
             PRODUCTION_GROUP_AGGREGATE if aggregate_production_mode else "diagnostic"
@@ -1533,125 +2129,15 @@ def main(argv: list[str] | None = None) -> int:
             "was requested."
         )
     else:
-        for step in build_release_contract_steps(args, base_rev=base_rev):
-            finding = run_step(step, cwd=repo_root)
-            if finding is not None:
-                findings.append(finding)
-
-        python_environment_finding = run_python_environment_preflight(
-            args.python, cwd=repo_root
+        findings.extend(
+            run_selected_standard_groups(
+                args,
+                base_rev=base_rev,
+                repo_root=repo_root,
+                selected_groups=standard_groups,
+                selected_pytest_bundles=pytest_bundles,
+            )
         )
-        if python_environment_finding is not None:
-            findings.append(python_environment_finding)
-            print(
-                "ℹ️ Skipping Python quality/test steps until the selected "
-                "environment has the required development/test modules."
-            )
-        else:
-            for step in build_python_quality_steps(args):
-                finding = run_step(step, cwd=repo_root)
-                if finding is not None:
-                    findings.append(finding)
-
-        if args.skip_integration:
-            warning = (
-                "Integration regression was skipped by request (--skip-integration)."
-            )
-            print(f"\nℹ️ {warning}")
-            findings.append(
-                Finding(
-                    severity="warning",
-                    name="Integration regression",
-                    summary=warning,
-                    remediation=(
-                        "Run the standard precheck again without `--skip-integration` "
-                        "before finalizing the PR."
-                    ),
-                    command=("bash", "./tests/run-integration-test.sh"),
-                )
-            )
-        else:
-            finding = run_step(
-                StepDefinition(
-                    name="Integration regression",
-                    command=("bash", "./tests/run-integration-test.sh"),
-                    failure_summary="The integration regression suite reported failures.",
-                    remediation=(
-                        "Investigate `./tests/run-integration-test.sh` failures, fix the "
-                        "root cause, and rerun the precheck."
-                    ),
-                ),
-                cwd=repo_root,
-            )
-            if finding is not None:
-                findings.append(finding)
-
-        if args.skip_pr_template_check:
-            warning = (
-                "PR-template validation was skipped by request "
-                "(--skip-pr-template-check)."
-            )
-            print(f"ℹ️ {warning}")
-            findings.append(
-                Finding(
-                    severity="warning",
-                    name="PR-template format validation",
-                    summary=warning,
-                    remediation=(
-                        "Run the standard precheck again without `--skip-pr-template-check` "
-                        "before opening or finalizing the PR."
-                    ),
-                    command=(
-                        "bash",
-                        "./scripts/validate-pr-template.sh",
-                        "./.github/pull_request_template.md",
-                    ),
-                )
-            )
-        else:
-            finding = run_step(
-                StepDefinition(
-                    name="PR-template format validation (.github/pull_request_template.md)",
-                    command=(
-                        "bash",
-                        "./scripts/validate-pr-template.sh",
-                        "./.github/pull_request_template.md",
-                    ),
-                    failure_summary=(
-                        "The repository PR template does not satisfy the template "
-                        "validation contract."
-                    ),
-                    remediation=(
-                        "Fix `./.github/pull_request_template.md` so it passes "
-                        "`./scripts/validate-pr-template.sh`."
-                    ),
-                ),
-                cwd=repo_root,
-            )
-            if finding is not None:
-                findings.append(finding)
-            if args.pr_body_file.strip():
-                finding = run_step(
-                    StepDefinition(
-                        name="PR-template format validation (provided PR body)",
-                        command=(
-                            "bash",
-                            "./scripts/validate-pr-template.sh",
-                            str(Path(args.pr_body_file).expanduser().resolve()),
-                        ),
-                        failure_summary=(
-                            "The provided PR body does not satisfy the template "
-                            "validation contract."
-                        ),
-                        remediation=(
-                            "Update the provided PR body so it passes "
-                            "`./scripts/validate-pr-template.sh`."
-                        ),
-                    ),
-                    cwd=repo_root,
-                )
-                if finding is not None:
-                    findings.append(finding)
 
     docker_build_findings: list[Finding] = []
     production_group_results: dict[str, str] = {}
