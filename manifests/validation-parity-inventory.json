@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "issue": 224,
+  "umbrella_issue": 222,
+  "captured_on": "2026-04-30",
+  "observation_only": true,
+  "observed_on_branch": "origin/main via .tmp/queue-worktrees/issue-224",
+  "baseline_input": "docs/maintainer/VALIDATION-BASELINE.md",
+  "tracked_report": "docs/maintainer/VALIDATION-PARITY-INVENTORY.md",
+  "authoritative_surfaces": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "role": "Remote GitHub job graph and exact check-name source of truth."
+    },
+    {
+      "path": "docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md",
+      "role": "Accepted architecture rule for the minimum local CI-parity contract."
+    },
+    {
+      "path": "docs/setup-github-repository.md",
+      "role": "Maintainer-facing branch-protection guidance that lists the exact required checks."
+    }
+  ],
+  "derivative_surfaces": [
+    {
+      "path": "scripts/local_ci_parity.py",
+      "role": "Local mirror of the CI contract and production-group taxonomy."
+    },
+    {
+      "path": ".vscode/tasks.json",
+      "role": "Workspace task wrapper for the canonical local parity command."
+    },
+    {
+      "path": "docs/WORK-ISSUE-WORKFLOW.md",
+      "role": "Workflow documentation that routes issue execution and merge automation through local parity plus pager-free polling."
+    },
+    {
+      "path": ".copilot/skills/resolve-issue-workflow/SKILL.md",
+      "role": "Resolve workflow contract for local CI-equivalent validation before PR creation."
+    },
+    {
+      "path": ".copilot/skills/pr-merge-workflow/SKILL.md",
+      "role": "Merge workflow contract for pager-free GitHub polling and merge readiness."
+    },
+    {
+      "path": ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+      "role": "Approved-queue polling contract that continues automatically while CI is pending."
+    },
+    {
+      "path": "scripts/noninteractive_gh.py",
+      "role": "One-shot pager-free GitHub issue/PR/check helper with watch_mode=false."
+    },
+    {
+      "path": "tests/test_regression.py",
+      "role": "Regression-lock surface for workflow and documentation contracts."
+    }
+  ],
+  "shadow_policy_findings": [
+    {
+      "path": "scripts/setup-github-repo.sh",
+      "reason": "Branch-protection setup lags the documented/current seven-check contract and writes temp state outside the repo-owned .tmp boundary.",
+      "configured_required_checks": [
+        "Python Code Quality (Lint & Format)",
+        "Architectural Boundary Tests",
+        "PR Template Conformance"
+      ],
+      "missing_documented_checks": [
+        "Production Docs Contract",
+        "Production Docker Build Parity",
+        "Production Runtime Proofs",
+        "Internal Production Gate — Docker Parity & Recovery Proofs"
+      ],
+      "temporary_payload_path": "/tmp/branch-protection-payload.json"
+    }
+  ],
+  "required_checks": [
+    "Python Code Quality (Lint & Format)",
+    "Architectural Boundary Tests",
+    "PR Template Conformance",
+    "Production Docs Contract",
+    "Production Docker Build Parity",
+    "Production Runtime Proofs",
+    "Internal Production Gate — Docker Parity & Recovery Proofs"
+  ],
+  "aggregate_gate": {
+    "name": "Internal Production Gate — Docker Parity & Recovery Proofs",
+    "depends_on": [
+      "Production Docs Contract",
+      "Production Docker Build Parity",
+      "Production Runtime Proofs"
+    ],
+    "local_command": "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+  },
+  "hang_risks": [
+    {
+      "id": "local-ci-run-command-no-timeout",
+      "path": "scripts/local_ci_parity.py",
+      "surface": "run_command() / run_step()",
+      "bounded": false,
+      "risk": "Default and fresh-checkout local parity subprocesses rely on subprocess.run without a timeout wrapper."
+    },
+    {
+      "id": "local-ci-run-git-no-timeout",
+      "path": "scripts/local_ci_parity.py",
+      "surface": "run_git()",
+      "bounded": false,
+      "risk": "Git ref/worktree helper calls use subprocess.run without a timeout."
+    },
+    {
+      "id": "production-runtime-proofs-no-timeout",
+      "path": "scripts/local_ci_parity.py",
+      "surface": "run_docker_e2e_validation()",
+      "bounded": false,
+      "risk": "The promoted Docker E2E runtime-proof lane uses a direct subprocess.run call with no timeout."
+    },
+    {
+      "id": "queue-polling-needs-external-bound",
+      "path": ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+      "surface": "queue / merge polling contract",
+      "bounded": false,
+      "risk": "The workflow requires polling until checks reach terminal state, but the caller must add the actual watchdog bound."
+    }
+  ],
+  "bounded_wait_paths": [
+    {
+      "path": "tests/test_throwaway_runtime_docker.py",
+      "surface": "_wait_until_reachable(url, max_wait_seconds=30)",
+      "notes": "Service reachability loop with a 30-second deadline and 1-second sleep interval."
+    },
+    {
+      "path": "tests/test_throwaway_runtime_docker.py",
+      "surface": "attempt-limited runtime verification retries",
+      "notes": "Subprocess retries are capped by an attempts counter and a configured delay."
+    }
+  ]
+}
