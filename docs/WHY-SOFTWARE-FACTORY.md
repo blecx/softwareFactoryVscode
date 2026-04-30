@@ -1,4 +1,4 @@
-# Why Software Factory exists
+# Why SoftwareFactoryVscode exists
 
 This page is the shortest public explanation of what `softwareFactoryVscode` is for.
 
@@ -6,7 +6,7 @@ It explains intent, goals, and non-goals in plain language. It does **not** rede
 
 ## The short version
 
-Software Factory exists because teams that adopt AI coding assistants usually end up rebuilding the same repository-level tooling over and over again:
+SoftwareFactoryVscode exists because teams that adopt AI coding assistants usually end up rebuilding the same repository-level tooling over and over again:
 
 - prompts and instructions,
 - agent workflows,
@@ -21,7 +21,7 @@ When every repository invents that layer from scratch, it becomes inconsistent, 
 
 ## Who it helps
 
-Software Factory is primarily for:
+SoftwareFactoryVscode is primarily for:
 
 - **maintainers** who want one repeatable AI workflow baseline across multiple repositories;
 - **operators** who need explicit lifecycle, validation, and recovery surfaces instead of ad-hoc local setup; and
@@ -53,7 +53,7 @@ The truthful `2.6` story is intentionally bounded:
 
 ## Non-goals
 
-Software Factory is **not** trying to be:
+SoftwareFactoryVscode is **not** trying to be:
 
 - an external hosted multi-tenant SaaS product;
 - a customer-facing cloud platform with billing, internet-hosted tenancy, or SaaS authentication claims;

@@ -23,17 +23,17 @@
       "status": "live",
       "canonical_sources": ["docs/PROJECT-OVERVIEW.md"],
       "primary_routes": [
-        "Why Software Factory",
-        "Getting Started",
+        "Why SoftwareFactoryVscode",
+        "Install a New Project",
         "Install and Update",
         "Operator Handout",
-        "Tutorials",
-        "Examples",
-        "FAQ",
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Operator Cheat Sheet",
         "Technical Overview"
       ],
       "audience": ["evaluators", "operators", "architecture-readers"],
-      "note": "Narrative-first landing page derived from the host-owned canonical project overview and used to route readers onward to onboarding, tutorial, operator-reference, and technical discovery pages without turning `docs/README.md` into the wiki authority surface."
+      "note": "Narrative-first landing page derived from the host-owned canonical project overview and used to surface distinct next-step pages for the main reader journeys while leaving secondary summary helpers in shared navigation instead of forcing a second router hop from `Home` or turning `docs/README.md` into the wiki authority surface."
     },
     {
       "wiki_page": "_Sidebar",
@@ -62,12 +62,13 @@
       "note": "Shared projection and authority reminder rendered on every published wiki page."
     },
     {
-      "wiki_page": "Why Software Factory",
+      "wiki_page": "Why SoftwareFactoryVscode",
       "page_type": "orientation",
       "status": "live",
       "canonical_sources": ["docs/WHY-SOFTWARE-FACTORY.md"],
+      "primary_routes": ["Install and Update", "Copilot Harness Model"],
       "audience": ["evaluators", "operators"],
-      "note": "Public intent, goals, and non-goals overview projected from the canonical why-page."
+      "note": "Public intent, goals, and non-goals overview projected from the canonical why-page using the exact project name and routing readers forward to concrete install or technical deep links rather than another top-level summary hop."
     },
     {
       "wiki_page": "Getting Started",
@@ -80,23 +81,33 @@
       ],
       "primary_routes": ["Install and Update", "Operator Handout"],
       "audience": ["evaluators", "operators"],
-      "note": "Wiki-native onboarding router built only from already wiki-safe evaluator and operator sources."
+      "note": "Wiki-native onboarding router built only from already wiki-safe evaluator and operator sources and intended to move readers into install and first-run actions instead of bouncing them back through sibling overview pages."
     },
     {
       "wiki_page": "Install and Update",
       "page_type": "installation-guide",
       "status": "live",
       "canonical_sources": ["docs/INSTALL.md"],
+      "primary_routes": [
+        "Install a New Project",
+        "Operator Handout",
+        "First Runtime Startup and Preflight"
+      ],
       "audience": ["operators"],
-      "note": "Condensed install/update projection that links back to the canonical long-form install authority."
+      "note": "Condensed install/update projection that links readers forward into install tutorials and first-run workflow without sending them back through the onboarding router."
     },
     {
       "wiki_page": "Operator Handout",
       "page_type": "operator-guide",
       "status": "live",
       "canonical_sources": ["docs/HANDOUT.md"],
+      "primary_routes": [
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Operator Cheat Sheet"
+      ],
       "audience": ["operators"],
-      "note": "Guided first-run operator flow projected from the canonical handout."
+      "note": "Guided first-run operator flow projected from the canonical handout and routed forward into first-run, repeat-run, and quick-reference follow-up pages."
     },
     {
       "wiki_page": "Tutorials",
@@ -110,12 +121,10 @@
       "primary_routes": [
         "Install a New Project",
         "First Runtime Startup and Preflight",
-        "Day-to-Day Operator Loop",
-        "Examples",
-        "FAQ"
+        "Day-to-Day Operator Loop"
       ],
       "audience": ["evaluators", "operators"],
-      "note": "Scenario-driven landing page for the published tutorial track, examples, and FAQ."
+      "note": "Scenario-driven landing page for the three published tutorial walkthroughs, with Examples and FAQ remaining sidebar-discoverable companion surfaces instead of default next hops."
     },
     {
       "wiki_page": "Install a New Project",
@@ -154,8 +163,14 @@
         "docs/HANDOUT.md",
         "docs/CHEAT_SHEET.md"
       ],
+      "primary_routes": [
+        "Install a New Project",
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Operator Runbook - Monitoring"
+      ],
       "audience": ["evaluators", "operators"],
-      "note": "Scenario-style entry points that cluster current supported workflows without expanding the authority surface."
+      "note": "Scenario-style entry points that cluster current supported workflows without expanding the authority surface or routing readers back through overview pages they already used."
     },
     {
       "wiki_page": "FAQ",
@@ -166,8 +181,13 @@
         "docs/HANDOUT.md",
         "docs/CHEAT_SHEET.md"
       ],
+      "primary_routes": [
+        "Operator Cheat Sheet",
+        "Operator Runbook - Monitoring",
+        "Operator Runbook - Incident Response"
+      ],
       "audience": ["evaluators", "operators"],
-      "note": "High-signal questions and answers distilled from the supported operator docs."
+      "note": "High-signal questions and answers distilled from the supported operator docs, with follow-on links into concrete operator references instead of summary-page loops."
     },
     {
       "wiki_page": "Operator Cheat Sheet",

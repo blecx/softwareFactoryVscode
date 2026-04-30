@@ -1537,11 +1537,16 @@ def test_docs_wiki_map_defines_conservative_export_targets() -> None:
     assert "repo file paths remain the canonical documentation source" in wiki_map
     assert "Only material explicitly marked **Wiki-safe**" in wiki_map
     assert "Unlisted material stays repo-only" in wiki_map
+    assert "Avoid peer-router loops and `Home` re-entry" in wiki_map
     assert (
         "The live wiki and every future resync pass must consume this map" in wiki_map
     )
-    assert "[`docs/PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) | `Home`" in wiki_map
+    assert re.search(
+        r"\[`docs/PROJECT-OVERVIEW\.md`\]\(PROJECT-OVERVIEW\.md\)\s*\|\s*`Home`",
+        wiki_map,
+    )
     assert "Narrative-first project landing story for first-time readers" in wiki_map
+    assert "`Why SoftwareFactoryVscode`" in wiki_map
     assert "WHY-SOFTWARE-FACTORY.md" in wiki_map
     assert "Getting Started" in wiki_map
     assert "HANDOUT.md" in wiki_map
@@ -1562,7 +1567,10 @@ def test_docs_wiki_map_defines_conservative_export_targets() -> None:
     assert "ops/MONITORING.md" in wiki_map
     assert "architecture/ADR-INDEX.md" in wiki_map
     assert "Accepted `docs/architecture/ADR-*.md` entries" in wiki_map
-    assert "[`README.md`](../README.md) | Repo-only" in wiki_map
+    assert re.search(
+        r"\[`README\.md`\]\(\.\./README\.md\)\s*\|\s*Repo-only",
+        wiki_map,
+    )
     assert "ROADMAP.md" in wiki_map
     assert "PRODUCTION-READINESS-PLAN.md" in wiki_map
     assert "docs/maintainer/*.md" in wiki_map
@@ -1600,7 +1608,7 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
     page_names = [page["wiki_page"] for page in manifest["pages"]]
     assert page_names[:3] == ["Home", "_Sidebar", "_Footer"]
     assert page_names[3:] == [
-        "Why Software Factory",
+        "Why SoftwareFactoryVscode",
         "Getting Started",
         "Install and Update",
         "Operator Handout",
@@ -1625,19 +1633,21 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
     home_page = manifest["pages"][0]
     assert home_page["canonical_sources"] == ["docs/PROJECT-OVERVIEW.md"]
     assert home_page["primary_routes"] == [
-        "Why Software Factory",
-        "Getting Started",
+        "Why SoftwareFactoryVscode",
+        "Install a New Project",
         "Install and Update",
         "Operator Handout",
-        "Tutorials",
-        "Examples",
-        "FAQ",
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Operator Cheat Sheet",
         "Technical Overview",
     ]
     assert (
         "Narrative-first landing page derived from the host-owned canonical "
         "project overview" in home_page["note"]
     )
+    assert "distinct next-step pages" in home_page["note"]
+    assert "shared navigation" in home_page["note"]
     assert "docs/README.md" in home_page["note"]
     assert "wiki authority surface" in home_page["note"]
 
@@ -1662,6 +1672,10 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
 
     why_page = manifest["pages"][3]
     assert why_page["canonical_sources"] == ["docs/WHY-SOFTWARE-FACTORY.md"]
+    assert why_page["primary_routes"] == [
+        "Install and Update",
+        "Copilot Harness Model",
+    ]
 
     getting_started_page = manifest["pages"][4]
     assert getting_started_page["canonical_sources"] == [
@@ -1676,9 +1690,19 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
 
     install_page = manifest["pages"][5]
     assert install_page["canonical_sources"] == ["docs/INSTALL.md"]
+    assert install_page["primary_routes"] == [
+        "Install a New Project",
+        "Operator Handout",
+        "First Runtime Startup and Preflight",
+    ]
 
     handout_page = manifest["pages"][6]
     assert handout_page["canonical_sources"] == ["docs/HANDOUT.md"]
+    assert handout_page["primary_routes"] == [
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Operator Cheat Sheet",
+    ]
 
     tutorials_page = manifest["pages"][7]
     assert tutorials_page["canonical_sources"] == [
@@ -1690,8 +1714,6 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "Install a New Project",
         "First Runtime Startup and Preflight",
         "Day-to-Day Operator Loop",
-        "Examples",
-        "FAQ",
     ]
 
     install_tutorial_page = manifest["pages"][8]
@@ -1719,12 +1741,23 @@ def test_wiki_projection_manifest_bootstraps_live_wiki_chrome_and_sources() -> N
         "docs/HANDOUT.md",
         "docs/CHEAT_SHEET.md",
     ]
+    assert examples_page["primary_routes"] == [
+        "Install a New Project",
+        "First Runtime Startup and Preflight",
+        "Day-to-Day Operator Loop",
+        "Operator Runbook - Monitoring",
+    ]
 
     faq_page = manifest["pages"][12]
     assert faq_page["canonical_sources"] == [
         "docs/INSTALL.md",
         "docs/HANDOUT.md",
         "docs/CHEAT_SHEET.md",
+    ]
+    assert faq_page["primary_routes"] == [
+        "Operator Cheat Sheet",
+        "Operator Runbook - Monitoring",
+        "Operator Runbook - Incident Response",
     ]
 
     cheat_sheet_page = manifest["pages"][13]
@@ -1795,14 +1828,21 @@ def test_home_wiki_projection_uses_project_overview_without_promoting_readme() -
     )
     home_page = next(page for page in manifest["pages"] if page["wiki_page"] == "Home")
 
-    assert "[`docs/PROJECT-OVERVIEW.md`](PROJECT-OVERVIEW.md) | `Home`" in wiki_map
+    assert re.search(
+        r"\[`docs/PROJECT-OVERVIEW\.md`\]\(PROJECT-OVERVIEW\.md\)\s*\|\s*`Home`",
+        wiki_map,
+    )
     assert "Narrative-first project landing story for first-time readers" in wiki_map
-    assert "[`README.md`](../README.md) | Repo-only" in wiki_map
+    assert re.search(
+        r"\[`README\.md`\]\(\.\./README\.md\)\s*\|\s*Repo-only",
+        wiki_map,
+    )
     assert home_page["canonical_sources"] == ["docs/PROJECT-OVERVIEW.md"]
     assert (
         "Narrative-first landing page derived from the host-owned canonical "
         "project overview" in home_page["note"]
     )
+    assert "distinct next-step pages" in home_page["note"]
     assert manifest["authority"]["top_level_readme_policy"] == "repo-only"
 
 
