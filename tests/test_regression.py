@@ -3393,6 +3393,7 @@ def test_run_docker_e2e_validation_sets_env_and_selected_pytest_filter(
         capture_output,
         text,
         env,
+        timeout,
     ):
         call["command"] = command
         call["cwd"] = cwd
@@ -3400,6 +3401,7 @@ def test_run_docker_e2e_validation_sets_env_and_selected_pytest_filter(
         call["capture_output"] = capture_output
         call["text"] = text
         call["run_docker_e2e"] = env.get("RUN_DOCKER_E2E")
+        call["timeout"] = timeout
         return subprocess.CompletedProcess(command, 0, stdout="ok\n", stderr="")
 
     monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/bin/docker")
@@ -3425,6 +3427,7 @@ def test_run_docker_e2e_validation_sets_env_and_selected_pytest_filter(
     assert call["capture_output"] is True
     assert call["text"] is True
     assert call["run_docker_e2e"] == "1"
+    assert call["timeout"] == module.ACTIVE_COMMAND_TIMEOUT_SECONDS
     transcript = (
         tmp_path
         / ".tmp"
