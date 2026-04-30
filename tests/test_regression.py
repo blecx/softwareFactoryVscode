@@ -3018,7 +3018,10 @@ def test_local_ci_parity_reports_findings_list_and_improvement_plan(
     assert "[ERROR] Black format check" in captured.out
     assert "Improvement plan" in captured.out
     assert "terminated after the first blocking error" in captured.out
-    assert "Cause: Code formatting does not match the Black profile. (exit code 1)." in captured.out
+    assert (
+        "Cause: Code formatting does not match the Black profile. (exit code 1)."
+        in captured.out
+    )
     assert (
         "Run Black on `factory_runtime/`, `scripts/`, and `tests/`, then review the diffs."
         in captured.out
@@ -3402,6 +3405,7 @@ def test_local_ci_parity_production_mode_reports_docker_e2e_failures_as_blocking
                     python_executable,
                     "-m",
                     "pytest",
+                    *module.PYTEST_FAST_FAIL_ARGS,
                     module.DOCKER_E2E_TEST_FILE,
                     "-k",
                     module.PRODUCTION_DOCKER_E2E_KEYWORD_EXPR,
@@ -3474,6 +3478,7 @@ def test_run_docker_e2e_validation_sets_env_and_selected_pytest_filter(
         "/custom/python",
         "-m",
         "pytest",
+        *module.PYTEST_FAST_FAIL_ARGS,
         module.DOCKER_E2E_TEST_FILE,
         "-k",
         module.PRODUCTION_DOCKER_E2E_KEYWORD_EXPR,
@@ -4182,7 +4187,10 @@ def test_local_ci_parity_reports_missing_dev_dependencies_before_quality_steps(
     assert "development/test modules: black, pytest" in captured.out
     assert "Run `./setup.sh`" in captured.out
     assert "terminated after the first blocking error" in captured.out
-    assert "Cause: The selected Python environment is missing required development/test modules: black, pytest." in captured.out
+    assert (
+        "Cause: The selected Python environment is missing required development/test modules: black, pytest."
+        in captured.out
+    )
     assert "Skipping Python quality/test steps" in captured.out
     assert "[ERROR] Black format check" not in captured.out
     assert "[ERROR] Pytest suite (tests/)" not in captured.out
@@ -4235,9 +4243,30 @@ def test_local_ci_parity_default_pytest_group_runs_named_bundles_in_order(
         command for command in executed_commands if command[1:3] == ("-m", "pytest")
     ]
     assert pytest_commands == [
-        (sys.executable, "-m", "pytest", *module.PYTEST_BUNDLE_TO_FILES[bundle])
+        (
+            sys.executable,
+            "-m",
+            "pytest",
+            *module.PYTEST_FAST_FAIL_ARGS,
+            *module.PYTEST_BUNDLE_TO_FILES[bundle],
+        )
         for bundle in module.PYTEST_BUNDLE_ORDER
     ]
+
+
+def test_local_ci_parity_python_quality_pytest_lane_uses_fast_fail() -> None:
+    module = _load_local_ci_parity_module()
+
+    args = module.parse_args(["--repo-root", ".", "--base-rev", "base-sha"])
+    pytest_step = module.build_python_quality_steps(args)[-1]
+
+    assert pytest_step.command == (
+        sys.executable,
+        "-m",
+        "pytest",
+        *module.PYTEST_FAST_FAIL_ARGS,
+        "tests/",
+    )
 
 
 def test_local_ci_parity_standard_group_pytest_bundle_replay_runs_only_selected_bundle(
@@ -4291,6 +4320,7 @@ def test_local_ci_parity_standard_group_pytest_bundle_replay_runs_only_selected_
             sys.executable,
             "-m",
             "pytest",
+            *module.PYTEST_FAST_FAIL_ARGS,
             *module.PYTEST_BUNDLE_TO_FILES[module.PYTEST_BUNDLE_LEGACY_MISC],
         )
     ]

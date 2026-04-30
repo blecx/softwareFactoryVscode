@@ -149,7 +149,9 @@ def test_capture_recovery_snapshot_warns_about_partial_queue_snapshot(tmp_path):
     tmp_dir = repo_root / ".tmp"
     tmp_dir.mkdir(parents=True)
     checkpoint_path = tmp_dir / "github-issue-queue-state.md"
-    checkpoint_path.write_text("- active_issue: 226\n- active_pr: none\n", encoding="utf-8")
+    checkpoint_path.write_text(
+        "- active_issue: 226\n- active_pr: none\n", encoding="utf-8"
+    )
     output_path = tmp_dir / "interruption-recovery-snapshot.md"
     partial_surface = (
         repo_root
@@ -170,7 +172,10 @@ def test_capture_recovery_snapshot_warns_about_partial_queue_snapshot(tmp_path):
         if command[:3] == ["git", "status", "--short"]:
             return _completed(command, "## main\n")
         if command[:3] == ["gh", "issue", "view"]:
-            return _completed(command, '{"state":"OPEN","url":"https://example.test/issues/226","title":"Issue 226","closedAt":null}\n')
+            return _completed(
+                command,
+                '{"state":"OPEN","url":"https://example.test/issues/226","title":"Issue 226","closedAt":null}\n',
+            )
         raise AssertionError(f"Unexpected command: {command}")
 
     module.capture_recovery_snapshot(
