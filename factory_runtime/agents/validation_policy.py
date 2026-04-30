@@ -2,10 +2,10 @@
 
 This module owns schema validation for the repository's phase-2 validation
 policy surface. Issue #226 established the canonical bundle taxonomy and
-watchdog metadata; issue #227 extends the same surface with the four validation
-levels, representative changed-surface rules, aggregate composition, and
-explicit local-vs-GitHub exceptions while still deferring broader invalid-policy
-lock coverage to later slices.
+watchdog metadata; issue #227 extended the same surface with the four
+validation levels, representative changed-surface rules, aggregate
+composition, and explicit local-vs-GitHub exceptions; issue #228 locks that
+contract down with the broader valid/invalid policy test suite.
 """
 
 from __future__ import annotations

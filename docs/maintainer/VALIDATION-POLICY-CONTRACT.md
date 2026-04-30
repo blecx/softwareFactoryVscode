@@ -1,11 +1,11 @@
 # Validation policy contract and official bundle taxonomy
 
-This document records the canonical validation-policy authority surface introduced for issue `#226` and extended for issue `#227` under umbrella issue `#225`.
+This document records the canonical validation-policy authority surface introduced for issue `#226`, extended for issue `#227`, and locked by the broader valid/invalid policy contract lock suite in issue `#228` under umbrella issue `#225`.
 
 - **Status:** canonical bundle-taxonomy and level-selection contract
 - **Authoritative config:** [`../../configs/validation_policy.yml`](../../configs/validation_policy.yml)
 - **Schema/loader:** [`../../factory_runtime/agents/validation_policy.py`](../../factory_runtime/agents/validation_policy.py)
-- **Current boundary:** this slice defines the official bundle identifiers, required bundle metadata, bounded watchdog contract, four validation levels, representative changed-surface resolution rules, aggregate escalation semantics, and explicit local-vs-GitHub exceptions. It still does **not** yet land the broader invalid-policy lock suite or migrate workflow runners to consume these semantics directly.
+- **Current boundary:** this slice defines the official bundle identifiers, required bundle metadata, bounded watchdog contract, four validation levels, representative changed-surface resolution rules, aggregate escalation semantics, explicit local-vs-GitHub exceptions, and the contract tests that lock those semantics against invalid-policy drift. It still does **not** yet migrate workflow runners to consume these semantics directly.
 
 ## Why this surface exists
 
@@ -19,7 +19,7 @@ For this repository, that authority surface is:
 
 ## Current boundary and deferred scope
 
-Issues `#226` and `#227` establish the canonical contract surface while still deferring the broader invalid-policy lock suite.
+Issues `#226`, `#227`, and `#228` establish the canonical contract surface and the broader valid/invalid policy contract lock around it.
 
 What this slice defines now:
 
@@ -27,12 +27,12 @@ What this slice defines now:
 - required bundle metadata (`kind`, `owner`, `summary`, current derivative labels, and bounded watchdog metadata);
 - aggregate membership for the canonical `baseline`, `merge-full`, and `production` bundles;
 - four validation levels that point back to those official bundles instead of inventing new level-specific bundle names;
-- representative changed-surface mapping and escalation rules; and
-- explicit local-vs-GitHub exceptions with rationale.
+- representative changed-surface mapping and escalation rules;
+- explicit local-vs-GitHub exceptions with rationale; and
+- contract tests that lock representative valid bundle-selection scenarios plus deterministic invalid-policy rejection cases.
 
 What this slice defers intentionally:
 
-- issue `#228` — the broader valid/invalid policy contract lock, including missing watchdog metadata, over-budget bundles, invalid bundle references, malformed exceptions, and other forbidden states; and
 - any migration of [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py) or [`../../.github/workflows/ci.yml`](../../.github/workflows/ci.yml) to consume the new policy directly.
 
 ## Four-level validation model
@@ -113,6 +113,16 @@ Current schema requirements:
 - aggregate bundles still need bounded watchdog metadata even after their member bundles are populated.
 
 This keeps the taxonomy compatible with the repository rule that CI-critical validation should remain split into bounded bundles with explicit deadlines rather than indefinite waits.
+
+## Contract lock test surfaces
+
+Issue `#228` lands the broader repository-owned lock suite that future resolver,
+runner, and workflow work must keep green.
+
+- [`../../tests/test_validation_policy.py`](../../tests/test_validation_policy.py) — canonical happy-path load and authority smoke test.
+- [`../../tests/test_validation_policy_selection_contract.py`](../../tests/test_validation_policy_selection_contract.py) — representative valid bundle-selection scenarios, escalation boundaries, and explicit exception coverage.
+- [`../../tests/test_validation_policy_errors.py`](../../tests/test_validation_policy_errors.py) — deterministic invalid-policy rejection cases including missing watchdog metadata, budget ceiling violations, bad bundle references, malformed exceptions, and duplicate/forbidden selection state.
+- [`../../tests/test_validation_policy_docs_contract.py`](../../tests/test_validation_policy_docs_contract.py) — contributor-facing discoverability and authority-routing lock for this contract note.
 
 ## Downstream surfaces that must consume these semantics later
 
