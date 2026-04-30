@@ -546,6 +546,45 @@ def test_existing_wiki_skills_route_first_time_hosts_to_bootstrap():
     assert "missing, incomplete, or not yet approved" in lowered_maintenance
 
 
+def test_wiki_skills_share_low_memory_boundary_shorthand() -> None:
+    repo_root = Path(__file__).parent.parent
+    bootstrap = (
+        repo_root / ".copilot" / "skills" / "wiki-bootstrap-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    policy = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "wiki-publication-policy-authoring"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    maintenance = (
+        repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    lowered_texts = [
+        bootstrap.lower(),
+        policy.lower(),
+        maintenance.lower(),
+    ]
+
+    for text in lowered_texts:
+        assert "low-memory boundary shorthand" in text
+        assert "what may go public and what stays repo-only" in text
+        assert "where approved canonical sources land in the wiki" in text
+        assert (
+            "what the host project says and why that wording is authoritative" in text
+        )
+        assert "what readers see after projection" in text
+
+    assert "pre-truth onboarding step" in bootstrap.lower()
+    assert (
+        "define the host publication boundary without replacing projection config"
+        in policy.lower()
+    )
+    assert "update live wiki output from approved host truth" in maintenance.lower()
+
+
 def test_wiki_bootstrap_skill_leaves_live_wiki_execution_to_maintainers():
     repo_root = Path(__file__).parent.parent
     skill_root = repo_root / ".copilot" / "skills" / "wiki-bootstrap-workflow"
@@ -644,6 +683,7 @@ def test_wiki_maintenance_skill_requires_host_truth_and_shared_assets():
     assert "host-owned projection config" in lowered_skill
     assert "canonical host docs" in lowered_skill
     assert "reader-facing projection" in lowered_skill
+    assert "lane really is maintenance" in lowered_skill
     assert (
         "stop and ask the host to author or fix it instead of guessing" in lowered_skill
     )
@@ -702,6 +742,7 @@ def test_wiki_publication_policy_skill_keeps_host_truth_in_repo():
     assert "projection config" in lowered_skill
     assert "canonical docs" in lowered_skill
     assert "leave live wiki publication to the maintenance workflow" in lowered_skill
+    assert "hand off back to `wiki-bootstrap-workflow`" in skill
     assert (
         "stop and ask for the missing host context instead of inventing a publication boundary"
         in lowered_skill

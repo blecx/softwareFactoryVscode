@@ -28,6 +28,15 @@ Provide a reusable, host-agnostic workflow for authoring and maintaining host-ow
 
 **Reusable publication-policy authoring procedure** — owns the general method for defining a host project's wiki publication boundary. The host project remains authoritative for the actual policy entries, projection config, canonical docs, and accepted authority documents.
 
+## Low-memory boundary shorthand
+
+- **Bootstrap** = create or verify the starting host-owned surfaces when they are missing, incomplete, or unapproved.
+- **Publication policy** = what may go public and what stays repo-only.
+- **Projection config** = where approved canonical sources land in the wiki.
+- **Canonical docs + authority docs** = what the host project says and why that wording is authoritative.
+- **Live GitHub wiki** = what readers see after projection.
+- **This skill** = define the host publication boundary without replacing projection config, canonical content, or live wiki maintenance.
+
 ## Required Host Inputs
 
 Read the host-owned truth surfaces before drafting or editing the publication policy:
@@ -52,11 +61,12 @@ If the host is still scaffolding those starting surfaces for the first time, han
 1. Read the host's authority docs and canonical documentation surfaces.
 2. Inventory candidate docs or doc groups that might be published.
 3. Classify each item as wiki-safe, repo-only, or unresolved.
-4. Map wiki-safe sources to canonical wiki targets without turning the map into a second source of truth.
+4. Map wiki-safe sources to canonical wiki targets without turning the map into a second source of truth or a projection manifest.
 5. Record repo-only surfaces and explain why they stay out of the wiki.
-6. Define how the policy relates to host projection config and canonical docs.
+6. Define how the policy hands off to projection config, canonical docs, and later live wiki maintenance without turning this file into any of those surfaces.
 7. Review the file for authority wording, anti-patterns, and host-specific accuracy.
-8. Leave live wiki publication to the maintenance workflow once the host policy is in place.
+8. If the starting surfaces turn out to be missing or unapproved, stop and hand off back to `wiki-bootstrap-workflow`.
+9. Leave live wiki publication to the maintenance workflow once the host policy is approved and the host truth surfaces are in place.
 
 Follow the detailed authoring procedure in `references/policy-authoring-procedure.md` and the classification/authority rules in `references/publication-boundary-rules.md` rather than embedding host-specific policy defaults here.
 
@@ -66,4 +76,5 @@ Follow the detailed authoring procedure in `references/policy-authoring-procedur
 - Treat the publication-policy file as a host-owned control surface, not as canonical content.
 - Require the host to separate publication policy from projection config and from canonical docs.
 - Keep the live wiki reader-facing and repo docs authoritative.
+- This skill defines the publication boundary; it does not backfill projection config, canonical content, or live wiki edits.
 - Do not ship one host's wiki-safe page inventory as a reusable default for every future project.

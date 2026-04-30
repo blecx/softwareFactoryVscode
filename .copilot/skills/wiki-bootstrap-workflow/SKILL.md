@@ -27,6 +27,15 @@ Provide a reusable, host-agnostic workflow for first-time host onboarding when t
 
 **Reusable first-time host bootstrap procedure** — owns the generic method for scaffolding host-owned wiki starting surfaces. The host project remains authoritative for the actual publication-policy entries, projection config, canonical docs, and accepted authority docs.
 
+## Low-memory boundary shorthand
+
+- **Publication policy** = what may go public and what stays repo-only.
+- **Projection config** = where approved canonical sources land in the wiki.
+- **Canonical docs + authority docs** = what the host project says and why that wording is authoritative.
+- **Live GitHub wiki** = what readers see after projection.
+- **Bootstrap** = the pre-truth onboarding step that gets the starting host-owned surfaces into place.
+- **Next lane** = hand off to `wiki-publication-policy-authoring` for boundary decisions, or to `wiki-maintenance-workflow` only after host truth is approved.
+
 ## Required Host Inputs
 
 Read or identify the following host-owned inputs before scaffolding any wiki control surface:
@@ -49,12 +58,13 @@ If the host cannot identify its authority docs or canonical docs, stop and ask f
 
 1. Confirm the bootstrap entry condition: one or more required host-owned wiki truth surfaces are missing, incomplete, or not yet approved.
 2. Work through the intake checklist to identify the host authority docs, canonical docs, repo-only boundaries, and approval state.
-3. Scaffold a host-owned `docs/WIKI-MAP.md` by using `.copilot/skills/wiki-publication-policy-authoring/assets/wiki-map-template.md` with host-specific inputs instead of copying another host's policy.
-4. Scaffold a host-owned `manifests/wiki-projection-manifest.json` by using `assets/wiki-projection-manifest-template.json` without inventing a page inventory.
-5. Record which canonical docs and authority docs will remain normative before any wiki projection work can begin.
-6. Stop when the host-owned starting surfaces exist, then hand off to the publication-policy-authoring skill for boundary authoring or review.
-7. Hand off to the `wiki-maintenance-workflow` only after the host publication policy, projection config, and canonical docs are present and authority-approved.
-8. Leave live wiki publishing, editing, and verification to the maintenance workflow and repo-only runbooks.
+3. Write down the four surface roles in host terms before editing: publication policy answers what may go public, projection config answers where approved sources land, canonical docs stay authoritative, and the live wiki stays reader-facing.
+4. Scaffold a host-owned `docs/WIKI-MAP.md` by using `.copilot/skills/wiki-publication-policy-authoring/assets/wiki-map-template.md` with host-specific inputs instead of copying another host's policy or inventing final boundary decisions here.
+5. Scaffold a host-owned `manifests/wiki-projection-manifest.json` by using `assets/wiki-projection-manifest-template.json` without inventing a page inventory or canonical content.
+6. Record which canonical docs and authority docs will remain normative before any wiki projection work can begin.
+7. Stop bootstrap once the host-owned starting surfaces exist. If the host still needs to define or revise the wiki-safe versus repo-only boundary, hand off to the publication-policy-authoring skill.
+8. Hand off to the `wiki-maintenance-workflow` only after the host publication policy, projection config, canonical docs, and authority docs are present and approved.
+9. Leave live wiki publishing, editing, and verification to the maintenance workflow and repo-only runbooks.
 
 Follow the detailed bootstrap procedure in `references/bootstrap-procedure.md` and the authority/boundary rules in `references/bootstrap-guardrails.md` instead of embedding host-specific truth in this skill.
 
@@ -63,5 +73,6 @@ Follow the detailed bootstrap procedure in `references/bootstrap-procedure.md` a
 - Keep project-specific wiki truth in the host repository, not in reusable skill text.
 - Keep publication policy separate from projection config, canonical docs, and live wiki output.
 - Treat the live GitHub wiki as a reader-facing projection, not as the authority surface.
+- Bootstrap creates or verifies starting surfaces; it does not finalize host policy, write canonical content, or touch live wiki output.
 - Do not ship one host's page inventory, default manifest entries, or canonical content as the reusable default for future hosts.
 - Stop instead of guessing when authority inputs are missing, incomplete, or not yet approved.
