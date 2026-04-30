@@ -10,9 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT_DOC_PATH = REPO_ROOT / CANONICAL_VALIDATION_POLICY_DOCUMENTATION_PATH
 
 
-def test_validation_policy_contract_doc_identifies_authority_and_deferred_surfaces() -> (
-    None
-):
+def test_validation_policy_contract_doc_identifies_authority_and_lock_suite() -> None:
     contract = CONTRACT_DOC_PATH.read_text(encoding="utf-8")
     docs_readme = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
     guardrails = (REPO_ROOT / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
@@ -25,8 +23,13 @@ def test_validation_policy_contract_doc_identifies_authority_and_deferred_surfac
     assert "## Explicit local-vs-GitHub exceptions" in contract
     assert "fresh-checkout-bootstrap" in contract
     assert "runner-ownership-parity" in contract
+    assert "broader valid/invalid policy contract lock" in contract
+    assert "## Contract lock test surfaces" in contract
     assert "configs/validation_policy.yml" in contract
     assert "factory_runtime/agents/validation_policy.py" in contract
+    assert "tests/test_validation_policy.py" in contract
+    assert "tests/test_validation_policy_selection_contract.py" in contract
+    assert "tests/test_validation_policy_errors.py" in contract
     assert "issue `#228`" in contract
     assert "merge-full" in contract
     assert "production" in contract
