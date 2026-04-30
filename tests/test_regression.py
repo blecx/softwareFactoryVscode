@@ -546,6 +546,85 @@ def test_existing_wiki_skills_route_first_time_hosts_to_bootstrap():
     assert "missing, incomplete, or not yet approved" in lowered_maintenance
 
 
+def test_wiki_bootstrap_skill_leaves_live_wiki_execution_to_maintainers():
+    repo_root = Path(__file__).parent.parent
+    skill_root = repo_root / ".copilot" / "skills" / "wiki-bootstrap-workflow"
+    combined = "\n".join(
+        [
+            (skill_root / "SKILL.md").read_text(encoding="utf-8"),
+            (skill_root / "references" / "bootstrap-procedure.md").read_text(
+                encoding="utf-8"
+            ),
+            (skill_root / "references" / "bootstrap-guardrails.md").read_text(
+                encoding="utf-8"
+            ),
+            (skill_root / "assets" / "bootstrap-intake-checklist.md").read_text(
+                encoding="utf-8"
+            ),
+            (
+                skill_root / "assets" / "wiki-projection-manifest-template.json"
+            ).read_text(encoding="utf-8"),
+        ]
+    )
+    lowered = combined.lower()
+
+    assert "publish, edit, or verify live github wiki pages directly" in lowered
+    assert (
+        "leave live wiki publishing, editing, and verification to the maintenance workflow"
+        in lowered
+    )
+    assert ".tmp/wiki-launch/live-wiki" not in combined
+    assert "last synced from" not in lowered
+    assert "restrict editing to collaborators only" not in lowered
+
+
+def test_wiki_bootstrap_contract_keeps_policy_config_content_projection_distinct():
+    repo_root = Path(__file__).parent.parent
+    contract = (
+        repo_root / "docs" / "maintainer" / "HOST-WIKI-TRUTH-CONTRACT.md"
+    ).read_text(encoding="utf-8")
+    guardrails = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "wiki-bootstrap-workflow"
+        / "references"
+        / "bootstrap-guardrails.md"
+    ).read_text(encoding="utf-8")
+    runbook = (repo_root / "docs" / "maintainer" / "WIKI-PUBLISHING.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Keep publication policy separate from projection config." in contract
+    assert "Keep projection config separate from canonical content." in contract
+    assert (
+        "Keep canonical content separate from the live GitHub wiki projection."
+        in contract
+    )
+    assert (
+        "Do not collapse publication policy, projection config, canonical content, "
+        "and live projection into one convenience file." in guardrails
+    )
+    assert (
+        "starts only after the required host-owned truth surfaces already exist and are approved"
+        in runbook.lower()
+    )
+
+
+def test_wiki_agent_wrapper_stays_thin_without_bootstrap_asset_details():
+    repo_root = Path(__file__).parent.parent
+    wrapper = (repo_root / ".github" / "agents" / "wiki.md").read_text(encoding="utf-8")
+    lowered = wrapper.lower()
+
+    assert "bootstrap-intake-checklist.md" not in wrapper
+    assert "wiki-projection-manifest-template.json" not in wrapper
+    assert "bootstrap-procedure.md" not in wrapper
+    assert "bootstrap-guardrails.md" not in wrapper
+    assert "create or update flow" not in lowered
+    assert "stop conditions and handoff" not in lowered
+    assert "public-render verification checklist" not in lowered
+
+
 def test_wiki_maintenance_skill_requires_host_truth_and_shared_assets():
     repo_root = Path(__file__).parent.parent
     skill_root = repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow"
