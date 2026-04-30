@@ -143,7 +143,7 @@ For local validation, keep the two parity paths distinct:
 - `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout` replays that same production gate from a clean git worktree after `./setup.sh`, which is the closest local match to GitHub Actions when you want merge-grade parity evidence before pushing.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains available as a compatibility alias when you only need the Docker build expansion path without the promoted Docker E2E lane.
 
-In GitHub Actions, production checks are now exposed as diagnosable jobs (`Production Docs Contract`, `Production Docker Build Parity`, and `Production Runtime Proofs`) followed by the canonical aggregate gate (`Internal Production Gate — Docker Parity & Recovery Proofs`). The aggregate gate remains the contract-facing sign-off authority.
+In GitHub Actions, production checks are now exposed as diagnosable jobs (`Production Docs Contract`, `Production Docker Build Parity`, and `Production Runtime Proofs`) followed by the canonical aggregate gate (`Internal Production Gate — Docker Parity & Recovery Proofs`). The aggregate gate remains the contract-facing sign-off authority, but CI now refreshes that sign-off bundle from the successful production diagnostics instead of replaying the same production lanes again on the critical path.
 
 The promoted blocking Docker E2E subset inside `--mode production` currently
 covers:

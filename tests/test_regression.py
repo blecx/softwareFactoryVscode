@@ -3963,6 +3963,82 @@ def test_local_ci_parity_production_groups_only_skips_default_prechecks(
     assert not any(command[1:3] == ("-m", "pytest") for command in executed_commands)
 
 
+def test_local_ci_parity_ci_bundle_only_refreshes_aggregate_without_replay(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+
+    def _unexpected_run_command(command, *, cwd):
+        del command, cwd
+        raise AssertionError("bundle-only aggregate path must not execute commands")
+
+    def _unexpected_docs(repo_root):
+        del repo_root
+        raise AssertionError("bundle-only aggregate path must not rerun docs checks")
+
+    def _unexpected_docker_build(repo_root):
+        del repo_root
+        raise AssertionError(
+            "bundle-only aggregate path must not rerun Docker build checks"
+        )
+
+    def _unexpected_runtime(repo_root, *, python_executable):
+        del repo_root, python_executable
+        raise AssertionError(
+            "bundle-only aggregate path must not rerun runtime proof checks"
+        )
+
+    monkeypatch.setattr(module, "run_command", _unexpected_run_command)
+    monkeypatch.setattr(
+        module,
+        "run_required_documentation_validation",
+        _unexpected_docs,
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_build_validation",
+        _unexpected_docker_build,
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_e2e_validation",
+        _unexpected_runtime,
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--production-group",
+            module.PRODUCTION_GROUP_AGGREGATE,
+            "--production-groups-only",
+            "--ci-production-readiness-bundle-only",
+        ]
+    )
+
+    assert exit_code == 0
+    latest_report = json.loads(
+        (tmp_path / ".tmp" / "production-readiness" / "latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert latest_report["production_groups_executed"] == list(
+        module.PRODUCTION_GROUP_ORDER
+    )
+    assert latest_report["production_group_results"] == {
+        group: "pass" for group in module.PRODUCTION_GROUP_ORDER
+    }
+    assert (
+        latest_report["result_source"]
+        == module.PRODUCTION_RESULT_SOURCE_UPSTREAM_CI_DIAGNOSTICS
+    )
+
+
 def test_local_ci_parity_rejects_production_groups_only_in_standard_mode(
     tmp_path: Path,
     capsys,
@@ -3982,6 +4058,29 @@ def test_local_ci_parity_rejects_production_groups_only_in_standard_mode(
 
     assert exit_code == 2
     assert "only supported with `--mode production`" in captured.out
+
+
+def test_local_ci_parity_rejects_ci_bundle_only_without_groups_only(
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--ci-production-readiness-bundle-only",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "requires `--production-groups-only`" in captured.out
 
 
 def test_local_ci_parity_production_aggregate_runs_named_groups_in_canonical_order(
@@ -4042,6 +4141,9 @@ def test_local_ci_parity_production_aggregate_runs_named_groups_in_canonical_ord
     )
     assert latest_report["production_groups_executed"] == list(
         module.PRODUCTION_GROUP_ORDER
+    )
+    assert (
+        latest_report["result_source"] == module.PRODUCTION_RESULT_SOURCE_LIVE_EXECUTION
     )
 
 

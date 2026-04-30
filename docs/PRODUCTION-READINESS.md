@@ -160,7 +160,7 @@ Use the local parity commands intentionally:
 - `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout` is the closest local replay of GitHub's checkout-and-bootstrap behavior. It creates a clean git worktree snapshot, runs `./setup.sh`, and then replays the canonical production gate there before you trust the result as merge-grade local evidence.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains supported as a compatibility alias when you want the Docker build expansion path without switching the named mode, but it does **not** add the promoted Docker E2E lane and the canonical production sign-off command is `--mode production`.
 
-GitHub Checks now mirrors that diagnostic structure through explicit production-only jobs (`Production Docs Contract`, `Production Docker Build Parity`, and `Production Runtime Proofs`) followed by the canonical aggregate `production-readiness` gate (`Internal Production Gate — Docker Parity & Recovery Proofs`). The aggregate job remains the readiness contract authority.
+GitHub Checks now mirrors that diagnostic structure through explicit production-only jobs (`Production Docs Contract`, `Production Docker Build Parity`, and `Production Runtime Proofs`) followed by the canonical aggregate `production-readiness` gate (`Internal Production Gate — Docker Parity & Recovery Proofs`). The aggregate job remains the readiness contract authority, but in CI it now refreshes the canonical sign-off bundle from those already-successful production diagnostics instead of replaying the same production lanes a second time on the critical path.
 
 The promoted blocking Docker E2E lane currently covers:
 
