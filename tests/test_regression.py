@@ -1382,6 +1382,57 @@ def test_docs_readme_wiki_first_stops_route_through_host_owned_truth() -> None:
     )
 
 
+def test_validation_baseline_artifacts_are_tracked_and_routed() -> None:
+    repo_root = Path(__file__).parent.parent
+    docs_readme = (repo_root / "docs" / "README.md").read_text(encoding="utf-8")
+    guardrails = (repo_root / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
+        encoding="utf-8"
+    )
+    report = (repo_root / "docs" / "maintainer" / "VALIDATION-BASELINE.md").read_text(
+        encoding="utf-8"
+    )
+    manifest = json.loads(
+        (repo_root / "manifests" / "validation-baseline.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert "maintainer/VALIDATION-BASELINE.md" in docs_readme
+    assert "validation timing baseline and hotspot evidence" in docs_readme
+
+    assert "VALIDATION-BASELINE.md" in guardrails
+    assert "validation-baseline.json" in guardrails
+    assert "current measured baseline" in guardrails
+
+    assert "# Validation runtime baseline and hotspot evidence" in report
+    assert "tracked successor location" in report
+    assert "observation-only evidence" in report
+    assert "25118595701" in report
+    assert "39.58 s" in report
+    assert "1182 s (19 m 42 s)" in report
+    assert "74.68%" in report
+    assert "927 s" in report
+    assert "does **not** change the validation contract" in report
+
+    assert manifest["schema_version"] == 1
+    assert manifest["issue"] == 223
+    assert manifest["umbrella_issue"] == 222
+    assert manifest["observation_only"] is True
+    assert manifest["tracked_report"] == "docs/maintainer/VALIDATION-BASELINE.md"
+    assert (
+        manifest["local"]["canonical_precheck"]["command"]
+        == "./.venv/bin/python ./scripts/local_ci_parity.py"
+    )
+    assert manifest["local"]["canonical_precheck"]["elapsed_seconds"] == 39.58
+    assert manifest["local"]["pytest_hotspot_replay"]["elapsed_seconds"] == 29.56
+    assert manifest["github_ci"]["run_id"] == 25118595701
+    assert manifest["github_ci"]["wall_clock_elapsed_seconds"] == 1182
+    assert manifest["github_ci"]["cumulative_install_dependencies_seconds"] == 927
+    assert (
+        manifest["derived_findings"]["local_to_remote_wall_clock_multiplier"] == 29.86
+    )
+
+
 def test_project_overview_doc_establishes_canonical_landing_story() -> None:
     repo_root = Path(__file__).parent.parent
     overview = (repo_root / "docs" / "PROJECT-OVERVIEW.md").read_text(encoding="utf-8")
