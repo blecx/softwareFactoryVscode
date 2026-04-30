@@ -63,10 +63,11 @@ protection setup.
 
 The final check, `Internal Production Gate — Docker Parity & Recovery Proofs`,
 is the **aggregate production authority lane**. It depends on the three
-production-only diagnostic jobs and then reruns the canonical aggregate command:
+production-only diagnostic jobs and now refreshes the canonical aggregate
+bundle from their already-successful results via the CI-only fast path:
 
 ```text
-./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+python3 ./scripts/local_ci_parity.py --mode production --production-group aggregate --production-groups-only --ci-production-readiness-bundle-only
 ```
 
 Within `scripts/local_ci_parity.py`, the production-group taxonomy is currently:

@@ -8523,6 +8523,9 @@ def test_ci_workflow_has_internal_production_readiness_job() -> None:
     assert "--production-group docker-builds" in text
     assert "--production-group runtime-proofs" in text
     assert "--production-groups-only" in text
+    assert "--ci-production-readiness-bundle-only" in text
+    assert "python3 ./scripts/local_ci_parity.py" in text
+    assert text.count("bash ./setup.sh") == 2
     assert "needs:" in text
     assert (
         "Run canonical internal production gate (Docker parity & recovery proofs)"

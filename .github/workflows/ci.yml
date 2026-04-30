@@ -85,13 +85,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
-        run: |
-          bash ./setup.sh
-
       - name: Run production docs-contract diagnostics
         run: |
-          ./.venv/bin/python ./scripts/local_ci_parity.py \
+          python3 ./scripts/local_ci_parity.py \
             --mode production \
             --production-group docs-contract \
             --production-groups-only
@@ -109,13 +105,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
-        run: |
-          bash ./setup.sh
-
       - name: Run production docker-build diagnostics
         run: |
-          ./.venv/bin/python ./scripts/local_ci_parity.py \
+          python3 ./scripts/local_ci_parity.py \
             --mode production \
             --production-group docker-builds \
             --production-groups-only
@@ -161,20 +153,18 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
-        run: |
-          bash ./setup.sh
-
       - name: Run canonical internal production gate (Docker parity & recovery proofs)
         run: |
-          # The canonical internal production gate still reuses the documented
-          # `./scripts/local_ci_parity.py --mode production` contract, while CI
-          # surfaces a clearer human-facing label because this lane bundles
-          # blocking Dockerfile builds, promoted Docker E2E runtime proofs
-          # (including backup/restore roundtrip evidence), required
-          # docs/runbook presence checks, and a concise sign-off bundle under
-          # .tmp.
-          ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+          # The canonical aggregate production gate remains the readiness
+          # authority, but CI refreshes the sign-off bundle from the already
+          # successful production-only diagnostic jobs instead of replaying
+          # Dockerfile build parity, docs-contract checks, and runtime proofs a
+          # second time on the critical path.
+          python3 ./scripts/local_ci_parity.py \
+            --mode production \
+            --production-group aggregate \
+            --production-groups-only \
+            --ci-production-readiness-bundle-only
 
       - name: Upload production-readiness evidence bundle
         if: always()
