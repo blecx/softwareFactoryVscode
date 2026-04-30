@@ -585,6 +585,42 @@ def test_wiki_skills_share_low_memory_boundary_shorthand() -> None:
     assert "update live wiki output from approved host truth" in maintenance.lower()
 
 
+def test_wiki_skill_handoffs_stay_lane_specific_and_truth_gated() -> None:
+    repo_root = Path(__file__).parent.parent
+    bootstrap = (
+        repo_root / ".copilot" / "skills" / "wiki-bootstrap-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    policy = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "wiki-publication-policy-authoring"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    maintenance = (
+        repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "**Next lane** = hand off to `wiki-publication-policy-authoring` for "
+        "boundary decisions, or to `wiki-maintenance-workflow` only after host "
+        "truth is approved." in bootstrap
+    )
+    assert (
+        "Leave live wiki publication to the maintenance workflow once the host "
+        "policy is approved and the host truth surfaces are in place." in policy
+    )
+    assert (
+        "Do not use this to invent or rewrite the host project's publication "
+        "policy." in maintenance
+    )
+    assert (
+        "Confirm the lane really is maintenance: the host publication policy, "
+        "projection config, canonical docs, and authority docs already exist and "
+        "are approved." in maintenance
+    )
+
+
 def test_wiki_bootstrap_skill_leaves_live_wiki_execution_to_maintainers():
     repo_root = Path(__file__).parent.parent
     skill_root = repo_root / ".copilot" / "skills" / "wiki-bootstrap-workflow"
@@ -1298,6 +1334,54 @@ def test_docs_readme_routes_audiences_without_competing_authority():
     assert "MULTI-WORKSPACE-MCP-IMPLEMENTATION-PLAN.md" in docs_readme
 
 
+def test_docs_readme_wiki_first_stops_route_through_host_owned_truth() -> None:
+    repo_root = Path(__file__).parent.parent
+    docs_readme = (repo_root / "docs" / "README.md").read_text(encoding="utf-8")
+    section = docs_readme.split("#### Wiki workflow first stops", maxsplit=1)[1].split(
+        "- [`WORK-ISSUE-WORKFLOW.md`](WORK-ISSUE-WORKFLOW.md)",
+        maxsplit=1,
+    )[0]
+
+    assert ".copilot/skills/" not in section
+    assert "truth first, post-truth publishing second" in section
+    assert (
+        "Where does host-owned wiki truth live, and is bootstrap still required?"
+        in section
+    )
+    assert (
+        "What is wiki-safe, what stays repo-only, and how do approved sources map "
+        "to the live wiki?" in section
+    )
+    assert (
+        "Approved truth already exists — how do we validate or publish the live "
+        "wiki safely?" in section
+    )
+    assert (
+        "[`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`]"
+        "(maintainer/HOST-WIKI-TRUTH-CONTRACT.md)" in section
+    )
+    assert (
+        "[`WIKI-MAP.md`](WIKI-MAP.md) and "
+        "[`../manifests/wiki-projection-manifest.json`]"
+        "(../manifests/wiki-projection-manifest.json)" in section
+    )
+    assert "[`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md)" in section
+
+    assert section.index(
+        "Where does host-owned wiki truth live, and is bootstrap still required?"
+    ) < section.index(
+        "What is wiki-safe, what stays repo-only, and how do approved sources map "
+        "to the live wiki?"
+    )
+    assert section.index(
+        "What is wiki-safe, what stays repo-only, and how do approved sources map "
+        "to the live wiki?"
+    ) < section.index(
+        "Approved truth already exists — how do we validate or publish the live "
+        "wiki safely?"
+    )
+
+
 def test_project_overview_doc_establishes_canonical_landing_story() -> None:
     repo_root = Path(__file__).parent.parent
     overview = (repo_root / "docs" / "PROJECT-OVERVIEW.md").read_text(encoding="utf-8")
@@ -1681,6 +1765,57 @@ def test_maintainer_wiki_publishing_runbook_keeps_wiki_repo_first():
     assert "issue → PR → merge" in runbook
 
 
+def test_wiki_contract_and_runbook_preserve_truth_first_handoff_order() -> None:
+    repo_root = Path(__file__).parent.parent
+    contract = (
+        repo_root / "docs" / "maintainer" / "HOST-WIKI-TRUTH-CONTRACT.md"
+    ).read_text(encoding="utf-8")
+    runbook = (repo_root / "docs" / "maintainer" / "WIKI-PUBLISHING.md").read_text(
+        encoding="utf-8"
+    )
+    adoption_order = contract.split("## Adoption order", maxsplit=1)[1].split(
+        "## Ownership split at a glance",
+        maxsplit=1,
+    )[0]
+
+    assert (
+        "[`wiki-bootstrap-workflow`]"
+        "(../../.copilot/skills/wiki-bootstrap-workflow/SKILL.md)" in adoption_order
+    )
+    assert (
+        "[`wiki-publication-policy-authoring`]"
+        "(../../.copilot/skills/wiki-publication-policy-authoring/SKILL.md)"
+        in adoption_order
+    )
+    assert (
+        "[`wiki-maintenance-workflow`]"
+        "(../../.copilot/skills/wiki-maintenance-workflow/SKILL.md)" in adoption_order
+    )
+    assert "[`WIKI-PUBLISHING.md`](WIKI-PUBLISHING.md)" in adoption_order
+
+    assert adoption_order.index(
+        "[`wiki-bootstrap-workflow`]"
+        "(../../.copilot/skills/wiki-bootstrap-workflow/SKILL.md)"
+    ) < adoption_order.index(
+        "[`wiki-publication-policy-authoring`]"
+        "(../../.copilot/skills/wiki-publication-policy-authoring/SKILL.md)"
+    )
+    assert adoption_order.index(
+        "[`wiki-publication-policy-authoring`]"
+        "(../../.copilot/skills/wiki-publication-policy-authoring/SKILL.md)"
+    ) < adoption_order.index(
+        "[`wiki-maintenance-workflow`]"
+        "(../../.copilot/skills/wiki-maintenance-workflow/SKILL.md)"
+    )
+
+    assert (
+        "If any answer is `no`, stop here and return to "
+        "[`HOST-WIKI-TRUTH-CONTRACT.md`](HOST-WIKI-TRUTH-CONTRACT.md), "
+        "bootstrap, or publication-policy authoring instead of stretching this "
+        "runbook into a truth-authoring surface." in runbook
+    )
+
+
 def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     repo_root = Path(__file__).parent.parent
     catalog = (repo_root / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
@@ -1826,6 +1961,28 @@ def test_wiki_agent_wrapper_offers_compact_three_lane_chooser() -> None:
     assert "create, update, retire, or verify live wiki pages" in wrapper
     assert "repo-specific sync, validation, or publication work" in wrapper
     assert "repair the host truth surfaces before touching live wiki pages" in wrapper
+
+
+def test_wiki_agent_wrapper_keeps_exactly_three_lane_choices() -> None:
+    repo_root = Path(__file__).parent.parent
+    wrapper = (repo_root / ".github" / "agents" / "wiki.md").read_text(encoding="utf-8")
+    chooser = wrapper.split("## Quick chooser", maxsplit=1)[1].split(
+        "## Use This Agent When",
+        maxsplit=1,
+    )[0]
+
+    assert chooser.count("| Bootstrap workflow |") == 1
+    assert chooser.count("| publication-policy-authoring skill |") == 1
+    assert chooser.count("| maintenance workflow |") == 1
+    assert "alongside the maintenance workflow" in chooser
+    assert ".copilot/skills/" not in chooser
+
+    assert chooser.index("| Bootstrap workflow |") < chooser.index(
+        "| publication-policy-authoring skill |"
+    )
+    assert chooser.index("| publication-policy-authoring skill |") < chooser.index(
+        "| maintenance workflow |"
+    )
 
 
 def test_docs_roadmap_separates_current_direction_from_historical_plans():
