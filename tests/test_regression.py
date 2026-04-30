@@ -1433,6 +1433,76 @@ def test_validation_baseline_artifacts_are_tracked_and_routed() -> None:
     )
 
 
+def test_validation_parity_inventory_artifacts_are_tracked_and_routed() -> None:
+    repo_root = Path(__file__).parent.parent
+    docs_readme = (repo_root / "docs" / "README.md").read_text(encoding="utf-8")
+    guardrails = (repo_root / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
+        encoding="utf-8"
+    )
+    report = (
+        repo_root / "docs" / "maintainer" / "VALIDATION-PARITY-INVENTORY.md"
+    ).read_text(encoding="utf-8")
+    manifest = json.loads(
+        (repo_root / "manifests" / "validation-parity-inventory.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert "maintainer/VALIDATION-PARITY-INVENTORY.md" in docs_readme
+    assert (
+        "required checks, accidental shadow policy, and CI-critical hang risks"
+        in docs_readme
+    )
+
+    assert "VALIDATION-PARITY-INVENTORY.md" in guardrails
+    assert "validation-parity-inventory.json" in guardrails
+    assert "parity-locked validation surfaces" in guardrails
+
+    assert "# Validation parity inventory, required checks, and hang risks" in report
+    assert "authoritative, derivative, or accidental shadow policy" in report
+    assert "Internal Production Gate — Docker Parity & Recovery Proofs" in report
+    assert "`/tmp/branch-protection-payload.json`" in report
+    assert "watch_mode: false" in report
+    assert "run_command() / run_step()" in report
+
+    assert manifest["schema_version"] == 1
+    assert manifest["issue"] == 224
+    assert manifest["umbrella_issue"] == 222
+    assert manifest["observation_only"] is True
+    assert manifest["baseline_input"] == "docs/maintainer/VALIDATION-BASELINE.md"
+    assert (
+        manifest["tracked_report"] == "docs/maintainer/VALIDATION-PARITY-INVENTORY.md"
+    )
+    assert (
+        manifest["required_checks"][-1]
+        == "Internal Production Gate — Docker Parity & Recovery Proofs"
+    )
+    assert manifest["aggregate_gate"]["depends_on"] == [
+        "Production Docs Contract",
+        "Production Docker Build Parity",
+        "Production Runtime Proofs",
+    ]
+
+    shadow = manifest["shadow_policy_findings"][0]
+    assert shadow["path"] == "scripts/setup-github-repo.sh"
+    assert shadow["temporary_payload_path"] == "/tmp/branch-protection-payload.json"
+    assert shadow["missing_documented_checks"] == [
+        "Production Docs Contract",
+        "Production Docker Build Parity",
+        "Production Runtime Proofs",
+        "Internal Production Gate — Docker Parity & Recovery Proofs",
+    ]
+
+    hang_ids = {item["id"] for item in manifest["hang_risks"]}
+    assert "local-ci-run-command-no-timeout" in hang_ids
+    assert "local-ci-run-git-no-timeout" in hang_ids
+    assert "production-runtime-proofs-no-timeout" in hang_ids
+    assert "queue-polling-needs-external-bound" in hang_ids
+
+    bounded_wait_surfaces = {item["surface"] for item in manifest["bounded_wait_paths"]}
+    assert "_wait_until_reachable(url, max_wait_seconds=30)" in bounded_wait_surfaces
+
+
 def test_project_overview_doc_establishes_canonical_landing_story() -> None:
     repo_root = Path(__file__).parent.parent
     overview = (repo_root / "docs" / "PROJECT-OVERVIEW.md").read_text(encoding="utf-8")
