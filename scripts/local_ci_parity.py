@@ -58,6 +58,7 @@ PYTEST_BUNDLE_QUOTA_TENANCY = "quota-tenancy"
 PYTEST_BUNDLE_RUNTIME_MANAGER = "runtime-manager"
 PYTEST_BUNDLE_RUNTIME_DOCKER = "runtime-docker"
 PYTEST_BUNDLE_LEGACY_MISC = "legacy-misc"
+PYTEST_FAST_FAIL_ARGS = ("-x",)
 PYTEST_BUNDLE_ORDER = (
     PYTEST_BUNDLE_DOCS_WORKFLOW,
     PYTEST_BUNDLE_INSTALL_SURFACE,
@@ -129,7 +130,7 @@ PRODUCTION_DOCKER_E2E_TEST_NAMES = (
 )
 PRODUCTION_DOCKER_E2E_KEYWORD_EXPR = " or ".join(PRODUCTION_DOCKER_E2E_TEST_NAMES)
 CANONICAL_PRODUCTION_DOCKER_E2E_COMMAND = (
-    f"RUN_DOCKER_E2E=1 ./.venv/bin/pytest {DOCKER_E2E_TEST_FILE} "
+    f"RUN_DOCKER_E2E=1 ./.venv/bin/pytest -x {DOCKER_E2E_TEST_FILE} "
     f'-k "{PRODUCTION_DOCKER_E2E_KEYWORD_EXPR}" -v'
 )
 
@@ -1035,7 +1036,7 @@ def build_python_quality_steps(
         steps.append(
             StepDefinition(
                 name="Pytest suite (tests/)",
-                command=(args.python, "-m", "pytest", "tests/"),
+                command=(args.python, "-m", "pytest", *PYTEST_FAST_FAIL_ARGS, "tests/"),
                 failure_summary="The pytest regression suite reported failures.",
                 remediation=(
                     "Investigate the failing tests under `tests/`, fix the root causes, "
@@ -1062,6 +1063,7 @@ def build_pytest_steps(
                     args.python,
                     "-m",
                     "pytest",
+                    *PYTEST_FAST_FAIL_ARGS,
                     *PYTEST_BUNDLE_TO_FILES[bundle_name],
                 ),
                 failure_summary=(
@@ -1457,6 +1459,7 @@ def run_docker_e2e_validation(
         python_executable,
         "-m",
         "pytest",
+        *PYTEST_FAST_FAIL_ARGS,
         DOCKER_E2E_TEST_FILE,
         "-k",
         PRODUCTION_DOCKER_E2E_KEYWORD_EXPR,

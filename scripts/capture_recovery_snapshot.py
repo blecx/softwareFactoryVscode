@@ -57,7 +57,9 @@ def parse_queue_checkpoint(checkpoint_path: Path) -> dict[str, str]:
     return state
 
 
-def inspect_execution_surface(repo_root: Path, surface_path: Path | None) -> dict[str, str | bool]:
+def inspect_execution_surface(
+    repo_root: Path, surface_path: Path | None
+) -> dict[str, str | bool]:
     repo_root = repo_root.resolve()
     candidate = (surface_path or repo_root).expanduser().resolve()
     surface_dir = candidate if candidate.is_dir() else candidate.parent
@@ -99,8 +101,10 @@ def inspect_execution_surface(repo_root: Path, surface_path: Path | None) -> dic
                     "surface_kind": "queue-worktree",
                     "safe_to_resume": True,
                     "note": (
-                        "The current surface is a full queue worktree rooted inside `.tmp/queue-worktrees/`. "
-                        "Resume only after confirming it matches the active issue recorded in `.tmp/github-issue-queue-state.md`."
+                        "The current surface is a full queue worktree rooted inside "
+                        "`.tmp/queue-worktrees/`. Resume only after confirming it "
+                        "matches the active issue recorded in "
+                        "`.tmp/github-issue-queue-state.md`."
                     ),
                 }
 
@@ -111,9 +115,12 @@ def inspect_execution_surface(repo_root: Path, surface_path: Path | None) -> dic
                 "surface_kind": "partial-queue-snapshot",
                 "safe_to_resume": False,
                 "note": (
-                    "The current surface lives under `.tmp/queue-worktrees/` but is missing the repo/worktree markers "
-                    "required for safe execution (for example `.git`, `docs/`, or `scripts/`). Treat it as a stray partial snapshot, not a valid resume surface. "
-                    "Re-anchor from the repository root and the active worktree recorded in `.tmp/github-issue-queue-state.md`."
+                    "The current surface lives under `.tmp/queue-worktrees/` but is "
+                    "missing the repo/worktree markers required for safe execution "
+                    "(for example `.git`, `docs/`, or `scripts/`). Treat it as a "
+                    "stray partial snapshot, not a valid resume surface. Re-anchor "
+                    "from the repository root and the active worktree recorded in "
+                    "`.tmp/github-issue-queue-state.md`."
                 ),
             }
 
@@ -124,7 +131,9 @@ def inspect_execution_surface(repo_root: Path, surface_path: Path | None) -> dic
             "surface_kind": "repo-subpath",
             "safe_to_resume": True,
             "note": (
-                "The current surface is inside the repository checkout. Treat the editor/file path as advisory only and resume from the active issue/PR recorded in `.tmp/github-issue-queue-state.md`."
+                "The current surface is inside the repository checkout. Treat the "
+                "editor/file path as advisory only and resume from the active "
+                "issue/PR recorded in `.tmp/github-issue-queue-state.md`."
             ),
         }
 
@@ -135,7 +144,9 @@ def inspect_execution_surface(repo_root: Path, surface_path: Path | None) -> dic
         "surface_kind": "outside-repo",
         "safe_to_resume": False,
         "note": (
-            "The current surface is outside the repository root. Do not resume from it; re-anchor from the repository root and `.tmp/github-issue-queue-state.md` instead."
+            "The current surface is outside the repository root. Do not resume from "
+            "it; re-anchor from the repository root and "
+            "`.tmp/github-issue-queue-state.md` instead."
         ),
     }
 
@@ -295,8 +306,7 @@ def render_execution_surface_section(
     lines.append(f"- surface_root: `{surface_assessment['surface_root']}`")
     lines.append(f"- surface_kind: `{surface_assessment['surface_kind']}`")
     lines.append(
-        "- safe_to_resume: "
-        + str(bool(surface_assessment["safe_to_resume"])).lower()
+        "- safe_to_resume: " + str(bool(surface_assessment["safe_to_resume"])).lower()
     )
     lines.append(f"- note: {surface_assessment['note']}")
     lines.append("")
@@ -318,7 +328,9 @@ def render_resume_checklist(
     if not bool(surface_assessment["safe_to_resume"]):
         lines.append(
             "2. Do not resume from the current surface path; it was classified as `"
-            f"{surface_assessment['surface_kind']}`. Re-anchor from the repository root and the active worktree recorded in `.tmp/github-issue-queue-state.md`."
+            f"{surface_assessment['surface_kind']}`. Re-anchor from the repository "
+            "root and the active worktree recorded in "
+            "`.tmp/github-issue-queue-state.md`."
         )
         next_index = 3
     else:
@@ -494,7 +506,9 @@ def main() -> int:
         active_issue=args.issue.strip() or None,
         active_pr=args.pr.strip() or None,
         include_runtime_status=args.include_runtime_status,
-        surface_path=Path(args.surface_path).expanduser() if args.surface_path.strip() else None,
+        surface_path=(
+            Path(args.surface_path).expanduser() if args.surface_path.strip() else None
+        ),
     )
     print("Recovery snapshot written to .tmp/interruption-recovery-snapshot.md")
     return 0
