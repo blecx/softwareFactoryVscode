@@ -1,0 +1,160 @@
+schema_version: 1
+authority:
+  status: canonical
+  config_path: configs/validation_policy.yml
+  documentation_path: docs/maintainer/VALIDATION-POLICY-CONTRACT.md
+  migration_status: derivative-surfaces-not-yet-migrated
+  notes:
+    - "This file is the authoritative bundle-taxonomy surface introduced by issue #226."
+    - "Issue #227 populates levels, changed-surface rules, and explicit exceptions."
+    - "Issue #228 broadens the invalid-policy contract lock around this schema."
+
+official_bundle_order:
+  - baseline
+  - docs-contract
+  - workflow-contract
+  - install-runtime
+  - runtime-manager
+  - multi-tenant
+  - quota-policy
+  - integration
+  - docker-builds
+  - runtime-proofs
+  - merge-full
+  - production
+
+bundles:
+  baseline:
+    kind: aggregate
+    owner: validation-contract
+    summary: "Reserved canonical identifier for the smallest official mirror bundle once issue #227 defines its member bundles."
+    current_derivative_labels: []
+    watchdog:
+      max_minutes: 10
+      timeout_kind: event-driven-deadline
+    notes:
+      - "Aggregate placeholder only; exact composition lands in issue #227."
+
+  docs-contract:
+    kind: atomic
+    owner: docs
+    summary: Release and documentation contract checks that protect canonical docs, manifests, and reader-facing authority surfaces.
+    current_derivative_labels:
+      - release-contract
+      - docs-workflow
+      - Production Docs Contract
+    watchdog:
+      max_minutes: 10
+      timeout_kind: event-driven-deadline
+
+  workflow-contract:
+    kind: atomic
+    owner: workflow
+    summary: Issue-template, PR-template, workflow-routing, and queue-guardrail contract checks that keep issue execution deterministic.
+    current_derivative_labels:
+      - release-contract
+      - pr-template
+      - docs-workflow
+    watchdog:
+      max_minutes: 10
+      timeout_kind: event-driven-deadline
+
+  install-runtime:
+    kind: atomic
+    owner: install-runtime
+    summary: Install-surface and workspace-contract checks for the generated workspace, host targeting, and installation compliance.
+    current_derivative_labels:
+      - install-surface
+    watchdog:
+      max_minutes: 20
+      timeout_kind: event-driven-deadline
+
+  runtime-manager:
+    kind: atomic
+    owner: runtime-manager
+    summary: Runtime manager and lifecycle checks for MCP runtime state, activation truth, and manager-backed recovery semantics.
+    current_derivative_labels:
+      - runtime-manager
+    watchdog:
+      max_minutes: 25
+      timeout_kind: event-driven-deadline
+
+  multi-tenant:
+    kind: atomic
+    owner: shared-tenancy
+    summary: Shared-tenancy and tenant-isolation checks that guard cross-tenant safety and secret-boundary behavior.
+    current_derivative_labels:
+      - quota-tenancy
+    watchdog:
+      max_minutes: 20
+      timeout_kind: event-driven-deadline
+
+  quota-policy:
+    kind: atomic
+    owner: quota-governance
+    summary: Quota-governance and LLM budget-allocation checks that keep runtime limits explicit and bounded.
+    current_derivative_labels:
+      - quota-tenancy
+    watchdog:
+      max_minutes: 20
+      timeout_kind: event-driven-deadline
+
+  integration:
+    kind: atomic
+    owner: integration
+    summary: Architectural boundary and integration checks that validate repo-owned end-to-end contracts outside unit-only coverage.
+    current_derivative_labels:
+      - integration
+      - Architectural Boundary Tests
+    watchdog:
+      max_minutes: 15
+      timeout_kind: event-driven-deadline
+
+  docker-builds:
+    kind: atomic
+    owner: docker
+    summary: Docker image build parity checks for repo-owned container images and their build-context assumptions.
+    current_derivative_labels:
+      - docker-builds
+      - Production Docker Build Parity
+    watchdog:
+      max_minutes: 30
+      timeout_kind: event-driven-deadline
+
+  runtime-proofs:
+    kind: atomic
+    owner: docker
+    summary: Promoted runtime proof checks for manager-backed Docker lifecycle, backup/restore, and related production-grade evidence.
+    current_derivative_labels:
+      - runtime-proofs
+      - Production Runtime Proofs
+    watchdog:
+      max_minutes: 30
+      timeout_kind: event-driven-deadline
+
+  merge-full:
+    kind: aggregate
+    owner: validation-contract
+    summary: "Reserved canonical identifier for the full merge-grade validation mirror once issue #227 defines its member bundles."
+    current_derivative_labels: []
+    watchdog:
+      max_minutes: 45
+      timeout_kind: event-driven-deadline
+    notes:
+      - "Aggregate placeholder only; exact composition lands in issue #227."
+
+  production:
+    kind: aggregate
+    owner: validation-contract
+    summary: "Canonical production authority mirror aligned to the aggregate production gate while its exact member bundles remain reserved for issue #227."
+    current_derivative_labels:
+      - Internal Production Gate — Docker Parity & Recovery Proofs
+    watchdog:
+      max_minutes: 45
+      timeout_kind: event-driven-deadline
+    notes:
+      - "Aggregate placeholder with current gate alignment; exact composition lands in issue #227."
+
+levels: {}
+changed_surface_rules: []
+exceptions: []

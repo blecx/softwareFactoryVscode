@@ -32,11 +32,11 @@ Wiki-related maintainer routing stays split on purpose so the index remains a fi
 
 For wiki-related maintainer work, keep the route compact: truth first, post-truth publishing second.
 
-| If you need to answer... | Open first |
-| --- | --- |
-| Where does host-owned wiki truth live, and is bootstrap still required? | [`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`](maintainer/HOST-WIKI-TRUTH-CONTRACT.md) |
+| If you need to answer...                                                                   | Open first                                                                                                                  |
+| ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Where does host-owned wiki truth live, and is bootstrap still required?                    | [`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`](maintainer/HOST-WIKI-TRUTH-CONTRACT.md)                                          |
 | What is wiki-safe, what stays repo-only, and how do approved sources map to the live wiki? | [`WIKI-MAP.md`](WIKI-MAP.md) and [`../manifests/wiki-projection-manifest.json`](../manifests/wiki-projection-manifest.json) |
-| Approved truth already exists — how do we validate or publish the live wiki safely? | [`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md) |
+| Approved truth already exists — how do we validate or publish the live wiki safely?        | [`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md)                                                            |
 
 - [`WORK-ISSUE-WORKFLOW.md`](WORK-ISSUE-WORKFLOW.md) — canonical issue → PR → merge workflow.
 - [`setup-github-repository.md`](setup-github-repository.md) — repository protection, branch, and CI setup guidance.
@@ -48,6 +48,7 @@ For wiki-related maintainer work, keep the route compact: truth first, post-trut
 - [`maintainer/GUARDRAILS.md`](maintainer/GUARDRAILS.md) — maintainer-facing catalog of current guardrail families, enforcement surfaces, and where to look before changing workflow behavior.
 - [`maintainer/VALIDATION-BASELINE.md`](maintainer/VALIDATION-BASELINE.md) — observation-only local-vs-GitHub validation timing baseline and hotspot evidence for the phase-1 convergence work.
 - [`maintainer/VALIDATION-PARITY-INVENTORY.md`](maintainer/VALIDATION-PARITY-INVENTORY.md) — observation-only inventory of parity-locked validation surfaces, exact required checks, accidental shadow policy, and CI-critical hang risks for the phase-1 convergence work.
+- [`maintainer/VALIDATION-POLICY-CONTRACT.md`](maintainer/VALIDATION-POLICY-CONTRACT.md) — canonical phase-2 validation-policy authority note covering the official bundle taxonomy, bounded watchdog metadata, and which derivative surfaces must migrate later.
 - [`maintainer/AGENT-ENFORCEMENT-MAP.md`](maintainer/AGENT-ENFORCEMENT-MAP.md) — workflow-specific map from the major agents/prompts to the skills, templates, checkpoints, and ADRs that actually constrain them.
 - [`maintainer/PROMPT-WORKFLOWS.md`](maintainer/PROMPT-WORKFLOWS.md) — maintainer-facing reference for the prompt workflow entrypoints and how they route back into the canonical workflow graph.
 - [`maintainer/APPROVAL-PROFILES.md`](maintainer/APPROVAL-PROFILES.md) — maintainer-facing reference for the current approval profiles, their posture, and the source files that actually define them.
@@ -74,7 +75,7 @@ this table because they remain normative authority sources rather than
 roadmap/plan status entries.
 
 | Document | Classification | Use it for |
-| -------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| --- | --- | --- |
 | [`ROADMAP.md`](ROADMAP.md) | Active roadmap | Current high-level direction, routing, and boundaries for active documentation/readiness work. |
 | [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | Active supporting plan | Current readiness sequencing within the shipped `2.6` guardrails and the scope defined by `PRODUCTION-READINESS.md`. |
 | [`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical sequencing | Trace the delivered namespace migration and mitigation work without treating it as a current execution plan. |
