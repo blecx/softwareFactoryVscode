@@ -1,9 +1,11 @@
 """Canonical validation policy contract and official bundle taxonomy.
 
 This module owns schema validation for the repository's phase-2 validation
-policy surface. It intentionally stops at bundle taxonomy and metadata for
-issue #226; level composition, changed-surface selection, explicit exceptions,
-and broader invalid-policy lock tests are reserved for later slices.
+policy surface. Issue #226 established the canonical bundle taxonomy and
+watchdog metadata; issue #227 extends the same surface with the four validation
+levels, representative changed-surface rules, aggregate composition, and
+explicit local-vs-GitHub exceptions while still deferring broader invalid-policy
+lock coverage to later slices.
 """
 
 from __future__ import annotations
@@ -50,6 +52,14 @@ ALLOWED_BUNDLE_OWNERS = frozenset(
     }
 )
 ALLOWED_TIMEOUT_KINDS = frozenset({"event-driven-deadline"})
+VALIDATION_LEVEL_ORDER = (
+    "focused-local",
+    "pr-update",
+    "merge",
+    "production",
+)
+VALIDATION_LEVEL_IDS = frozenset(VALIDATION_LEVEL_ORDER)
+ALLOWED_LEVEL_STRATEGIES = frozenset({"changed-surface", "aggregate"})
 ALLOWED_TOP_LEVEL_KEYS = frozenset(
     {
         "schema_version",
@@ -253,6 +263,287 @@ class ValidationBundle:
 
 
 @dataclass(frozen=True, slots=True)
+class ValidationLevel:
+    """One canonical validation level definition."""
+
+    level_id: str
+    order: int
+    summary: str
+    strategy: str
+    default_bundle: str
+    allowed_rule_bundle_kinds: tuple[str, ...]
+    allowed_escalations: tuple[str, ...]
+    notes: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(
+        cls,
+        level_id: str,
+        data: Mapping[str, Any],
+        *,
+        bundles: Mapping[str, ValidationBundle],
+    ) -> "ValidationLevel":
+        path = f"levels.{level_id}"
+        mapping = _expect_mapping(data, path=path)
+        order = mapping.get("order")
+        if isinstance(order, bool) or not isinstance(order, int):
+            raise ValidationPolicyError(f"{path}.order must be an integer.")
+        if order <= 0 or order > len(VALIDATION_LEVEL_ORDER):
+            raise ValidationPolicyError(
+                f"{path}.order must be between 1 and {len(VALIDATION_LEVEL_ORDER)}."
+            )
+
+        strategy = _expect_string(mapping.get("strategy"), path=f"{path}.strategy")
+        if strategy not in ALLOWED_LEVEL_STRATEGIES:
+            raise ValidationPolicyError(
+                f"{path}.strategy must be one of "
+                f"{sorted(ALLOWED_LEVEL_STRATEGIES)}, got `{strategy}`."
+            )
+
+        default_bundle = _expect_string(
+            mapping.get("default_bundle"), path=f"{path}.default_bundle"
+        )
+        if default_bundle not in OFFICIAL_BUNDLE_IDS:
+            raise ValidationPolicyError(
+                f"{path}.default_bundle must be one of the official bundle ids, "
+                f"got `{default_bundle}`."
+            )
+        if bundles[default_bundle].kind != "aggregate":
+            raise ValidationPolicyError(
+                f"{path}.default_bundle must reference an aggregate official bundle."
+            )
+
+        allowed_rule_bundle_kinds = _expect_string_list(
+            mapping.get("allowed_rule_bundle_kinds", []),
+            path=f"{path}.allowed_rule_bundle_kinds",
+            allow_empty=True,
+        )
+        invalid_rule_kinds = [
+            kind
+            for kind in allowed_rule_bundle_kinds
+            if kind not in ALLOWED_BUNDLE_KINDS
+        ]
+        if invalid_rule_kinds:
+            joined = ", ".join(f"`{kind}`" for kind in invalid_rule_kinds)
+            raise ValidationPolicyError(
+                f"{path}.allowed_rule_bundle_kinds contains invalid bundle kinds: {joined}."
+            )
+
+        allowed_escalations = _expect_string_list(
+            mapping.get("allowed_escalations", []),
+            path=f"{path}.allowed_escalations",
+            allow_empty=True,
+        )
+        unknown_escalations = [
+            bundle_id
+            for bundle_id in allowed_escalations
+            if bundle_id not in OFFICIAL_BUNDLE_IDS
+        ]
+        if unknown_escalations:
+            joined = ", ".join(f"`{bundle_id}`" for bundle_id in unknown_escalations)
+            raise ValidationPolicyError(
+                f"{path}.allowed_escalations contains unknown official bundle ids: {joined}."
+            )
+        nonaggregate_escalations = [
+            bundle_id
+            for bundle_id in allowed_escalations
+            if bundles[bundle_id].kind != "aggregate"
+        ]
+        if nonaggregate_escalations:
+            joined = ", ".join(
+                f"`{bundle_id}`" for bundle_id in nonaggregate_escalations
+            )
+            raise ValidationPolicyError(
+                f"{path}.allowed_escalations must reference aggregate bundles only: {joined}."
+            )
+
+        if strategy == "aggregate":
+            if allowed_rule_bundle_kinds:
+                raise ValidationPolicyError(
+                    f"{path}.allowed_rule_bundle_kinds must stay empty for aggregate levels."
+                )
+            if allowed_escalations:
+                raise ValidationPolicyError(
+                    f"{path}.allowed_escalations must stay empty for aggregate levels."
+                )
+
+        return cls(
+            level_id=level_id,
+            order=order,
+            summary=_expect_string(mapping.get("summary"), path=f"{path}.summary"),
+            strategy=strategy,
+            default_bundle=default_bundle,
+            allowed_rule_bundle_kinds=allowed_rule_bundle_kinds,
+            allowed_escalations=allowed_escalations,
+            notes=_expect_string_list(
+                mapping.get("notes", []),
+                path=f"{path}.notes",
+                allow_empty=True,
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ChangedSurfaceRule:
+    """Canonical mapping from changed surfaces to official bundles."""
+
+    rule_id: str
+    summary: str
+    include_paths: tuple[str, ...]
+    bundles: tuple[str, ...]
+    minimum_level: str
+    escalate_to: str | None
+    rationale: str
+    notes: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: Mapping[str, Any],
+        *,
+        bundles: Mapping[str, ValidationBundle],
+        levels: Mapping[str, ValidationLevel],
+        index: int,
+    ) -> "ChangedSurfaceRule":
+        path = f"changed_surface_rules[{index}]"
+        mapping = _expect_mapping(data, path=path)
+        rule_id = _expect_string(mapping.get("id"), path=f"{path}.id")
+        selected_bundles = _expect_string_list(
+            mapping.get("bundles"), path=f"{path}.bundles", allow_empty=False
+        )
+        unknown_bundle_ids = [
+            bundle_id
+            for bundle_id in selected_bundles
+            if bundle_id not in OFFICIAL_BUNDLE_IDS
+        ]
+        if unknown_bundle_ids:
+            joined = ", ".join(f"`{bundle_id}`" for bundle_id in unknown_bundle_ids)
+            raise ValidationPolicyError(
+                f"{path}.bundles contains unknown official bundle ids: {joined}."
+            )
+        non_atomic_bundles = [
+            bundle_id
+            for bundle_id in selected_bundles
+            if bundles[bundle_id].kind != "atomic"
+        ]
+        if non_atomic_bundles:
+            joined = ", ".join(f"`{bundle_id}`" for bundle_id in non_atomic_bundles)
+            raise ValidationPolicyError(
+                f"{path}.bundles must reference only atomic official bundles: {joined}."
+            )
+
+        minimum_level = _expect_string(
+            mapping.get("minimum_level"), path=f"{path}.minimum_level"
+        )
+        if minimum_level not in VALIDATION_LEVEL_IDS:
+            raise ValidationPolicyError(
+                f"{path}.minimum_level must be one of {VALIDATION_LEVEL_ORDER}, got `{minimum_level}`."
+            )
+        if levels[minimum_level].strategy != "changed-surface":
+            raise ValidationPolicyError(
+                f"{path}.minimum_level must reference a changed-surface level."
+            )
+
+        raw_escalation = mapping.get("escalate_to")
+        escalate_to: str | None
+        if raw_escalation is None:
+            escalate_to = None
+        else:
+            escalate_to = _expect_string(raw_escalation, path=f"{path}.escalate_to")
+            if escalate_to not in OFFICIAL_BUNDLE_IDS:
+                raise ValidationPolicyError(
+                    f"{path}.escalate_to must be an official bundle id, got `{escalate_to}`."
+                )
+            if bundles[escalate_to].kind != "aggregate":
+                raise ValidationPolicyError(
+                    f"{path}.escalate_to must reference an aggregate bundle."
+                )
+            if escalate_to not in levels[minimum_level].allowed_escalations:
+                raise ValidationPolicyError(
+                    f"{path}.escalate_to must be allowed by levels.{minimum_level}.allowed_escalations."
+                )
+
+        return cls(
+            rule_id=rule_id,
+            summary=_expect_string(mapping.get("summary"), path=f"{path}.summary"),
+            include_paths=_expect_string_list(
+                mapping.get("include_paths"),
+                path=f"{path}.include_paths",
+                allow_empty=False,
+            ),
+            bundles=selected_bundles,
+            minimum_level=minimum_level,
+            escalate_to=escalate_to,
+            rationale=_expect_string(
+                mapping.get("rationale"), path=f"{path}.rationale"
+            ),
+            notes=_expect_string_list(
+                mapping.get("notes", []),
+                path=f"{path}.notes",
+                allow_empty=True,
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ValidationPolicyException:
+    """Explicit allowed local-vs-GitHub validation divergence."""
+
+    exception_id: str
+    applies_to_levels: tuple[str, ...]
+    summary: str
+    local_behavior: str
+    github_behavior: str
+    rationale: str
+    notes: tuple[str, ...] = ()
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: Mapping[str, Any],
+        *,
+        index: int,
+    ) -> "ValidationPolicyException":
+        path = f"exceptions[{index}]"
+        mapping = _expect_mapping(data, path=path)
+        applies_to_levels = _expect_string_list(
+            mapping.get("applies_to_levels"),
+            path=f"{path}.applies_to_levels",
+            allow_empty=False,
+        )
+        unknown_levels = [
+            level_id
+            for level_id in applies_to_levels
+            if level_id not in VALIDATION_LEVEL_IDS
+        ]
+        if unknown_levels:
+            joined = ", ".join(f"`{level_id}`" for level_id in unknown_levels)
+            raise ValidationPolicyError(
+                f"{path}.applies_to_levels contains unknown validation levels: {joined}."
+            )
+
+        return cls(
+            exception_id=_expect_string(mapping.get("id"), path=f"{path}.id"),
+            applies_to_levels=applies_to_levels,
+            summary=_expect_string(mapping.get("summary"), path=f"{path}.summary"),
+            local_behavior=_expect_string(
+                mapping.get("local_behavior"), path=f"{path}.local_behavior"
+            ),
+            github_behavior=_expect_string(
+                mapping.get("github_behavior"), path=f"{path}.github_behavior"
+            ),
+            rationale=_expect_string(
+                mapping.get("rationale"), path=f"{path}.rationale"
+            ),
+            notes=_expect_string_list(
+                mapping.get("notes", []),
+                path=f"{path}.notes",
+                allow_empty=True,
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ValidationPolicy:
     """Canonical validation policy surface for official bundle taxonomy."""
 
@@ -260,9 +551,9 @@ class ValidationPolicy:
     authority: ValidationPolicyAuthority
     official_bundle_order: tuple[str, ...]
     bundles: dict[str, ValidationBundle]
-    levels: dict[str, Any]
-    changed_surface_rules: tuple[dict[str, Any], ...]
-    exceptions: tuple[dict[str, Any], ...]
+    levels: dict[str, ValidationLevel]
+    changed_surface_rules: tuple[ChangedSurfaceRule, ...]
+    exceptions: tuple[ValidationPolicyException, ...]
 
     @classmethod
     def from_yaml_file(cls, path: Path) -> "ValidationPolicy":
@@ -329,9 +620,69 @@ class ValidationPolicy:
             for bundle_id in OFFICIAL_BUNDLE_ORDER
         }
 
-        levels = mapping.get("levels", {})
-        if not isinstance(levels, dict):
-            raise ValidationPolicyError("levels must be a mapping when present.")
+        aggregate_bundle_ids = [
+            bundle_id
+            for bundle_id, bundle in bundles.items()
+            if bundle.kind == "aggregate"
+        ]
+        missing_aggregate_members = [
+            bundle_id
+            for bundle_id in aggregate_bundle_ids
+            if not bundles[bundle_id].members
+        ]
+        if missing_aggregate_members:
+            joined = ", ".join(
+                f"`{bundle_id}`" for bundle_id in missing_aggregate_members
+            )
+            raise ValidationPolicyError(
+                f"Aggregate official bundles must declare members: {joined}."
+            )
+        for bundle_id in aggregate_bundle_ids:
+            non_atomic_members = [
+                member
+                for member in bundles[bundle_id].members
+                if bundles[member].kind != "atomic"
+            ]
+            if non_atomic_members:
+                joined = ", ".join(f"`{member}`" for member in non_atomic_members)
+                raise ValidationPolicyError(
+                    f"bundles.{bundle_id}.members must reference only atomic bundles: {joined}."
+                )
+
+        levels_mapping = _expect_mapping(mapping.get("levels"), path="levels")
+        unknown_level_ids = sorted(set(levels_mapping) - VALIDATION_LEVEL_IDS)
+        if unknown_level_ids:
+            joined = ", ".join(f"`{level_id}`" for level_id in unknown_level_ids)
+            raise ValidationPolicyError(
+                f"Unknown validation level identifiers in levels: {joined}."
+            )
+
+        missing_level_ids = [
+            level_id
+            for level_id in VALIDATION_LEVEL_ORDER
+            if level_id not in levels_mapping
+        ]
+        if missing_level_ids:
+            joined = ", ".join(f"`{level_id}`" for level_id in missing_level_ids)
+            raise ValidationPolicyError(
+                f"Missing validation level definitions for: {joined}."
+            )
+
+        levels = {
+            level_id: ValidationLevel.from_dict(
+                level_id,
+                levels_mapping[level_id],
+                bundles=bundles,
+            )
+            for level_id in VALIDATION_LEVEL_ORDER
+        }
+        observed_level_orders = sorted(level.order for level in levels.values())
+        expected_level_orders = list(range(1, len(VALIDATION_LEVEL_ORDER) + 1))
+        if observed_level_orders != expected_level_orders:
+            raise ValidationPolicyError(
+                "Validation levels must use the canonical order values "
+                f"{expected_level_orders}, got {observed_level_orders}."
+            )
 
         changed_surface_rules = mapping.get("changed_surface_rules", [])
         if not isinstance(changed_surface_rules, list):
@@ -339,17 +690,60 @@ class ValidationPolicy:
                 "changed_surface_rules must be a list when present."
             )
         normalized_changed_surface_rules = tuple(
-            _expect_mapping(rule, path=f"changed_surface_rules[{index}]")
+            ChangedSurfaceRule.from_dict(
+                rule,
+                bundles=bundles,
+                levels=levels,
+                index=index,
+            )
             for index, rule in enumerate(changed_surface_rules)
         )
+        if not normalized_changed_surface_rules:
+            raise ValidationPolicyError(
+                "changed_surface_rules must not be empty once level-selection semantics are defined."
+            )
+        duplicate_rule_ids = sorted(
+            {
+                rule.rule_id
+                for rule in normalized_changed_surface_rules
+                if [item.rule_id for item in normalized_changed_surface_rules].count(
+                    rule.rule_id
+                )
+                > 1
+            }
+        )
+        if duplicate_rule_ids:
+            joined = ", ".join(f"`{rule_id}`" for rule_id in duplicate_rule_ids)
+            raise ValidationPolicyError(
+                f"changed_surface_rules contains duplicate ids: {joined}."
+            )
 
         exceptions = mapping.get("exceptions", [])
         if not isinstance(exceptions, list):
             raise ValidationPolicyError("exceptions must be a list when present.")
         normalized_exceptions = tuple(
-            _expect_mapping(item, path=f"exceptions[{index}]")
+            ValidationPolicyException.from_dict(item, index=index)
             for index, item in enumerate(exceptions)
         )
+        if not normalized_exceptions:
+            raise ValidationPolicyError(
+                "exceptions must not be empty once explicit policy-backed divergence is defined."
+            )
+        duplicate_exception_ids = sorted(
+            {
+                item.exception_id
+                for item in normalized_exceptions
+                if [entry.exception_id for entry in normalized_exceptions].count(
+                    item.exception_id
+                )
+                > 1
+            }
+        )
+        if duplicate_exception_ids:
+            joined = ", ".join(
+                f"`{exception_id}`" for exception_id in duplicate_exception_ids
+            )
+            raise ValidationPolicyError(f"exceptions contains duplicate ids: {joined}.")
 
         return cls(
             schema_version=schema_version,

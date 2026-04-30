@@ -27,13 +27,14 @@ bundles:
   baseline:
     kind: aggregate
     owner: validation-contract
-    summary: "Reserved canonical identifier for the smallest official mirror bundle once issue #227 defines its member bundles."
+    summary: "Canonical smallest official mirror bundle used by changed-surface-driven local and PR-update validation levels."
     current_derivative_labels: []
+    members:
+      - docs-contract
+      - workflow-contract
     watchdog:
       max_minutes: 10
       timeout_kind: event-driven-deadline
-    notes:
-      - "Aggregate placeholder only; exact composition lands in issue #227."
 
   docs-contract:
     kind: atomic
@@ -135,26 +136,220 @@ bundles:
   merge-full:
     kind: aggregate
     owner: validation-contract
-    summary: "Reserved canonical identifier for the full merge-grade validation mirror once issue #227 defines its member bundles."
+    summary: "Canonical full merge-grade validation mirror that aggregates every bounded official atomic bundle."
     current_derivative_labels: []
+    members:
+      - docs-contract
+      - workflow-contract
+      - install-runtime
+      - runtime-manager
+      - multi-tenant
+      - quota-policy
+      - integration
+      - docker-builds
+      - runtime-proofs
     watchdog:
       max_minutes: 45
       timeout_kind: event-driven-deadline
-    notes:
-      - "Aggregate placeholder only; exact composition lands in issue #227."
 
   production:
     kind: aggregate
     owner: validation-contract
-    summary: "Canonical production authority mirror aligned to the aggregate production gate while its exact member bundles remain reserved for issue #227."
+    summary: "Canonical production authority mirror aligned to the aggregate production gate and restricted to its production-grade bounded sub-bundles."
     current_derivative_labels:
       - Internal Production Gate — Docker Parity & Recovery Proofs
+    members:
+      - docs-contract
+      - docker-builds
+      - runtime-proofs
     watchdog:
       max_minutes: 45
       timeout_kind: event-driven-deadline
-    notes:
-      - "Aggregate placeholder with current gate alignment; exact composition lands in issue #227."
 
-levels: {}
-changed_surface_rules: []
-exceptions: []
+levels:
+  focused-local:
+    order: 1
+    summary: "Smallest bounded local mirror: start from `baseline`, add atomic bundles selected by changed surfaces, and escalate only when a rule makes that expansion explicit."
+    strategy: changed-surface
+    default_bundle: baseline
+    allowed_rule_bundle_kinds:
+      - atomic
+    allowed_escalations:
+      - merge-full
+      - production
+  pr-update:
+    order: 2
+    summary: "PR update mirror: apply the same changed-surface-first bundle selection as local review while keeping aggregate escalations explicit and policy-backed."
+    strategy: changed-surface
+    default_bundle: baseline
+    allowed_rule_bundle_kinds:
+      - atomic
+    allowed_escalations:
+      - merge-full
+      - production
+  merge:
+    order: 3
+    summary: "Merge mirror: resolve directly to the canonical `merge-full` aggregate instead of relying on caller-specific bundle assembly."
+    strategy: aggregate
+    default_bundle: merge-full
+    allowed_rule_bundle_kinds: []
+    allowed_escalations: []
+  production:
+    order: 4
+    summary: "Production authority mirror: resolve directly to the canonical `production` aggregate that matches the current production-only GitHub gate."
+    strategy: aggregate
+    default_bundle: production
+    allowed_rule_bundle_kinds: []
+    allowed_escalations: []
+
+changed_surface_rules:
+  - id: docs-authority-surface
+    summary: "Canonical docs, release surfaces, and maintainer authority notes resolve to the docs-contract bundle."
+    include_paths:
+      - README.md
+      - CHANGELOG.md
+      - VERSION
+      - docs/**
+      - manifests/release-manifest.json
+      - manifests/wiki-projection-manifest.json
+    bundles:
+      - docs-contract
+    minimum_level: focused-local
+    rationale: "Reader-facing docs, release surfaces, and maintainer authority notes should trip the docs contract first instead of silently waiting for broader merge-only coverage."
+
+  - id: workflow-contract-surface
+    summary: "Workflow wrappers, prompts, templates, and queue-routing surfaces resolve to the workflow-contract bundle."
+    include_paths:
+      - .github/**
+      - .copilot/**
+      - .vscode/tasks.json
+      - docs/WORK-ISSUE-WORKFLOW.md
+      - docs/setup-github-repository.md
+      - scripts/noninteractive_gh.py
+      - scripts/validate-pr-template.sh
+    bundles:
+      - workflow-contract
+    minimum_level: focused-local
+    rationale: "Workflow contract surfaces need template/routing coverage immediately, but they do not require aggregate escalation unless another rule explicitly requests it."
+
+  - id: install-runtime-surface
+    summary: "Install/update and generated-workspace surfaces resolve to the install-runtime bundle."
+    include_paths:
+      - scripts/bootstrap_host.py
+      - scripts/factory_workspace.py
+      - scripts/install_factory.py
+      - docs/INSTALL.md
+      - tests/test_factory_install.py
+      - tests/test_workspace_surface_guard.py
+    bundles:
+      - install-runtime
+    minimum_level: focused-local
+    rationale: "Install-surface changes should prove the generated-workspace and host-targeting contract before broader queue work continues."
+
+  - id: runtime-manager-surface
+    summary: "Manager-backed runtime lifecycle surfaces resolve to the runtime-manager bundle."
+    include_paths:
+      - factory_runtime/mcp_runtime/**
+      - scripts/factory_stack.py
+      - tests/test_mcp_runtime_manager.py
+      - tests/test_runtime_mode.py
+    bundles:
+      - runtime-manager
+    minimum_level: focused-local
+    rationale: "Runtime truth changes should stay on the dedicated runtime-manager contract surface unless another rule raises the required level."
+
+  - id: quota-tenancy-surface
+    summary: "Shared-tenancy and quota-governance surfaces resolve to both the multi-tenant and quota-policy bundles."
+    include_paths:
+      - factory_runtime/secret_safety.py
+      - factory_runtime/shared_tenancy.py
+      - tests/test_llm_quota_policy.py
+      - tests/test_multi_tenant.py
+      - tests/test_quota_broker.py
+      - tests/test_quota_governance_contract.py
+      - tests/test_quota_load_validation.py
+    bundles:
+      - multi-tenant
+      - quota-policy
+    minimum_level: focused-local
+    rationale: "Tenant-isolation and quota rules ship as a pair in the current derivative surfaces, so the canonical contract keeps both official bundles together for those changes."
+
+  - id: integration-boundary-surface
+    summary: "Compose and integration-boundary surfaces resolve to the integration bundle and start at PR-update rather than the smallest local mirror."
+    include_paths:
+      - compose/**
+      - tests/run-integration-test.sh
+    bundles:
+      - integration
+    minimum_level: pr-update
+    rationale: "Architectural boundary checks are heavier and correspond to PR-grade validation rather than the smallest local feedback loop."
+
+  - id: validation-contract-surface
+    summary: "Validation-contract authority changes resolve to docs/workflow contract bundles and explicitly escalate to the full merge mirror."
+    include_paths:
+      - .github/workflows/ci.yml
+      - configs/validation_policy.yml
+      - docs/maintainer/VALIDATION-PARITY-INVENTORY.md
+      - docs/maintainer/VALIDATION-POLICY-CONTRACT.md
+      - factory_runtime/agents/validation_policy.py
+      - manifests/validation-parity-inventory.json
+      - scripts/local_ci_parity.py
+    bundles:
+      - docs-contract
+      - workflow-contract
+    minimum_level: pr-update
+    escalate_to: merge-full
+    rationale: "When the validation contract itself changes, local and GitHub parity must expand to the full merge-grade bundle set rather than trust a narrower targeted replay."
+
+  - id: production-authority-surface
+    summary: "Docker/prod-readiness authority surfaces resolve to the production bundles and explicitly escalate to the production aggregate."
+    include_paths:
+      - docker/**
+      - docs/PRODUCTION-READINESS.md
+      - docs/ops/**
+      - tests/test_throwaway_runtime_docker.py
+    bundles:
+      - docker-builds
+      - runtime-proofs
+    minimum_level: pr-update
+    escalate_to: production
+    rationale: "Docker and production-readiness changes must preserve the same bounded production authority lane GitHub treats as the final gate."
+
+exceptions:
+  - id: github-event-metadata
+    applies_to_levels:
+      - pr-update
+      - merge
+      - production
+    summary: "GitHub CI receives pull_request/push event metadata that local mirrors cannot synthesize automatically."
+    local_behavior: "Local callers must provide explicit diff/base context and may use repo-owned one-shot GitHub queries instead of workflow event payloads."
+    github_behavior: "GitHub Actions derives selectors, refs, and event metadata from the `pull_request` or `push` event payload."
+    rationale: "Event metadata changes how the diff is discovered, not what the official bundles mean once the diff is known."
+
+  - id: fresh-checkout-bootstrap
+    applies_to_levels:
+      - pr-update
+      - merge
+      - production
+    summary: "GitHub always runs from a fresh checkout with bootstrap, while local mirrors may reuse the active worktree unless exact replay is requested."
+    local_behavior: "Local parity may reuse the current worktree by default and can opt into `--fresh-checkout` when bootstrap parity matters."
+    github_behavior: "GitHub CI always starts from a fresh checkout and reruns `./setup.sh` in that clean environment."
+    rationale: "Bootstrap substrate differs between local and GitHub execution, but the selected official bundles must remain the same."
+
+  - id: github-permissions-and-protected-resources
+    applies_to_levels:
+      - pr-update
+      - merge
+      - production
+    summary: "GitHub-only token permissions, collaborator checks, and protected-resource writes are not reproducible in local mirrors."
+    local_behavior: "Local parity uses repo-local files and read-only/pager-free queries; permission-enforced mutations stay outside the local mirror contract."
+    github_behavior: "GitHub PR/CI flows run with repository-scoped tokens and GitHub's protected-resource permission model."
+    rationale: "Permission semantics are explicit environment differences and must not become hidden bundle-selection drift."
+
+  - id: runner-ownership-parity
+    applies_to_levels:
+      - production
+    summary: "GitHub-hosted runner Docker ownership semantics can differ from local daemon bind-mount behavior."
+    local_behavior: "Local production mirrors may rely on the bind-mount ownership probe and fresh-checkout guidance to identify divergence before treating GitHub as the source of truth."
+    github_behavior: "GitHub production lanes run on GitHub-hosted runners whose Docker ownership semantics match the required production gate."
+    rationale: "Runner ownership quirks are an explicit production-only exception, not silent permission to weaken the production bundle contract."

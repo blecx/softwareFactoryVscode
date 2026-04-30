@@ -20,11 +20,19 @@ def test_validation_policy_contract_doc_identifies_authority_and_deferred_surfac
     )
 
     assert "# Validation policy contract and official bundle taxonomy" in contract
+    assert "## Four-level validation model" in contract
+    assert "## Representative changed-surface selection rules" in contract
+    assert "## Explicit local-vs-GitHub exceptions" in contract
+    assert "fresh-checkout-bootstrap" in contract
+    assert "runner-ownership-parity" in contract
     assert "configs/validation_policy.yml" in contract
     assert "factory_runtime/agents/validation_policy.py" in contract
-    assert "issue `#227`" in contract
     assert "issue `#228`" in contract
+    assert "merge-full" in contract
+    assert "production" in contract
     assert "scripts/local_ci_parity.py" in contract
     assert ".github/workflows/ci.yml" in contract
     assert "VALIDATION-POLICY-CONTRACT.md" in docs_readme
+    assert "four-level model" in docs_readme
     assert "VALIDATION-POLICY-CONTRACT.md" in guardrails
+    assert "changed-surface selection contract" in guardrails

@@ -75,3 +75,41 @@ def test_validation_policy_rejects_malformed_bundle_metadata() -> None:
         ValidationPolicyError, match=r"bundles\.workflow-contract\.owner"
     ):
         ValidationPolicy.from_dict(data)
+
+
+def test_validation_policy_rejects_missing_level_definition() -> None:
+    data = copy.deepcopy(_load_raw_policy())
+    del data["levels"]["merge"]
+
+    with pytest.raises(ValidationPolicyError, match="Missing validation level"):
+        ValidationPolicy.from_dict(data)
+
+
+def test_validation_policy_rejects_aggregate_bundle_without_members() -> None:
+    data = copy.deepcopy(_load_raw_policy())
+    data["bundles"]["production"]["members"] = []
+
+    with pytest.raises(ValidationPolicyError, match="Aggregate official bundles"):
+        ValidationPolicy.from_dict(data)
+
+
+def test_validation_policy_rejects_changed_surface_rule_with_aggregate_bundle() -> None:
+    data = copy.deepcopy(_load_raw_policy())
+    data["changed_surface_rules"][0]["bundles"] = ["baseline"]
+
+    with pytest.raises(
+        ValidationPolicyError,
+        match=r"changed_surface_rules\[0\]\.bundles must reference only atomic",
+    ):
+        ValidationPolicy.from_dict(data)
+
+
+def test_validation_policy_rejects_exception_with_unknown_level() -> None:
+    data = copy.deepcopy(_load_raw_policy())
+    data["exceptions"][0]["applies_to_levels"] = ["shadow-level"]
+
+    with pytest.raises(
+        ValidationPolicyError,
+        match=r"exceptions\[0\]\.applies_to_levels",
+    ):
+        ValidationPolicy.from_dict(data)

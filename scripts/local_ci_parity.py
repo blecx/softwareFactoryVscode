@@ -74,6 +74,7 @@ PYTEST_BUNDLE_TO_FILES: dict[str, tuple[str, ...]] = {
         "tests/test_noninteractive_gh.py",
         "tests/test_recovery_snapshot.py",
         "tests/test_validation_policy.py",
+        "tests/test_validation_policy_selection_contract.py",
         "tests/test_validation_policy_errors.py",
         "tests/test_validation_policy_docs_contract.py",
     ),
