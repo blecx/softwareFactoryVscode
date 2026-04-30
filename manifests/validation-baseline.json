@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "issue": 223,
+  "umbrella_issue": 222,
+  "captured_on": "2026-04-30",
+  "observation_only": true,
+  "tracked_report": "docs/maintainer/VALIDATION-BASELINE.md",
+  "raw_supporting_artifacts": [
+    ".tmp/validation-baseline/",
+    ".tmp/issue-223-gh-run-25118595701-jobs-api.json"
+  ],
+  "local": {
+    "execution_surface": ".tmp/queue-worktrees/issue-223",
+    "git_base": "origin/main",
+    "canonical_precheck": {
+      "command": "./.venv/bin/python ./scripts/local_ci_parity.py",
+      "elapsed_seconds": 39.58,
+      "result": "pass-with-warning",
+      "warning": "Docker image build parity is skipped by default in standard mode.",
+      "notes": [
+        "Measured from a clean issue-223 worktree reset to origin/main.",
+        "This is the current monolithic local parity surface on origin/main."
+      ]
+    },
+    "pytest_hotspot_replay": {
+      "command": "./.venv/bin/python -m pytest tests/ --durations=10 -q",
+      "elapsed_seconds": 29.56,
+      "passed": 374,
+      "skipped": 5,
+      "share_of_standard_precheck_percent": 74.68,
+      "slowest_tests": [
+        {
+          "name": "tests/test_factory_install.py::test_release_update_smoke_flow",
+          "elapsed_seconds": 1.78
+        },
+        {
+          "name": "tests/test_factory_install.py::test_factory_update_check_uses_live_local_source_head_when_manifest_lags",
+          "elapsed_seconds": 1.76
+        },
+        {
+          "name": "tests/test_factory_install.py::test_factory_update_apply_refreshes_install_from_source_manifest",
+          "elapsed_seconds": 1.73
+        },
+        {
+          "name": "tests/test_factory_install.py::test_update_ignores_local_backup_branch_and_resets_to_latest_source",
+          "elapsed_seconds": 1.68
+        },
+        {
+          "name": "tests/test_factory_install.py::test_update_removes_legacy_factory_gitignore_block",
+          "elapsed_seconds": 1.61
+        },
+        {
+          "name": "tests/test_factory_install.py::test_update_preserves_custom_workspace_and_env",
+          "elapsed_seconds": 1.56
+        },
+        {
+          "name": "tests/test_multi_tenant.py::test_shared_service_extractors_allow_compatibility_fallback",
+          "elapsed_seconds": 1.21
+        },
+        {
+          "name": "tests/test_factory_install.py::test_throwaway_target_install_regression_via_cli",
+          "elapsed_seconds": 1.07
+        },
+        {
+          "name": "tests/test_legacy_cleanup.py::test_install_factory_removes_legacy_root_contract_even_if_miscreated_as_directories",
+          "elapsed_seconds": 0.93
+        },
+        {
+          "name": "tests/test_factory_install.py::test_update_refresh_preserves_active_workspace_and_runtime_state",
+          "elapsed_seconds": 0.93
+        }
+      ],
+      "notes": [
+        "Current origin/main does not expose first-class named standard groups or named pytest bundle replays.",
+        "Pytest --durations was used only as a diagnostic measurement aid; it does not redefine parity semantics."
+      ]
+    }
+  },
+  "github_ci": {
+    "run_id": 25118595701,
+    "run_url": "https://github.com/blecx/softwareFactoryVscode/actions/runs/25118595701",
+    "wall_clock_elapsed_seconds": 1182,
+    "jobs": [
+      {
+        "name": "PR Template Conformance",
+        "elapsed_seconds": 3,
+        "install_dependencies_seconds": null,
+        "dominant_step": {
+          "name": "Run actions/checkout@v6",
+          "elapsed_seconds": 1
+        }
+      },
+      {
+        "name": "Python Code Quality (Lint & Format)",
+        "elapsed_seconds": 222,
+        "install_dependencies_seconds": 189,
+        "dominant_step": {
+          "name": "Run unit tests",
+          "elapsed_seconds": 15
+        }
+      },
+      {
+        "name": "Architectural Boundary Tests",
+        "elapsed_seconds": 3,
+        "install_dependencies_seconds": null,
+        "dominant_step": {
+          "name": "Run isolated integration test",
+          "elapsed_seconds": 0
+        }
+      },
+      {
+        "name": "Production Docs Contract",
+        "elapsed_seconds": 185,
+        "install_dependencies_seconds": 182,
+        "dominant_step": {
+          "name": "Run production docs-contract diagnostics",
+          "elapsed_seconds": 0
+        }
+      },
+      {
+        "name": "Production Docker Build Parity",
+        "elapsed_seconds": 323,
+        "install_dependencies_seconds": 180,
+        "dominant_step": {
+          "name": "Run production docker-build diagnostics",
+          "elapsed_seconds": 139
+        }
+      },
+      {
+        "name": "Production Runtime Proofs",
+        "elapsed_seconds": 513,
+        "install_dependencies_seconds": 190,
+        "dominant_step": {
+          "name": "Run production runtime-proof diagnostics",
+          "elapsed_seconds": 319
+        }
+      },
+      {
+        "name": "Internal Production Gate — Docker Parity & Recovery Proofs",
+        "elapsed_seconds": 653,
+        "install_dependencies_seconds": 186,
+        "dominant_step": {
+          "name": "Run canonical internal production gate (Docker parity & recovery proofs)",
+          "elapsed_seconds": 462
+        }
+      }
+    ],
+    "required_checks": [
+      "Python Code Quality (Lint & Format)",
+      "Architectural Boundary Tests",
+      "PR Template Conformance",
+      "Production Docs Contract",
+      "Production Docker Build Parity",
+      "Production Runtime Proofs",
+      "Internal Production Gate — Docker Parity & Recovery Proofs"
+    ],
+    "cumulative_install_dependencies_seconds": 927,
+    "critical_path": [
+      "Production Runtime Proofs",
+      "Internal Production Gate — Docker Parity & Recovery Proofs"
+    ]
+  },
+  "derived_findings": {
+    "local_to_remote_wall_clock_multiplier": 29.86,
+    "local_primary_hotspot": "pytest tests/ inside the default local parity command",
+    "remote_primary_hotspot": "the promoted production runtime proofs plus the later canonical aggregate production gate",
+    "repeated_bootstrap_cost": "Install dependencies consumes 927 cumulative seconds across five Python-backed GitHub jobs.",
+    "current_local_visibility_gap": "origin/main still requires separate diagnostic commands such as pytest --durations to isolate slow local subsets."
+  },
+  "limitations": [
+    "This artifact measures current behavior only and does not establish new policy.",
+    "The GitHub timing reference comes from run 25118595701 because it exposes the same seven-check structure currently defined on origin/main.",
+    "Current origin/main lacks first-class named standard groups and named pytest bundle replay for baseline-local hotspot slicing."
+  ],
+  "reproducibility": {
+    "commands": [
+      "./.venv/bin/python ./scripts/local_ci_parity.py",
+      "./.venv/bin/python -m pytest tests/ --durations=10 -q",
+      "GH_PAGER=cat gh run view 25118595701 --repo blecx/softwareFactoryVscode --json jobs,url"
+    ]
+  }
+}
