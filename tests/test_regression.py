@@ -980,6 +980,7 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "## Non-interactive GitHub / terminal patterns" in workflow_doc
     assert "scripts/noninteractive_gh.py" in workflow_doc
     assert "gh pr checks --watch" in workflow_doc
+    assert "gh run watch" in workflow_doc
     assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
         in workflow_doc
@@ -992,6 +993,7 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
         in merge_skill
     )
     assert "gh pr checks --watch" in merge_skill
+    assert "gh run watch" in merge_skill
     assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
         in merge_skill
