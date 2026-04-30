@@ -26,10 +26,22 @@ Per `ADR-013`, accepted ADRs are the normative architecture source for guardrail
 
 ### Maintainers and workflow contributors
 
+Wiki-related maintainer routing stays split on purpose so the index remains a first stop rather than a competing authority surface.
+
+#### Wiki workflow first stops
+
+For wiki-related maintainer work, keep the route compact: truth first, post-truth publishing second.
+
+| If you need to answer... | Open first |
+| --- | --- |
+| Where does host-owned wiki truth live, and is bootstrap still required? | [`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`](maintainer/HOST-WIKI-TRUTH-CONTRACT.md) |
+| What is wiki-safe, what stays repo-only, and how do approved sources map to the live wiki? | [`WIKI-MAP.md`](WIKI-MAP.md) and [`../manifests/wiki-projection-manifest.json`](../manifests/wiki-projection-manifest.json) |
+| Approved truth already exists — how do we validate or publish the live wiki safely? | [`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md) |
+
 - [`WORK-ISSUE-WORKFLOW.md`](WORK-ISSUE-WORKFLOW.md) — canonical issue → PR → merge workflow.
 - [`setup-github-repository.md`](setup-github-repository.md) — repository protection, branch, and CI setup guidance.
-- [`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`](maintainer/HOST-WIKI-TRUTH-CONTRACT.md) — future-project wiki bootstrap and ownership contract for host policy (`docs/WIKI-MAP.md`), host projection config (`manifests/wiki-projection-manifest.json`), canonical docs, and why `.copilot` stays reusable procedure only.
-- [`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md) — repo-only maintainer runbook for post-truth wiki validation, sync/publishing discipline, and collaborators-only editing checks.
+- [`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`](maintainer/HOST-WIKI-TRUTH-CONTRACT.md) — future-project wiki bootstrap and ownership contract; the first stop for where host-owned truth lives, whether bootstrap is still required, and what adoption order future hosts follow.
+- [`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md) — repo-only maintainer runbook for post-truth wiki validation, sync/publishing discipline, and collaborators-only editing checks after approved host truth already exists.
 - [`WIKI-MAP.md`](WIKI-MAP.md) — stable wiki publication policy and live GitHub Wiki target map, including which current docs remain repo-only and why the wiki stays subordinate to repo authority.
 - [`HARNESS-INTEGRATION-SPEC.md`](HARNESS-INTEGRATION-SPEC.md) — install/update contract and ownership boundaries.
 - [`COPILOT-HARNESS-MODEL.md`](COPILOT-HARNESS-MODEL.md) — high-level explanation of why this repository exists and how the Factory fits into a host repo.

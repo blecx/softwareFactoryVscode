@@ -2,6 +2,7 @@
 
 This page is a repo-only maintainer runbook for validating and publishing the live GitHub wiki.
 It records the repository-specific sync procedure, not the publication policy, projection config, or canonical content.
+Use this runbook only when the maintainer question is how to validate or publish the live wiki safely after approved host truth already exists.
 This runbook starts only after the required host-owned truth surfaces already exist and are approved: accepted ADRs or equivalent authority docs, canonical docs, `docs/WIKI-MAP.md`, and `manifests/wiki-projection-manifest.json`.
 If those surfaces are missing or unapproved, return to bootstrap or publication-policy authoring first instead of inventing truth during live wiki publishing.
 
@@ -11,6 +12,16 @@ Per [`ADR-013`](../architecture/ADR-013-Architecture-Authority-and-Plan-Separati
 [`../WIKI-MAP.md`](../WIKI-MAP.md) decides what is wiki-safe.
 [`../../manifests/wiki-projection-manifest.json`](../../manifests/wiki-projection-manifest.json) decides which approved pages are currently expected to be live and how they are routed.
 The live GitHub wiki remains a reader-facing projection.
+
+## Entry gate
+
+Continue here only if all of the following are already true:
+
+- `docs/WIKI-MAP.md` exists and is approved as the host publication boundary.
+- `manifests/wiki-projection-manifest.json` exists and is approved as the host projection config.
+- The canonical docs and accepted ADRs named by the manifest already contain the truth you intend to publish.
+
+If any answer is `no`, stop here and return to [`HOST-WIKI-TRUTH-CONTRACT.md`](HOST-WIKI-TRUTH-CONTRACT.md), bootstrap, or publication-policy authoring instead of stretching this runbook into a truth-authoring surface.
 
 ## Use this runbook when
 
