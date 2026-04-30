@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -21,6 +22,8 @@ ISSUE_VIEW_FIELDS = "number,title,state,url,closedAt"
 PR_VIEW_FIELDS = "number,title,state,isDraft,mergeable,reviewDecision,url,headRefName,baseRefName,mergedAt"
 PR_CHECK_FIELDS = "number,title,url,statusCheckRollup"
 REPO_VIEW_FIELDS = "nameWithOwner,url,defaultBranchRef"
+DEFAULT_PR_CHECK_POLL_INTERVAL_SECONDS = 15
+DEFAULT_PR_CHECK_TIMEOUT_SECONDS = 600
 COMPLETED_FAILURES = {
     "ACTION_REQUIRED",
     "CANCELLED",
@@ -58,14 +61,18 @@ def run_gh_json(args: Sequence[str]) -> Any:
 
 
 def build_query_metadata(
-    kind: str, *, selector: str = "", repo: str = ""
+    kind: str,
+    *,
+    selector: str = "",
+    repo: str = "",
+    watch_mode: bool = False,
 ) -> dict[str, Any]:
     return {
         "kind": kind,
         "selector": selector,
         "repo": repo,
         "pager_disabled": True,
-        "watch_mode": False,
+        "watch_mode": watch_mode,
     }
 
 
@@ -197,25 +204,80 @@ def build_pr_checks_payload(args: argparse.Namespace) -> dict[str, Any]:
     if args.repo:
         command.extend(["--repo", args.repo])
 
-    pr = run_gh_json(command) or {}
-    checks = [
-        normalize_status_check(item)
-        for item in (pr.get("statusCheckRollup") or [])
-        if isinstance(item, dict)
-    ]
+    wait_enabled = bool(getattr(args, "wait", False))
+    poll_interval_seconds = max(
+        int(
+            getattr(
+                args,
+                "poll_interval_seconds",
+                DEFAULT_PR_CHECK_POLL_INTERVAL_SECONDS,
+            )
+        ),
+        1,
+    )
+    timeout_seconds = max(
+        int(
+            getattr(
+                args,
+                "timeout_seconds",
+                DEFAULT_PR_CHECK_TIMEOUT_SECONDS,
+            )
+        ),
+        1,
+    )
+    start_monotonic = time.monotonic()
+    deadline = start_monotonic + timeout_seconds if wait_enabled else None
+    attempts = 0
+    timed_out = False
+
+    while True:
+        attempts += 1
+        pr = run_gh_json(command) or {}
+        checks = [
+            normalize_status_check(item)
+            for item in (pr.get("statusCheckRollup") or [])
+            if isinstance(item, dict)
+        ]
+        summary = summarize_status_checks(checks)
+
+        if not wait_enabled or summary["overall"] != "pending":
+            break
+
+        assert deadline is not None
+        remaining_seconds = deadline - time.monotonic()
+        if remaining_seconds <= 0:
+            timed_out = True
+            summary["overall"] = "pending-timeout"
+            break
+
+        time.sleep(min(float(poll_interval_seconds), remaining_seconds))
+
+    elapsed_seconds = (
+        max(0, int(time.monotonic() - start_monotonic)) if wait_enabled else 0
+    )
+
     return {
         "query": build_query_metadata(
             "pr-checks",
             selector=args.selector,
             repo=args.repo,
+            watch_mode=wait_enabled,
         ),
         "pr": {
             "number": pr.get("number"),
             "title": pr.get("title"),
             "url": pr.get("url"),
         },
-        "summary": summarize_status_checks(checks),
+        "summary": summary,
         "checks": checks,
+        "wait": {
+            "enabled": wait_enabled,
+            "timedOut": timed_out,
+            "pollIntervalSeconds": poll_interval_seconds,
+            "timeoutSeconds": timeout_seconds,
+            "attempts": attempts,
+            "elapsedSeconds": elapsed_seconds,
+        },
     }
 
 
@@ -259,6 +321,17 @@ def build_parser() -> argparse.ArgumentParser:
     pr_checks = subparsers.add_parser("pr-checks")
     pr_checks.add_argument("selector")
     pr_checks.add_argument("--repo", default="")
+    pr_checks.add_argument("--wait", action="store_true")
+    pr_checks.add_argument(
+        "--poll-interval-seconds",
+        type=int,
+        default=DEFAULT_PR_CHECK_POLL_INTERVAL_SECONDS,
+    )
+    pr_checks.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=DEFAULT_PR_CHECK_TIMEOUT_SECONDS,
+    )
     pr_checks.set_defaults(handler=build_pr_checks_payload)
 
     repo_view = subparsers.add_parser("repo-view")

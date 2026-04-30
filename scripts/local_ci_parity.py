@@ -153,6 +153,20 @@ class Finding:
     returncode: int | None = None
 
 
+class LocalCIParityFailure(RuntimeError):
+    def __init__(
+        self,
+        *,
+        finding: Finding,
+        findings: Sequence[Finding],
+        rerun_command: str,
+    ) -> None:
+        super().__init__(finding.summary)
+        self.finding = finding
+        self.findings = tuple(findings)
+        self.rerun_command = rerun_command
+
+
 @dataclass(frozen=True)
 class ProductionReadinessBundle:
     run_directory: Path
@@ -1089,6 +1103,8 @@ def run_selected_standard_groups(
                 finding = run_step(step, cwd=repo_root)
                 if finding is not None:
                     findings.append(finding)
+                    if finding.severity == "error":
+                        return findings
             continue
 
         if group in (STANDARD_GROUP_PYTHON_QUALITY, STANDARD_GROUP_PYTEST):
@@ -1104,6 +1120,8 @@ def run_selected_standard_groups(
                         "ℹ️ Skipping Python quality/test steps until the selected "
                         "environment has the required development/test modules."
                     )
+                    if python_environment_finding.severity == "error":
+                        return findings
 
             if python_environment_finding is not None:
                 continue
@@ -1120,6 +1138,8 @@ def run_selected_standard_groups(
                 finding = run_step(step, cwd=repo_root)
                 if finding is not None:
                     findings.append(finding)
+                    if finding.severity == "error":
+                        return findings
             continue
 
         if group == STANDARD_GROUP_INTEGRATION:
@@ -1159,6 +1179,8 @@ def run_selected_standard_groups(
                 )
                 if finding is not None:
                     findings.append(finding)
+                    if finding.severity == "error":
+                        return findings
             continue
 
         if group == STANDARD_GROUP_PR_TEMPLATE:
@@ -1213,6 +1235,8 @@ def run_selected_standard_groups(
                 )
                 if finding is not None:
                     findings.append(finding)
+                    if finding.severity == "error":
+                        return findings
                 if args.pr_body_file.strip():
                     finding = run_step(
                         StepDefinition(
@@ -1239,6 +1263,8 @@ def run_selected_standard_groups(
                     )
                     if finding is not None:
                         findings.append(finding)
+                        if finding.severity == "error":
+                            return findings
 
     return findings
 
@@ -1416,6 +1442,8 @@ def run_docker_build_validation(repo_root: Path) -> list[Finding]:
         )
         if finding is not None:
             findings.append(finding)
+            if finding.severity == "error":
+                return findings
 
     return findings
 
@@ -1605,6 +1633,20 @@ def print_improvement_plan(findings: Sequence[Finding], *, rerun_command: str) -
     print("=" * 60)
     for index, item in enumerate(plan, start=1):
         print(f"{index}. {item}")
+
+
+def raise_for_blocking_findings(
+    findings: Sequence[Finding],
+    *,
+    rerun_command: str,
+) -> None:
+    for finding in findings:
+        if finding.severity == "error":
+            raise LocalCIParityFailure(
+                finding=finding,
+                findings=findings,
+                rerun_command=rerun_command,
+            )
 
 
 def run_required_documentation_validation(repo_root: Path) -> list[Finding]:
@@ -2074,6 +2116,7 @@ def main(argv: list[str] | None = None) -> int:
         base_rev=args.base_rev,
         head_rev=head_rev,
     )
+    rerun_command = build_rerun_command(args)
 
     if args.fresh_checkout:
         return run_fresh_checkout_validation(
@@ -2115,86 +2158,112 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     findings: list[Finding] = []
-
-    if args.production_groups_only:
-        print(
-            "ℹ️ Skipping default prechecks because `--production-groups-only` "
-            "was requested."
-        )
-    else:
-        findings.extend(
-            run_selected_standard_groups(
-                args,
-                base_rev=base_rev,
-                repo_root=repo_root,
-                selected_groups=standard_groups,
-                selected_pytest_bundles=pytest_bundles,
-            )
-        )
-
     docker_build_findings: list[Finding] = []
     production_group_results: dict[str, str] = {}
 
-    if args.mode == PRODUCTION_MODE:
-        for group in production_groups:
-            group_findings: list[Finding] = []
-            if group == PRODUCTION_GROUP_DOCS_CONTRACT:
-                group_findings = run_required_documentation_validation(repo_root)
-            elif group == PRODUCTION_GROUP_DOCKER_BUILDS:
-                group_findings = run_docker_build_validation(repo_root)
-                docker_build_findings = group_findings
-            elif group == PRODUCTION_GROUP_RUNTIME_PROOFS:
-                if aggregate_production_mode and any(
-                    finding.severity == "error" for finding in docker_build_findings
-                ):
-                    print(
-                        "\nℹ️ Skipping Docker E2E runtime proof lane until Docker "
-                        "image build parity is green."
-                    )
-                    production_group_results[group] = "skipped-docker-build-errors"
-                    continue
-                group_findings = run_docker_e2e_validation(
-                    repo_root,
-                    python_executable=args.python,
-                )
-
-            findings.extend(group_findings)
-            if any(finding.severity == "error" for finding in group_findings):
-                production_group_results[group] = "fail"
-            elif any(finding.severity == "warning" for finding in group_findings):
-                production_group_results[group] = "warn"
-            else:
-                production_group_results[group] = "pass"
-
-    elif docker_build_requested(args):
-        docker_build_findings = run_docker_build_validation(repo_root)
-        findings.extend(docker_build_findings)
-    else:
-        warning = (
-            "Docker image build parity is skipped by default in standard mode; "
-            "this run did not "
-            "validate `docker/*/Dockerfile` builds."
-        )
-        print(
-            "\nℹ️ "
-            f"{warning} Run `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` "
-            "(or `--include-docker-build`) for blocking container-build parity."
-        )
-        findings.append(
-            Finding(
-                severity="warning",
-                name="Docker image build parity",
-                summary=warning,
-                remediation=(
-                    "Run `./.venv/bin/python ./scripts/local_ci_parity.py --mode "
-                    "production` (or `--include-docker-build`) before production "
-                    "sign-off when you need blocking container-build parity."
-                ),
+    try:
+        if args.production_groups_only:
+            print(
+                "ℹ️ Skipping default prechecks because `--production-groups-only` "
+                "was requested."
             )
-        )
+        else:
+            findings.extend(
+                run_selected_standard_groups(
+                    args,
+                    base_rev=base_rev,
+                    repo_root=repo_root,
+                    selected_groups=standard_groups,
+                    selected_pytest_bundles=pytest_bundles,
+                )
+            )
+            raise_for_blocking_findings(findings, rerun_command=rerun_command)
+
+        if args.mode == PRODUCTION_MODE:
+            for group in production_groups:
+                group_findings: list[Finding] = []
+                if group == PRODUCTION_GROUP_DOCS_CONTRACT:
+                    group_findings = run_required_documentation_validation(repo_root)
+                elif group == PRODUCTION_GROUP_DOCKER_BUILDS:
+                    group_findings = run_docker_build_validation(repo_root)
+                    docker_build_findings = group_findings
+                elif group == PRODUCTION_GROUP_RUNTIME_PROOFS:
+                    if aggregate_production_mode and any(
+                        finding.severity == "error" for finding in docker_build_findings
+                    ):
+                        print(
+                            "\nℹ️ Skipping Docker E2E runtime proof lane until Docker "
+                            "image build parity is green."
+                        )
+                        production_group_results[group] = "skipped-docker-build-errors"
+                        continue
+                    group_findings = run_docker_e2e_validation(
+                        repo_root,
+                        python_executable=args.python,
+                    )
+
+                findings.extend(group_findings)
+                if any(finding.severity == "error" for finding in group_findings):
+                    production_group_results[group] = "fail"
+                elif any(finding.severity == "warning" for finding in group_findings):
+                    production_group_results[group] = "warn"
+                else:
+                    production_group_results[group] = "pass"
+                raise_for_blocking_findings(findings, rerun_command=rerun_command)
+
+        elif docker_build_requested(args):
+            docker_build_findings = run_docker_build_validation(repo_root)
+            findings.extend(docker_build_findings)
+            raise_for_blocking_findings(findings, rerun_command=rerun_command)
+        else:
+            warning = (
+                "Docker image build parity is skipped by default in standard mode; "
+                "this run did not "
+                "validate `docker/*/Dockerfile` builds."
+            )
+            print(
+                "\nℹ️ "
+                f"{warning} Run `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` "
+                "(or `--include-docker-build`) for blocking container-build parity."
+            )
+            findings.append(
+                Finding(
+                    severity="warning",
+                    name="Docker image build parity",
+                    summary=warning,
+                    remediation=(
+                        "Run `./.venv/bin/python ./scripts/local_ci_parity.py --mode "
+                        "production` (or `--include-docker-build`) before production "
+                        "sign-off when you need blocking container-build parity."
+                    ),
+                )
+            )
+    except LocalCIParityFailure as exc:
+        print_findings_report(exc.findings)
+        print_improvement_plan(exc.findings, rerun_command=exc.rerun_command)
+
+        if args.mode == PRODUCTION_MODE and aggregate_production_mode:
+            production_bundle = write_production_readiness_bundle(
+                repo_root,
+                base_rev=base_rev,
+                head_rev=head_rev,
+                findings=exc.findings,
+                production_groups_executed=production_groups,
+                production_group_results=production_group_results,
+            )
+            print_production_readiness_bundle_summary(
+                production_bundle,
+                repo_root=repo_root,
+            )
+
+        print("\n❌ Local CI-parity checks terminated after the first blocking error.")
+        print(f"Cause: {exc.finding.summary}")
+        if exc.finding.command:
+            print(f"Failed command: {format_command(exc.finding.command)}")
+        return 1
 
     print_findings_report(findings)
-    print_improvement_plan(findings, rerun_command=build_rerun_command(args))
+    print_improvement_plan(findings, rerun_command=rerun_command)
 
     if args.mode == PRODUCTION_MODE:
         if aggregate_production_mode:

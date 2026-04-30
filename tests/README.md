@@ -46,6 +46,21 @@ The throwaway-target regression in `tests/test_factory_install.py` validates the
 - post-install verifier success
 - non-mutating smoke prompt output contract
 
+## Fast-fail guardrail for CI-sensitive tests
+
+When you add or change a CI-sensitive test, parity wrapper, or validation helper,
+prefer **fast-fail** behavior over broad error aggregation.
+
+- Stop on the **first blocking error** instead of continuing through later steps.
+- Exit non-zero immediately and print the exact failing command and cause.
+- Treat watchdogs/timeouts as a **hang fallback**, not the primary way users learn
+  that a normal validation step failed.
+- If diagnosis still needs replay support, expose focused rerun commands or named
+  bundles instead of forcing one monolithic validation pass.
+
+In short: normal failures should terminate with actionable output quickly, while
+timeouts remain reserved for genuine stuck-process protection.
+
 ## Practical baseline coverage map (P0/P1/P2 lock)
 
 The practical per-workspace baseline is protected by a mix of functional and documentation regressions:

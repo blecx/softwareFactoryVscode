@@ -105,6 +105,8 @@ def test_capture_recovery_snapshot_writes_required_sections(tmp_path):
     assert "# Interruption recovery snapshot" in snapshot
     assert "- generated_at: 2026-04-19T20:40:00Z" in snapshot
     assert "## Queue checkpoint" in snapshot
+    assert "## Execution surface assessment" in snapshot
+    assert "- surface_kind: `repo-root`" in snapshot
     assert "- active_issue: 63" in snapshot
     assert "## Local git state" in snapshot
     assert "## GitHub truth" in snapshot
@@ -115,3 +117,72 @@ def test_capture_recovery_snapshot_writes_required_sections(tmp_path):
     assert "## Next resume checklist" in snapshot
     assert "do not assume the runtime stopped" in snapshot
     assert "window closed/reopened" in snapshot
+
+
+def test_inspect_execution_surface_rejects_partial_queue_snapshot(tmp_path):
+    module = _load_recovery_module()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir(parents=True)
+    (repo_root / ".tmp").mkdir()
+
+    partial_surface = (
+        repo_root
+        / ".tmp"
+        / "queue-worktrees"
+        / "wiki-routing-fixes"
+        / "tests"
+        / "test_regression.py"
+    )
+    partial_surface.parent.mkdir(parents=True)
+    partial_surface.write_text("# partial snapshot\n", encoding="utf-8")
+
+    assessment = module.inspect_execution_surface(repo_root, partial_surface)
+
+    assert assessment["surface_kind"] == "partial-queue-snapshot"
+    assert assessment["safe_to_resume"] is False
+    assert ".tmp/github-issue-queue-state.md" in assessment["note"]
+
+
+def test_capture_recovery_snapshot_warns_about_partial_queue_snapshot(tmp_path):
+    module = _load_recovery_module()
+    repo_root = tmp_path / "repo"
+    tmp_dir = repo_root / ".tmp"
+    tmp_dir.mkdir(parents=True)
+    checkpoint_path = tmp_dir / "github-issue-queue-state.md"
+    checkpoint_path.write_text("- active_issue: 226\n- active_pr: none\n", encoding="utf-8")
+    output_path = tmp_dir / "interruption-recovery-snapshot.md"
+    partial_surface = (
+        repo_root
+        / ".tmp"
+        / "queue-worktrees"
+        / "wiki-routing-fixes"
+        / "tests"
+        / "test_regression.py"
+    )
+    partial_surface.parent.mkdir(parents=True)
+    partial_surface.write_text("# partial snapshot\n", encoding="utf-8")
+
+    def fake_runner(command, cwd):
+        del cwd
+        command = list(command)
+        if command[:4] == ["git", "rev-parse", "--abbrev-ref", "HEAD"]:
+            return _completed(command, "main\n")
+        if command[:3] == ["git", "status", "--short"]:
+            return _completed(command, "## main\n")
+        if command[:3] == ["gh", "issue", "view"]:
+            return _completed(command, '{"state":"OPEN","url":"https://example.test/issues/226","title":"Issue 226","closedAt":null}\n')
+        raise AssertionError(f"Unexpected command: {command}")
+
+    module.capture_recovery_snapshot(
+        repo_root=repo_root,
+        checkpoint_path=checkpoint_path,
+        output_path=output_path,
+        surface_path=partial_surface,
+        runner=fake_runner,
+        generated_at="2026-04-30T19:30:00Z",
+    )
+
+    snapshot = output_path.read_text(encoding="utf-8")
+    assert "- surface_kind: `partial-queue-snapshot`" in snapshot
+    assert "- safe_to_resume: false" in snapshot
+    assert "Do not resume from the current surface path" in snapshot

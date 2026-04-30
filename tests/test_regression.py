@@ -169,6 +169,8 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
     assert "single source of truth" in lowered_skill
     assert "resolve-issue` → `pr-merge`" in skill
     assert "do not stop merely because ci is pending" in lowered_skill
+    assert "timeout-seconds 600" in skill
+    assert "pending-timeout" in lowered_skill
     assert "execute-approved-plan" in workflow_doc
     assert "run the approved queue" in lowered_instructions
     assert (
@@ -406,6 +408,12 @@ def test_interruption_recovery_assets_and_docs_exist():
     assert "factory_stack.py status" in recovery_skill
     assert "window close/reopen" in workflow_doc
     assert "foreground task exit" in workflow_doc
+    assert ".tmp/queue-worktrees/*" in workflow_doc
+    assert ".tmp/queue-worktrees/*" in recovery_prompt
+    assert ".tmp/queue-worktrees/*" in recovery_skill
+    assert "stray partial snapshot" in workflow_doc
+    assert "stray partial snapshot" in recovery_skill
+    assert "--surface-path <path>" in recovery_prompt
 
 
 def test_new_adrs_capture_template_and_local_ci_contracts():
@@ -972,6 +980,10 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "## Non-interactive GitHub / terminal patterns" in workflow_doc
     assert "scripts/noninteractive_gh.py" in workflow_doc
     assert "gh pr checks --watch" in workflow_doc
+    assert (
+        "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
+        in workflow_doc
+    )
     assert "heredoc" in workflow_doc
     assert "Long-running Docker/test output" in workflow_doc
 
@@ -980,6 +992,10 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
         in merge_skill
     )
     assert "gh pr checks --watch" in merge_skill
+    assert (
+        "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
+        in merge_skill
+    )
     assert "./.venv/bin/python ./scripts/noninteractive_gh.py issue-list" in issue_skill
     assert "heredoc-based Python command" in resolve_skill
 
@@ -1497,10 +1513,10 @@ def test_validation_parity_inventory_artifacts_are_tracked_and_routed() -> None:
     assert "local-ci-run-command-no-timeout" in hang_ids
     assert "local-ci-run-git-no-timeout" in hang_ids
     assert "production-runtime-proofs-no-timeout" in hang_ids
-    assert "queue-polling-needs-external-bound" in hang_ids
 
     bounded_wait_surfaces = {item["surface"] for item in manifest["bounded_wait_paths"]}
     assert "_wait_until_reachable(url, max_wait_seconds=30)" in bounded_wait_surfaces
+    assert "pr-checks --wait --timeout-seconds=600" in bounded_wait_surfaces
 
 
 def test_project_overview_doc_establishes_canonical_landing_story() -> None:
@@ -2005,6 +2021,8 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert "ADR-005-Strong-Templating-Enforcement.md" in catalog
     assert "ADR-006-Local-CI-Parity-Prechecks.md" in catalog
     assert ".github/workflows/ci.yml" in catalog
+    assert "tests/README.md" in catalog
+    assert "test-authoring fast-fail rule" in catalog
     assert "manifests/wiki-projection-manifest.json" in catalog
     assert "configs/bash_gateway_policy.default.yml" in catalog
     assert "scripts/setup-low-approval.sh" in catalog
@@ -2253,6 +2271,10 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
     assert "## Readiness closeout evidence bundle" in tests_readme
     assert "./.venv/bin/pytest tests/test_regression.py -v" in tests_readme
     assert "./.venv/bin/python ./scripts/local_ci_parity.py" in tests_readme
+    assert "## Fast-fail guardrail for CI-sensitive tests" in tests_readme
+    assert "Stop on the **first blocking error**" in tests_readme
+    assert "exact failing command and cause" in tests_readme
+    assert "hang fallback" in tests_readme
     assert "activate_switch_back_keeps_one_active_workspace" in tests_readme
     assert "stop_cleanup_retains_images_and_supports_restart" in tests_readme
     assert "Still deferred after this readiness pass:" in tests_readme
@@ -2989,22 +3011,17 @@ def test_local_ci_parity_reports_findings_list_and_improvement_plan(
     captured = capsys.readouterr()
 
     assert exit_code == 1
-    assert any("black" in command for command in executed_commands)
-    assert any("flake8" in command for command in executed_commands)
+    assert any(command[1:3] == ("-m", "black") for command in executed_commands)
+    assert not any(command[1:3] == ("-m", "flake8") for command in executed_commands)
 
     assert "Findings" in captured.out
     assert "[ERROR] Black format check" in captured.out
-    assert "[WARNING] Integration regression" in captured.out
-    assert "[WARNING] PR-template format validation" in captured.out
-    assert "[WARNING] Docker image build parity" in captured.out
     assert "Improvement plan" in captured.out
+    assert "terminated after the first blocking error" in captured.out
+    assert "Cause: Code formatting does not match the Black profile. (exit code 1)." in captured.out
     assert (
         "Run Black on `factory_runtime/`, `scripts/`, and `tests/`, then review the diffs."
         in captured.out
-    )
-    assert (
-        "Run the standard precheck again without `--skip-integration` before "
-        "finalizing the PR." in captured.out
     )
     assert "would reformat scripts/demo.py" in captured.err
 
@@ -4164,6 +4181,8 @@ def test_local_ci_parity_reports_missing_dev_dependencies_before_quality_steps(
     assert "[ERROR] Python environment preflight" in captured.out
     assert "development/test modules: black, pytest" in captured.out
     assert "Run `./setup.sh`" in captured.out
+    assert "terminated after the first blocking error" in captured.out
+    assert "Cause: The selected Python environment is missing required development/test modules: black, pytest." in captured.out
     assert "Skipping Python quality/test steps" in captured.out
     assert "[ERROR] Black format check" not in captured.out
     assert "[ERROR] Pytest suite (tests/)" not in captured.out
@@ -4354,6 +4373,8 @@ def test_local_ci_parity_watchdog_timeout_reports_split_replay_guidance(
     assert "configured watchdog" in captured.out
     assert "--standard-group pytest --pytest-bundle" in captured.out
     assert module.PYTEST_BUNDLE_DOCS_WORKFLOW in captured.out
+    assert "terminated after the first blocking error" in captured.out
+    assert "Cause: `" in captured.out
 
 
 def test_local_ci_parity_rejects_pytest_bundle_with_production_groups_only(

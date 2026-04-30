@@ -25,6 +25,7 @@ When continuity is lost because of compaction, restart, timeout, tool uncertaint
 3. Read `.tmp/github-issue-queue-state.md` before deciding what happens next.
 4. Capture or refresh `.tmp/interruption-recovery-snapshot.md` with:
    - `./.venv/bin/python ./scripts/capture_recovery_snapshot.py`
+   - If the current editor/file/cwd may be stale or unusual, pass `--surface-path <path>` so the snapshot can classify whether it is a valid execution surface.
 5. Add `--include-runtime-status` when the interrupted task touched runtime, Docker, MCP, or workspace lifecycle infrastructure.
    - The runtime-sensitive path captures `./scripts/factory_stack.py status` output inside `.tmp/interruption-recovery-snapshot.md`.
 6. Do not merge, close, or start the next issue until branch state, queue state, GitHub truth, and any needed runtime state all agree.
@@ -41,6 +42,7 @@ When continuity is lost because of compaction, restart, timeout, tool uncertaint
    - active PR number/state
    - current CI/check state
    - runtime/service state when applicable
+   - execution-surface assessment, especially whether the current editor/file/cwd is only a partial `.tmp/queue-worktrees/*` snapshot rather than a full repo/worktree
 5. Update `.tmp/github-issue-queue-state.md` before continuing implementation, merge, cleanup, or queue selection.
 6. Continue only the currently active issue unless the operator has explicitly approved moving to the next one.
 

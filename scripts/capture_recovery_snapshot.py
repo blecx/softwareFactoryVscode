@@ -13,6 +13,14 @@ from typing import Callable, Sequence
 SCRIPT_REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CHECKPOINT_PATH = Path(".tmp/github-issue-queue-state.md")
 DEFAULT_OUTPUT_PATH = Path(".tmp/interruption-recovery-snapshot.md")
+REPO_SURFACE_MARKERS = (
+    ".github",
+    "docs",
+    "scripts",
+    "tests",
+    "README.md",
+    "pytest.ini",
+)
 CommandRunner = Callable[[Sequence[str], Path], subprocess.CompletedProcess[str]]
 
 
@@ -47,6 +55,89 @@ def parse_queue_checkpoint(checkpoint_path: Path) -> dict[str, str]:
         key, value = line[2:].split(":", 1)
         state[key.strip()] = value.strip()
     return state
+
+
+def inspect_execution_surface(repo_root: Path, surface_path: Path | None) -> dict[str, str | bool]:
+    repo_root = repo_root.resolve()
+    candidate = (surface_path or repo_root).expanduser().resolve()
+    surface_dir = candidate if candidate.is_dir() else candidate.parent
+    queue_root = (repo_root / ".tmp" / "queue-worktrees").resolve()
+
+    try:
+        relative_queue_path = surface_dir.relative_to(queue_root)
+    except ValueError:
+        relative_queue_path = None
+
+    if surface_dir == repo_root:
+        return {
+            "surface_path": str(candidate),
+            "surface_dir": str(surface_dir),
+            "surface_root": str(repo_root),
+            "surface_kind": "repo-root",
+            "safe_to_resume": True,
+            "note": (
+                "The current surface resolves to the repository root, which is a "
+                "valid re-anchor point. Continue only after `.tmp/github-issue-queue-state.md` "
+                "and GitHub truth agree on the active issue/PR state."
+            ),
+        }
+
+    if repo_root in surface_dir.parents:
+        if relative_queue_path is not None and relative_queue_path.parts:
+            queue_surface_root = queue_root / relative_queue_path.parts[0]
+            has_git_dir = (queue_surface_root / ".git").exists()
+            marker_count = sum(
+                1
+                for marker in REPO_SURFACE_MARKERS
+                if (queue_surface_root / marker).exists()
+            )
+            if has_git_dir and marker_count == len(REPO_SURFACE_MARKERS):
+                return {
+                    "surface_path": str(candidate),
+                    "surface_dir": str(surface_dir),
+                    "surface_root": str(queue_surface_root),
+                    "surface_kind": "queue-worktree",
+                    "safe_to_resume": True,
+                    "note": (
+                        "The current surface is a full queue worktree rooted inside `.tmp/queue-worktrees/`. "
+                        "Resume only after confirming it matches the active issue recorded in `.tmp/github-issue-queue-state.md`."
+                    ),
+                }
+
+            return {
+                "surface_path": str(candidate),
+                "surface_dir": str(surface_dir),
+                "surface_root": str(queue_surface_root),
+                "surface_kind": "partial-queue-snapshot",
+                "safe_to_resume": False,
+                "note": (
+                    "The current surface lives under `.tmp/queue-worktrees/` but is missing the repo/worktree markers "
+                    "required for safe execution (for example `.git`, `docs/`, or `scripts/`). Treat it as a stray partial snapshot, not a valid resume surface. "
+                    "Re-anchor from the repository root and the active worktree recorded in `.tmp/github-issue-queue-state.md`."
+                ),
+            }
+
+        return {
+            "surface_path": str(candidate),
+            "surface_dir": str(surface_dir),
+            "surface_root": str(repo_root),
+            "surface_kind": "repo-subpath",
+            "safe_to_resume": True,
+            "note": (
+                "The current surface is inside the repository checkout. Treat the editor/file path as advisory only and resume from the active issue/PR recorded in `.tmp/github-issue-queue-state.md`."
+            ),
+        }
+
+    return {
+        "surface_path": str(candidate),
+        "surface_dir": str(surface_dir),
+        "surface_root": str(surface_dir),
+        "surface_kind": "outside-repo",
+        "safe_to_resume": False,
+        "note": (
+            "The current surface is outside the repository root. Do not resume from it; re-anchor from the repository root and `.tmp/github-issue-queue-state.md` instead."
+        ),
+    }
 
 
 def run_command(command: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -195,53 +286,82 @@ def render_queue_checkpoint_section(
     return "\n".join(lines)
 
 
+def render_execution_surface_section(
+    surface_assessment: dict[str, str | bool],
+) -> str:
+    lines = ["## Execution surface assessment", ""]
+    lines.append(f"- surface_path: `{surface_assessment['surface_path']}`")
+    lines.append(f"- surface_dir: `{surface_assessment['surface_dir']}`")
+    lines.append(f"- surface_root: `{surface_assessment['surface_root']}`")
+    lines.append(f"- surface_kind: `{surface_assessment['surface_kind']}`")
+    lines.append(
+        "- safe_to_resume: "
+        + str(bool(surface_assessment["safe_to_resume"])).lower()
+    )
+    lines.append(f"- note: {surface_assessment['note']}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def render_resume_checklist(
     active_issue: str | None,
     active_pr: str | None,
     *,
     include_runtime_status: bool,
+    surface_assessment: dict[str, str | bool],
 ) -> str:
     lines = [
         "## Next resume checklist",
         "",
         "1. Compare the queue checkpoint with the GitHub truth sections above.",
-        "2. Update `.tmp/github-issue-queue-state.md` before continuing "
-        "implementation, merge, cleanup, or queue selection.",
     ]
+    if not bool(surface_assessment["safe_to_resume"]):
+        lines.append(
+            "2. Do not resume from the current surface path; it was classified as `"
+            f"{surface_assessment['surface_kind']}`. Re-anchor from the repository root and the active worktree recorded in `.tmp/github-issue-queue-state.md`."
+        )
+        next_index = 3
+    else:
+        next_index = 2
+
+    lines.append(
+        f"{next_index}. Update `.tmp/github-issue-queue-state.md` before continuing "
+        "implementation, merge, cleanup, or queue selection.",
+    )
     if active_issue:
         lines.append(
-            f"3. Resume only issue `#{active_issue}` unless the operator "
+            f"{next_index + 1}. Resume only issue `#{active_issue}` unless the operator "
             "explicitly approves moving to the next issue."
         )
     else:
         lines.append(
-            "3. Identify the active issue before continuing any implementation "
+            f"{next_index + 1}. Identify the active issue before continuing any implementation "
             "or merge action."
         )
     if active_pr and active_pr.lower() != "none":
         lines.append(
-            f"4. Re-check PR `#{active_pr}` state immediately before any merge "
+            f"{next_index + 2}. Re-check PR `#{active_pr}` state immediately before any merge "
             "or close narration."
         )
     else:
         lines.append(
-            "4. If no PR exists yet, continue only with implementation/validation "
+            f"{next_index + 2}. If no PR exists yet, continue only with implementation/validation "
             "steps for the active issue."
         )
     lines.append(
-        "5. If VS Code reloaded, the window closed/reopened, or the foreground "
+        f"{next_index + 3}. If VS Code reloaded, the window closed/reopened, or the foreground "
         "task exited, do not assume the runtime stopped; compare against "
         "`factory_stack.py status` or the runtime snapshot before deciding "
         "whether start/stop/recovery is needed."
     )
     if include_runtime_status:
         lines.append(
-            "6. Use the runtime snapshot section above to decide whether "
+            f"{next_index + 4}. Use the runtime snapshot section above to decide whether "
             "infrastructure recovery is required before resuming the task."
         )
     else:
         lines.append(
-            "6. Re-run this helper with `--include-runtime-status` if the "
+            f"{next_index + 4}. Re-run this helper with `--include-runtime-status` if the "
             "interrupted task touched runtime or MCP services."
         )
     lines.append("")
@@ -256,6 +376,7 @@ def capture_recovery_snapshot(
     active_issue: str | None = None,
     active_pr: str | None = None,
     include_runtime_status: bool = False,
+    surface_path: Path | None = None,
     runner: CommandRunner = run_command,
     generated_at: str | None = None,
 ) -> Path:
@@ -263,6 +384,7 @@ def capture_recovery_snapshot(
     checkpoint_path = resolve_repo_relative_path(repo_root, checkpoint_path)
     output_path = resolve_output_path(repo_root, output_path)
     checkpoint_state = parse_queue_checkpoint(checkpoint_path)
+    surface_assessment = inspect_execution_surface(repo_root, surface_path)
 
     active_issue = active_issue or checkpoint_state.get("active_issue")
     active_pr = active_pr or checkpoint_state.get("active_pr")
@@ -279,6 +401,7 @@ def capture_recovery_snapshot(
         f"- runtime_status_requested: {str(include_runtime_status).lower()}",
         "",
         render_queue_checkpoint_section(checkpoint_state, checkpoint_path),
+        render_execution_surface_section(surface_assessment),
         "## Local git state",
         "",
         *collect_git_sections(repo_root, runner),
@@ -299,6 +422,7 @@ def capture_recovery_snapshot(
             active_issue,
             active_pr,
             include_runtime_status=include_runtime_status,
+            surface_assessment=surface_assessment,
         ),
     ]
 
@@ -349,6 +473,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Also capture `factory_stack.py status` output for runtime-sensitive work.",
     )
+    parser.add_argument(
+        "--surface-path",
+        default="",
+        help=(
+            "Optional current editor/file/cwd path to classify as a resume surface. "
+            "When omitted, the current working directory is assessed."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -362,6 +494,7 @@ def main() -> int:
         active_issue=args.issue.strip() or None,
         active_pr=args.pr.strip() or None,
         include_runtime_status=args.include_runtime_status,
+        surface_path=Path(args.surface_path).expanduser() if args.surface_path.strip() else None,
     )
     print("Recovery snapshot written to .tmp/interruption-recovery-snapshot.md")
     return 0

@@ -34,6 +34,7 @@ This file is a VS Code discovery wrapper. Keep bounded plan-execution logic in `
 - Reuse the canonical `resolve-issue` → `pr-merge` slice path for every issue in the plan; do not invent a plan-specific implementation or merge process.
 - Use `.tmp/`, never `/tmp`.
 - Stop on real blockers, not just because CI is still polling.
+- Use bounded CI waits only; if GitHub checks remain pending after 10 minutes, stop with a precise blocker and resume later instead of waiting indefinitely.
 - Do not guess the plan when more than one plausible issue set exists.
 
 ## Completion Contract

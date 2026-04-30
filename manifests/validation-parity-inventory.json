@@ -112,16 +112,14 @@
       "surface": "run_docker_e2e_validation()",
       "bounded": false,
       "risk": "The promoted Docker E2E runtime-proof lane uses a direct subprocess.run call with no timeout."
-    },
-    {
-      "id": "queue-polling-needs-external-bound",
-      "path": ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
-      "surface": "queue / merge polling contract",
-      "bounded": false,
-      "risk": "The workflow requires polling until checks reach terminal state, but the caller must add the actual watchdog bound."
     }
   ],
   "bounded_wait_paths": [
+    {
+      "path": "scripts/noninteractive_gh.py",
+      "surface": "pr-checks --wait --timeout-seconds=600",
+      "notes": "Pager-free PR-check polling now supports a repo-owned 10-minute watchdog and returns `pending-timeout` instead of waiting indefinitely."
+    },
     {
       "path": "tests/test_throwaway_runtime_docker.py",
       "surface": "_wait_until_reachable(url, max_wait_seconds=30)",

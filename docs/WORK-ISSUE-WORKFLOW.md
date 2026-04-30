@@ -72,6 +72,8 @@ Routing rule:
   ```
 
 - Prefer polling the helper's JSON output over `gh pr checks --watch`, pager UI, or web/watch flows when you are inside an automation loop.
+- For bounded waiting, prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600` over `gh pr checks --watch`, `gh run watch`, or other watch-style flows.
+- If the helper returns `summary.overall = pending-timeout`, treat that as a real blocker for the current automation pass: refresh `.tmp/github-issue-queue-state.md`, report CI as still pending, and stop so the operator or a later resume can re-anchor cleanly instead of waiting indefinitely.
 - If the helper does not cover a one-off query yet, use an equivalent pager-free pattern such as `GH_PAGER=cat PAGER=cat gh ... --json ...`; do not rely on the CLI deciding whether to open a pager.
 - When transforming JSON in shell automation, pipe into `python -c '...'` or a dedicated script. Do **not** combine a pipe with a heredoc-based Python command such as `... | python - <<'PY'`, because the heredoc replaces stdin and the piped JSON never reaches `sys.stdin`.
 - Long-running Docker/test output is not itself evidence of an input prompt. Before sending terminal input, confirm that the terminal explicitly requests it (for example `Enter ...`, `[y/N]`, `Username:`, or a tool-level input-needed signal).
@@ -122,6 +124,7 @@ Routing rule:
   - current branch
   - working tree state
   - queue checkpoint contents from `.tmp/github-issue-queue-state.md`
+  - execution-surface assessment for the current editor/file/cwd when supplied
   - active issue/PR GitHub truth when available
   - PR check output when available
   - optional `factory_stack.py status` output for runtime-sensitive work
@@ -129,6 +132,7 @@ Routing rule:
   runtime truth. Use `factory_stack.py status` or
   `capture_recovery_snapshot.py --include-runtime-status` before assuming the
   runtime stopped or needs a fresh `start`.
+- Treat the current editor/file path as advisory only. If it points under `.tmp/queue-worktrees/*` but the top-level directory is missing repo/worktree markers such as `.git`, `docs/`, or `scripts/`, classify it as a stray partial snapshot and resume from the repository root plus `.tmp/github-issue-queue-state.md` instead of treating that path as the active worktree.
 - Review the recovery snapshot and update `.tmp/github-issue-queue-state.md` before resuming implementation, merge, cleanup, or queue selection.
 
 ## Required guardrails

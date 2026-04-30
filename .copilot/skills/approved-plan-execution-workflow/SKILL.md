@@ -55,7 +55,8 @@ Provides context and instructions for the `approved-plan-execution-workflow` ski
 - **Batch Size**: Processes one issue at a time internally (One Issue = One PR = One Merge), but keeps moving across the approved bounded set without re-asking between slices.
 - **Automatic Continuation**: Treat the operator request as approval for the full bounded issue set, not just the first slice.
 - **Error Halt**: Stop immediately on CI failures that are not yet fixed, merge conflicts, blocked PRs, template violations, missing validation evidence, workflow ambiguity, or architecture conflicts.
-- **Polling Rule**: Do not stop merely because CI is pending. Poll GitHub truth non-interactively until checks reach a terminal state, then continue automatically on success.
+- **Polling Rule**: Do not stop merely because CI is pending, but also do not wait indefinitely. Use bounded non-interactive polling (prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600`) and continue automatically only when checks reach terminal success within that window.
+- **Pending-Timeout Halt**: If CI is still pending after the 10-minute bounded wait window, record the still-pending GitHub truth in `.tmp/github-issue-queue-state.md`, report a precise `pending-timeout` blocker, and stop so a later resume can re-anchor safely.
 - **Completion**: Break the loop only when every issue in the approved set is merged and GitHub-verified closed, or when a true blocker prevents safe continuation.
 
 ## Delegation Boundaries
@@ -85,7 +86,7 @@ Provides context and instructions for the `approved-plan-execution-workflow` ski
 4. Update `.tmp/github-issue-queue-state.md` with the active issue, branch, status, and next gate.
 5. Delegate the active slice to the resolve workflow.
 6. When the slice becomes ready for merge, delegate to the merge workflow.
-7. Poll GitHub checks non-interactively until terminal success or failure.
+7. Poll GitHub checks non-interactively using a bounded wait window; if the result is `pending-timeout`, stop and report the blocker instead of spinning.
 8. If checks fail, return to the active issue through the canonical resolve workflow, fix the root cause, rerun required local prechecks, and retry.
 9. After merge, verify GitHub issue closure and queue checkpoint evidence, then advance automatically to the next approved issue.
 10. If interrupted, capture `.tmp/interruption-recovery-snapshot.md`, re-anchor, and resume from GitHub truth instead of guessing.
