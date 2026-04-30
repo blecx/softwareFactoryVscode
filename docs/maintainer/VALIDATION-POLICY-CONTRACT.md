@@ -1,11 +1,11 @@
 # Validation policy contract and official bundle taxonomy
 
-This document records the canonical validation-policy authority surface introduced for issue `#226` under umbrella issue `#225`.
+This document records the canonical validation-policy authority surface introduced for issue `#226` and extended for issue `#227` under umbrella issue `#225`.
 
-- **Status:** canonical bundle-taxonomy contract
+- **Status:** canonical bundle-taxonomy and level-selection contract
 - **Authoritative config:** [`../../configs/validation_policy.yml`](../../configs/validation_policy.yml)
 - **Schema/loader:** [`../../factory_runtime/agents/validation_policy.py`](../../factory_runtime/agents/validation_policy.py)
-- **Current boundary:** this slice defines the official bundle identifiers, required bundle metadata, and bounded watchdog contract. It does **not** yet define the four validation levels, changed-surface resolution rules, explicit local-vs-GitHub exceptions, or the full invalid-policy lock suite.
+- **Current boundary:** this slice defines the official bundle identifiers, required bundle metadata, bounded watchdog contract, four validation levels, representative changed-surface resolution rules, aggregate escalation semantics, and explicit local-vs-GitHub exceptions. It still does **not** yet land the broader invalid-policy lock suite or migrate workflow runners to consume these semantics directly.
 
 ## Why this surface exists
 
@@ -19,37 +19,88 @@ For this repository, that authority surface is:
 
 ## Current boundary and deferred scope
 
-Issue `#226` intentionally stops at taxonomy and schema ownership.
+Issues `#226` and `#227` establish the canonical contract surface while still deferring the broader invalid-policy lock suite.
 
 What this slice defines now:
 
 - one authoritative config location for official validation bundle identifiers;
 - required bundle metadata (`kind`, `owner`, `summary`, current derivative labels, and bounded watchdog metadata);
-- canonical placeholder identifiers for aggregate bundles such as `baseline`, `merge-full`, and `production`; and
-- empty reserved sections (`levels`, `changed_surface_rules`, and `exceptions`) so later slices can extend the same contract rather than reset it.
+- aggregate membership for the canonical `baseline`, `merge-full`, and `production` bundles;
+- four validation levels that point back to those official bundles instead of inventing new level-specific bundle names;
+- representative changed-surface mapping and escalation rules; and
+- explicit local-vs-GitHub exceptions with rationale.
 
 What this slice defers intentionally:
 
-- issue `#227` — four level compositions, changed-surface mapping, escalation semantics, aggregate membership, and explicit local-vs-GitHub exceptions;
 - issue `#228` — the broader valid/invalid policy contract lock, including missing watchdog metadata, over-budget bundles, invalid bundle references, malformed exceptions, and other forbidden states; and
 - any migration of [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py) or [`../../.github/workflows/ci.yml`](../../.github/workflows/ci.yml) to consume the new policy directly.
 
+## Four-level validation model
+
+| Level | Intent | Resolution rule |
+| --- | --- | --- |
+| `focused-local` (Level 1) | Smallest bounded local mirror for a specific changed surface. | Start from aggregate bundle `baseline`, add the atomic bundles selected by `changed_surface_rules`, and escalate only when the matching rule explicitly names `merge-full` or `production`. |
+| `pr-update` (Level 2) | PR update mirror for the current diff. | Uses the same changed-surface-first selection model as `focused-local`, but it is the minimum level for broader PR-grade surfaces such as integration and validation-contract drift. |
+| `merge` (Level 3) | Full merge mirror. | Resolves directly to aggregate bundle `merge-full`. |
+| `production` (Level 4) | Production authority mirror. | Resolves directly to aggregate bundle `production`. |
+
+The two changed-surface-driven levels intentionally point back to the same
+official bundle taxonomy instead of inventing separate “Level 1” or “Level 2”
+bundle names. That keeps later resolver/runner code aligned with one canonical
+bundle vocabulary.
+
 ## Official bundle taxonomy
 
-| Official bundle     | Kind      | Primary owner         | Meaning today                                                                                                                            | Current derivative labels                                       |
-| ------------------- | --------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| `baseline`          | aggregate | `validation-contract` | Reserved identifier for the smallest official mirror bundle once issue `#227` defines composition.                                       | none yet                                                        |
-| `docs-contract`     | atomic    | `docs`                | Release/docs contract checks that protect canonical docs, manifests, and reader-facing authority surfaces.                               | `release-contract`, `docs-workflow`, `Production Docs Contract` |
-| `workflow-contract` | atomic    | `workflow`            | Template, workflow-routing, and queue-guardrail checks that keep issue execution deterministic.                                          | `release-contract`, `pr-template`, `docs-workflow`              |
-| `install-runtime`   | atomic    | `install-runtime`     | Install-surface and generated-workspace contract checks.                                                                                 | `install-surface`                                               |
-| `runtime-manager`   | atomic    | `runtime-manager`     | Runtime manager and lifecycle truth checks.                                                                                              | `runtime-manager`                                               |
-| `multi-tenant`      | atomic    | `shared-tenancy`      | Tenant-isolation and shared-tenancy contract checks.                                                                                     | `quota-tenancy`                                                 |
-| `quota-policy`      | atomic    | `quota-governance`    | Quota-governance and bounded-budget contract checks.                                                                                     | `quota-tenancy`                                                 |
-| `integration`       | atomic    | `integration`         | Architectural boundary and integration checks beyond unit-only coverage.                                                                 | `integration`, `Architectural Boundary Tests`                   |
-| `docker-builds`     | atomic    | `docker`              | Docker image build parity checks.                                                                                                        | `docker-builds`, `Production Docker Build Parity`               |
-| `runtime-proofs`    | atomic    | `docker`              | Promoted Docker/runtime proof checks for production-grade evidence.                                                                      | `runtime-proofs`, `Production Runtime Proofs`                   |
-| `merge-full`        | aggregate | `validation-contract` | Reserved identifier for the full merge-grade official mirror bundle once issue `#227` defines composition.                               | none yet                                                        |
-| `production`        | aggregate | `validation-contract` | Canonical production authority mirror aligned to the aggregate production gate while exact composition remains deferred to issue `#227`. | `Internal Production Gate — Docker Parity & Recovery Proofs`    |
+- `baseline` *(aggregate, owner `validation-contract`)* — smallest official mirror bundle composed of `docs-contract` + `workflow-contract` for changed-surface-driven local and PR-update validation. Current derivative labels: none yet.
+- `docs-contract` *(atomic, owner `docs`)* — release/docs contract checks that protect canonical docs, manifests, and reader-facing authority surfaces. Current derivative labels: `release-contract`, `docs-workflow`, `Production Docs Contract`.
+- `workflow-contract` *(atomic, owner `workflow`)* — template, workflow-routing, and queue-guardrail checks that keep issue execution deterministic. Current derivative labels: `release-contract`, `pr-template`, `docs-workflow`.
+- `install-runtime` *(atomic, owner `install-runtime`)* — install-surface and generated-workspace contract checks. Current derivative labels: `install-surface`.
+- `runtime-manager` *(atomic, owner `runtime-manager`)* — runtime manager and lifecycle truth checks. Current derivative labels: `runtime-manager`.
+- `multi-tenant` *(atomic, owner `shared-tenancy`)* — tenant-isolation and shared-tenancy contract checks. Current derivative labels: `quota-tenancy`.
+- `quota-policy` *(atomic, owner `quota-governance`)* — quota-governance and bounded-budget contract checks. Current derivative labels: `quota-tenancy`.
+- `integration` *(atomic, owner `integration`)* — architectural boundary and integration checks beyond unit-only coverage. Current derivative labels: `integration`, `Architectural Boundary Tests`.
+- `docker-builds` *(atomic, owner `docker`)* — Docker image build parity checks. Current derivative labels: `docker-builds`, `Production Docker Build Parity`.
+- `runtime-proofs` *(atomic, owner `docker`)* — promoted Docker/runtime proof checks for production-grade evidence. Current derivative labels: `runtime-proofs`, `Production Runtime Proofs`.
+- `merge-full` *(aggregate, owner `validation-contract`)* — full merge-grade official mirror aggregating every bounded atomic bundle: docs, workflow, install/runtime, tenancy/quota, integration, Docker builds, and runtime proofs. Current derivative labels: none yet.
+- `production` *(aggregate, owner `validation-contract`)* — canonical production authority mirror aligned to the aggregate production gate and composed of `docs-contract`, `docker-builds`, and `runtime-proofs`. Current derivative labels: `Internal Production Gate — Docker Parity & Recovery Proofs`.
+
+## Representative changed-surface selection rules
+
+The canonical policy now records representative changed-surface classes so later
+resolver/runner work can consume the same intent instead of reconstructing it
+from ad-hoc workflow code.
+
+| Rule id | Representative surfaces | Selected bundles | Minimum level | Explicit escalation |
+| --- | --- | --- | --- | --- |
+| `docs-authority-surface` | `README.md`, release docs, `docs/**`, canonical manifests | `docs-contract` | `focused-local` | none |
+| `workflow-contract-surface` | `.github/**`, `.copilot/**`, queue/prompt routing docs, PR-template validation helpers | `workflow-contract` | `focused-local` | none |
+| `install-runtime-surface` | install/update scripts and generated-workspace contract tests | `install-runtime` | `focused-local` | none |
+| `runtime-manager-surface` | manager-backed runtime package, runtime manager tests, runtime mode tests | `runtime-manager` | `focused-local` | none |
+| `quota-tenancy-surface` | shared-tenancy, quota governance, tenant-isolation tests | `multi-tenant`, `quota-policy` | `focused-local` | none |
+| `integration-boundary-surface` | `compose/**`, `tests/run-integration-test.sh` | `integration` | `pr-update` | none |
+| `validation-contract-surface` | canonical validation policy/config, local parity wrapper, CI workflow, parity inventory | `docs-contract`, `workflow-contract` | `pr-update` | `merge-full` |
+| `production-authority-surface` | `docker/**`, production-readiness docs/runbooks, Docker runtime-proof tests | `docker-builds`, `runtime-proofs` | `pr-update` | `production` |
+
+Two escalation cases matter on purpose:
+
+- `validation-contract-surface` escalates to `merge-full` because changing the
+  validation contract itself must re-prove the whole merge-grade official
+  bundle set, not a narrow targeted replay.
+- `production-authority-surface` escalates to `production` because those
+  surfaces map to the same aggregate authority lane GitHub already treats as the
+  final production gate.
+
+## Explicit local-vs-GitHub exceptions
+
+The policy now records the allowed differences explicitly instead of hiding them
+inside wrapper code or workflow YAML.
+
+| Exception id | Local behavior | GitHub behavior | Why the divergence is allowed |
+| --- | --- | --- | --- |
+| `github-event-metadata` | Local callers provide explicit diff/base context and may use repo-owned one-shot GitHub queries. | GitHub derives refs and selectors from `pull_request` / `push` event payloads. | Event metadata changes how the diff is discovered, not what the selected bundles mean. |
+| `fresh-checkout-bootstrap` | Local parity may reuse the active worktree or opt into `--fresh-checkout`. | GitHub always starts from a fresh checkout and reruns bootstrap. | Bootstrap substrate differs, but bundle selection must stay the same. |
+| `github-permissions-and-protected-resources` | Local parity uses repo-local files and read-only/pager-free queries. | GitHub CI/PR flows run with repository-scoped tokens and protected-resource permissions. | Permission semantics are explicit environment differences, not hidden bundle drift. |
+| `runner-ownership-parity` | Local production mirrors may rely on the bind-mount ownership probe or fresh-checkout guidance. | GitHub production lanes run on GitHub-hosted runner ownership semantics. | Runner ownership quirks are an explicit production-only exception. |
 
 ## Bounded watchdog contract introduced here
 
@@ -59,18 +110,20 @@ Current schema requirements:
 
 - `watchdog.max_minutes` must be a positive integer and must stay at or below `45` minutes;
 - `watchdog.timeout_kind` must currently be `event-driven-deadline`; and
-- aggregate placeholders still need bounded watchdog metadata even before their member bundles are populated.
+- aggregate bundles still need bounded watchdog metadata even after their member bundles are populated.
 
 This keeps the taxonomy compatible with the repository rule that CI-critical validation should remain split into bounded bundles with explicit deadlines rather than indefinite waits.
 
-## Downstream surfaces that must consume these names later
+## Downstream surfaces that must consume these semantics later
 
-The following surfaces remain derivative today and must migrate intentionally in later phases instead of continuing to define shadow bundle truth:
+The following surfaces remain derivative today and must migrate intentionally in later phases instead of continuing to define shadow validation semantics:
 
 - [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py)
 - [`../../.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 - [`../WORK-ISSUE-WORKFLOW.md`](../WORK-ISSUE-WORKFLOW.md)
 - [`../setup-github-repository.md`](../setup-github-repository.md)
+- [`../CHEAT_SHEET.md`](../CHEAT_SHEET.md)
+- [`../HANDOUT.md`](../HANDOUT.md)
 - [`VALIDATION-PARITY-INVENTORY.md`](VALIDATION-PARITY-INVENTORY.md)
 - [`../architecture/ADR-006-Local-CI-Parity-Prechecks.md`](../architecture/ADR-006-Local-CI-Parity-Prechecks.md)
 

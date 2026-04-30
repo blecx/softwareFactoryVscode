@@ -6,6 +6,7 @@ from factory_runtime.agents.validation_policy import (
     CANONICAL_VALIDATION_POLICY_CONFIG_PATH,
     CANONICAL_VALIDATION_POLICY_DOCUMENTATION_PATH,
     OFFICIAL_BUNDLE_ORDER,
+    VALIDATION_LEVEL_ORDER,
     VALIDATION_POLICY_SCHEMA_VERSION,
     ValidationPolicy,
 )
@@ -28,9 +29,32 @@ def test_canonical_validation_policy_loads_and_preserves_official_bundle_order()
     )
     assert policy.official_bundle_order == OFFICIAL_BUNDLE_ORDER
     assert tuple(policy.bundles) == OFFICIAL_BUNDLE_ORDER
+    assert policy.bundles["baseline"].members == (
+        "docs-contract",
+        "workflow-contract",
+    )
     assert policy.bundles["docs-contract"].kind == "atomic"
+    assert policy.bundles["merge-full"].members == (
+        "docs-contract",
+        "workflow-contract",
+        "install-runtime",
+        "runtime-manager",
+        "multi-tenant",
+        "quota-policy",
+        "integration",
+        "docker-builds",
+        "runtime-proofs",
+    )
     assert policy.bundles["production"].kind == "aggregate"
+    assert policy.bundles["production"].members == (
+        "docs-contract",
+        "docker-builds",
+        "runtime-proofs",
+    )
     assert policy.bundles["production"].watchdog.max_minutes == 45
-    assert policy.levels == {}
-    assert policy.changed_surface_rules == ()
-    assert policy.exceptions == ()
+    assert tuple(policy.levels) == VALIDATION_LEVEL_ORDER
+    assert policy.levels["focused-local"].default_bundle == "baseline"
+    assert policy.levels["merge"].default_bundle == "merge-full"
+    assert policy.levels["production"].default_bundle == "production"
+    assert len(policy.changed_surface_rules) == 8
+    assert len(policy.exceptions) == 4
