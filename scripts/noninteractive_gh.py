@@ -66,14 +66,18 @@ def build_query_metadata(
     selector: str = "",
     repo: str = "",
     watch_mode: bool = False,
+    state_source: str = "",
 ) -> dict[str, Any]:
-    return {
+    payload = {
         "kind": kind,
         "selector": selector,
         "repo": repo,
         "pager_disabled": True,
         "watch_mode": watch_mode,
     }
+    if state_source:
+        payload["state_source"] = state_source
+    return payload
 
 
 def normalize_issue(issue: dict[str, Any]) -> dict[str, Any]:
@@ -262,6 +266,7 @@ def build_pr_checks_payload(args: argparse.Namespace) -> dict[str, Any]:
             selector=args.selector,
             repo=args.repo,
             watch_mode=wait_enabled,
+            state_source="github-pr-statuscheckrollup",
         ),
         "pr": {
             "number": pr.get("number"),

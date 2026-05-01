@@ -60,6 +60,7 @@ def test_build_pr_checks_payload_summarizes_rollup(monkeypatch) -> None:
 
     assert payload["query"]["kind"] == "pr-checks"
     assert payload["query"]["watch_mode"] is False
+    assert payload["query"]["state_source"] == "github-pr-statuscheckrollup"
     assert payload["summary"]["overall"] == "pending"
     assert payload["summary"]["successful"] == 1
     assert payload["summary"]["pending"] == 1
@@ -129,6 +130,7 @@ def test_build_pr_checks_payload_waits_until_success(monkeypatch) -> None:
     )
 
     assert payload["query"]["watch_mode"] is True
+    assert payload["query"]["state_source"] == "github-pr-statuscheckrollup"
     assert payload["summary"]["overall"] == "success"
     assert payload["wait"]["enabled"] is True
     assert payload["wait"]["timedOut"] is False
@@ -181,6 +183,7 @@ def test_build_pr_checks_payload_times_out_pending_wait(monkeypatch) -> None:
     )
 
     assert payload["summary"]["overall"] == "pending-timeout"
+    assert payload["query"]["state_source"] == "github-pr-statuscheckrollup"
     assert payload["wait"]["enabled"] is True
     assert payload["wait"]["timedOut"] is True
     assert payload["wait"]["attempts"] == 3
@@ -195,6 +198,7 @@ def test_main_pr_checks_outputs_machine_friendly_json(monkeypatch, capsys) -> No
             "repo": "",
             "pager_disabled": True,
             "watch_mode": False,
+            "state_source": "github-pr-statuscheckrollup",
         },
         "pr": {
             "number": 68,

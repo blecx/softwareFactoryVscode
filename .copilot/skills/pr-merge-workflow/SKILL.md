@@ -39,6 +39,7 @@ repository's issue → PR → merge process.
    `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER>`
    - For bounded waiting in automation, prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600`.
    - Prefer JSON polling over `gh pr checks --watch`, `gh run watch`, or other watch/pager UI flows; they add unnecessary terminal churn in repo automation.
+   - Treat PR readiness as GitHub truth only. Do **not** infer status from local PID files, process liveness, terminal silence, or similar host-side heuristics; use `statusCheckRollup`, mergeability, and related GitHub JSON metadata instead.
    - Refresh `.tmp/github-issue-queue-state.md` from GitHub truth before merge/close narration. Record `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; that checkpoint is the shared state contract used by canonical workflows and interruption recovery.
    - If the helper reports `summary.overall = pending-timeout`, stop the automatic wait, record the still-pending CI state in `.tmp/github-issue-queue-state.md`, and return a blocker/resume point instead of continuing to poll indefinitely.
    - If checks fail or the PR is not mergeable, do not invent a separate repair path. Hand the slice back to `resolve-issue`, fix the root cause there, rerun local prechecks, and then re-enter `pr-merge`.

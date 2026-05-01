@@ -1051,6 +1051,8 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "scripts/noninteractive_gh.py" in workflow_doc
     assert "gh pr checks --watch" in workflow_doc
     assert "gh run watch" in workflow_doc
+    assert "GitHub truth only" in workflow_doc
+    assert "not local PID files, process liveness, terminal idleness" in workflow_doc
     assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
         in workflow_doc
@@ -1064,6 +1066,11 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     )
     assert "gh pr checks --watch" in merge_skill
     assert "gh run watch" in merge_skill
+    assert "Treat PR readiness as GitHub truth only." in merge_skill
+    assert (
+        "Do **not** infer status from local PID files, process liveness, terminal silence"
+        in merge_skill
+    )
     assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
         in merge_skill
@@ -4802,6 +4809,7 @@ def test_local_ci_parity_official_level_uses_shared_engine_resolver(
 ):
     module = _load_local_ci_parity_module()
     captured: dict[str, object] = {}
+    policy = module.ValidationPolicy.load_canonical()
 
     monkeypatch.setattr(
         module, "resolve_head_revision", lambda repo_root, head_rev: "head-sha"
@@ -4829,12 +4837,39 @@ def test_local_ci_parity_official_level_uses_shared_engine_resolver(
                 "execution_level": requested_level,
                 "default_bundle": "baseline",
                 "resolved_bundle_ids": ("baseline",),
-                "matched_rule_ids": (),
-                "selected_atomic_bundles": (),
-                "effective_atomic_bundles": (),
+                "matched_rule_ids": ("docs-workflow",),
+                "selected_atomic_bundles": ("docs-contract",),
+                "effective_atomic_bundles": ("docs-contract",),
                 "escalation_bundle": None,
-                "applicable_exceptions": (),
-                "reasons": (),
+                "applicable_exceptions": (
+                    type(
+                        "ExceptionBehavior",
+                        (),
+                        {
+                            "exception_id": "fresh-checkout-bootstrap",
+                            "summary": "Local parity may reuse the active worktree.",
+                            "applies_to_level": requested_level,
+                            "context": context,
+                            "context_behavior": "local-worktree-or-fresh-checkout",
+                            "rationale": "Bootstrap substrate differs but bundle choice stays canonical.",
+                        },
+                    )(),
+                ),
+                "reasons": (
+                    type(
+                        "Reason",
+                        (),
+                        {
+                            "reason_type": "matched-rule",
+                            "summary": "Rule `docs-workflow` matched the changed paths.",
+                            "bundle_ids": ("docs-contract",),
+                            "matched_paths": changed_paths,
+                            "rule_id": "docs-workflow",
+                            "level_id": requested_level,
+                            "exception_id": None,
+                        },
+                    )(),
+                ),
             },
         )()
 
@@ -4845,6 +4880,7 @@ def test_local_ci_parity_official_level_uses_shared_engine_resolver(
         def execute_plan(self, request):
             captured["request"] = request
             timestamp = "2026-05-01T00:00:00Z"
+            bundle = policy.bundles["docs-contract"]
             return ValidationRunReport(
                 schema_version=1,
                 repo_root=str(request.repo_root),
@@ -4868,7 +4904,22 @@ def test_local_ci_parity_official_level_uses_shared_engine_resolver(
                 terminal_outcome="passed",
                 terminated_by_bundle_id=None,
                 terminal_cause=None,
-                bundle_reports=(),
+                bundle_reports=(
+                    ValidationBundleReport(
+                        bundle_id=bundle.bundle_id,
+                        kind=bundle.kind,
+                        owner=bundle.owner,
+                        summary=bundle.summary,
+                        current_derivative_labels=bundle.current_derivative_labels,
+                        watchdog_budget_minutes=bundle.watchdog.effective_budget_minutes,
+                        timeout_kind=bundle.watchdog.timeout_kind,
+                        status="passed",
+                        started_at=timestamp,
+                        completed_at=timestamp,
+                        elapsed_seconds=0.1,
+                        steps=(),
+                    ),
+                ),
             )
 
     monkeypatch.setattr(
@@ -4897,6 +4948,19 @@ def test_local_ci_parity_official_level_uses_shared_engine_resolver(
     assert request.head_rev == "head-sha"
     assert "Shared validation runner official local mirror" in captured_output.out
     assert "level=focused-local" in captured_output.out
+    assert "projection_source=shared-validation-resolver-runner" in captured_output.out
+    assert "mirrors_github_bundle_structure=true" in captured_output.out
+    assert "resolved_bundle_ids=baseline" in captured_output.out
+    assert "matched_rule_ids=docs-workflow" in captured_output.out
+    assert "selected_atomic_bundles=docs-contract" in captured_output.out
+    assert "reason[1].type=matched-rule" in captured_output.out
+    assert "reason[1].matched_paths=README.md" in captured_output.out
+    assert "exception[1].id=fresh-checkout-bootstrap" in captured_output.out
+    assert "bundle[docs-contract].watchdog_budget_minutes=" in captured_output.out
+    assert (
+        "bundle[docs-contract].timeout_kind=event-driven-deadline"
+        in captured_output.out
+    )
 
 
 def test_local_ci_parity_official_level_rejects_legacy_flags(
@@ -4927,6 +4991,7 @@ def test_local_ci_parity_official_level_rejects_legacy_flags(
 def test_local_ci_parity_official_production_level_writes_signoff_bundle(
     monkeypatch,
     tmp_path: Path,
+    capsys,
 ):
     module = _load_local_ci_parity_module()
     policy = module.ValidationPolicy.load_canonical()
@@ -5033,8 +5098,23 @@ def test_local_ci_parity_official_production_level_writes_signoff_bundle(
             "production",
         ]
     )
+    captured = capsys.readouterr()
 
     assert exit_code == 0
+    assert (
+        "fresh_checkout_semantics=github-uses-fresh-checkout-bootstrap" in captured.out
+    )
+    assert (
+        "fresh_checkout_command="
+        f"{module.FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}" in captured.out
+    )
+    assert (
+        "effective_atomic_bundles=docs-contract,docker-builds,runtime-proofs"
+        in captured.out
+    )
+    assert "bundle[docs-contract].watchdog_budget_minutes=" in captured.out
+    assert "bundle[docker-builds].watchdog_budget_minutes=" in captured.out
+    assert "bundle[runtime-proofs].watchdog_budget_minutes=" in captured.out
     latest_report = json.loads(
         (tmp_path / ".tmp" / "production-readiness" / "latest.json").read_text(
             encoding="utf-8"
@@ -5050,3 +5130,12 @@ def test_local_ci_parity_official_production_level_writes_signoff_bundle(
         "docker-builds": "pass",
         "runtime-proofs": "pass",
     }
+
+
+def test_local_ci_parity_install_docs_note_official_level_output_contract() -> None:
+    install_doc = Path("docs/INSTALL.md").read_text(encoding="utf-8")
+
+    assert "--level <focused-local|pr-update|merge|production>" in install_doc
+    assert "stable `key=value` projection" in install_doc
+    assert "selected bundles, reasons, watchdog budgets, timeout kinds" in install_doc
+    assert "--fresh-checkout" in install_doc
