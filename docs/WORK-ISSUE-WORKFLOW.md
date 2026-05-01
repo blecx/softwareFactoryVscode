@@ -75,7 +75,7 @@ Routing rule:
 - For bounded waiting, prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600` over `gh pr checks --watch`, `gh run watch`, or other watch-style flows.
 - If the helper returns `summary.overall = pending-timeout`, treat that as a real blocker for the current automation pass: refresh `.tmp/github-issue-queue-state.md`, report CI as still pending, and stop so the operator or a later resume can re-anchor cleanly instead of waiting indefinitely.
 - If the helper does not cover a one-off query yet, use an equivalent pager-free pattern such as `GH_PAGER=cat PAGER=cat gh ... --json ...`; do not rely on the CLI deciding whether to open a pager.
-- When transforming JSON in shell automation, pipe into `python -c '...'` or a dedicated script. Do **not** combine a pipe with a heredoc-based Python command such as `... | python - <<'PY'`, because the heredoc replaces stdin and the piped JSON never reaches `sys.stdin`.
+- When transforming JSON in shell automation, pipe into `python3 -c '...'`, `./.venv/bin/python -c '...'`, or a dedicated script. Do **not** combine a pipe with a heredoc-based Python command such as `... | python3 - <<'PY'`, because the heredoc replaces stdin and the piped JSON never reaches `sys.stdin`.
 - Long-running Docker/test output is not itself evidence of an input prompt. Before sending terminal input, confirm that the terminal explicitly requests it (for example `Enter ...`, `[y/N]`, `Username:`, or a tool-level input-needed signal).
 
 ## Deterministic queue checkpoint contract

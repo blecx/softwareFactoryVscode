@@ -12,11 +12,15 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - **Fail Safe:** If a bug fix requires violating a known constraint or ADR, you must pause, escalate the conflict to the human user, and ask for architectural clarification rather than silently applying the non-compliant fix.
 - **Respect ordered-issue checkpoints:** When work is moving through the issue → PR → merge loop, keep `.tmp/github-issue-queue-state.md` current. `resolve-issue`, `pr-merge`, `execute-approved-plan`, and interruption recovery all consume that shared checkpoint; do not invent a second enforcement path or bypass the GitHub-truth evidence (`issue_state`, `pr_state`, `ci_state`, `cleanup_state`, `last_github_truth`).
 - **Respect execution surfaces:** Generated-workspace-sensitive tasks belong to the host repository's generated `software-factory.code-workspace` surface (or an explicit companion runtime target), not the source checkout alone. Source-checkout tooling may inspect or point at the companion installed workspace, but it must not invent a second runtime contract or silently pretend that `Host Project (Root)` exists when it does not.
+- **Re-anchor before acting on issue work:** Before implementation, validation, or merge narration for any queued issue, read `.tmp/github-issue-queue-state.md`, confirm the active branch/worktree matches that checkpoint, and treat the current editor path as advisory only until that re-anchor is complete.
+- **Refuse stray partial `.tmp` snapshots as execution surfaces:** If the current editor/file path points under `.tmp/queue-worktrees/*` but the top-level directory is missing repo/worktree markers such as `.git`, `docs/`, or `scripts/`, treat it as a stray partial snapshot, do **not** continue work from it, and resume from the repository root plus `.tmp/github-issue-queue-state.md`.
+- **Do not claim progress from the wrong surface:** If the checkpoint, branch/worktree state, and editor path disagree, stop, re-anchor, and explain the mismatch before running commands, editing files, or narrating issue progress. Do not guess which surface is authoritative.
 
 ## 2. ADR and Architectural Awareness
 
 - Explicitly check `docs/architecture/` before mutating or refactoring installation paths, namespaces (e.g., `.copilot` vs root rules), communication protocols, or directory boundaries.
 - Treat boundaries like the `.copilot` subsystem directory and workspace environmental constraints (`.tmp`, `.factory.env`) as immutable mature structures that the code must defensively adapt to, not things you can discard when convenient.
+- When queue execution or interruption recovery is in play, treat `.tmp/github-issue-queue-state.md` plus a registered git worktree as the canonical execution anchor; a stale editor tab or stray `.tmp` snapshot is never enough evidence to resume work.
 
 ## 3. MCP-First Tool Routing
 
@@ -29,7 +33,7 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 
 - Mature components expect hostile environments. Do not assume folders (like `.tmp`) haven't been deleted or that environment variables won't behave unexpectedly.
 - Write defensive code that seamlessly recovers from transient state loss (e.g., `mkdir -p` before acting) rather than failing the toolchain when things aren't "perfect".
-- For generated or rewritten Python source, use the repository's **actual formatter** (`python -m black` or the Black library) before treating the write as complete. Do **not** hand-format Python output or rely on newline-only normalization as a substitute for Black.
+- For generated or rewritten Python source, use the repository's **actual formatter** with an explicit interpreter (`./.venv/bin/python -m black`, `python3 -m black`, or the Black library) before treating the write as complete. Do **not** hand-format Python output, rely on bare `python`, or treat newline-only normalization as a substitute for Black.
 - Repo-owned writer surfaces that persist Python files for issue resolution should invoke Black-compatible formatting at save time when formatter-enforced mode is required, so later `black --check` acts as confirmation rather than surprise.
 
 ## 5. Release Bump Discipline

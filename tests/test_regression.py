@@ -938,6 +938,12 @@ def test_execution_surface_routing_contract_is_documented() -> None:
 
     assert "Respect execution surfaces" in instructions
     assert "generated `software-factory.code-workspace` surface" in instructions
+    assert "Re-anchor before acting on issue work" in instructions
+    assert "Refuse stray partial `.tmp` snapshots as execution surfaces" in instructions
+    assert "Do not claim progress from the wrong surface" in instructions
+    assert ".tmp/github-issue-queue-state.md" in instructions
+    assert "current editor path as advisory only" in instructions
+    assert "stray partial snapshot" in instructions
 
 
 def test_mcp_first_tool_routing_guidance_is_documented() -> None:
@@ -2297,12 +2303,30 @@ def test_python_writer_formatter_guardrail_is_documented() -> None:
         encoding="utf-8"
     )
     tests_readme = (repo_root / "tests" / "README.md").read_text(encoding="utf-8")
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    pr_template = (repo_root / ".github" / "pull_request_template.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "actual formatter" in instructions
     assert "Do **not** hand-format Python output" in instructions
     assert "Black-compatible formatting at save time" in instructions
+    assert "./.venv/bin/python -m black" in instructions
+    assert "python3 -m black" in instructions
+    assert "rely on bare `python`" in instructions
     assert "actual formatter-first rule for generated Python writes" in guardrails
     assert "Formatter fidelity for generated Python files" in guardrails
+    assert "Queue/interruption re-anchoring or stale editor paths" in guardrails
+    assert "execution-surface re-anchoring" in guardrails
+    assert "stray-snapshot refusal" in guardrails
+    assert "python3 -c '...'" in workflow_doc
+    assert "./.venv/bin/python -c '...'" in workflow_doc
+    assert "python3 - <<'PY'" in workflow_doc
+    assert "python scripts/check_neutrality.py" not in pr_template
+    assert "python3 scripts/check_neutrality.py" in pr_template
+    assert "python3 -m pytest tests factory_runtime/tests -q --tb=short" in pr_template
     assert "run **Black itself** before treating the save as complete" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
     assert (
@@ -3703,6 +3727,65 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     assert "committed HEAD only" in captured.out
 
 
+def test_local_ci_parity_fresh_checkout_reports_git_timeout_during_snapshot_creation(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    monkeypatch.setattr(
+        module, "resolve_head_revision", lambda repo_root, head_rev: "deadbeef"
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_bind_mount_ownership_parity_probe",
+        lambda repo_root: None,
+    )
+    monkeypatch.setattr(
+        module, "worktree_has_uncommitted_changes", lambda repo_root: False
+    )
+    monkeypatch.setattr(
+        module,
+        "create_fresh_checkout_snapshot",
+        lambda repo_root, *, head_rev: (_ for _ in ()).throw(
+            module.CommandTimeoutError(
+                command=(
+                    "git",
+                    "-C",
+                    str(tmp_path),
+                    "worktree",
+                    "add",
+                    "--detach",
+                    str(tmp_path / "fresh-checkout"),
+                    head_rev,
+                ),
+                timeout_seconds=module.DEFAULT_WATCHDOG_SECONDS,
+                stdout="",
+                stderr="",
+            )
+        ),
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--fresh-checkout",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "configured watchdog" in captured.out
+    assert "Creating the fresh-checkout git worktree did not complete" in captured.out
+    assert "git -C" in captured.out
+
+
 def test_local_ci_parity_fresh_checkout_production_mode_blocks_on_docker_ownership_gap(
     monkeypatch,
     tmp_path: Path,
@@ -4548,6 +4631,71 @@ def test_local_ci_parity_watchdog_timeout_reports_split_replay_guidance(
     assert module.PYTEST_BUNDLE_DOCS_WORKFLOW in captured.out
     assert "terminated after the first blocking error" in captured.out
     assert "Cause: `" in captured.out
+
+
+def test_local_ci_parity_run_git_uses_watchdog_timeout(monkeypatch, tmp_path: Path):
+    module = _load_local_ci_parity_module()
+    captured: dict[str, object] = {}
+    module.ACTIVE_COMMAND_TIMEOUT_SECONDS = module.DEFAULT_WATCHDOG_SECONDS
+
+    def _fake_subprocess_run(
+        command,
+        *,
+        check,
+        text,
+        capture_output,
+        timeout,
+    ):
+        captured["command"] = tuple(command)
+        captured["check"] = check
+        captured["text"] = text
+        captured["capture_output"] = capture_output
+        captured["timeout"] = timeout
+        return subprocess.CompletedProcess(list(command), 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_subprocess_run)
+
+    result = module.run_git(tmp_path, ["status", "--short"])
+
+    assert result.returncode == 0
+    assert captured["command"] == (
+        "git",
+        "-C",
+        str(tmp_path),
+        "status",
+        "--short",
+    )
+    assert captured["check"] is False
+    assert captured["text"] is True
+    assert captured["capture_output"] is True
+    assert captured["timeout"] == module.DEFAULT_WATCHDOG_SECONDS
+
+
+def test_local_ci_parity_reports_git_timeout_during_revision_resolution(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    def _fake_run_git(repo_root: Path, args: list[str]):
+        del repo_root
+        raise module.CommandTimeoutError(
+            command=("git", "-C", str(tmp_path), *args),
+            timeout_seconds=module.DEFAULT_WATCHDOG_SECONDS,
+            stdout="",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module, "run_git", _fake_run_git)
+
+    exit_code = module.main(["--repo-root", str(tmp_path), "--base-rev", "base-sha"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "configured watchdog" in captured.out
+    assert "Git revision resolution did not complete" in captured.out
+    assert "git -C" in captured.out
 
 
 def test_local_ci_parity_rejects_pytest_bundle_with_production_groups_only(

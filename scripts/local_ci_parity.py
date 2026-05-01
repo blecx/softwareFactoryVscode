@@ -799,7 +799,20 @@ def run_fresh_checkout_validation(
             )
             return 1
 
-    if worktree_has_uncommitted_changes(repo_root):
+    try:
+        has_uncommitted_changes = worktree_has_uncommitted_changes(repo_root)
+    except CommandTimeoutError as exc:
+        report_timeout_failure(
+            exc,
+            detail=(
+                "Git worktree state detection did not complete within the "
+                "configured watchdog. Clear the stuck git process/lock and rerun "
+                "the fresh-checkout parity path."
+            ),
+        )
+        return 1
+
+    if has_uncommitted_changes:
         print(
             "ℹ️ Working tree has uncommitted changes; fresh-checkout parity replays "
             "committed HEAD only, which is the closest local match to the pushed "
@@ -808,6 +821,16 @@ def run_fresh_checkout_validation(
 
     try:
         snapshot_path = create_fresh_checkout_snapshot(repo_root, head_rev=head_rev)
+    except CommandTimeoutError as exc:
+        report_timeout_failure(
+            exc,
+            detail=(
+                "Creating the fresh-checkout git worktree did not complete within "
+                "the configured watchdog. Clear the stuck git process/lock and rerun "
+                "the fresh-checkout parity path."
+            ),
+        )
+        return 1
     except RuntimeError as exc:
         print(f"❌ {exc}")
         return 1
@@ -817,8 +840,7 @@ def run_fresh_checkout_validation(
     try:
         setup_result = run_command(("bash", "./setup.sh"), cwd=snapshot_path)
     except CommandTimeoutError as exc:
-        emit_captured_output(exc.stdout, exc.stderr)
-        print(f"❌ {format_timeout_summary(exc.command, exc.timeout_seconds)}")
+        report_timeout_failure(exc)
         return 1
     emit_command_output(setup_result)
     if setup_result.returncode != 0:
@@ -836,8 +858,7 @@ def run_fresh_checkout_validation(
     try:
         child_result = run_command(child_command, cwd=snapshot_path)
     except CommandTimeoutError as exc:
-        emit_captured_output(exc.stdout, exc.stderr)
-        print(f"❌ {format_timeout_summary(exc.command, exc.timeout_seconds)}")
+        report_timeout_failure(exc)
         return 1
     emit_command_output(child_result)
     return child_result.returncode
@@ -905,6 +926,15 @@ def emit_command_output(result: subprocess.CompletedProcess[str]) -> None:
     emit_captured_output(result.stdout, result.stderr)
 
 
+def report_timeout_failure(
+    exc: CommandTimeoutError, *, detail: str | None = None
+) -> None:
+    emit_captured_output(exc.stdout, exc.stderr)
+    print(f"❌ {format_timeout_summary(exc.command, exc.timeout_seconds)}")
+    if detail:
+        print(detail)
+
+
 def run_step(step: StepDefinition, *, cwd: Path) -> Finding | None:
     print(f"\n▶ {step.name}")
     try:
@@ -942,12 +972,24 @@ def run_step(step: StepDefinition, *, cwd: Path) -> Finding | None:
 
 
 def run_git(repo_root: Path, args: Sequence[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(repo_root), *args],
-        check=False,
-        text=True,
-        capture_output=True,
-    )
+    command = ["git", "-C", str(repo_root), *args]
+    try:
+        return subprocess.run(
+            command,
+            check=False,
+            text=True,
+            capture_output=True,
+            timeout=ACTIVE_COMMAND_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise CommandTimeoutError(
+            command=command,
+            timeout_seconds=(
+                ACTIVE_COMMAND_TIMEOUT_SECONDS or DEFAULT_WATCHDOG_SECONDS
+            ),
+            stdout=exc.stdout,
+            stderr=exc.stderr,
+        ) from exc
 
 
 def git_ref_exists(repo_root: Path, ref: str) -> bool:
@@ -2310,12 +2352,23 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     repo_root = Path(args.repo_root).expanduser().resolve()
-    head_rev = resolve_head_revision(repo_root, args.head_rev)
-    base_rev = resolve_base_rev(
-        repo_root,
-        base_rev=args.base_rev,
-        head_rev=head_rev,
-    )
+    try:
+        head_rev = resolve_head_revision(repo_root, args.head_rev)
+        base_rev = resolve_base_rev(
+            repo_root,
+            base_rev=args.base_rev,
+            head_rev=head_rev,
+        )
+    except CommandTimeoutError as exc:
+        report_timeout_failure(
+            exc,
+            detail=(
+                "Git revision resolution did not complete within the configured "
+                "watchdog. Clear the stuck git process/lock and rerun the parity "
+                "command."
+            ),
+        )
+        return 1
     rerun_command = build_rerun_command(args)
 
     if args.fresh_checkout:

@@ -15,11 +15,11 @@
 
 ## Validation / evidence
 
-- `python scripts/check_neutrality.py`:
-- `python scripts/check_variable_contract.py`:
-- `python scripts/check_boundaries.py`:
-- `python scripts/check_vscode_workspace.py`:
-- `python -m pytest tests factory_runtime/tests -q --tb=short`:
+- `python3 scripts/check_neutrality.py`:
+- `python3 scripts/check_variable_contract.py`:
+- `python3 scripts/check_boundaries.py`:
+- `python3 scripts/check_vscode_workspace.py`:
+- `python3 -m pytest tests factory_runtime/tests -q --tb=short`:
 
 ## Cross-repo impact
 
