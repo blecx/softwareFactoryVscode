@@ -1509,7 +1509,7 @@ def test_validation_parity_inventory_artifacts_are_tracked_and_routed() -> None:
     assert "run_command() / run_step()" in report
 
     assert manifest["schema_version"] == 1
-    assert manifest["issue"] == 224
+    assert manifest["issue"] == 232
     assert manifest["umbrella_issue"] == 222
     assert manifest["observation_only"] is True
     assert manifest["baseline_input"] == "docs/maintainer/VALIDATION-BASELINE.md"
@@ -1525,6 +1525,13 @@ def test_validation_parity_inventory_artifacts_are_tracked_and_routed() -> None:
         "Production Docker Build Parity",
         "Production Runtime Proofs",
     ]
+    assert manifest["aggregate_gate"]["job_timeout_minutes"] == 45
+    assert (
+        manifest["aggregate_gate"]["ci_bundle_refresh_command"]
+        == "./.venv/bin/python ./scripts/local_ci_parity.py --mode production "
+        "--production-group aggregate --production-groups-only "
+        "--ci-production-readiness-bundle-only"
+    )
 
     shadow = manifest["shadow_policy_findings"][0]
     assert shadow["path"] == "scripts/setup-github-repo.sh"
@@ -1537,13 +1544,24 @@ def test_validation_parity_inventory_artifacts_are_tracked_and_routed() -> None:
     ]
 
     hang_ids = {item["id"] for item in manifest["hang_risks"]}
-    assert "local-ci-run-command-no-timeout" in hang_ids
-    assert "local-ci-run-git-no-timeout" in hang_ids
-    assert "production-runtime-proofs-no-timeout" in hang_ids
+    assert "local-ci-run-command-watchdog" in hang_ids
+    assert "local-ci-run-git-watchdog" in hang_ids
+    assert "production-runtime-proofs-watchdog" in hang_ids
+    assert "github-actions-job-timeouts" in hang_ids
+
+    hang_risks = {item["id"]: item for item in manifest["hang_risks"]}
+    assert hang_risks["local-ci-run-command-watchdog"]["bounded"] is True
+    assert hang_risks["local-ci-run-git-watchdog"]["bounded"] is True
+    assert hang_risks["production-runtime-proofs-watchdog"]["bounded"] is True
+    assert hang_risks["github-actions-job-timeouts"]["bounded"] is True
 
     bounded_wait_surfaces = {item["surface"] for item in manifest["bounded_wait_paths"]}
     assert "_wait_until_reachable(url, max_wait_seconds=30)" in bounded_wait_surfaces
     assert "pr-checks --wait --timeout-seconds=600" in bounded_wait_surfaces
+    assert (
+        "timeout-minutes aligned to validation-policy watchdog budgets"
+        in bounded_wait_surfaces
+    )
 
 
 def test_project_overview_doc_establishes_canonical_landing_story() -> None:
