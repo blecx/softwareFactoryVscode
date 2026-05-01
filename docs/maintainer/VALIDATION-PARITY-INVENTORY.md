@@ -31,18 +31,18 @@ What this artifact does **not** do:
 
 ## Current parity-locked validation surfaces
 
-| Surface | Classification | Why later phases must preserve or account for it |
-| --- | --- | --- |
-| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | Authoritative | Defines the remote GitHub job graph, exact check names, and the aggregate production gate dependency chain. |
-| [`../architecture/ADR-006-Local-CI-Parity-Prechecks.md`](../architecture/ADR-006-Local-CI-Parity-Prechecks.md) | Authoritative | Declares that `.github/workflows/ci.yml` is the minimum local precheck contract and names `./.venv/bin/python ./scripts/local_ci_parity.py` as the primary local parity path. |
-| [`../setup-github-repository.md`](../setup-github-repository.md) | Authoritative | Documents the exact branch-protection check names that maintainers are expected to enforce on GitHub. |
-| [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py) | Derivative | Mirrors the CI contract locally, defines the production group taxonomy, and exposes the canonical `--mode production` aggregate replay. |
-| [`../../.vscode/tasks.json`](../../.vscode/tasks.json) | Derivative | Wraps the canonical local parity command in the `✅ Validate: Local CI Parity` workspace task. |
-| [`../WORK-ISSUE-WORKFLOW.md`](../WORK-ISSUE-WORKFLOW.md) | Derivative | Requires local parity before PR handoff and mandates pager-free GitHub polling during merge automation. |
-| [`../../.copilot/skills/resolve-issue-workflow/SKILL.md`](../../.copilot/skills/resolve-issue-workflow/SKILL.md), [`../../.copilot/skills/pr-merge-workflow/SKILL.md`](../../.copilot/skills/pr-merge-workflow/SKILL.md), and [`../../.copilot/skills/approved-plan-execution-workflow/SKILL.md`](../../.copilot/skills/approved-plan-execution-workflow/SKILL.md) | Derivative | Re-state the canonical local validation gate and the queue/merge polling rules that execute against GitHub truth. |
-| [`../../scripts/noninteractive_gh.py`](../../scripts/noninteractive_gh.py) | Derivative | Provides the one-shot pager-free GitHub issue/PR/check polling payloads used by queue and merge automation. |
-| [`../../tests/test_regression.py`](../../tests/test_regression.py) | Derivative | Locks documentation, workflow, and validation-contract wording so parity drift shows up as a regression failure. |
-| [`../../scripts/setup-github-repo.sh`](../../scripts/setup-github-repo.sh) | Accidental shadow policy | Configures branch protection from a stale three-check list and writes its payload under `/tmp`, so following it today would weaken the documented protection contract and violate the repo-owned temp boundary rule. |
+| Surface                                                                                                                                                                                                                                                                                                                                                            | Classification           | Why later phases must preserve or account for it                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)                                                                                                                                                                                                                                                                                                       | Authoritative            | Defines the remote GitHub job graph, exact check names, and the aggregate production gate dependency chain.                                                                                                          |
+| [`../architecture/ADR-006-Local-CI-Parity-Prechecks.md`](../architecture/ADR-006-Local-CI-Parity-Prechecks.md)                                                                                                                                                                                                                                                     | Authoritative            | Declares that `.github/workflows/ci.yml` is the minimum local precheck contract and names `./.venv/bin/python ./scripts/local_ci_parity.py` as the primary local parity path.                                        |
+| [`../setup-github-repository.md`](../setup-github-repository.md)                                                                                                                                                                                                                                                                                                   | Authoritative            | Documents the exact branch-protection check names that maintainers are expected to enforce on GitHub.                                                                                                                |
+| [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py)                                                                                                                                                                                                                                                                                             | Derivative               | Mirrors the CI contract locally, defines the production group taxonomy, and exposes the canonical `--mode production` aggregate replay.                                                                              |
+| [`../../.vscode/tasks.json`](../../.vscode/tasks.json)                                                                                                                                                                                                                                                                                                             | Derivative               | Wraps the canonical local parity command in the `✅ Validate: Local CI Parity` workspace task.                                                                                                                       |
+| [`../WORK-ISSUE-WORKFLOW.md`](../WORK-ISSUE-WORKFLOW.md)                                                                                                                                                                                                                                                                                                           | Derivative               | Requires local parity before PR handoff and mandates pager-free GitHub polling during merge automation.                                                                                                              |
+| [`../../.copilot/skills/resolve-issue-workflow/SKILL.md`](../../.copilot/skills/resolve-issue-workflow/SKILL.md), [`../../.copilot/skills/pr-merge-workflow/SKILL.md`](../../.copilot/skills/pr-merge-workflow/SKILL.md), and [`../../.copilot/skills/approved-plan-execution-workflow/SKILL.md`](../../.copilot/skills/approved-plan-execution-workflow/SKILL.md) | Derivative               | Re-state the canonical local validation gate and the queue/merge polling rules that execute against GitHub truth.                                                                                                    |
+| [`../../scripts/noninteractive_gh.py`](../../scripts/noninteractive_gh.py)                                                                                                                                                                                                                                                                                         | Derivative               | Provides the one-shot pager-free GitHub issue/PR/check polling payloads used by queue and merge automation.                                                                                                          |
+| [`../../tests/test_regression.py`](../../tests/test_regression.py)                                                                                                                                                                                                                                                                                                 | Derivative               | Locks documentation, workflow, and validation-contract wording so parity drift shows up as a regression failure.                                                                                                     |
+| [`../../scripts/setup-github-repo.sh`](../../scripts/setup-github-repo.sh)                                                                                                                                                                                                                                                                                         | Accidental shadow policy | Configures branch protection from a stale three-check list and writes its payload under `/tmp`, so following it today would weaken the documented protection contract and violate the repo-owned temp boundary rule. |
 
 ## Exact current required checks and aggregate production authority
 
@@ -63,8 +63,10 @@ protection setup.
 
 The final check, `Internal Production Gate — Docker Parity & Recovery Proofs`,
 is the **aggregate production authority lane**. It depends on the three
-production-only diagnostic jobs and now refreshes the canonical aggregate
-bundle from their already-successful results via the CI-only fast path:
+production-only diagnostic jobs, uses an explicit 45-minute job timeout that
+matches the canonical production aggregate watchdog budget, and refreshes the
+canonical aggregate bundle from their already-successful results via the
+CI-only fast path:
 
 ```text
 python3 ./scripts/local_ci_parity.py --mode production --production-group aggregate --production-groups-only --ci-production-readiness-bundle-only
@@ -101,18 +103,22 @@ current required-check set.
 
 ## CI-critical wait and hang inventory
 
-### Unbounded or externally bounded today
+### Bounded official waits after issue #232
 
-The highest-risk current local wait surface is `run_command() / run_step()` in
-`scripts/local_ci_parity.py`, because it fans out across most of the default
-and fresh-checkout parity lanes without an explicit timeout.
+Issue `#232` closes the loop on the official validation surfaces identified by
+issue `#224`: the canonical local parity path, the promoted Docker/runtime
+proof lane, pager-free PR-check polling, and the production-only GitHub jobs
+now all carry explicit deadline-backed terminal behavior.
 
-| Surface | Current wait behavior | Why it is hang-prone |
-| --- | --- | --- |
-| `run_command()` / `run_step()` in [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py) | Calls `subprocess.run(...)` with no timeout wrapper for the default local parity steps and the fresh-checkout replay path. | Any stuck child process (`./setup.sh`, `pytest`, integration regression, Docker build helpers, or the child parity replay) can wait indefinitely. |
-| `run_git()` in [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py) | Calls `subprocess.run(...)` with no timeout while resolving refs, merge-bases, or worktree state. | A wedged git call in the fresh-checkout or parity path can block the entire validation flow with no watchdog. |
-| `run_docker_e2e_validation()` in [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py) | Launches the promoted Docker E2E runtime-proof pytest lane via a direct `subprocess.run(...)` with no timeout. | Docker/runtime proof hangs remain unbounded on `origin/main`, even though the lane is part of the production critical path. |
-| Queue / merge polling rules in [`../../.copilot/skills/pr-merge-workflow/SKILL.md`](../../.copilot/skills/pr-merge-workflow/SKILL.md) and [`../../.copilot/skills/approved-plan-execution-workflow/SKILL.md`](../../.copilot/skills/approved-plan-execution-workflow/SKILL.md) | Require non-interactive polling until GitHub checks reach a terminal state. | The workflow contract does not yet encode a max-attempt or elapsed-time bound, so automation needs an external watchdog to avoid waiting forever on a stuck `pending` check. |
+The concrete watchdog-backed local parity anchors are run_command() / run_step(), run_git(), and run_docker_e2e_validation() in `scripts/local_ci_parity.py`.
+
+| Surface                                                                                                                                                                                                                                                                        | Current wait behavior                                                                                                                   | Why it is hang-prone                                                                                                                   |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `run_command()` / `run_step()` in [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py)                                                                                                                                                                       | Runs every default and fresh-checkout parity subprocess through the shared watchdog-backed timeout wrapper.                             | Stuck child processes now terminate with explicit timeout findings and replay guidance instead of waiting indefinitely.                |
+| `run_git()` in [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py)                                                                                                                                                                                          | Applies the same watchdog deadline to git ref/worktree helper calls used by revision resolution and fresh-checkout state detection.     | Wedged git calls now fail explicitly, so revision discovery and fresh-checkout setup cannot hang forever.                              |
+| `run_docker_e2e_validation()` in [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py)                                                                                                                                                                        | Executes the promoted Docker E2E runtime-proof lane with the same configured watchdog used by the rest of the parity command.           | Runtime-proof hangs now terminate with a blocking timeout report and a focused replay command instead of stalling the production lane. |
+| Queue / merge polling rules in [`../../.copilot/skills/pr-merge-workflow/SKILL.md`](../../.copilot/skills/pr-merge-workflow/SKILL.md) and [`../../.copilot/skills/approved-plan-execution-workflow/SKILL.md`](../../.copilot/skills/approved-plan-execution-workflow/SKILL.md) | Use pager-free PR-check polling with `--wait --timeout-seconds 600` and stop on `pending-timeout`.                                      | Automation now reaches a deterministic blocker state instead of spinning forever on a stuck `pending` check.                           |
+| GitHub Actions jobs in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)                                                                                                                                                                                            | Encode explicit `timeout-minutes` values that match the canonical validation-policy watchdog budgets for the official CI-critical jobs. | Remote CI now fails on budget overruns with explicit job-level timeout evidence instead of inheriting unrelated runner defaults.       |
 
 ### Bounded waits already present
 
@@ -135,11 +141,10 @@ queue-polling paths.
 ## Current GitHub polling boundary
 
 [`../../scripts/noninteractive_gh.py`](../../scripts/noninteractive_gh.py)
-intentionally returns one-shot JSON payloads with `watch_mode: false`. That is
-useful because it keeps polling pager-free and scriptable, but it also means the
-helper itself does **not** provide a built-in polling deadline or watch loop.
-Later watchdog work therefore has to add explicit bounds in the caller/wrapper
-layer instead of assuming the helper already solves the wait problem.
+still supports one-shot JSON payloads with `watch_mode: false` for scriptable
+single reads, but it now also exposes a bounded `--wait` mode with explicit
+poll intervals, a repo-owned timeout, and `summary.overall = pending-timeout`
+when GitHub readiness does not converge in time.
 
 ## How later phases should use this
 
@@ -148,7 +153,7 @@ layer instead of assuming the helper already solves the wait problem.
   derivative workflow/docs surfaces together.
 - Treat `VALIDATION-BASELINE.md` as the timing input and this inventory as the
   contract/risk map when prioritizing convergence or watchdog work.
-- Replace the unbounded subprocess and polling paths with explicit watchdog
-  behavior on purpose rather than by ad-hoc script edits.
+- Preserve the explicit watchdog/time-budget semantics on purpose rather than
+  regressing to unbounded subprocess, git, polling, or CI-job waits.
 - Reconcile `scripts/setup-github-repo.sh` deliberately; do not let the stale
   three-check payload continue masquerading as the current protection truth.

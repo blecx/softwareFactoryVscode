@@ -8516,9 +8516,14 @@ def test_ci_workflow_has_internal_production_readiness_job() -> None:
     assert "Production Docker Build Parity" in text
     assert "Production Runtime Proofs" in text
     assert "Internal Production Gate — Docker Parity & Recovery Proofs" in text
+    assert "timeout-minutes: 45" in text
+    assert "timeout-minutes: 30" in text
+    assert "timeout-minutes: 15" in text
+    assert "timeout-minutes: 10" in text
     assert (
         "--mode production" in text
     ), "CI production-readiness job must invoke the canonical production gate command"
+    assert "--production-group aggregate" in text
     assert "--production-group docs-contract" in text
     assert "--production-group docker-builds" in text
     assert "--production-group runtime-proofs" in text

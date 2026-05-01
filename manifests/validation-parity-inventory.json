@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "issue": 224,
+  "issue": 232,
   "umbrella_issue": 222,
-  "captured_on": "2026-04-30",
+  "captured_on": "2026-05-01",
   "observation_only": true,
-  "observed_on_branch": "origin/main via .tmp/queue-worktrees/issue-224",
+  "observed_on_branch": "origin/main via .tmp/queue-worktrees/issue-232-event-driven-watchdog-primitives",
   "baseline_input": "docs/maintainer/VALIDATION-BASELINE.md",
   "tracked_report": "docs/maintainer/VALIDATION-PARITY-INVENTORY.md",
   "authoritative_surfaces": [
@@ -89,29 +89,38 @@
       "Production Docker Build Parity",
       "Production Runtime Proofs"
     ],
-    "local_command": "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+    "local_command": "./.venv/bin/python ./scripts/local_ci_parity.py --mode production",
+    "ci_bundle_refresh_command": "./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group aggregate --production-groups-only --ci-production-readiness-bundle-only",
+    "job_timeout_minutes": 45
   },
   "hang_risks": [
     {
-      "id": "local-ci-run-command-no-timeout",
+      "id": "local-ci-run-command-watchdog",
       "path": "scripts/local_ci_parity.py",
       "surface": "run_command() / run_step()",
-      "bounded": false,
-      "risk": "Default and fresh-checkout local parity subprocesses rely on subprocess.run without a timeout wrapper."
+      "bounded": true,
+      "risk": "Default and fresh-checkout local parity subprocesses now run through the shared watchdog-backed timeout wrapper and fail explicitly on budget overruns."
     },
     {
-      "id": "local-ci-run-git-no-timeout",
+      "id": "local-ci-run-git-watchdog",
       "path": "scripts/local_ci_parity.py",
       "surface": "run_git()",
-      "bounded": false,
-      "risk": "Git ref/worktree helper calls use subprocess.run without a timeout."
+      "bounded": true,
+      "risk": "Git ref/worktree helper calls now inherit the same watchdog budget used by the parity command and fail explicitly when revision discovery stalls."
     },
     {
-      "id": "production-runtime-proofs-no-timeout",
+      "id": "production-runtime-proofs-watchdog",
       "path": "scripts/local_ci_parity.py",
       "surface": "run_docker_e2e_validation()",
-      "bounded": false,
-      "risk": "The promoted Docker E2E runtime-proof lane uses a direct subprocess.run call with no timeout."
+      "bounded": true,
+      "risk": "The promoted Docker E2E runtime-proof lane now applies the configured watchdog and emits focused timeout remediation instead of hanging indefinitely."
+    },
+    {
+      "id": "github-actions-job-timeouts",
+      "path": ".github/workflows/ci.yml",
+      "surface": "Official CI-critical GitHub jobs",
+      "bounded": true,
+      "risk": "The official CI-critical jobs now encode timeout-minutes values aligned to the canonical validation-policy watchdog budgets, so remote CI fails explicitly on budget overruns."
     }
   ],
   "bounded_wait_paths": [
@@ -119,6 +128,11 @@
       "path": "scripts/noninteractive_gh.py",
       "surface": "pr-checks --wait --timeout-seconds=600",
       "notes": "Pager-free PR-check polling now supports a repo-owned 10-minute watchdog and returns `pending-timeout` instead of waiting indefinitely."
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "surface": "timeout-minutes aligned to validation-policy watchdog budgets",
+      "notes": "The official CI-critical jobs now declare explicit GitHub Actions timeout budgets: 45 for backend-quality/production-readiness, 15 for integration, 10 for template/docs-contract, and 30 for docker-build/runtime-proof lanes."
     },
     {
       "path": "tests/test_throwaway_runtime_docker.py",
