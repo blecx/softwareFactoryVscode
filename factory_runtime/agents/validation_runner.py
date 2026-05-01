@@ -165,6 +165,7 @@ class ValidationStepReport:
     stdout: str = ""
     stderr: str = ""
     failure_summary: str | None = None
+    terminal_cause: str | None = None
     cached: bool = False
 
     def to_dict(self) -> dict[str, Any]:
@@ -181,6 +182,7 @@ class ValidationStepReport:
             "stdout": self.stdout,
             "stderr": self.stderr,
             "failure_summary": self.failure_summary,
+            "terminal_cause": self.terminal_cause,
             "cached": self.cached,
         }
 
@@ -202,6 +204,9 @@ class ValidationBundleReport:
     elapsed_seconds: float
     steps: tuple[ValidationStepReport, ...]
     failure_summary: str | None = None
+    terminal_step_id: str | None = None
+    terminal_step_summary: str | None = None
+    terminal_cause: str | None = None
     skipped_reason: str | None = None
 
     @classmethod
@@ -243,6 +248,9 @@ class ValidationBundleReport:
             "elapsed_seconds": self.elapsed_seconds,
             "steps": [step.to_dict() for step in self.steps],
             "failure_summary": self.failure_summary,
+            "terminal_step_id": self.terminal_step_id,
+            "terminal_step_summary": self.terminal_step_summary,
+            "terminal_cause": self.terminal_cause,
             "skipped_reason": self.skipped_reason,
         }
 
@@ -272,6 +280,7 @@ class ValidationRunReport:
     elapsed_seconds: float
     terminal_outcome: str
     terminated_by_bundle_id: str | None
+    terminal_cause: str | None
     bundle_reports: tuple[ValidationBundleReport, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -318,6 +327,7 @@ class ValidationRunReport:
             "elapsed_seconds": self.elapsed_seconds,
             "terminal_outcome": self.terminal_outcome,
             "terminated_by_bundle_id": self.terminated_by_bundle_id,
+            "terminal_cause": self.terminal_cause,
             "bundle_reports": [item.to_dict() for item in self.bundle_reports],
         }
 
@@ -404,6 +414,7 @@ class ValidationRunner:
         bundle_reports: list[ValidationBundleReport] = []
         terminal_outcome = VALIDATION_STEP_STATUS_PASSED
         terminated_by_bundle_id: str | None = None
+        terminal_cause: str | None = None
 
         for index, bundle_id in enumerate(plan.effective_atomic_bundles):
             bundle = self._policy.bundles.get(bundle_id)
@@ -430,6 +441,7 @@ class ValidationRunner:
 
             terminal_outcome = report.status
             terminated_by_bundle_id = bundle_id
+            terminal_cause = report.terminal_cause
             if not self._stop_on_failure:
                 continue
 
@@ -475,6 +487,7 @@ class ValidationRunner:
             elapsed_seconds=elapsed_seconds,
             terminal_outcome=terminal_outcome,
             terminated_by_bundle_id=terminated_by_bundle_id,
+            terminal_cause=terminal_cause,
             bundle_reports=tuple(bundle_reports),
         )
 
@@ -817,6 +830,9 @@ class ValidationRunner:
         step_reports: list[ValidationStepReport] = []
         bundle_status = VALIDATION_STEP_STATUS_PASSED
         failure_summary: str | None = None
+        terminal_step_id: str | None = None
+        terminal_step_summary: str | None = None
+        terminal_cause: str | None = None
 
         for step in steps:
             step_report = step(deadline)
@@ -825,6 +841,9 @@ class ValidationRunner:
                 continue
             bundle_status = step_report.status
             failure_summary = step_report.failure_summary or step_report.summary
+            terminal_step_id = step_report.step_id
+            terminal_step_summary = step_report.summary
+            terminal_cause = step_report.terminal_cause
             break
 
         bundle_completed_at = _isoformat_utc(self._timestamp_factory())
@@ -846,6 +865,9 @@ class ValidationRunner:
             elapsed_seconds=elapsed_seconds,
             steps=tuple(step_reports),
             failure_summary=failure_summary,
+            terminal_step_id=terminal_step_id,
+            terminal_step_summary=terminal_step_summary,
+            terminal_cause=terminal_cause,
         )
 
     def _execute_cached_step(
@@ -913,6 +935,7 @@ class ValidationRunner:
             elapsed_seconds=elapsed_seconds,
             failure_summary=failure_summary,
             stderr=failure_summary,
+            terminal_cause="internal-validation-failure",
         )
 
     def _failed_internal_step(
@@ -944,6 +967,7 @@ class ValidationRunner:
             elapsed_seconds=0.0,
             failure_summary=failure_summary,
             stderr=failure_summary,
+            terminal_cause="internal-validation-failure",
         )
 
     def _execute_subprocess_step(
@@ -1016,6 +1040,7 @@ class ValidationRunner:
                 stdout=result.stdout or "",
                 stderr=result.stderr or "",
                 failure_summary=failure_summary,
+                terminal_cause="exit-nonzero",
             )
         except subprocess.TimeoutExpired as exc:
             completed_at = _isoformat_utc(self._timestamp_factory())
@@ -1040,6 +1065,7 @@ class ValidationRunner:
                 stdout=exc.stdout or "",
                 stderr=exc.stderr or "",
                 failure_summary=failure_summary,
+                terminal_cause="watchdog-timeout",
             )
         except OSError as exc:
             completed_at = _isoformat_utc(self._timestamp_factory())
@@ -1061,6 +1087,7 @@ class ValidationRunner:
                 env_overrides=env_overrides,
                 stderr=str(exc),
                 failure_summary=failure_summary,
+                terminal_cause="spawn-error",
             )
 
     def _deadline_exhausted_step(
@@ -1088,6 +1115,7 @@ class ValidationRunner:
             command=command,
             env_overrides=env_overrides,
             failure_summary=failure_summary,
+            terminal_cause="deadline-exhausted-before-step",
         )
 
     def _remaining_timeout_seconds(self, deadline: float | None) -> float | None:

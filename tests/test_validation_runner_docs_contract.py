@@ -30,6 +30,8 @@ def test_validation_runner_contract_doc_identifies_authority_and_deferred_caller
     assert "validation_compat_adapters.py" in contract
     assert "validation_policy.py" in contract
     assert "per-bundle status, timing, and terminal outcome" in contract
+    assert "terminal cause" in normalized_contract
+    assert "terminal_step_id" in contract
     assert "watchdog.max_minutes" in contract
     assert "effective_budget_minutes" in contract
     assert "scripts/local_ci_parity.py" in contract

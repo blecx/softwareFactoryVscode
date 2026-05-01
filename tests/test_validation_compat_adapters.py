@@ -164,6 +164,7 @@ def test_local_ci_production_groups_only_helper_converts_runner_report_to_findin
                     "Missing required internal-production docs/runbooks: "
                     "`docs/PRODUCTION-READINESS.md`."
                 ),
+                terminal_cause="internal-validation-failure",
                 stderr=(
                     "Missing required internal-production docs/runbooks: "
                     "`docs/PRODUCTION-READINESS.md`."
@@ -187,6 +188,9 @@ def test_local_ci_production_groups_only_helper_converts_runner_report_to_findin
                 elapsed_seconds=0.1,
                 steps=(failed_step,),
                 failure_summary=failed_step.failure_summary,
+                terminal_step_id=failed_step.step_id,
+                terminal_step_summary=failed_step.summary,
+                terminal_cause=failed_step.terminal_cause,
             )
             docker_bundle = ValidationBundleReport.skipped(
                 policy.bundles["docker-builds"],
@@ -215,6 +219,7 @@ def test_local_ci_production_groups_only_helper_converts_runner_report_to_findin
                 elapsed_seconds=0.1,
                 terminal_outcome="failed",
                 terminated_by_bundle_id="docs-contract",
+                terminal_cause="internal-validation-failure",
                 bundle_reports=(docs_bundle, docker_bundle),
             )
 
@@ -239,9 +244,9 @@ def test_local_ci_production_groups_only_helper_converts_runner_report_to_findin
     assert request.python_executable == "/custom/python"
     assert request.plan.resolved_bundle_ids == ("docs-contract", "docker-builds")
     assert findings[0].name == "Required internal-production docs/runbooks"
-    assert findings[0].summary.startswith(
-        "Missing required internal-production docs/runbooks"
-    )
+    assert findings[0].summary.startswith("Bundle `docs-contract` ended with `failed`")
+    assert "cause: `internal-validation-failure`" in findings[0].summary
+    assert "Missing required internal-production docs/runbooks" in findings[0].summary
     assert "transitional compatibility adapter" in findings[0].remediation
     assert results == {
         "docs-contract": "fail",
