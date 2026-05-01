@@ -2102,10 +2102,7 @@ def print_official_local_mirror_projection(
     if report.escalation_bundle is not None:
         print(f"escalation_bundle={report.escalation_bundle}")
 
-    if (
-        report.execution_level == PRODUCTION_MODE
-        and not os.getenv("GITHUB_ACTIONS", "").strip()
-    ):
+    if report.execution_level == PRODUCTION_MODE:
         print("fresh_checkout_semantics=github-uses-fresh-checkout-bootstrap")
         print(f"fresh_checkout_command={FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}")
 
