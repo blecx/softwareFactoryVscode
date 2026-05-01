@@ -24,6 +24,9 @@ def test_validation_policy_contract_doc_identifies_authority_and_lock_suite() ->
     assert "fresh-checkout-bootstrap" in contract
     assert "runner-ownership-parity" in contract
     assert "broader valid/invalid policy contract lock" in contract
+    assert "issue `#230`" in contract
+    assert "per-bundle runtime-budget/watchdog metadata" in contract
+    assert "min(45 minutes, repo-owned watchdog.max_minutes)" in contract
     assert "## Contract lock test surfaces" in contract
     assert "configs/validation_policy.yml" in contract
     assert "factory_runtime/agents/validation_policy.py" in contract
@@ -37,5 +40,7 @@ def test_validation_policy_contract_doc_identifies_authority_and_lock_suite() ->
     assert ".github/workflows/ci.yml" in contract
     assert "VALIDATION-POLICY-CONTRACT.md" in docs_readme
     assert "four-level model" in docs_readme
+    assert "per-bundle watchdog/runtime budgets" in docs_readme
     assert "VALIDATION-POLICY-CONTRACT.md" in guardrails
     assert "changed-surface selection contract" in guardrails
+    assert "bounded-runtime metadata" in guardrails

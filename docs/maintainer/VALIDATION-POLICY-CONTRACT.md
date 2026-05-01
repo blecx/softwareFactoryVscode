@@ -1,6 +1,6 @@
 # Validation policy contract and official bundle taxonomy
 
-This document records the canonical validation-policy authority surface introduced for issue `#226`, extended for issue `#227`, and locked by the broader valid/invalid policy contract lock suite in issue `#228` under umbrella issue `#225`.
+This document records the canonical validation-policy authority surface introduced for issues `#226`-`#228` under umbrella issue `#225`, and extended in issue `#230` under umbrella issue `#229` so every official bundle now carries explicit per-bundle runtime-budget/watchdog metadata. issue `#228` remains the broader valid/invalid policy contract lock for this surface.
 
 - **Status:** canonical bundle-taxonomy and level-selection contract
 - **Authoritative config:** [`../../configs/validation_policy.yml`](../../configs/validation_policy.yml)
@@ -19,7 +19,7 @@ For this repository, that authority surface is:
 
 ## Current boundary and deferred scope
 
-Issues `#226`, `#227`, and `#228` establish the canonical contract surface and the broader valid/invalid policy contract lock around it.
+Issues `#226`, `#227`, and `#228` establish the canonical contract surface and the broader valid/invalid policy contract lock around it. Issue `#230` makes the bounded-runtime metadata explicit enough that later shared-runner and workflow work can consume one repo-owned budget/watchdog contract instead of inventing timeout semantics independently.
 
 What this slice defines now:
 
@@ -111,6 +111,8 @@ Current schema requirements:
 - `watchdog.max_minutes` must be a positive integer and must stay at or below `45` minutes;
 - `watchdog.timeout_kind` must currently be `event-driven-deadline`; and
 - aggregate bundles still need bounded watchdog metadata even after their member bundles are populated.
+
+Issue `#230` treats those two fields as the canonical documented equivalents for per-bundle runtime-budget and watchdog metadata. The repo-owned policy budget lives in `watchdog.max_minutes`, and the effective enforced budget is `min(45 minutes, repo-owned watchdog.max_minutes)`. Because the policy rejects values above `45`, the effective-budget rule currently collapses to the configured `watchdog.max_minutes` while still documenting the hard ceiling future runner/workflow code must honor.
 
 This keeps the taxonomy compatible with the repository rule that CI-critical validation should remain split into bounded bundles with explicit deadlines rather than indefinite waits.
 

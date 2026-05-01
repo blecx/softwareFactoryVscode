@@ -58,3 +58,31 @@ def test_canonical_validation_policy_loads_and_preserves_official_bundle_order()
     assert policy.levels["production"].default_bundle == "production"
     assert len(policy.changed_surface_rules) == 8
     assert len(policy.exceptions) == 4
+
+
+def test_canonical_validation_policy_exposes_bounded_watchdog_budget_contract() -> None:
+    policy = ValidationPolicy.from_yaml_file(POLICY_PATH)
+
+    assert all(
+        bundle.watchdog.timeout_kind == "event-driven-deadline"
+        for bundle in policy.bundles.values()
+    )
+    assert all(
+        bundle.watchdog.budget_minutes == bundle.watchdog.max_minutes
+        for bundle in policy.bundles.values()
+    )
+    assert all(
+        0 < bundle.watchdog.budget_minutes <= 45 for bundle in policy.bundles.values()
+    )
+    assert all(
+        bundle.watchdog.effective_budget_minutes
+        == min(45, bundle.watchdog.budget_minutes)
+        for bundle in policy.bundles.values()
+    )
+    assert (
+        max(
+            bundle.watchdog.effective_budget_minutes
+            for bundle in policy.bundles.values()
+        )
+        == 45
+    )
