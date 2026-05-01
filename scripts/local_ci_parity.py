@@ -2067,6 +2067,88 @@ def display_path(path: Path, repo_root: Path) -> str:
         return str(path)
 
 
+def _display_csv(values: Sequence[str]) -> str:
+    return ",".join(values) if values else "<none>"
+
+
+def _display_bool(value: bool) -> str:
+    return "true" if value else "false"
+
+
+def print_official_local_mirror_projection(
+    report: ValidationRunReport,
+    *,
+    repo_root: Path,
+    fresh_checkout_requested: bool,
+) -> None:
+    print("\n" + "=" * 60)
+    print("Official local mirror projection")
+    print("=" * 60)
+    print("projection_source=shared-validation-resolver-runner")
+    print("mirrors_github_bundle_structure=true")
+    print(f"repo_root={report.repo_root}")
+    print(f"context={report.context}")
+    print(f"requested_level={report.requested_level}")
+    print(f"effective_level={report.effective_level}")
+    print(f"execution_level={report.execution_level}")
+    print(f"default_bundle={report.default_bundle}")
+    print(f"resolved_bundle_ids={_display_csv(report.resolved_bundle_ids)}")
+    print(f"matched_rule_ids={_display_csv(report.matched_rule_ids)}")
+    print("selected_atomic_bundles=" f"{_display_csv(report.selected_atomic_bundles)}")
+    print(
+        "effective_atomic_bundles=" f"{_display_csv(report.effective_atomic_bundles)}"
+    )
+    print("fresh_checkout_requested=" f"{_display_bool(fresh_checkout_requested)}")
+    if report.escalation_bundle is not None:
+        print(f"escalation_bundle={report.escalation_bundle}")
+
+    if (
+        report.execution_level == PRODUCTION_MODE
+        and not os.getenv("GITHUB_ACTIONS", "").strip()
+    ):
+        print("fresh_checkout_semantics=github-uses-fresh-checkout-bootstrap")
+        print(f"fresh_checkout_command={FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}")
+
+    for index, reason in enumerate(report.reasons, start=1):
+        prefix = f"reason[{index}]"
+        print(f"{prefix}.type={reason.reason_type}")
+        print(f"{prefix}.summary={reason.summary}")
+        if reason.level_id is not None:
+            print(f"{prefix}.level={reason.level_id}")
+        if reason.rule_id is not None:
+            print(f"{prefix}.rule_id={reason.rule_id}")
+        if reason.exception_id is not None:
+            print(f"{prefix}.exception_id={reason.exception_id}")
+        if reason.bundle_ids:
+            print(f"{prefix}.bundle_ids={_display_csv(reason.bundle_ids)}")
+        if reason.matched_paths:
+            print(f"{prefix}.matched_paths={_display_csv(reason.matched_paths)}")
+
+    for index, exception in enumerate(report.applicable_exceptions, start=1):
+        prefix = f"exception[{index}]"
+        print(f"{prefix}.id={exception.exception_id}")
+        print(f"{prefix}.applies_to_level={exception.applies_to_level}")
+        print(f"{prefix}.context={exception.context}")
+        print(f"{prefix}.behavior={exception.context_behavior}")
+        print(f"{prefix}.summary={exception.summary}")
+        print(f"{prefix}.rationale={exception.rationale}")
+
+    for bundle_report in report.bundle_reports:
+        prefix = f"bundle[{bundle_report.bundle_id}]"
+        print(f"{prefix}.kind={bundle_report.kind}")
+        print(f"{prefix}.owner={bundle_report.owner}")
+        print(f"{prefix}.status={bundle_report.status}")
+        print(
+            f"{prefix}.watchdog_budget_minutes={bundle_report.watchdog_budget_minutes}"
+        )
+        print(f"{prefix}.timeout_kind={bundle_report.timeout_kind}")
+        print(
+            f"{prefix}.labels={_display_csv(bundle_report.current_derivative_labels)}"
+        )
+        print(f"{prefix}.summary={bundle_report.summary}")
+        print(f"{prefix}.elapsed_seconds={bundle_report.elapsed_seconds:.3f}")
+
+
 def build_production_readiness_summary_markdown(
     *,
     repo_root: Path,
@@ -2572,6 +2654,11 @@ def main(argv: list[str] | None = None) -> int:
                     pr_body_file=args.pr_body_file,
                     rerun_command=rerun_command,
                 )
+            )
+            print_official_local_mirror_projection(
+                official_level_report,
+                repo_root=repo_root,
+                fresh_checkout_requested=args.fresh_checkout,
             )
             findings.extend(shared_engine_findings)
             if args.level == PRODUCTION_MODE:
