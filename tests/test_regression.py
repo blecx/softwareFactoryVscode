@@ -216,12 +216,18 @@ def test_issue_start_hardening_is_persistent_in_shared_workflow_surfaces() -> No
     )
 
     assert "## 7. Workflow Hardening and Deterministic Recovery" in instructions
-    assert "GH_THROTTLE_TIMEOUT_SECONDS" in instructions or "bounded watchdogs" in instructions
+    assert (
+        "GH_THROTTLE_TIMEOUT_SECONDS" in instructions
+        or "bounded watchdogs" in instructions
+    )
     assert "fresh GitHub truth" in resolve_wrapper
     assert "exact failing check/job/step metadata" in resolve_wrapper
     assert "execute-approved-umbrella" in workflow_doc
     assert "single approved issue" in plan_wrapper
-    assert "Delegate execution of the resolved child issue set to `execute-approved-plan`." in umbrella_wrapper
+    assert (
+        "Delegate execution of the resolved child issue set to `execute-approved-plan`."
+        in umbrella_wrapper
+    )
 
 
 def test_legacy_continue_alias_files_are_removed():
@@ -4696,7 +4702,11 @@ def test_local_ci_parity_watchdog_timeout_reports_split_replay_guidance(
 def test_local_ci_parity_run_git_uses_watchdog_timeout(monkeypatch, tmp_path: Path):
     module = _load_local_ci_parity_module()
     captured: dict[str, Any] = {}
-    module.ACTIVE_COMMAND_TIMEOUT_SECONDS = module.DEFAULT_WATCHDOG_SECONDS
+    setattr(
+        module,
+        "ACTIVE_COMMAND_TIMEOUT_SECONDS",
+        module.DEFAULT_WATCHDOG_SECONDS,
+    )
 
     def _fake_subprocess_run(
         command,
@@ -4802,7 +4812,9 @@ def test_local_ci_parity_official_level_uses_shared_engine_resolver(
         lambda repo_root, *, base_rev, head_rev: ("README.md",),
     )
 
-    def _fake_resolve_validation_plan(*, changed_paths, requested_level, context, policy):
+    def _fake_resolve_validation_plan(
+        *, changed_paths, requested_level, context, policy
+    ):
         captured["changed_paths"] = changed_paths
         captured["requested_level"] = requested_level
         captured["context"] = context
@@ -4859,7 +4871,9 @@ def test_local_ci_parity_official_level_uses_shared_engine_resolver(
                 bundle_reports=(),
             )
 
-    monkeypatch.setattr(module, "resolve_validation_plan", _fake_resolve_validation_plan)
+    monkeypatch.setattr(
+        module, "resolve_validation_plan", _fake_resolve_validation_plan
+    )
     monkeypatch.setattr(module, "ValidationRunner", _FakeRunner)
 
     exit_code = module.main(
@@ -4926,7 +4940,9 @@ def test_local_ci_parity_official_production_level_writes_signoff_bundle(
         lambda repo_root, *, base_rev, head_rev: ("docker/Dockerfile",),
     )
 
-    def _fake_resolve_validation_plan(*, changed_paths, requested_level, context, policy):
+    def _fake_resolve_validation_plan(
+        *, changed_paths, requested_level, context, policy
+    ):
         return type(
             "Plan",
             (),
@@ -5002,7 +5018,9 @@ def test_local_ci_parity_official_production_level_writes_signoff_bundle(
                 bundle_reports=tuple(bundle_reports),
             )
 
-    monkeypatch.setattr(module, "resolve_validation_plan", _fake_resolve_validation_plan)
+    monkeypatch.setattr(
+        module, "resolve_validation_plan", _fake_resolve_validation_plan
+    )
     monkeypatch.setattr(module, "ValidationRunner", _FakeRunner)
 
     exit_code = module.main(

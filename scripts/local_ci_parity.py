@@ -491,9 +491,28 @@ def _current_host_posix_id(getter_name: str) -> int | None:
         return None
 
     try:
-        return int(getter())
+        value = getter()
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            return int(value)
+        return None
     except (OSError, TypeError, ValueError):
         return None
+
+
+def _normalize_timeout_stream(value: str | bytes | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, bytearray):
+        return bytes(value).decode("utf-8", errors="replace")
+    if isinstance(value, memoryview):
+        return value.tobytes().decode("utf-8", errors="replace")
+    return value
 
 
 def _cleanup_docker_bind_mount_probe(
@@ -891,8 +910,8 @@ def run_command(
         raise CommandTimeoutError(
             command=command,
             timeout_seconds=ACTIVE_COMMAND_TIMEOUT_SECONDS or DEFAULT_WATCHDOG_SECONDS,
-            stdout=exc.stdout,
-            stderr=exc.stderr,
+            stdout=_normalize_timeout_stream(exc.stdout),
+            stderr=_normalize_timeout_stream(exc.stderr),
         ) from exc
 
 
@@ -998,8 +1017,8 @@ def run_git(repo_root: Path, args: Sequence[str]) -> subprocess.CompletedProcess
             timeout_seconds=(
                 ACTIVE_COMMAND_TIMEOUT_SECONDS or DEFAULT_WATCHDOG_SECONDS
             ),
-            stdout=exc.stdout,
-            stderr=exc.stderr,
+            stdout=_normalize_timeout_stream(exc.stdout),
+            stderr=_normalize_timeout_stream(exc.stderr),
         ) from exc
 
 
@@ -2528,7 +2547,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.ci_production_readiness_bundle_only:
             print("ci_production_readiness_bundle_only=true")
 
-    if (args.mode == PRODUCTION_MODE or args.level == PRODUCTION_MODE) and not os.getenv("GITHUB_ACTIONS", "").strip():
+    if (
+        args.mode == PRODUCTION_MODE or args.level == PRODUCTION_MODE
+    ) and not os.getenv("GITHUB_ACTIONS", "").strip():
         print(
             "exact_github_parity_command=" f"{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}"
         )

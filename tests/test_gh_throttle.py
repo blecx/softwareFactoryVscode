@@ -7,7 +7,9 @@ import pytest
 from factory_runtime.agents.tooling import gh_throttle
 
 
-def test_run_gh_throttled_applies_default_watchdog(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_gh_throttled_applies_default_watchdog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_run(command, check, **kwargs):
@@ -31,7 +33,9 @@ def test_run_gh_throttled_applies_default_watchdog(monkeypatch: pytest.MonkeyPat
     assert captured["timeout"] == 7.0
 
 
-def test_run_gh_throttled_respects_explicit_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_gh_throttled_respects_explicit_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured: dict[str, object] = {}
 
     def fake_run(command, check, **kwargs):
