@@ -10,6 +10,7 @@ COPY factory_runtime/ /factory/factory_runtime/
 ENV PYTHONPATH="/factory"
 
 RUN pip install --no-cache-dir \
+    black==24.4.2 \
     mcp==1.25.0 \
     uvicorn[standard]==0.44.0
 

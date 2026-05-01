@@ -29,6 +29,8 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 
 - Mature components expect hostile environments. Do not assume folders (like `.tmp`) haven't been deleted or that environment variables won't behave unexpectedly.
 - Write defensive code that seamlessly recovers from transient state loss (e.g., `mkdir -p` before acting) rather than failing the toolchain when things aren't "perfect".
+- For generated or rewritten Python source, use the repository's **actual formatter** (`python -m black` or the Black library) before treating the write as complete. Do **not** hand-format Python output or rely on newline-only normalization as a substitute for Black.
+- Repo-owned writer surfaces that persist Python files for issue resolution should invoke Black-compatible formatting at save time when formatter-enforced mode is required, so later `black --check` acts as confirmation rather than surprise.
 
 ## 5. Release Bump Discipline
 

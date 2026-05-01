@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import pytest
 
+from factory_runtime.agents.validation_plan_resolver import resolve_validation_plan
 from factory_runtime.agents.validation_policy import (
     CANONICAL_VALIDATION_POLICY_CONFIG_PATH,
     ValidationPolicy,
@@ -14,84 +14,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 POLICY_PATH = REPO_ROOT / CANONICAL_VALIDATION_POLICY_CONFIG_PATH
 
 
-@dataclass(frozen=True, slots=True)
-class _ResolvedSelection:
-    requested_level: str
-    effective_level: str
-    default_bundle: str
-    matched_rule_ids: tuple[str, ...]
-    selected_atomic_bundles: tuple[str, ...]
-    escalation_bundle: str | None
-
-
 def _rule_map(policy: ValidationPolicy) -> dict[str, object]:
     return {rule.rule_id: rule for rule in policy.changed_surface_rules}
 
 
 def _exception_map(policy: ValidationPolicy) -> dict[str, object]:
     return {item.exception_id: item for item in policy.exceptions}
-
-
-def _matches_include_path(path: str, pattern: str) -> bool:
-    normalized = str(PurePosixPath(path))
-    pure_path = PurePosixPath(normalized)
-    return normalized == pattern or pure_path.match(pattern)
-
-
-def _resolve_selection(
-    policy: ValidationPolicy,
-    *,
-    changed_paths: tuple[str, ...],
-    requested_level: str,
-) -> _ResolvedSelection:
-    level = policy.levels[requested_level]
-    if level.strategy == "aggregate":
-        return _ResolvedSelection(
-            requested_level=requested_level,
-            effective_level=requested_level,
-            default_bundle=level.default_bundle,
-            matched_rule_ids=(),
-            selected_atomic_bundles=(),
-            escalation_bundle=None,
-        )
-
-    matched_rules = tuple(
-        rule
-        for rule in policy.changed_surface_rules
-        if any(
-            _matches_include_path(path, pattern)
-            for path in changed_paths
-            for pattern in rule.include_paths
-        )
-    )
-    effective_level = max(
-        (requested_level, *(rule.minimum_level for rule in matched_rules)),
-        key=lambda level_id: policy.levels[level_id].order,
-    )
-    selected_atomic_bundles = tuple(
-        dict.fromkeys(bundle_id for rule in matched_rules for bundle_id in rule.bundles)
-    )
-    escalation_candidates = tuple(
-        dict.fromkeys(
-            rule.escalate_to for rule in matched_rules if rule.escalate_to is not None
-        )
-    )
-    escalation_bundle = (
-        max(
-            escalation_candidates,
-            key=lambda bundle_id: {"merge-full": 3, "production": 4}[bundle_id],
-        )
-        if escalation_candidates
-        else None
-    )
-    return _ResolvedSelection(
-        requested_level=requested_level,
-        effective_level=effective_level,
-        default_bundle=level.default_bundle,
-        matched_rule_ids=tuple(rule.rule_id for rule in matched_rules),
-        selected_atomic_bundles=selected_atomic_bundles,
-        escalation_bundle=escalation_bundle,
-    )
 
 
 def test_validation_policy_changed_surface_rules_cover_representative_classes() -> None:
@@ -114,18 +42,43 @@ def test_validation_policy_changed_surface_rules_cover_representative_classes() 
 def test_validation_policy_selection_keeps_docs_changes_in_focused_local() -> None:
     policy = ValidationPolicy.from_yaml_file(POLICY_PATH)
 
-    result = _resolve_selection(
-        policy,
+    result = resolve_validation_plan(
         changed_paths=("docs/README.md",),
         requested_level="focused-local",
+        context="local",
+        policy=policy,
     )
 
     assert result.requested_level == "focused-local"
     assert result.effective_level == "focused-local"
+    assert result.execution_level == "focused-local"
     assert result.default_bundle == "baseline"
+    assert result.resolved_bundle_ids == ("baseline",)
     assert result.matched_rule_ids == ("docs-authority-surface",)
     assert result.selected_atomic_bundles == ("docs-contract",)
+    assert result.effective_atomic_bundles == ("docs-contract", "workflow-contract")
     assert result.escalation_bundle is None
+
+
+def test_validation_policy_selection_keeps_nested_docs_changes_in_focused_local() -> (
+    None
+):
+    policy = ValidationPolicy.from_yaml_file(POLICY_PATH)
+
+    result = resolve_validation_plan(
+        changed_paths=("docs/archive/README.md",),
+        requested_level="focused-local",
+        context="local",
+        policy=policy,
+    )
+
+    assert result.requested_level == "focused-local"
+    assert result.effective_level == "focused-local"
+    assert result.execution_level == "focused-local"
+    assert result.resolved_bundle_ids == ("baseline",)
+    assert result.matched_rule_ids == ("docs-authority-surface",)
+    assert result.selected_atomic_bundles == ("docs-contract",)
+    assert result.effective_atomic_bundles == ("docs-contract", "workflow-contract")
 
 
 def test_validation_policy_selection_promotes_integration_changes_to_pr_update() -> (
@@ -133,32 +86,44 @@ def test_validation_policy_selection_promotes_integration_changes_to_pr_update()
 ):
     policy = ValidationPolicy.from_yaml_file(POLICY_PATH)
 
-    result = _resolve_selection(
-        policy,
+    result = resolve_validation_plan(
         changed_paths=("compose/docker-compose.factory.yml",),
         requested_level="focused-local",
+        context="local",
+        policy=policy,
     )
 
     assert result.effective_level == "pr-update"
+    assert result.execution_level == "pr-update"
     assert result.default_bundle == "baseline"
+    assert result.resolved_bundle_ids == ("baseline", "integration")
     assert result.matched_rule_ids == ("integration-boundary-surface",)
     assert result.selected_atomic_bundles == ("integration",)
+    assert result.effective_atomic_bundles == (
+        "docs-contract",
+        "workflow-contract",
+        "integration",
+    )
     assert result.escalation_bundle is None
 
 
 def test_validation_policy_selection_escalates_contract_changes_to_merge_full() -> None:
     policy = ValidationPolicy.from_yaml_file(POLICY_PATH)
 
-    result = _resolve_selection(
-        policy,
+    result = resolve_validation_plan(
         changed_paths=("configs/validation_policy.yml",),
         requested_level="focused-local",
+        context="local",
+        policy=policy,
     )
 
     assert result.effective_level == "pr-update"
+    assert result.execution_level == "merge"
     assert result.default_bundle == "baseline"
+    assert result.resolved_bundle_ids == ("merge-full",)
     assert result.matched_rule_ids == ("validation-contract-surface",)
     assert result.selected_atomic_bundles == ("docs-contract", "workflow-contract")
+    assert result.effective_atomic_bundles == policy.bundles["merge-full"].members
     assert result.escalation_bundle == "merge-full"
 
 
@@ -167,43 +132,58 @@ def test_validation_policy_selection_escalates_production_surfaces_to_production
 ):
     policy = ValidationPolicy.from_yaml_file(POLICY_PATH)
 
-    result = _resolve_selection(
-        policy,
+    result = resolve_validation_plan(
         changed_paths=("docs/ops/MONITORING.md",),
         requested_level="focused-local",
+        context="local",
+        policy=policy,
     )
 
     assert result.effective_level == "pr-update"
+    assert result.execution_level == "production"
     assert result.default_bundle == "baseline"
+    assert result.resolved_bundle_ids == ("production",)
     assert result.matched_rule_ids == ("production-authority-surface",)
     assert result.selected_atomic_bundles == ("docker-builds", "runtime-proofs")
+    assert result.effective_atomic_bundles == policy.bundles["production"].members
     assert result.escalation_bundle == "production"
 
 
 def test_validation_policy_aggregate_levels_resolve_to_canonical_defaults() -> None:
     policy = ValidationPolicy.from_yaml_file(POLICY_PATH)
 
-    merge_result = _resolve_selection(
-        policy,
+    merge_result = resolve_validation_plan(
         changed_paths=("README.md",),
         requested_level="merge",
+        context="local",
+        policy=policy,
     )
-    production_result = _resolve_selection(
-        policy,
+    production_result = resolve_validation_plan(
         changed_paths=("README.md",),
         requested_level="production",
+        context="local",
+        policy=policy,
     )
 
     assert merge_result.effective_level == "merge"
+    assert merge_result.execution_level == "merge"
     assert merge_result.default_bundle == "merge-full"
+    assert merge_result.resolved_bundle_ids == ("merge-full",)
     assert merge_result.matched_rule_ids == ()
     assert merge_result.selected_atomic_bundles == ()
+    assert merge_result.effective_atomic_bundles == policy.bundles["merge-full"].members
     assert merge_result.escalation_bundle is None
 
     assert production_result.effective_level == "production"
+    assert production_result.execution_level == "production"
     assert production_result.default_bundle == "production"
+    assert production_result.resolved_bundle_ids == ("production",)
     assert production_result.matched_rule_ids == ()
     assert production_result.selected_atomic_bundles == ()
+    assert (
+        production_result.effective_atomic_bundles
+        == policy.bundles["production"].members
+    )
     assert production_result.escalation_bundle is None
 
 

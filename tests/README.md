@@ -61,6 +61,19 @@ prefer **fast-fail** behavior over broad error aggregation.
 In short: normal failures should terminate with actionable output quickly, while
 timeouts remain reserved for genuine stuck-process protection.
 
+## Formatter guardrail for generated Python files
+
+When a tool, agent, or repository-owned writer surface creates or rewrites
+Python source, run **Black itself** before treating the save as complete.
+
+- Use the actual formatter (`./.venv/bin/python -m black …` or the Black
+  library), not a hand-formatted approximation.
+- LF-only line endings and a trailing newline are necessary, but they are **not**
+  a substitute for Black.
+- If a writer path persists `.py` or `.pyi` files for issue resolution, it
+  should apply Black-compatible formatting at save time so later
+  `black --check` failures point to real drift rather than an avoidable write bug.
+
 ## Practical baseline coverage map (P0/P1/P2 lock)
 
 The practical per-workspace baseline is protected by a mix of functional and documentation regressions:

@@ -2025,6 +2025,7 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert ".github/workflows/ci.yml" in catalog
     assert "tests/README.md" in catalog
     assert "test-authoring fast-fail rule" in catalog
+    assert "actual formatter-first rule for generated Python writes" in catalog
     assert "manifests/wiki-projection-manifest.json" in catalog
     assert "configs/bash_gateway_policy.default.yml" in catalog
     assert "scripts/setup-low-approval.sh" in catalog
@@ -2239,6 +2240,9 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
     tests_readme = (repo_root / "tests" / "README.md").read_text(encoding="utf-8")
 
     assert "## Practical baseline coverage map (P0/P1/P2 lock)" in tests_readme
+    assert "## Formatter guardrail for generated Python files" in tests_readme
+    assert "run **Black itself** before treating the save as complete" in tests_readme
+    assert "not a hand-formatted approximation" in tests_readme
     assert (
         "**Install/update contract:** `tests/test_factory_install.py`" in tests_readme
     )
@@ -2263,6 +2267,24 @@ def test_tests_readme_maps_practical_baseline_coverage_surfaces():
     assert "Cleanup / `runtime-deleted`" in tests_readme
     assert "Reload / reopen recovery" in tests_readme
     assert "RUN_DOCKER_E2E=1" in tests_readme
+
+
+def test_python_writer_formatter_guardrail_is_documented() -> None:
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    guardrails = (repo_root / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
+        encoding="utf-8"
+    )
+    tests_readme = (repo_root / "tests" / "README.md").read_text(encoding="utf-8")
+
+    assert "actual formatter" in instructions
+    assert "Do **not** hand-format Python output" in instructions
+    assert "Black-compatible formatting at save time" in instructions
+    assert "actual formatter-first rule for generated Python writes" in guardrails
+    assert "Formatter fidelity for generated Python files" in guardrails
+    assert "run **Black itself** before treating the save as complete" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
     assert (
         "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
