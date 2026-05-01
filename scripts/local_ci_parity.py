@@ -31,6 +31,7 @@ from factory_runtime.agents.validation_compat_adapters import (
     COMPATIBILITY_ADAPTER_DEPRECATION_NOTE,
     build_local_ci_production_groups_runner_request,
 )
+from factory_runtime.agents.validation_plan_resolver import resolve_validation_plan
 from factory_runtime.agents.validation_policy import ValidationPolicy
 from factory_runtime.agents.validation_runner import (
     TERMINAL_STEP_STATUSES,
@@ -38,6 +39,7 @@ from factory_runtime.agents.validation_runner import (
     VALIDATION_STEP_STATUS_SKIPPED,
     VALIDATION_STEP_STATUS_TIMED_OUT,
     ValidationRunner,
+    ValidationRunnerRequest,
     ValidationRunReport,
     ValidationStepReport,
 )
@@ -161,6 +163,10 @@ PRODUCTION_RESULT_SOURCE_UPSTREAM_CI_DIAGNOSTICS = "upstream-ci-diagnostics"
 LOCAL_CI_SHARED_ENGINE_COMPATIBILITY_NOTE = (
     "The `--production-groups-only` diagnostic path is a transitional "
     "compatibility adapter over the shared validation runner."
+)
+LOCAL_CI_OFFICIAL_LEVEL_WRAPPER_NOTE = (
+    "The `--level` entrypoint is the thin official four-level local mirror over "
+    "the shared validation resolver/runner contract."
 )
 
 
@@ -385,6 +391,8 @@ def build_rerun_command(args: argparse.Namespace) -> str:
         "./.venv/bin/python",
         "./scripts/local_ci_parity.py",
     ]
+    if args.level:
+        command.extend(["--level", args.level])
     if args.mode != STANDARD_MODE:
         command.extend(["--mode", args.mode])
         for group in args.production_group:
@@ -483,9 +491,28 @@ def _current_host_posix_id(getter_name: str) -> int | None:
         return None
 
     try:
-        return int(getter())
+        value = getter()
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str):
+            return int(value)
+        return None
     except (OSError, TypeError, ValueError):
         return None
+
+
+def _normalize_timeout_stream(value: str | bytes | None) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, bytearray):
+        return bytes(value).decode("utf-8", errors="replace")
+    if isinstance(value, memoryview):
+        return value.tobytes().decode("utf-8", errors="replace")
+    return value
 
 
 def _cleanup_docker_bind_mount_probe(
@@ -749,6 +776,9 @@ def build_fresh_checkout_command(
         "./.venv/bin/python",
     ]
 
+    if args.level:
+        command.extend(["--level", args.level])
+
     if args.mode != STANDARD_MODE:
         command.extend(["--mode", args.mode])
         for group in args.production_group:
@@ -880,8 +910,8 @@ def run_command(
         raise CommandTimeoutError(
             command=command,
             timeout_seconds=ACTIVE_COMMAND_TIMEOUT_SECONDS or DEFAULT_WATCHDOG_SECONDS,
-            stdout=exc.stdout,
-            stderr=exc.stderr,
+            stdout=_normalize_timeout_stream(exc.stdout),
+            stderr=_normalize_timeout_stream(exc.stderr),
         ) from exc
 
 
@@ -987,8 +1017,8 @@ def run_git(repo_root: Path, args: Sequence[str]) -> subprocess.CompletedProcess
             timeout_seconds=(
                 ACTIVE_COMMAND_TIMEOUT_SECONDS or DEFAULT_WATCHDOG_SECONDS
             ),
-            stdout=exc.stdout,
-            stderr=exc.stderr,
+            stdout=_normalize_timeout_stream(exc.stdout),
+            stderr=_normalize_timeout_stream(exc.stderr),
         ) from exc
 
 
@@ -1770,11 +1800,11 @@ def _shared_engine_findings_from_report(
     report: ValidationRunReport,
     *,
     rerun_command: str,
+    note: str,
 ) -> list[Finding]:
     findings: list[Finding] = []
     remediation = (
-        f"{LOCAL_CI_SHARED_ENGINE_COMPATIBILITY_NOTE} "
-        f"{COMPATIBILITY_ADAPTER_DEPRECATION_NOTE} "
+        f"{note} "
         f"Fix the reported shared-engine failure and rerun `{rerun_command}`."
     )
 
@@ -1859,9 +1889,86 @@ def run_selected_production_groups_via_shared_engine(
         _shared_engine_findings_from_report(
             report,
             rerun_command=rerun_command,
+            note=(
+                f"{LOCAL_CI_SHARED_ENGINE_COMPATIBILITY_NOTE} "
+                f"{COMPATIBILITY_ADAPTER_DEPRECATION_NOTE}"
+            ),
         ),
         _shared_engine_production_group_results(report),
     )
+
+
+def changed_files(repo_root: Path, *, base_rev: str, head_rev: str) -> tuple[str, ...]:
+    result = run_git(repo_root, ["diff", "--name-only", f"{base_rev}..{head_rev}"])
+    if result.returncode != 0:
+        details = (result.stderr or result.stdout or "unknown git diff failure").strip()
+        raise RuntimeError(
+            "Unable to determine changed files for local validation plan resolution: "
+            f"{details}"
+        )
+    return tuple(line.strip() for line in result.stdout.splitlines() if line.strip())
+
+
+def run_selected_official_level_via_shared_engine(
+    *,
+    repo_root: Path,
+    base_rev: str,
+    head_rev: str,
+    python_executable: str,
+    requested_level: str,
+    pr_body_file: str,
+    rerun_command: str,
+) -> tuple[ValidationRunReport, list[Finding]]:
+    print("\n▶ Shared validation runner official local mirror")
+    print(f"ℹ️ {LOCAL_CI_OFFICIAL_LEVEL_WRAPPER_NOTE}")
+
+    policy = ValidationPolicy.load_canonical()
+    plan = resolve_validation_plan(
+        changed_paths=changed_files(repo_root, base_rev=base_rev, head_rev=head_rev),
+        requested_level=requested_level,
+        context="local",
+        policy=policy,
+    )
+    request = ValidationRunnerRequest(
+        repo_root=repo_root,
+        plan=plan,
+        base_rev=base_rev,
+        head_rev=head_rev,
+        python_executable=python_executable,
+        pr_body_file=pr_body_file,
+    )
+    report = ValidationRunner(policy=policy).execute_plan(request)
+    return (
+        report,
+        _shared_engine_findings_from_report(
+            report,
+            rerun_command=rerun_command,
+            note=LOCAL_CI_OFFICIAL_LEVEL_WRAPPER_NOTE,
+        ),
+    )
+
+
+def official_level_legacy_flag_conflicts(args: argparse.Namespace) -> tuple[str, ...]:
+    conflicts: list[str] = []
+    if args.mode != STANDARD_MODE:
+        conflicts.append("--mode")
+    if args.standard_group:
+        conflicts.append("--standard-group")
+    if args.pytest_bundle:
+        conflicts.append("--pytest-bundle")
+    if args.include_docker_build:
+        conflicts.append("--include-docker-build")
+    if args.skip_integration:
+        conflicts.append("--skip-integration")
+    if args.skip_pr_template_check:
+        conflicts.append("--skip-pr-template-check")
+    if args.production_group:
+        conflicts.append("--production-group")
+    if args.production_groups_only:
+        conflicts.append("--production-groups-only")
+    if args.ci_production_readiness_bundle_only:
+        conflicts.append("--ci-production-readiness-bundle-only")
+    return tuple(conflicts)
 
 
 def raise_for_blocking_findings(
@@ -2213,6 +2320,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run local CI-parity checks before PR finalization."
     )
+    parser.add_argument(
+        "--level",
+        choices=tuple(ValidationPolicy.load_canonical().levels),
+        default="",
+        help=(
+            "Official four-level local mirror entrypoint. Choose one of "
+            "`focused-local`, `pr-update`, `merge`, or `production` to resolve "
+            "the current diff through the shared validation resolver/runner. "
+            "Legacy mode/group flags remain compatibility surfaces and cannot be "
+            "combined with `--level`."
+        ),
+    )
     parser.add_argument("--repo-root", default=".")
     parser.add_argument("--base-rev", default="")
     parser.add_argument("--head-rev", default="HEAD")
@@ -2344,6 +2463,15 @@ def main(argv: list[str] | None = None) -> int:
         args.watchdog_seconds if args.watchdog_seconds > 0 else None
     )
 
+    if args.level:
+        conflicts = official_level_legacy_flag_conflicts(args)
+        if conflicts:
+            print(
+                "❌ `--level` is the official shared-engine wrapper and cannot be combined with "
+                f"legacy compatibility flags/options: {', '.join(conflicts)}."
+            )
+            return 2
+
     try:
         aggregate_production_mode, production_groups = (
             resolve_production_group_selection(args)
@@ -2395,6 +2523,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"repo_root={repo_root}")
     print(f"base_rev={base_rev}")
     print(f"head_rev={head_rev}")
+    if args.level:
+        print(f"level={args.level}")
     print(f"mode={args.mode}")
     if ACTIVE_COMMAND_TIMEOUT_SECONDS is None:
         print("watchdog_seconds=disabled")
@@ -2417,7 +2547,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.ci_production_readiness_bundle_only:
             print("ci_production_readiness_bundle_only=true")
 
-    if args.mode == PRODUCTION_MODE and not os.getenv("GITHUB_ACTIONS", "").strip():
+    if (
+        args.mode == PRODUCTION_MODE or args.level == PRODUCTION_MODE
+    ) and not os.getenv("GITHUB_ACTIONS", "").strip():
         print(
             "exact_github_parity_command=" f"{FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND}"
         )
@@ -2426,9 +2558,28 @@ def main(argv: list[str] | None = None) -> int:
     docker_build_findings: list[Finding] = []
     production_group_results: dict[str, str] = {}
     production_result_source = PRODUCTION_RESULT_SOURCE_LIVE_EXECUTION
+    official_level_report: ValidationRunReport | None = None
 
     try:
-        if args.production_groups_only:
+        if args.level:
+            official_level_report, shared_engine_findings = (
+                run_selected_official_level_via_shared_engine(
+                    repo_root=repo_root,
+                    base_rev=base_rev,
+                    head_rev=head_rev,
+                    python_executable=args.python,
+                    requested_level=args.level,
+                    pr_body_file=args.pr_body_file,
+                    rerun_command=rerun_command,
+                )
+            )
+            findings.extend(shared_engine_findings)
+            if args.level == PRODUCTION_MODE:
+                production_group_results = _shared_engine_production_group_results(
+                    official_level_report
+                )
+            raise_for_blocking_findings(findings, rerun_command=rerun_command)
+        elif args.production_groups_only:
             print(
                 "ℹ️ Skipping default prechecks because `--production-groups-only` "
                 "was requested."
@@ -2540,7 +2691,21 @@ def main(argv: list[str] | None = None) -> int:
         print_findings_report(exc.findings)
         print_improvement_plan(exc.findings, rerun_command=exc.rerun_command)
 
-        if args.mode == PRODUCTION_MODE and aggregate_production_mode:
+        if args.level == PRODUCTION_MODE:
+            production_bundle = write_production_readiness_bundle(
+                repo_root,
+                base_rev=base_rev,
+                head_rev=head_rev,
+                findings=exc.findings,
+                production_groups_executed=tuple(production_group_results),
+                production_group_results=production_group_results,
+                result_source=production_result_source,
+            )
+            print_production_readiness_bundle_summary(
+                production_bundle,
+                repo_root=repo_root,
+            )
+        elif args.mode == PRODUCTION_MODE and aggregate_production_mode:
             production_bundle = write_production_readiness_bundle(
                 repo_root,
                 base_rev=base_rev,
@@ -2564,7 +2729,21 @@ def main(argv: list[str] | None = None) -> int:
     print_findings_report(findings)
     print_improvement_plan(findings, rerun_command=rerun_command)
 
-    if args.mode == PRODUCTION_MODE:
+    if args.level == PRODUCTION_MODE:
+        production_bundle = write_production_readiness_bundle(
+            repo_root,
+            base_rev=base_rev,
+            head_rev=head_rev,
+            findings=findings,
+            production_groups_executed=tuple(production_group_results),
+            production_group_results=production_group_results,
+            result_source=production_result_source,
+        )
+        print_production_readiness_bundle_summary(
+            production_bundle,
+            repo_root=repo_root,
+        )
+    elif args.mode == PRODUCTION_MODE:
         if aggregate_production_mode:
             production_bundle = write_production_readiness_bundle(
                 repo_root,
