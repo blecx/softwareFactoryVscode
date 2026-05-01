@@ -13,10 +13,10 @@ This file is a VS Code discovery wrapper. Keep bounded plan-execution logic in `
 
 ## When to Use
 - Use this when the operator says execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set.
-- Use this when a finite GitHub-backed issue set or umbrella issue should be executed end-to-end without re-asking between slices unless a true blocker appears.
+- Use this when a finite GitHub-backed issue set, a single approved issue, or an umbrella-derived child issue set should be executed end-to-end without re-asking between slices unless a true blocker appears.
 
 ## When Not to Use
-- Do not use this for direct implementation of a single issue (use `resolve-issue`).
+- Do not use this when the task is only ad-hoc implementation without an approved bounded issue set.
 - Do not use this when the plan or queue is ambiguous and multiple plausible issue sets exist.
 - Do not use this for issue drafting only (use `create-issue`).
 
@@ -26,15 +26,20 @@ This file is a VS Code discovery wrapper. Keep bounded plan-execution logic in `
 - `.copilot/skills/resolve-issue-workflow/SKILL.md`
 - `.copilot/skills/pr-merge-workflow/SKILL.md`
 - `.copilot/skills/interruption-recovery-workflow/SKILL.md`
+- `.github/copilot-instructions.md`
 
 ## Hard Rules
 
 - Only run a bounded, explicit, GitHub-backed issue set.
 - Keep one issue per PR and one PR per merge.
 - Reuse the canonical `resolve-issue` → `pr-merge` slice path for every issue in the plan; do not invent a plan-specific implementation or merge process.
+- At each issue start, re-anchor from `.tmp/github-issue-queue-state.md` and fresh GitHub truth before implementation, validation, or merge narration.
+- Prefer `./.venv/bin/python` for repository Python commands; if a justified fallback is required, use explicit `python3`, never bare `python`.
 - Use `.tmp/`, never `/tmp`.
 - Stop on real blockers, not just because CI is still polling.
 - Use bounded CI waits only; if GitHub checks remain pending after 10 minutes, stop with a precise blocker and resume later instead of waiting indefinitely.
+- Require explicit success/failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence or ambiguous output.
+- After one failed hypothesis, gather fresh evidence before applying another code change.
 - Do not guess the plan when more than one plausible issue set exists.
 
 ## Completion Contract

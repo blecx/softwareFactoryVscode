@@ -39,6 +39,7 @@
       "create-issue": true,
       "close-issue": true,
       "execute-approved-plan": true,
+      "execute-approved-umbrella": true,
       "resolve-issue": true,
       "pr-merge": true,
       "ralph-agent": true
@@ -89,7 +90,6 @@
       "git rm": true,
       "git stash": true,
       "python3": true,
-      "python": true,
       "python -m black": true,
       "python -m flake8": true,
       "npm install": true,
@@ -145,6 +145,7 @@
       "create-issue": true,
       "close-issue": true,
       "execute-approved-plan": true,
+      "execute-approved-umbrella": true,
       "resolve-issue": true,
       "pr-merge": true,
       "ralph-agent": true,

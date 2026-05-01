@@ -9,6 +9,7 @@ Use these Copilot agents in VS Code Chat:
 1. `@create-issue` — draft or create a template-compliant issue.
 1. `@resolve-issue` — implement one scoped issue into one PR.
 1. `@pr-merge` — validate, merge, and close the linked issue.
+1. `@execute-approved-umbrella` — resolve an approved umbrella issue into a bounded ordered child issue set and delegate execution back to `@execute-approved-plan`.
 1. `@queue-backend` or `@queue-phase-2` — continue the repeatable
    one-issue-at-a-time loop with a manual checkpoint between iterations,
    using the same `@resolve-issue` → `@pr-merge` slice path.
@@ -39,7 +40,10 @@ The repository supports exactly one canonical issue-to-merge process:
    post-merge cleanup.
 3. `@execute-approved-plan` is the bounded multi-issue wrapper that repeats the
    same `@resolve-issue` → `@pr-merge` slice path for an explicit approved set.
-4. `@queue-backend` and `@queue-phase-2` are scoped/manual-checkpoint wrappers
+4. `@execute-approved-umbrella` is a thin scope resolver for approved umbrella
+  issues; it delegates execution back into `@execute-approved-plan` and does
+  **not** define a second implementation, merge, repair, or checkpoint loop.
+5. `@queue-backend` and `@queue-phase-2` are scoped/manual-checkpoint wrappers
    over that same canonical slice path; they do **not** define a different
    implementation, PR, or merge process.
 
@@ -74,6 +78,7 @@ Routing rule:
 - Prefer polling the helper's JSON output over `gh pr checks --watch`, pager UI, or web/watch flows when you are inside an automation loop.
 - For bounded waiting, prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600` over `gh pr checks --watch`, `gh run watch`, or other watch-style flows.
 - If the helper returns `summary.overall = pending-timeout`, treat that as a real blocker for the current automation pass: refresh `.tmp/github-issue-queue-state.md`, report CI as still pending, and stop so the operator or a later resume can re-anchor cleanly instead of waiting indefinitely.
+- For GitHub fetch/list/view automation, require a bounded subprocess watchdog as well; use repo-owned helpers such as `scripts/noninteractive_gh.py` and `factory_runtime.agents.tooling.gh_throttle.run_gh_throttled(...)` so slow item fetches fail with a timeout instead of waiting for manual interruption.
 - If the helper does not cover a one-off query yet, use an equivalent pager-free pattern such as `GH_PAGER=cat PAGER=cat gh ... --json ...`; do not rely on the CLI deciding whether to open a pager.
 - When transforming JSON in shell automation, pipe into `python3 -c '...'`, `./.venv/bin/python -c '...'`, or a dedicated script. Do **not** combine a pipe with a heredoc-based Python command such as `... | python3 - <<'PY'`, because the heredoc replaces stdin and the piped JSON never reaches `sys.stdin`.
 - Long-running Docker/test output is not itself evidence of an input prompt. Before sending terminal input, confirm that the terminal explicitly requests it (for example `Enter ...`, `[y/N]`, `Username:`, or a tool-level input-needed signal).
@@ -244,3 +249,6 @@ For a new item:
 5. For ongoing queue work, switch to `@queue-backend` or `@queue-phase-2`.
 6. When the operator has already approved a finite GitHub-backed issue set and
    wants continuous execution, use `@execute-approved-plan`.
+7. When the operator approved an umbrella issue and wants the child issue set
+  resolved and executed through the same bounded engine, use
+  `@execute-approved-umbrella`.

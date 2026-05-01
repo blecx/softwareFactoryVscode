@@ -125,6 +125,7 @@ def test_low_friction_profile_approves_canonical_queue_agents():
 
     auto_approve = approval_profiles["low-friction"]["chat.tools.subagent.autoApprove"]
     assert auto_approve["execute-approved-plan"] is True
+    assert auto_approve["execute-approved-umbrella"] is True
     assert auto_approve["queue-backend"] is True
     assert auto_approve["queue-phase-2"] is True
     assert "continue-backend" not in auto_approve
@@ -183,6 +184,39 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
         ]
         is True
     )
+    assert (
+        approval_profiles["trusted-workflow"]["chat.tools.subagent.autoApprove"][
+            "execute-approved-umbrella"
+        ]
+        is True
+    )
+
+
+def test_issue_start_hardening_is_persistent_in_shared_workflow_surfaces() -> None:
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_wrapper = (repo_root / ".github" / "agents" / "resolve-issue.md").read_text(
+        encoding="utf-8"
+    )
+    plan_wrapper = (
+        repo_root / ".github" / "agents" / "execute-approved-plan.md"
+    ).read_text(encoding="utf-8")
+    umbrella_wrapper = (
+        repo_root / ".github" / "agents" / "execute-approved-umbrella.md"
+    ).read_text(encoding="utf-8")
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "## 7. Workflow Hardening and Deterministic Recovery" in instructions
+    assert "GH_THROTTLE_TIMEOUT_SECONDS" in instructions or "bounded watchdogs" in instructions
+    assert "fresh GitHub truth" in resolve_wrapper
+    assert "exact failing check/job/step metadata" in resolve_wrapper
+    assert "execute-approved-umbrella" in workflow_doc
+    assert "single approved issue" in plan_wrapper
+    assert "Delegate execution of the resolved child issue set to `execute-approved-plan`." in umbrella_wrapper
 
 
 def test_legacy_continue_alias_files_are_removed():
@@ -2094,6 +2128,7 @@ def test_maintainer_prompt_and_approval_reference_pages_track_current_sources():
     assert "resolve-issue" in prompt_reference
     assert "pr-merge" in prompt_reference
     assert "execute-approved-plan" in prompt_reference
+    assert "execute-approved-umbrella" in prompt_reference
     assert "WORK-ISSUE-WORKFLOW.md" in prompt_reference
     assert "copilot-instructions.md" in prompt_reference
 
@@ -2132,6 +2167,7 @@ def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sourc
     assert "resolve-issue" in enforcement_map
     assert "pr-merge" in enforcement_map
     assert "execute-approved-plan" in enforcement_map
+    assert "execute-approved-umbrella" in enforcement_map
     assert "queue-backend" in enforcement_map
     assert "queue-phase-2" in enforcement_map
     assert "Plan" in enforcement_map

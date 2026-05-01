@@ -29,6 +29,14 @@ def _resolve_base_backoff_seconds() -> float:
         return 15.0
 
 
+def _resolve_default_timeout_seconds() -> float:
+    raw = os.environ.get("GH_THROTTLE_TIMEOUT_SECONDS", "30") or "30"
+    try:
+        return max(1.0, float(raw))
+    except ValueError:
+        return 30.0
+
+
 def _is_rate_limited(output: str) -> bool:
     text = (output or "").lower()
     return any(
@@ -82,7 +90,14 @@ def run_gh_throttled(
     - `GH_MIN_INTERVAL_SECONDS` (default: 3)
     - `GH_THROTTLE_MAX_ATTEMPTS` (default: 3)
     - `GH_THROTTLE_BACKOFF_SECONDS` (default: 15)
+        - `GH_THROTTLE_TIMEOUT_SECONDS` (default: 30)
     - Or pass `min_interval_seconds` explicitly.
+
+        Timeout behavior:
+        - If the caller does not provide `timeout`, a default watchdog timeout is
+            applied so hung `gh` fetches fail fast.
+        - If the caller provides `timeout=None`, the watchdog is explicitly
+            disabled for that invocation.
     """
 
     global _LAST_GH_CALL_TS
@@ -90,9 +105,13 @@ def run_gh_throttled(
     interval = _resolve_min_interval_seconds(min_interval_seconds)
     max_attempts = _resolve_max_attempts()
     base_backoff = _resolve_base_backoff_seconds()
+    default_timeout_seconds = _resolve_default_timeout_seconds()
 
     check_requested = bool(subprocess_kwargs.pop("check", False))
     command = list(args)
+
+    if "timeout" not in subprocess_kwargs:
+        subprocess_kwargs["timeout"] = default_timeout_seconds
 
     attempt = 1
     while True:

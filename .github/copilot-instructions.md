@@ -55,4 +55,17 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Do not force these aliases onto single-issue execution requests; those still belong to `resolve-issue`.
 - There is no supported global `UserPromptSubmit` workflow hook in this contract. Prompt-time hooks created a second process and must not be reintroduced as issue/merge gatekeepers.
 
+## 7. Workflow Hardening and Deterministic Recovery
+
+- At the start of any issue slice, re-anchor from `.tmp/github-issue-queue-state.md` and fresh GitHub truth before implementation, validation, repair, merge narration, or completion claims.
+- prefer `./.venv/bin/python` for repository Python commands. If the repository venv is unavailable for a justified one-off, use explicit `python3`. do **not** use bare `python`.
+- Treat `execute-approved-plan` as the generic executor for any approved bounded GitHub-backed issue set, including a single approved issue, an umbrella-derived child issue set, an explicit approved issue list, or a checkpoint-published queue.
+- Specialized wrappers such as an umbrella resolver may narrow scope or resolve ordering, but they must not introduce a second execution, merge, repair, or checkpoint path.
+- Use bounded waits, explicit watchdog/timeout states, and deterministic stop conditions for CI polling and long-running validation. A pending timeout is a blocker, not permission to keep spinning.
+- GitHub fetch/list/view automation must also use bounded watchdogs; do not allow unbounded `gh` fetches or item-enumeration loops to wait until manual interruption.
+- Require explicit success or failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence, partial logs, or ambiguous output.
+- Inspect the exact failing check, job, and step metadata before deciding on root cause. Do not guess from job titles alone.
+- After one failed hypothesis, gather new evidence before applying another code change. Do not fall into trial-and-error churn.
+- If parsing, piping, or terminal behavior makes the result ambiguous, stop and report the ambiguity instead of continuing on guessed state.
+
 Remember: **You solve nothing if you fix one bug by creating architectural debt or violating design guardrails.**

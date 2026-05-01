@@ -20,8 +20,8 @@ Start with these files when you need to verify or adjust approval behavior:
 | Profile | Practical posture | What it currently auto-approves | Use this when |
 | --- | --- | --- | --- |
 | `safe` | Lowest-trust / most conservative workflow posture | A narrow set of subagents (`Plan`, `create-issue`, `close-issue`) plus basic read/test/GitHub CLI terminal commands | You want the smallest default allowlist and expect implementation, merge, or broader terminal work to keep prompting for approval |
-| `trusted-workflow` | Canonical maintainer workflow posture | The core implementation/merge subagents (`resolve-issue`, `pr-merge`, `execute-approved-plan`, `ralph-agent`) plus a bounded allowlist of git, Python, Docker, npm, and repo workflow commands | You are running the canonical issue → PR → merge flow and want fewer approval interruptions without switching to blanket command approval |
-| `low-friction` | Highest-trust / lowest-friction posture | Additional workflow/factory agents (`workflow`, `factory-operator`, `queue-backend`, `queue-phase-2`, and others) plus regex-based near blanket terminal approval | You intentionally want a high-trust session and accept that the approval barrier is dramatically reduced |
+| `trusted-workflow` | Canonical maintainer workflow posture | The core implementation/merge subagents (`resolve-issue`, `pr-merge`, `execute-approved-plan`, `execute-approved-umbrella`, `ralph-agent`) plus a bounded allowlist of git, explicit `python3`, Docker, npm, and repo workflow commands | You are running the canonical issue → PR → merge flow or an approved umbrella-derived bounded plan and want fewer approval interruptions without switching to blanket command approval |
+| `low-friction` | Highest-trust / lowest-friction posture | Additional workflow/factory agents (`workflow`, `factory-operator`, `execute-approved-umbrella`, `queue-backend`, `queue-phase-2`, and others) plus regex-based near blanket terminal approval | You intentionally want a high-trust session and accept that the approval barrier is dramatically reduced |
 
 ## How the workspace surfaces these profiles
 
@@ -36,5 +36,6 @@ Those tasks route through [`../../scripts/setup-low-approval.sh`](../../scripts/
 ## What this page does and does not mean
 
 - This page explains the currently configured approval profiles; it does **not** authorize changing their behavior.
+- Approval posture should stay aligned with the workflow hardening rules in [`.github/copilot-instructions.md`](../../.github/copilot-instructions.md): prefer repo-venv Python execution first, allow explicit `python3` only as the justified fallback, and do not treat bare `python` as an approved default.
 - If you need to review which workflow/agent surfaces those profiles matter to, pair this page with [`AGENT-ENFORCEMENT-MAP.md`](AGENT-ENFORCEMENT-MAP.md) and [`../WORK-ISSUE-WORKFLOW.md`](../WORK-ISSUE-WORKFLOW.md).
 - If you need to change the actual profile behavior, update the canonical config/scripts directly and keep the maintainer docs descriptive of the verified result.
