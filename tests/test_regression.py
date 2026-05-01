@@ -5,6 +5,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -16,6 +17,10 @@ from factory_runtime.agents.coverage_analyzer import (
     CoverageAnalyzer,
     CoverageFile,
     CoverageReport,
+)
+from factory_runtime.agents.validation_runner import (
+    ValidationBundleReport,
+    ValidationRunReport,
 )
 
 
@@ -4690,7 +4695,7 @@ def test_local_ci_parity_watchdog_timeout_reports_split_replay_guidance(
 
 def test_local_ci_parity_run_git_uses_watchdog_timeout(monkeypatch, tmp_path: Path):
     module = _load_local_ci_parity_module()
-    captured: dict[str, object] = {}
+    captured: dict[str, Any] = {}
     module.ACTIVE_COMMAND_TIMEOUT_SECONDS = module.DEFAULT_WATCHDOG_SECONDS
 
     def _fake_subprocess_run(
@@ -4778,3 +4783,252 @@ def test_local_ci_parity_rejects_pytest_bundle_with_production_groups_only(
 
     assert exit_code == 2
     assert "only supported in standard mode" in captured.out
+
+
+def test_local_ci_parity_official_level_uses_shared_engine_resolver(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        module, "resolve_head_revision", lambda repo_root, head_rev: "head-sha"
+    )
+    monkeypatch.setattr(
+        module,
+        "changed_files",
+        lambda repo_root, *, base_rev, head_rev: ("README.md",),
+    )
+
+    def _fake_resolve_validation_plan(*, changed_paths, requested_level, context, policy):
+        captured["changed_paths"] = changed_paths
+        captured["requested_level"] = requested_level
+        captured["context"] = context
+        return type(
+            "Plan",
+            (),
+            {
+                "context": context,
+                "changed_paths": changed_paths,
+                "requested_level": requested_level,
+                "effective_level": requested_level,
+                "execution_level": requested_level,
+                "default_bundle": "baseline",
+                "resolved_bundle_ids": ("baseline",),
+                "matched_rule_ids": (),
+                "selected_atomic_bundles": (),
+                "effective_atomic_bundles": (),
+                "escalation_bundle": None,
+                "applicable_exceptions": (),
+                "reasons": (),
+            },
+        )()
+
+    class _FakeRunner:
+        def __init__(self, *, policy):
+            captured["policy_loaded"] = policy is not None
+
+        def execute_plan(self, request):
+            captured["request"] = request
+            timestamp = "2026-05-01T00:00:00Z"
+            return ValidationRunReport(
+                schema_version=1,
+                repo_root=str(request.repo_root),
+                base_rev=request.base_rev,
+                head_rev=request.head_rev,
+                context=request.plan.context,
+                requested_level=request.plan.requested_level,
+                effective_level=request.plan.effective_level,
+                execution_level=request.plan.execution_level,
+                default_bundle=request.plan.default_bundle,
+                resolved_bundle_ids=request.plan.resolved_bundle_ids,
+                matched_rule_ids=request.plan.matched_rule_ids,
+                selected_atomic_bundles=request.plan.selected_atomic_bundles,
+                effective_atomic_bundles=request.plan.effective_atomic_bundles,
+                escalation_bundle=request.plan.escalation_bundle,
+                applicable_exceptions=request.plan.applicable_exceptions,
+                reasons=request.plan.reasons,
+                started_at=timestamp,
+                completed_at=timestamp,
+                elapsed_seconds=0.1,
+                terminal_outcome="passed",
+                terminated_by_bundle_id=None,
+                terminal_cause=None,
+                bundle_reports=(),
+            )
+
+    monkeypatch.setattr(module, "resolve_validation_plan", _fake_resolve_validation_plan)
+    monkeypatch.setattr(module, "ValidationRunner", _FakeRunner)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--level",
+            "focused-local",
+        ]
+    )
+    captured_output = capsys.readouterr()
+
+    assert exit_code == 0
+    assert captured["changed_paths"] == ("README.md",)
+    assert captured["requested_level"] == "focused-local"
+    assert captured["context"] == "local"
+    request: Any = captured["request"]
+    assert request.base_rev == "base-sha"
+    assert request.head_rev == "head-sha"
+    assert "Shared validation runner official local mirror" in captured_output.out
+    assert "level=focused-local" in captured_output.out
+
+
+def test_local_ci_parity_official_level_rejects_legacy_flags(
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--level",
+            "merge",
+            "--standard-group",
+            module.STANDARD_GROUP_PYTEST,
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "official shared-engine wrapper" in captured.out
+    assert "--standard-group" in captured.out
+
+
+def test_local_ci_parity_official_production_level_writes_signoff_bundle(
+    monkeypatch,
+    tmp_path: Path,
+):
+    module = _load_local_ci_parity_module()
+    policy = module.ValidationPolicy.load_canonical()
+
+    monkeypatch.setattr(
+        module, "resolve_head_revision", lambda repo_root, head_rev: "head-sha"
+    )
+    monkeypatch.setattr(
+        module,
+        "changed_files",
+        lambda repo_root, *, base_rev, head_rev: ("docker/Dockerfile",),
+    )
+
+    def _fake_resolve_validation_plan(*, changed_paths, requested_level, context, policy):
+        return type(
+            "Plan",
+            (),
+            {
+                "context": context,
+                "changed_paths": changed_paths,
+                "requested_level": requested_level,
+                "effective_level": requested_level,
+                "execution_level": requested_level,
+                "default_bundle": "production",
+                "resolved_bundle_ids": ("production",),
+                "matched_rule_ids": (),
+                "selected_atomic_bundles": (),
+                "effective_atomic_bundles": (
+                    "docs-contract",
+                    "docker-builds",
+                    "runtime-proofs",
+                ),
+                "escalation_bundle": None,
+                "applicable_exceptions": (),
+                "reasons": (),
+            },
+        )()
+
+    class _FakeRunner:
+        def __init__(self, *, policy):
+            self._policy = policy
+
+        def execute_plan(self, request):
+            timestamp = "2026-05-01T00:00:00Z"
+            bundle_reports = []
+            for bundle_id in request.plan.effective_atomic_bundles:
+                bundle = self._policy.bundles[bundle_id]
+                bundle_reports.append(
+                    ValidationBundleReport(
+                        bundle_id=bundle.bundle_id,
+                        kind=bundle.kind,
+                        owner=bundle.owner,
+                        summary=bundle.summary,
+                        current_derivative_labels=bundle.current_derivative_labels,
+                        watchdog_budget_minutes=bundle.watchdog.effective_budget_minutes,
+                        timeout_kind=bundle.watchdog.timeout_kind,
+                        status="passed",
+                        started_at=timestamp,
+                        completed_at=timestamp,
+                        elapsed_seconds=0.1,
+                        steps=(),
+                    )
+                )
+            return ValidationRunReport(
+                schema_version=1,
+                repo_root=str(request.repo_root),
+                base_rev=request.base_rev,
+                head_rev=request.head_rev,
+                context=request.plan.context,
+                requested_level=request.plan.requested_level,
+                effective_level=request.plan.effective_level,
+                execution_level=request.plan.execution_level,
+                default_bundle=request.plan.default_bundle,
+                resolved_bundle_ids=request.plan.resolved_bundle_ids,
+                matched_rule_ids=request.plan.matched_rule_ids,
+                selected_atomic_bundles=request.plan.selected_atomic_bundles,
+                effective_atomic_bundles=request.plan.effective_atomic_bundles,
+                escalation_bundle=request.plan.escalation_bundle,
+                applicable_exceptions=request.plan.applicable_exceptions,
+                reasons=request.plan.reasons,
+                started_at=timestamp,
+                completed_at=timestamp,
+                elapsed_seconds=0.3,
+                terminal_outcome="passed",
+                terminated_by_bundle_id=None,
+                terminal_cause=None,
+                bundle_reports=tuple(bundle_reports),
+            )
+
+    monkeypatch.setattr(module, "resolve_validation_plan", _fake_resolve_validation_plan)
+    monkeypatch.setattr(module, "ValidationRunner", _FakeRunner)
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--level",
+            "production",
+        ]
+    )
+
+    assert exit_code == 0
+    latest_report = json.loads(
+        (tmp_path / ".tmp" / "production-readiness" / "latest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert latest_report["production_groups_executed"] == [
+        "docs-contract",
+        "docker-builds",
+        "runtime-proofs",
+    ]
+    assert latest_report["production_group_results"] == {
+        "docs-contract": "pass",
+        "docker-builds": "pass",
+        "runtime-proofs": "pass",
+    }
