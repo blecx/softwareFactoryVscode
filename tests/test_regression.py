@@ -1051,6 +1051,8 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "scripts/noninteractive_gh.py" in workflow_doc
     assert "gh pr checks --watch" in workflow_doc
     assert "gh run watch" in workflow_doc
+    assert "GitHub truth only" in workflow_doc
+    assert "not local PID files, process liveness, terminal idleness" in workflow_doc
     assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
         in workflow_doc
@@ -1064,6 +1066,8 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     )
     assert "gh pr checks --watch" in merge_skill
     assert "gh run watch" in merge_skill
+    assert "Treat PR readiness as GitHub truth only." in merge_skill
+    assert "Do **not** infer status from local PID files, process liveness, terminal silence" in merge_skill
     assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
         in merge_skill

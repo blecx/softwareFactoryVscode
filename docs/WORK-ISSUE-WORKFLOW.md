@@ -77,6 +77,7 @@ Routing rule:
 
 - Prefer polling the helper's JSON output over `gh pr checks --watch`, pager UI, or web/watch flows when you are inside an automation loop.
 - For bounded waiting, prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600` over `gh pr checks --watch`, `gh run watch`, or other watch-style flows.
+- Treat PR readiness/check status as GitHub truth only: rely on `statusCheckRollup` / merge metadata from `./scripts/noninteractive_gh.py` or equivalent `gh ... --json ...` queries, not local PID files, process liveness, terminal idleness, or other host-side heuristics.
 - If the helper returns `summary.overall = pending-timeout`, treat that as a real blocker for the current automation pass: refresh `.tmp/github-issue-queue-state.md`, report CI as still pending, and stop so the operator or a later resume can re-anchor cleanly instead of waiting indefinitely.
 - For GitHub fetch/list/view automation, require a bounded subprocess watchdog as well; use repo-owned helpers such as `scripts/noninteractive_gh.py` and `factory_runtime.agents.tooling.gh_throttle.run_gh_throttled(...)` so slow item fetches fail with a timeout instead of waiting for manual interruption.
 - If the helper does not cover a one-off query yet, use an equivalent pager-free pattern such as `GH_PAGER=cat PAGER=cat gh ... --json ...`; do not rely on the CLI deciding whether to open a pager.
