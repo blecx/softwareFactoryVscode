@@ -92,6 +92,7 @@ def test_validation_runner_executes_resolved_baseline_plan_and_emits_structured_
     assert all(
         item.status == VALIDATION_STEP_STATUS_PASSED for item in report.bundle_reports
     )
+    assert report.terminal_cause is None
 
     docs_steps = tuple(step.step_id for step in report.bundle_reports[0].steps)
     workflow_steps = tuple(step.step_id for step in report.bundle_reports[1].steps)
@@ -172,8 +173,12 @@ def test_validation_runner_times_out_and_skips_remaining_bundles(
 
     assert report.terminal_outcome == VALIDATION_STEP_STATUS_TIMED_OUT
     assert report.terminated_by_bundle_id == "docs-contract"
+    assert report.terminal_cause == "watchdog-timeout"
     assert report.bundle_reports[0].status == VALIDATION_STEP_STATUS_TIMED_OUT
     assert report.bundle_reports[0].steps[-1].status == VALIDATION_STEP_STATUS_TIMED_OUT
+    assert report.bundle_reports[0].terminal_step_id == "pytest-docs-workflow"
+    assert report.bundle_reports[0].terminal_cause == "watchdog-timeout"
+    assert report.bundle_reports[0].steps[-1].terminal_cause == "watchdog-timeout"
     assert report.bundle_reports[1].status == VALIDATION_STEP_STATUS_SKIPPED
     assert "Skipped after bundle `docs-contract`" in (
         report.bundle_reports[1].skipped_reason or ""
@@ -219,10 +224,26 @@ def test_validation_runner_fast_fails_after_first_blocking_bundle_with_custom_ex
                         if status == VALIDATION_STEP_STATUS_FAILED
                         else None
                     ),
+                    terminal_cause=(
+                        "synthetic-failure"
+                        if status == VALIDATION_STEP_STATUS_FAILED
+                        else None
+                    ),
                 ),
             ),
             failure_summary=(
                 "synthetic failure" if status == VALIDATION_STEP_STATUS_FAILED else None
+            ),
+            terminal_step_id=(
+                "synthetic-step" if status == VALIDATION_STEP_STATUS_FAILED else None
+            ),
+            terminal_step_summary=(
+                "Synthetic executor output for shared runner unit coverage."
+                if status == VALIDATION_STEP_STATUS_FAILED
+                else None
+            ),
+            terminal_cause=(
+                "synthetic-failure" if status == VALIDATION_STEP_STATUS_FAILED else None
             ),
         )
 
@@ -256,12 +277,56 @@ def test_validation_runner_fast_fails_after_first_blocking_bundle_with_custom_ex
 
     assert report.terminal_outcome == VALIDATION_STEP_STATUS_FAILED
     assert report.terminated_by_bundle_id == "docs-contract"
+    assert report.terminal_cause == "synthetic-failure"
     assert report.bundle_reports[0].bundle_id == "docs-contract"
     assert report.bundle_reports[0].status == VALIDATION_STEP_STATUS_FAILED
+    assert report.bundle_reports[0].terminal_step_id == "synthetic-step"
     assert all(
         item.status == VALIDATION_STEP_STATUS_SKIPPED
         for item in report.bundle_reports[1:]
     )
+
+
+def test_validation_runner_to_dict_includes_structured_terminal_metadata(
+    tmp_path: Path,
+) -> None:
+    policy = _canonical_policy()
+    plan = resolve_validation_plan(
+        changed_paths=("README.md",),
+        requested_level="focused-local",
+        context="local",
+        policy=policy,
+    )
+    _write_required_docs(tmp_path)
+
+    def _fake_command_executor(command, cwd, timeout_seconds, env):
+        del cwd, env
+        raise subprocess.TimeoutExpired(
+            cmd=list(command),
+            timeout=timeout_seconds or 1.0,
+            output="busy\n",
+            stderr="stuck\n",
+        )
+
+    runner = ValidationRunner(policy=policy, command_executor=_fake_command_executor)
+    report = runner.execute_plan(
+        ValidationRunnerRequest(
+            repo_root=tmp_path,
+            plan=plan,
+            base_rev="base-sha",
+            head_rev="head-sha",
+            python_executable=sys.executable,
+        )
+    )
+
+    payload = report.to_dict()
+    bundle_payload = payload["bundle_reports"][0]
+    step_payload = bundle_payload["steps"][-1]
+
+    assert payload["terminal_cause"] == "watchdog-timeout"
+    assert bundle_payload["terminal_cause"] == "watchdog-timeout"
+    assert bundle_payload["terminal_step_id"] == "release-docs-policy"
+    assert step_payload["terminal_cause"] == "watchdog-timeout"
 
 
 def test_validation_runner_registers_all_official_atomic_bundle_executors() -> None:

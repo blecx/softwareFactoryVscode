@@ -54,11 +54,17 @@ The runner emits one structured report object (`ValidationRunReport`) with:
 - run timing: start timestamp, end timestamp, total elapsed seconds, and the
   terminal outcome for the full run;
 - per-bundle reporting: official bundle id, owner, kind, derivative labels,
-  watchdog budget, timeout kind, per-bundle status, timing, and optional skip
-  reason;
+  watchdog budget, timeout kind, per-bundle status, timing, explicit terminal
+  step/cause metadata for blocking bundles, and optional skip reason;
 - per-step reporting inside each bundle: step id, summary, command,
-  environment overrides, timing, exit code, stdout/stderr, failure summary, and
-  whether the step result came from shared-step caching.
+  environment overrides, timing, exit code, stdout/stderr, failure summary,
+  structured terminal cause metadata for blocking steps, and whether the step
+  result came from shared-step caching.
+
+For watchdog-backed failures, the structured report now carries the fields
+caller adapters need without parsing prose: `bundle_id`, `elapsed_seconds`,
+`watchdog_budget_minutes`, and `terminal_cause` (plus `terminal_step_id` when
+the blocking step is known).
 
 This report shape is intentionally caller-neutral. Local CLI output, CI job
 logs, and future watchdog-specific diagnostics should all derive from the same

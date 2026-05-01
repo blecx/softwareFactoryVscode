@@ -1778,6 +1778,20 @@ def _shared_engine_findings_from_report(
         f"Fix the reported shared-engine failure and rerun `{rerun_command}`."
     )
 
+    def _terminal_summary(bundle_report, step) -> str:
+        base_summary = (
+            step.failure_summary or bundle_report.failure_summary or step.summary
+        )
+        terminal_cause = (
+            bundle_report.terminal_cause or step.terminal_cause or "unknown"
+        )
+        return (
+            f"Bundle `{bundle_report.bundle_id}` ended with `{bundle_report.status}` "
+            f"after {bundle_report.elapsed_seconds:.3f}s against the "
+            f"{bundle_report.watchdog_budget_minutes}-minute watchdog during step "
+            f"`{step.step_id}` (cause: `{terminal_cause}`). {base_summary}"
+        )
+
     for bundle_report in report.bundle_reports:
         terminal_steps = tuple(
             step
@@ -1792,11 +1806,7 @@ def _shared_engine_findings_from_report(
                 Finding(
                     severity="error",
                     name=_legacy_shared_step_name(step),
-                    summary=(
-                        step.failure_summary
-                        or bundle_report.failure_summary
-                        or step.summary
-                    ),
+                    summary=_terminal_summary(bundle_report, step),
                     remediation=remediation,
                     command=_finding_command_from_shared_step(step),
                     returncode=step.returncode,
