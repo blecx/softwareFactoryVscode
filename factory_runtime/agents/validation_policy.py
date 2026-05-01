@@ -1,11 +1,14 @@
 """Canonical validation policy contract and official bundle taxonomy.
 
-This module owns schema validation for the repository's phase-2 validation
-policy surface. Issue #226 established the canonical bundle taxonomy and
-watchdog metadata; issue #227 extended the same surface with the four
-validation levels, representative changed-surface rules, aggregate
-composition, and explicit local-vs-GitHub exceptions; issue #228 locks that
-contract down with the broader valid/invalid policy test suite.
+This module owns schema validation for the repository's canonical validation
+policy surface. Issue #226 established the canonical bundle taxonomy; issue
+#227 extended the same surface with the four validation levels,
+representative changed-surface rules, aggregate composition, and explicit
+local-vs-GitHub exceptions; issue #228 locked that contract down with the
+broader valid/invalid policy test suite; and issue #230 makes the per-bundle
+runtime-budget/watchdog semantics explicit via `watchdog.max_minutes` and
+`watchdog.timeout_kind` as the documented equivalents for the bounded-runtime
+contract.
 """
 
 from __future__ import annotations
@@ -139,6 +142,18 @@ class ValidationBundleWatchdog:
 
     max_minutes: int
     timeout_kind: str
+
+    @property
+    def budget_minutes(self) -> int:
+        """Repository-owned bundle budget recorded in the canonical policy."""
+
+        return self.max_minutes
+
+    @property
+    def effective_budget_minutes(self) -> int:
+        """Effective budget after applying the repository hard ceiling."""
+
+        return min(MAX_WATCHDOG_BUDGET_MINUTES, self.budget_minutes)
 
     @classmethod
     def from_dict(

@@ -8,6 +8,7 @@ authority:
     - "This file is the authoritative bundle-taxonomy surface introduced by issue #226."
     - "Issue #227 populates levels, changed-surface rules, and explicit exceptions."
     - "Issue #228 broadens the invalid-policy contract lock around this schema."
+    - "Issue #230 treats `watchdog.max_minutes` plus `watchdog.timeout_kind` as the canonical per-bundle runtime-budget/watchdog metadata, with the effective bundle budget defined as `min(45 minutes, repo-owned watchdog.max_minutes)`."
 
 official_bundle_order:
   - baseline

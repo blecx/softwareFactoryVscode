@@ -60,6 +60,17 @@ def test_validation_policy_rejects_missing_watchdog_metadata() -> None:
         ValidationPolicy.from_dict(data)
 
 
+def test_validation_policy_rejects_missing_watchdog_mapping() -> None:
+    data = copy.deepcopy(_load_raw_policy())
+    del data["bundles"]["runtime-proofs"]["watchdog"]
+
+    with pytest.raises(
+        ValidationPolicyError,
+        match=r"bundles\.runtime-proofs\.watchdog must be a mapping",
+    ):
+        ValidationPolicy.from_dict(data)
+
+
 def test_validation_policy_rejects_over_budget_watchdog() -> None:
     data = copy.deepcopy(_load_raw_policy())
     data["bundles"]["runtime-proofs"]["watchdog"]["max_minutes"] = 46
