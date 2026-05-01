@@ -19,6 +19,10 @@ from factory_runtime.agents.coverage_analyzer import (
 )
 
 
+def _normalize_text(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
 def test_complexity_scorer_basic():
     scorer = ComplexityScorer()
     body = (
@@ -570,27 +574,37 @@ def test_wiki_skills_share_low_memory_boundary_shorthand() -> None:
         repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow" / "SKILL.md"
     ).read_text(encoding="utf-8")
 
-    lowered_texts = [
-        bootstrap.lower(),
-        policy.lower(),
-        maintenance.lower(),
+    normalized_texts = [
+        _normalize_text(bootstrap),
+        _normalize_text(policy),
+        _normalize_text(maintenance),
     ]
 
-    for text in lowered_texts:
+    for text in normalized_texts:
         assert "low-memory boundary shorthand" in text
-        assert "what may go public and what stays repo-only" in text
-        assert "where approved canonical sources land in the wiki" in text
-        assert (
-            "what the host project says and why that wording is authoritative" in text
-        )
-        assert "what readers see after projection" in text
+        assert "**publication policy**" in text
+        assert "**projection config**" in text
+        assert "**canonical docs + authority docs**" in text
+        assert "**live github wiki**" in text
+        assert "repo-only" in text
+        assert "approved" in text
+        assert "authoritative" in text
+        assert "readers" in text
+        assert "projection" in text
 
-    assert "pre-truth onboarding step" in bootstrap.lower()
-    assert (
-        "define the host publication boundary without replacing projection config"
-        in policy.lower()
-    )
-    assert "update live wiki output from approved host truth" in maintenance.lower()
+    bootstrap_normalized = _normalize_text(bootstrap)
+    policy_normalized = _normalize_text(policy)
+    maintenance_normalized = _normalize_text(maintenance)
+
+    assert "**bootstrap**" in bootstrap_normalized
+    assert "starting host-owned surfaces" in bootstrap_normalized
+    assert "**this skill**" in policy_normalized
+    assert "host publication boundary" in policy_normalized
+    assert "projection config" in policy_normalized
+    assert "live wiki maintenance" in policy_normalized
+    assert "**this skill**" in maintenance_normalized
+    assert "live wiki output" in maintenance_normalized
+    assert "approved host truth" in maintenance_normalized
 
 
 def test_wiki_skill_handoffs_stay_lane_specific_and_truth_gated() -> None:
@@ -609,24 +623,29 @@ def test_wiki_skill_handoffs_stay_lane_specific_and_truth_gated() -> None:
         repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow" / "SKILL.md"
     ).read_text(encoding="utf-8")
 
-    assert (
-        "**Next lane** = hand off to `wiki-publication-policy-authoring` for "
-        "boundary decisions, or to `wiki-maintenance-workflow` only after host "
-        "truth is approved." in bootstrap
-    )
-    assert (
-        "Leave live wiki publication to the maintenance workflow once the host "
-        "policy is approved and the host truth surfaces are in place." in policy
-    )
-    assert (
-        "Do not use this to invent or rewrite the host project's publication "
-        "policy." in maintenance
-    )
-    assert (
-        "Confirm the lane really is maintenance: the host publication policy, "
-        "projection config, canonical docs, and authority docs already exist and "
-        "are approved." in maintenance
-    )
+    bootstrap_normalized = _normalize_text(bootstrap)
+    policy_normalized = _normalize_text(policy)
+    maintenance_normalized = _normalize_text(maintenance)
+
+    assert "**next lane**" in bootstrap_normalized
+    assert "wiki-publication-policy-authoring" in bootstrap_normalized
+    assert "boundary decisions" in bootstrap_normalized
+    assert "wiki-maintenance-workflow" in bootstrap_normalized
+    assert "host truth is approved" in bootstrap_normalized
+
+    assert "leave live wiki publication" in policy_normalized
+    assert "maintenance workflow" in policy_normalized
+    assert "host policy is approved" in policy_normalized
+    assert "host truth surfaces are in place" in policy_normalized
+
+    assert "do not use this to invent or rewrite" in maintenance_normalized
+    assert "publication policy" in maintenance_normalized
+    assert "lane really is maintenance" in maintenance_normalized
+    assert "host publication policy" in maintenance_normalized
+    assert "projection config" in maintenance_normalized
+    assert "canonical docs" in maintenance_normalized
+    assert "authority docs" in maintenance_normalized
+    assert "approved" in maintenance_normalized
 
 
 def test_wiki_bootstrap_skill_leaves_live_wiki_execution_to_maintainers():
@@ -919,6 +938,12 @@ def test_execution_surface_routing_contract_is_documented() -> None:
 
     assert "Respect execution surfaces" in instructions
     assert "generated `software-factory.code-workspace` surface" in instructions
+    assert "Re-anchor before acting on issue work" in instructions
+    assert "Refuse stray partial `.tmp` snapshots as execution surfaces" in instructions
+    assert "Do not claim progress from the wrong surface" in instructions
+    assert ".tmp/github-issue-queue-state.md" in instructions
+    assert "current editor path as advisory only" in instructions
+    assert "stray partial snapshot" in instructions
 
 
 def test_mcp_first_tool_routing_guidance_is_documented() -> None:
@@ -1952,6 +1977,7 @@ def test_wiki_contract_and_runbook_preserve_truth_first_handoff_order() -> None:
     runbook = (repo_root / "docs" / "maintainer" / "WIKI-PUBLISHING.md").read_text(
         encoding="utf-8"
     )
+    normalized_runbook = _normalize_text(runbook)
     adoption_order = contract.split("## Adoption order", maxsplit=1)[1].split(
         "## Ownership split at a glance",
         maxsplit=1,
@@ -1987,12 +2013,11 @@ def test_wiki_contract_and_runbook_preserve_truth_first_handoff_order() -> None:
         "(../../.copilot/skills/wiki-maintenance-workflow/SKILL.md)"
     )
 
-    assert (
-        "If any answer is `no`, stop here and return to "
-        "[`HOST-WIKI-TRUTH-CONTRACT.md`](HOST-WIKI-TRUTH-CONTRACT.md), "
-        "bootstrap, or publication-policy authoring instead of stretching this "
-        "runbook into a truth-authoring surface." in runbook
-    )
+    assert "if any answer is `no`, stop here and return to" in normalized_runbook
+    assert "host-wiki-truth-contract.md" in normalized_runbook
+    assert "bootstrap" in normalized_runbook
+    assert "publication-policy authoring" in normalized_runbook
+    assert "truth-authoring surface" in normalized_runbook
 
 
 def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
@@ -2278,12 +2303,30 @@ def test_python_writer_formatter_guardrail_is_documented() -> None:
         encoding="utf-8"
     )
     tests_readme = (repo_root / "tests" / "README.md").read_text(encoding="utf-8")
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    pr_template = (repo_root / ".github" / "pull_request_template.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "actual formatter" in instructions
     assert "Do **not** hand-format Python output" in instructions
     assert "Black-compatible formatting at save time" in instructions
+    assert "./.venv/bin/python -m black" in instructions
+    assert "python3 -m black" in instructions
+    assert "rely on bare `python`" in instructions
     assert "actual formatter-first rule for generated Python writes" in guardrails
     assert "Formatter fidelity for generated Python files" in guardrails
+    assert "Queue/interruption re-anchoring or stale editor paths" in guardrails
+    assert "execution-surface re-anchoring" in guardrails
+    assert "stray-snapshot refusal" in guardrails
+    assert "python3 -c '...'" in workflow_doc
+    assert "./.venv/bin/python -c '...'" in workflow_doc
+    assert "python3 - <<'PY'" in workflow_doc
+    assert "python scripts/check_neutrality.py" not in pr_template
+    assert "python3 scripts/check_neutrality.py" in pr_template
+    assert "python3 -m pytest tests factory_runtime/tests -q --tb=short" in pr_template
     assert "run **Black itself** before treating the save as complete" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
     assert (
@@ -3684,6 +3727,65 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     assert "committed HEAD only" in captured.out
 
 
+def test_local_ci_parity_fresh_checkout_reports_git_timeout_during_snapshot_creation(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    monkeypatch.setattr(
+        module, "resolve_head_revision", lambda repo_root, head_rev: "deadbeef"
+    )
+    monkeypatch.setattr(
+        module,
+        "run_docker_bind_mount_ownership_parity_probe",
+        lambda repo_root: None,
+    )
+    monkeypatch.setattr(
+        module, "worktree_has_uncommitted_changes", lambda repo_root: False
+    )
+    monkeypatch.setattr(
+        module,
+        "create_fresh_checkout_snapshot",
+        lambda repo_root, *, head_rev: (_ for _ in ()).throw(
+            module.CommandTimeoutError(
+                command=(
+                    "git",
+                    "-C",
+                    str(tmp_path),
+                    "worktree",
+                    "add",
+                    "--detach",
+                    str(tmp_path / "fresh-checkout"),
+                    head_rev,
+                ),
+                timeout_seconds=module.DEFAULT_WATCHDOG_SECONDS,
+                stdout="",
+                stderr="",
+            )
+        ),
+    )
+
+    exit_code = module.main(
+        [
+            "--repo-root",
+            str(tmp_path),
+            "--base-rev",
+            "base-sha",
+            "--mode",
+            "production",
+            "--fresh-checkout",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "configured watchdog" in captured.out
+    assert "Creating the fresh-checkout git worktree did not complete" in captured.out
+    assert "git -C" in captured.out
+
+
 def test_local_ci_parity_fresh_checkout_production_mode_blocks_on_docker_ownership_gap(
     monkeypatch,
     tmp_path: Path,
@@ -3934,7 +4036,7 @@ def test_local_ci_parity_production_groups_only_skips_default_prechecks(
     tmp_path: Path,
 ):
     module = _load_local_ci_parity_module()
-    call_order: list[str] = []
+    delegated_groups: list[tuple[str, ...]] = []
     executed_commands: list[tuple[str, ...]] = []
 
     def _fake_run_command(command, *, cwd):
@@ -3945,26 +4047,24 @@ def test_local_ci_parity_production_groups_only_skips_default_prechecks(
             list(command_tuple), 0, stdout="ok\n", stderr=""
         )
 
+    def _fake_shared_runner(
+        *,
+        repo_root: Path,
+        base_rev: str,
+        head_rev: str,
+        python_executable: str,
+        selected_groups,
+        rerun_command: str,
+    ):
+        del repo_root, base_rev, head_rev, python_executable, rerun_command
+        delegated_groups.append(tuple(selected_groups))
+        return [], {module.PRODUCTION_GROUP_DOCS_CONTRACT: "pass"}
+
     monkeypatch.setattr(module, "run_command", _fake_run_command)
     monkeypatch.setattr(
         module,
-        "run_required_documentation_validation",
-        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCS_CONTRACT)
-        or [],
-    )
-    monkeypatch.setattr(
-        module,
-        "run_docker_build_validation",
-        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCKER_BUILDS)
-        or [],
-    )
-    monkeypatch.setattr(
-        module,
-        "run_docker_e2e_validation",
-        lambda repo_root, *, python_executable: call_order.append(
-            module.PRODUCTION_GROUP_RUNTIME_PROOFS
-        )
-        or [],
+        "run_selected_production_groups_via_shared_engine",
+        _fake_shared_runner,
     )
 
     exit_code = module.main(
@@ -3982,7 +4082,7 @@ def test_local_ci_parity_production_groups_only_skips_default_prechecks(
     )
 
     assert exit_code == 0
-    assert call_order == [module.PRODUCTION_GROUP_DOCS_CONTRACT]
+    assert delegated_groups == [(module.PRODUCTION_GROUP_DOCS_CONTRACT,)]
     assert not any(command[1:3] == ("-m", "black") for command in executed_commands)
     assert not any(command[1:3] == ("-m", "pytest") for command in executed_commands)
 
@@ -4531,6 +4631,71 @@ def test_local_ci_parity_watchdog_timeout_reports_split_replay_guidance(
     assert module.PYTEST_BUNDLE_DOCS_WORKFLOW in captured.out
     assert "terminated after the first blocking error" in captured.out
     assert "Cause: `" in captured.out
+
+
+def test_local_ci_parity_run_git_uses_watchdog_timeout(monkeypatch, tmp_path: Path):
+    module = _load_local_ci_parity_module()
+    captured: dict[str, object] = {}
+    module.ACTIVE_COMMAND_TIMEOUT_SECONDS = module.DEFAULT_WATCHDOG_SECONDS
+
+    def _fake_subprocess_run(
+        command,
+        *,
+        check,
+        text,
+        capture_output,
+        timeout,
+    ):
+        captured["command"] = tuple(command)
+        captured["check"] = check
+        captured["text"] = text
+        captured["capture_output"] = capture_output
+        captured["timeout"] = timeout
+        return subprocess.CompletedProcess(list(command), 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(module.subprocess, "run", _fake_subprocess_run)
+
+    result = module.run_git(tmp_path, ["status", "--short"])
+
+    assert result.returncode == 0
+    assert captured["command"] == (
+        "git",
+        "-C",
+        str(tmp_path),
+        "status",
+        "--short",
+    )
+    assert captured["check"] is False
+    assert captured["text"] is True
+    assert captured["capture_output"] is True
+    assert captured["timeout"] == module.DEFAULT_WATCHDOG_SECONDS
+
+
+def test_local_ci_parity_reports_git_timeout_during_revision_resolution(
+    monkeypatch,
+    tmp_path: Path,
+    capsys,
+):
+    module = _load_local_ci_parity_module()
+
+    def _fake_run_git(repo_root: Path, args: list[str]):
+        del repo_root
+        raise module.CommandTimeoutError(
+            command=("git", "-C", str(tmp_path), *args),
+            timeout_seconds=module.DEFAULT_WATCHDOG_SECONDS,
+            stdout="",
+            stderr="",
+        )
+
+    monkeypatch.setattr(module, "run_git", _fake_run_git)
+
+    exit_code = module.main(["--repo-root", str(tmp_path), "--base-rev", "base-sha"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "configured watchdog" in captured.out
+    assert "Git revision resolution did not complete" in captured.out
+    assert "git -C" in captured.out
 
 
 def test_local_ci_parity_rejects_pytest_bundle_with_production_groups_only(

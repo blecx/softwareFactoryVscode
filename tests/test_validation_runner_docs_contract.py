@@ -8,10 +8,15 @@ RUNNER_CONTRACT_PATH = (
 )
 
 
+def _normalize_text(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
 def test_validation_runner_contract_doc_identifies_authority_and_deferred_callers() -> (
     None
 ):
     contract = RUNNER_CONTRACT_PATH.read_text(encoding="utf-8")
+    normalized_contract = _normalize_text(contract)
     docs_readme = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
     guardrails = (REPO_ROOT / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
         encoding="utf-8"
@@ -19,8 +24,10 @@ def test_validation_runner_contract_doc_identifies_authority_and_deferred_caller
 
     assert "# Validation runner contract and structured reporting" in contract
     assert "issue `#235`" in contract
+    assert "issue `#236`" in contract
     assert "validation_plan_resolver.py" in contract
     assert "validation_runner.py" in contract
+    assert "validation_compat_adapters.py" in contract
     assert "validation_policy.py" in contract
     assert "per-bundle status, timing, and terminal outcome" in contract
     assert "watchdog.max_minutes" in contract
@@ -29,6 +36,9 @@ def test_validation_runner_contract_doc_identifies_authority_and_deferred_caller
     assert ".github/workflows/ci.yml" in contract
     assert "## Structured report contract" in contract
     assert "## Caller boundary and deferred migrations" in contract
+    assert "production-groups-only" in contract
+    assert "transitional callers" in normalized_contract
+    assert "not new normative surfaces" in normalized_contract
     assert "tests/test_validation_runner.py" in contract
     assert "tests/test_validation_runner_docs_contract.py" in contract
 

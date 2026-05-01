@@ -85,9 +85,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install dependencies
+        run: |
+          bash ./setup.sh
+
       - name: Run production docs-contract diagnostics
         run: |
-          python3 ./scripts/local_ci_parity.py \
+          ./.venv/bin/python ./scripts/local_ci_parity.py \
             --mode production \
             --production-group docs-contract \
             --production-groups-only
@@ -105,9 +109,13 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install dependencies
+        run: |
+          bash ./setup.sh
+
       - name: Run production docker-build diagnostics
         run: |
-          python3 ./scripts/local_ci_parity.py \
+          ./.venv/bin/python ./scripts/local_ci_parity.py \
             --mode production \
             --production-group docker-builds \
             --production-groups-only
@@ -153,6 +161,10 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Install dependencies
+        run: |
+          bash ./setup.sh
+
       - name: Run canonical internal production gate (Docker parity & recovery proofs)
         run: |
           # The canonical aggregate production gate remains the readiness
@@ -160,7 +172,7 @@ jobs:
           # successful production-only diagnostic jobs instead of replaying
           # Dockerfile build parity, docs-contract checks, and runtime proofs a
           # second time on the critical path.
-          python3 ./scripts/local_ci_parity.py \
+          ./.venv/bin/python ./scripts/local_ci_parity.py \
             --mode production \
             --production-group aggregate \
             --production-groups-only \

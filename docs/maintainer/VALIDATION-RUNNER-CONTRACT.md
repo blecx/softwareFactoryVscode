@@ -2,16 +2,18 @@
 
 This document records the shared validation runner introduced for issue `#235`
 under umbrella issue `#233`, after issue `#234` landed the shared validation
-plan resolver. The runner is the first repo-owned execution surface that
-consumes the canonical validation policy and resolver output together without
-inventing a second caller-specific bundle taxonomy.
+plan resolver and issue `#236` added the first thin compatibility adapters for
+legacy caller continuity. The runner is the first repo-owned execution surface
+that consumes the canonical validation policy and resolver output together
+without inventing a second caller-specific bundle taxonomy.
 
 - **Status:** shared-engine runner/reporting contract
 - **Authoritative resolver input:** [`../../factory_runtime/agents/validation_plan_resolver.py`](../../factory_runtime/agents/validation_plan_resolver.py)
 - **Authoritative runner/report implementation:** [`../../factory_runtime/agents/validation_runner.py`](../../factory_runtime/agents/validation_runner.py)
 - **Canonical policy input:** [`../../configs/validation_policy.yml`](../../configs/validation_policy.yml)
 - **Schema/loader for policy metadata:** [`../../factory_runtime/agents/validation_policy.py`](../../factory_runtime/agents/validation_policy.py)
-- **Current boundary:** this slice executes the resolved official atomic bundle plan, honors per-bundle watchdog metadata from the canonical policy, and emits one structured report contract with per-bundle status, timing, and terminal outcome details. It still does **not** yet migrate [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py) or [`../../.github/workflows/ci.yml`](../../.github/workflows/ci.yml) to call the shared runner by default.
+- **Compatibility adapter boundary:** [`../../factory_runtime/agents/validation_compat_adapters.py`](../../factory_runtime/agents/validation_compat_adapters.py)
+- **Current boundary:** this slice executes the resolved official atomic bundle plan, honors per-bundle watchdog metadata from the canonical policy, and emits one structured report contract with per-bundle status, timing, and terminal outcome details. Issue `#236` also lets the `--mode production --production-groups-only` path in [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py) delegate to the shared runner through an explicit compatibility adapter. The default local aggregate flow and [`../../.github/workflows/ci.yml`](../../.github/workflows/ci.yml) still do **not** yet call the shared runner by default.
 
 ## Why this surface exists
 
@@ -79,16 +81,26 @@ defaults.
 
 ## Caller boundary and deferred migrations
 
-This issue intentionally stops at the shared engine/report contract.
+Issue `#235` intentionally stopped at the shared engine/report contract. Issue
+`#236` starts the compatibility migration without making those adapters a new
+authority surface.
 
-Still deferred after issue `#235`:
+Still deferred after issue `#236`:
 
 - making [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py)
-  use the shared runner as its default execution path;
+  use the shared runner as its default execution path for the standard path,
+  the aggregate production gate, and legacy pytest-bundle replays;
 - migrating [`../../.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
   jobs to consume the same report contract directly; and
-- the compatibility adapters and regression locks that preserve caller
-  continuity while those migrations happen.
+- removing the temporary compatibility adapters once those callers consume the
+  shared runner/report contract directly.
+
+The compatibility adapters are intentionally narrow:
+
+- they may translate legacy caller inputs into official atomic bundle ids;
+- they must keep bundle selection, watchdog semantics, and metadata anchored to
+  the canonical policy and resolver; and
+- they must be documented as transitional callers, not new normative surfaces.
 
 Those later migrations must reference this runner contract, the shared resolver,
 the canonical validation policy, and [`../architecture/ADR-006-Local-CI-Parity-Prechecks.md`](../architecture/ADR-006-Local-CI-Parity-Prechecks.md) instead of inventing a fresh local-vs-GitHub execution contract.
@@ -96,6 +108,7 @@ the canonical validation policy, and [`../architecture/ADR-006-Local-CI-Parity-P
 ## Lock test surfaces
 
 - [`../../tests/test_validation_runner.py`](../../tests/test_validation_runner.py) — shared runner execution/reporting contract coverage, timeout behavior, fast-fail skip semantics, and official bundle registration.
+- [`../../tests/test_validation_compat_adapters.py`](../../tests/test_validation_compat_adapters.py) — compatibility-adapter request/plan coverage plus local-ci shared-runner delegation regression locks.
 - [`../../tests/test_validation_runner_docs_contract.py`](../../tests/test_validation_runner_docs_contract.py) — maintainer-facing discoverability and authority-routing lock for this runner contract note.
 - [`../../tests/test_validation_plan_resolver.py`](../../tests/test_validation_plan_resolver.py) — shared plan resolution behavior that feeds the runner.
 - [`../../tests/test_validation_policy_selection_contract.py`](../../tests/test_validation_policy_selection_contract.py) — policy-backed selection scenarios that determine which official bundles the runner must execute.
