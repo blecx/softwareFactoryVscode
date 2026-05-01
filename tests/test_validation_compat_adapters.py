@@ -75,7 +75,9 @@ def test_explicit_compatibility_plan_marks_transitional_shared_engine_surface() 
     assert plan.effective_atomic_bundles == ("docs-contract", "runtime-proofs")
 
     compatibility_reasons = [
-        reason for reason in plan.reasons if reason.reason_type == "compatibility-adapter"
+        reason
+        for reason in plan.reasons
+        if reason.reason_type == "compatibility-adapter"
     ]
     assert len(compatibility_reasons) == 1
     assert (
@@ -91,7 +93,9 @@ def test_explicit_compatibility_plan_marks_transitional_shared_engine_surface() 
 def test_explicit_compatibility_plan_rejects_unknown_or_non_atomic_bundles() -> None:
     policy = ValidationPolicy.load_canonical()
 
-    with pytest.raises(ValidationCompatibilityAdapterError, match="known official bundles"):
+    with pytest.raises(
+        ValidationCompatibilityAdapterError, match="known official bundles"
+    ):
         build_explicit_compatibility_plan(
             bundle_ids=("not-a-real-bundle",),
             requested_level="production",
@@ -100,7 +104,9 @@ def test_explicit_compatibility_plan_rejects_unknown_or_non_atomic_bundles() -> 
             policy=policy,
         )
 
-    with pytest.raises(ValidationCompatibilityAdapterError, match="official atomic bundles"):
+    with pytest.raises(
+        ValidationCompatibilityAdapterError, match="official atomic bundles"
+    ):
         build_explicit_compatibility_plan(
             bundle_ids=("production",),
             requested_level="production",
@@ -110,7 +116,9 @@ def test_explicit_compatibility_plan_rejects_unknown_or_non_atomic_bundles() -> 
         )
 
 
-def test_local_ci_production_groups_runner_request_preserves_revisions_and_python() -> None:
+def test_local_ci_production_groups_runner_request_preserves_revisions_and_python() -> (
+    None
+):
     policy = ValidationPolicy.load_canonical()
 
     request = build_local_ci_production_groups_runner_request(
