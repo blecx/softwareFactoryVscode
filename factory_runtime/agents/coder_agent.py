@@ -27,6 +27,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
+from factory_runtime.text_write_normalization import normalize_repo_text_for_write
+
 if TYPE_CHECKING:
     from openai import AsyncOpenAI
 
@@ -327,9 +329,14 @@ class CoderAgent:
                 continue
 
             target = self._root / filepath
+            normalized_content = normalize_repo_text_for_write(
+                target,
+                content,
+                require_python_formatter=True,
+            )
             before = target.read_text() if target.exists() else None
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content)
+            target.write_text(normalized_content)
             files_changed.append(filepath)
 
             # Write snapshot to agent-bus
@@ -339,7 +346,7 @@ class CoderAgent:
                     "run_id": run_id,
                     "filepath": filepath,
                     "content_before": before,
-                    "content_after": content,
+                    "content_after": normalized_content,
                 },
             )
 
@@ -398,16 +405,21 @@ class CoderAgent:
                         content = edit.get("content", "")
                         if filepath and content:
                             target = self._root / filepath
+                            normalized_content = normalize_repo_text_for_write(
+                                target,
+                                content,
+                                require_python_formatter=True,
+                            )
                             before = target.read_text() if target.exists() else None
                             target.parent.mkdir(parents=True, exist_ok=True)
-                            target.write_text(content)
+                            target.write_text(normalized_content)
                             await self._mcp.call_tool(
                                 "bus_write_snapshot",
                                 {
                                     "run_id": run_id,
                                     "filepath": filepath,
                                     "content_before": before,
-                                    "content_after": content,
+                                    "content_after": normalized_content,
                                 },
                             )
                 except json.JSONDecodeError:

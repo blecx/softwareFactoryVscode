@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from factory_runtime.text_write_normalization import normalize_repo_text_for_write
+
 from .path_guard import RepoPathGuard
 
 
@@ -60,10 +62,15 @@ class FilesystemService:
         elif not resolved.parent.exists():
             raise ValueError("parent directory does not exist")
 
-        resolved.write_text(content, encoding="utf-8")
+        normalized_content = normalize_repo_text_for_write(
+            resolved,
+            content,
+            require_python_formatter=True,
+        )
+        resolved.write_text(normalized_content, encoding="utf-8")
         return {
             "path": str(resolved.relative_to(self.repo_root)),
-            "bytes_written": len(content.encode("utf-8")),
+            "bytes_written": len(normalized_content.encode("utf-8")),
         }
 
     def make_dir(self, path: str, parents: bool = True) -> dict[str, Any]:

@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from factory_runtime.agents.tooling.contracts import ToolResult
+from factory_runtime.text_write_normalization import normalize_repo_text_for_write
 
 
 def read_file_content_typed(
@@ -43,12 +44,17 @@ def write_file_content_typed(
     try:
         path = Path(base_directory) / file_path
         path.parent.mkdir(parents=True, exist_ok=True)
+        normalized_content = normalize_repo_text_for_write(
+            path,
+            content,
+            require_python_formatter=True,
+        )
 
         with open(path, "w", encoding="utf-8") as handle:
-            handle.write(content)
+            handle.write(normalized_content)
 
         return ToolResult.success(
-            f"Successfully wrote {len(content)} bytes to {file_path}"
+            f"Successfully wrote {len(normalized_content.encode('utf-8'))} bytes to {file_path}"
         )
     except Exception as exc:
         return ToolResult.failure(
