@@ -2090,6 +2090,7 @@ def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
     assert ".github/copilot-instructions.md" in catalog
     assert ".copilot/skills/*" in catalog
     assert ".github/agents/*" in catalog
+    assert "execute-approved-umbrella.md" in catalog
     assert "PROMPT-WORKFLOWS.md" in catalog
     assert ".github/prompts/*" in catalog
     assert "APPROVAL-PROFILES.md" in catalog
