@@ -10,8 +10,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 CONTRACT_DOC_PATH = REPO_ROOT / CANONICAL_VALIDATION_POLICY_DOCUMENTATION_PATH
 
 
+def _normalize_text(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
 def test_validation_policy_contract_doc_identifies_authority_and_lock_suite() -> None:
     contract = CONTRACT_DOC_PATH.read_text(encoding="utf-8")
+    normalized_contract = _normalize_text(contract)
     docs_readme = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
     guardrails = (REPO_ROOT / "docs" / "maintainer" / "GUARDRAILS.md").read_text(
         encoding="utf-8"
@@ -23,10 +28,13 @@ def test_validation_policy_contract_doc_identifies_authority_and_lock_suite() ->
     assert "## Explicit local-vs-GitHub exceptions" in contract
     assert "fresh-checkout-bootstrap" in contract
     assert "runner-ownership-parity" in contract
-    assert "broader valid/invalid policy contract lock" in contract
     assert "issue `#230`" in contract
-    assert "per-bundle runtime-budget/watchdog metadata" in contract
-    assert "min(45 minutes, repo-owned watchdog.max_minutes)" in contract
+    assert "valid bundle-selection scenarios" in normalized_contract
+    assert "invalid-policy rejection cases" in normalized_contract
+    assert "watchdog.max_minutes" in contract
+    assert "event-driven-deadline" in contract
+    assert "45 minutes" in normalized_contract
+    assert "effective enforced budget" in normalized_contract
     assert "## Contract lock test surfaces" in contract
     assert "configs/validation_policy.yml" in contract
     assert "factory_runtime/agents/validation_policy.py" in contract

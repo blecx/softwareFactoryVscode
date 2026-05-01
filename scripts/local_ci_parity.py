@@ -23,6 +23,25 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Sequence
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from factory_runtime.agents.validation_compat_adapters import (
+    COMPATIBILITY_ADAPTER_DEPRECATION_NOTE,
+    build_local_ci_production_groups_runner_request,
+)
+from factory_runtime.agents.validation_policy import ValidationPolicy
+from factory_runtime.agents.validation_runner import (
+    TERMINAL_STEP_STATUSES,
+    VALIDATION_STEP_STATUS_FAILED,
+    VALIDATION_STEP_STATUS_SKIPPED,
+    VALIDATION_STEP_STATUS_TIMED_OUT,
+    ValidationRunReport,
+    ValidationRunner,
+    ValidationStepReport,
+)
+
 DEFAULT_REPO_URL = "https://github.com/blecx/softwareFactoryVscode.git"
 REQUIRED_DEV_TOOL_MODULES = ("black", "flake8", "isort", "pytest")
 STANDARD_MODE = "standard"
@@ -139,6 +158,10 @@ CANONICAL_PRODUCTION_DOCKER_E2E_COMMAND = (
 )
 PRODUCTION_RESULT_SOURCE_LIVE_EXECUTION = "live-execution"
 PRODUCTION_RESULT_SOURCE_UPSTREAM_CI_DIAGNOSTICS = "upstream-ci-diagnostics"
+LOCAL_CI_SHARED_ENGINE_COMPATIBILITY_NOTE = (
+    "The `--production-groups-only` diagnostic path is a transitional "
+    "compatibility adapter over the shared validation runner."
+)
 
 
 @dataclass(frozen=True)
@@ -1680,6 +1703,115 @@ def print_improvement_plan(findings: Sequence[Finding], *, rerun_command: str) -
         print(f"{index}. {item}")
 
 
+def _finding_command_from_shared_step(step: ValidationStepReport) -> tuple[str, ...]:
+    if not step.env_overrides:
+        return step.command
+
+    env_prefix = tuple(f"{name}={value}" for name, value in step.env_overrides)
+    return ("env", *env_prefix, *step.command)
+
+
+def _legacy_shared_step_name(step: ValidationStepReport) -> str:
+    if step.step_id == "required-internal-production-docs":
+        return "Required internal-production docs/runbooks"
+    if step.step_id == "docker-runtime-proofs":
+        return "Docker E2E runtime proof lane"
+    if step.step_id == "discover-dockerfiles":
+        return "Docker image build parity"
+    if step.step_id.startswith("docker-build-"):
+        service = step.step_id.removeprefix("docker-build-")
+        return f"Docker build validation ({service})"
+    return step.summary
+
+
+def _shared_engine_findings_from_report(
+    report: ValidationRunReport,
+    *,
+    rerun_command: str,
+) -> list[Finding]:
+    findings: list[Finding] = []
+    remediation = (
+        f"{LOCAL_CI_SHARED_ENGINE_COMPATIBILITY_NOTE} "
+        f"{COMPATIBILITY_ADAPTER_DEPRECATION_NOTE} "
+        f"Fix the reported shared-engine failure and rerun `{rerun_command}`."
+    )
+
+    for bundle_report in report.bundle_reports:
+        terminal_steps = tuple(
+            step
+            for step in bundle_report.steps
+            if step.status in TERMINAL_STEP_STATUSES
+        )
+        if not terminal_steps:
+            continue
+
+        for step in terminal_steps:
+            findings.append(
+                Finding(
+                    severity="error",
+                    name=_legacy_shared_step_name(step),
+                    summary=(
+                        step.failure_summary
+                        or bundle_report.failure_summary
+                        or step.summary
+                    ),
+                    remediation=remediation,
+                    command=_finding_command_from_shared_step(step),
+                    returncode=step.returncode,
+                )
+            )
+
+    return findings
+
+
+def _shared_engine_production_group_results(
+    report: ValidationRunReport,
+) -> dict[str, str]:
+    results: dict[str, str] = {}
+    for bundle_report in report.bundle_reports:
+        if bundle_report.status == VALIDATION_STEP_STATUS_SKIPPED:
+            results[bundle_report.bundle_id] = "skipped-shared-runner-fast-fail"
+        elif bundle_report.status in (
+            VALIDATION_STEP_STATUS_FAILED,
+            VALIDATION_STEP_STATUS_TIMED_OUT,
+        ):
+            results[bundle_report.bundle_id] = "fail"
+        else:
+            results[bundle_report.bundle_id] = "pass"
+    return results
+
+
+def run_selected_production_groups_via_shared_engine(
+    *,
+    repo_root: Path,
+    base_rev: str,
+    head_rev: str,
+    python_executable: str,
+    selected_groups: Sequence[str],
+    rerun_command: str,
+) -> tuple[list[Finding], dict[str, str]]:
+    print("\n▶ Shared validation runner compatibility adapter")
+    print(f"ℹ️ {LOCAL_CI_SHARED_ENGINE_COMPATIBILITY_NOTE}")
+
+    policy = ValidationPolicy.load_canonical()
+    request = build_local_ci_production_groups_runner_request(
+        repo_root=repo_root,
+        base_rev=base_rev,
+        head_rev=head_rev,
+        python_executable=python_executable,
+        selected_groups=selected_groups,
+        policy=policy,
+    )
+    report = ValidationRunner(policy=policy).execute_plan(request)
+    return (
+        _shared_engine_findings_from_report(
+            report,
+            rerun_command=rerun_command,
+        ),
+        _shared_engine_production_group_results(report),
+    )
+
+
 def raise_for_blocking_findings(
     findings: Sequence[Finding],
     *,
@@ -2111,7 +2243,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "In production mode, select one or more named production-only check "
             "groups. Defaults to `aggregate`, which runs docs-contract, "
             "docker-builds, and runtime-proofs in canonical order and emits the "
-            "canonical sign-off bundle."
+            "canonical sign-off bundle. Named groups remain transitional "
+            "compatibility entrypoints; when paired with `--production-groups-only`, "
+            "they delegate through the shared validation runner."
         ),
     )
     parser.add_argument(
@@ -2123,7 +2257,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "for production-diagnostic workflows in CI; when combined with "
             "`--ci-production-readiness-bundle-only`, aggregate mode refreshes "
             "the canonical sign-off bundle from already-successful upstream "
-            "production diagnostics without replaying them."
+            "production diagnostics without replaying them. This diagnostic path "
+            "is the current compatibility adapter that delegates named production "
+            "groups to the shared validation runner."
         ),
     )
     parser.add_argument(
@@ -2258,6 +2394,19 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 for group in production_groups:
                     production_group_results[group] = "pass"
+            elif args.production_groups_only:
+                shared_engine_findings, production_group_results = (
+                    run_selected_production_groups_via_shared_engine(
+                        repo_root=repo_root,
+                        base_rev=base_rev,
+                        head_rev=head_rev,
+                        python_executable=args.python,
+                        selected_groups=production_groups,
+                        rerun_command=rerun_command,
+                    )
+                )
+                findings.extend(shared_engine_findings)
+                raise_for_blocking_findings(findings, rerun_command=rerun_command)
             else:
                 for group in production_groups:
                     group_findings: list[Finding] = []

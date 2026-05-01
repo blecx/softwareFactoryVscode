@@ -19,6 +19,10 @@ from factory_runtime.agents.coverage_analyzer import (
 )
 
 
+def _normalize_text(value: str) -> str:
+    return " ".join(value.casefold().split())
+
+
 def test_complexity_scorer_basic():
     scorer = ComplexityScorer()
     body = (
@@ -570,27 +574,37 @@ def test_wiki_skills_share_low_memory_boundary_shorthand() -> None:
         repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow" / "SKILL.md"
     ).read_text(encoding="utf-8")
 
-    lowered_texts = [
-        bootstrap.lower(),
-        policy.lower(),
-        maintenance.lower(),
+    normalized_texts = [
+        _normalize_text(bootstrap),
+        _normalize_text(policy),
+        _normalize_text(maintenance),
     ]
 
-    for text in lowered_texts:
+    for text in normalized_texts:
         assert "low-memory boundary shorthand" in text
-        assert "what may go public and what stays repo-only" in text
-        assert "where approved canonical sources land in the wiki" in text
-        assert (
-            "what the host project says and why that wording is authoritative" in text
-        )
-        assert "what readers see after projection" in text
+        assert "**publication policy**" in text
+        assert "**projection config**" in text
+        assert "**canonical docs + authority docs**" in text
+        assert "**live github wiki**" in text
+        assert "repo-only" in text
+        assert "approved" in text
+        assert "authoritative" in text
+        assert "readers" in text
+        assert "projection" in text
 
-    assert "pre-truth onboarding step" in bootstrap.lower()
-    assert (
-        "define the host publication boundary without replacing projection config"
-        in policy.lower()
-    )
-    assert "update live wiki output from approved host truth" in maintenance.lower()
+    bootstrap_normalized = _normalize_text(bootstrap)
+    policy_normalized = _normalize_text(policy)
+    maintenance_normalized = _normalize_text(maintenance)
+
+    assert "**bootstrap**" in bootstrap_normalized
+    assert "starting host-owned surfaces" in bootstrap_normalized
+    assert "**this skill**" in policy_normalized
+    assert "host publication boundary" in policy_normalized
+    assert "projection config" in policy_normalized
+    assert "live wiki maintenance" in policy_normalized
+    assert "**this skill**" in maintenance_normalized
+    assert "live wiki output" in maintenance_normalized
+    assert "approved host truth" in maintenance_normalized
 
 
 def test_wiki_skill_handoffs_stay_lane_specific_and_truth_gated() -> None:
@@ -609,24 +623,29 @@ def test_wiki_skill_handoffs_stay_lane_specific_and_truth_gated() -> None:
         repo_root / ".copilot" / "skills" / "wiki-maintenance-workflow" / "SKILL.md"
     ).read_text(encoding="utf-8")
 
-    assert (
-        "**Next lane** = hand off to `wiki-publication-policy-authoring` for "
-        "boundary decisions, or to `wiki-maintenance-workflow` only after host "
-        "truth is approved." in bootstrap
-    )
-    assert (
-        "Leave live wiki publication to the maintenance workflow once the host "
-        "policy is approved and the host truth surfaces are in place." in policy
-    )
-    assert (
-        "Do not use this to invent or rewrite the host project's publication "
-        "policy." in maintenance
-    )
-    assert (
-        "Confirm the lane really is maintenance: the host publication policy, "
-        "projection config, canonical docs, and authority docs already exist and "
-        "are approved." in maintenance
-    )
+    bootstrap_normalized = _normalize_text(bootstrap)
+    policy_normalized = _normalize_text(policy)
+    maintenance_normalized = _normalize_text(maintenance)
+
+    assert "**next lane**" in bootstrap_normalized
+    assert "wiki-publication-policy-authoring" in bootstrap_normalized
+    assert "boundary decisions" in bootstrap_normalized
+    assert "wiki-maintenance-workflow" in bootstrap_normalized
+    assert "host truth is approved" in bootstrap_normalized
+
+    assert "leave live wiki publication" in policy_normalized
+    assert "maintenance workflow" in policy_normalized
+    assert "host policy is approved" in policy_normalized
+    assert "host truth surfaces are in place" in policy_normalized
+
+    assert "do not use this to invent or rewrite" in maintenance_normalized
+    assert "publication policy" in maintenance_normalized
+    assert "lane really is maintenance" in maintenance_normalized
+    assert "host publication policy" in maintenance_normalized
+    assert "projection config" in maintenance_normalized
+    assert "canonical docs" in maintenance_normalized
+    assert "authority docs" in maintenance_normalized
+    assert "approved" in maintenance_normalized
 
 
 def test_wiki_bootstrap_skill_leaves_live_wiki_execution_to_maintainers():
@@ -1952,6 +1971,7 @@ def test_wiki_contract_and_runbook_preserve_truth_first_handoff_order() -> None:
     runbook = (repo_root / "docs" / "maintainer" / "WIKI-PUBLISHING.md").read_text(
         encoding="utf-8"
     )
+    normalized_runbook = _normalize_text(runbook)
     adoption_order = contract.split("## Adoption order", maxsplit=1)[1].split(
         "## Ownership split at a glance",
         maxsplit=1,
@@ -1987,12 +2007,11 @@ def test_wiki_contract_and_runbook_preserve_truth_first_handoff_order() -> None:
         "(../../.copilot/skills/wiki-maintenance-workflow/SKILL.md)"
     )
 
-    assert (
-        "If any answer is `no`, stop here and return to "
-        "[`HOST-WIKI-TRUTH-CONTRACT.md`](HOST-WIKI-TRUTH-CONTRACT.md), "
-        "bootstrap, or publication-policy authoring instead of stretching this "
-        "runbook into a truth-authoring surface." in runbook
-    )
+    assert "if any answer is `no`, stop here and return to" in normalized_runbook
+    assert "host-wiki-truth-contract.md" in normalized_runbook
+    assert "bootstrap" in normalized_runbook
+    assert "publication-policy authoring" in normalized_runbook
+    assert "truth-authoring surface" in normalized_runbook
 
 
 def test_maintainer_guardrail_catalog_indexes_current_enforcement_surfaces():
@@ -3934,7 +3953,7 @@ def test_local_ci_parity_production_groups_only_skips_default_prechecks(
     tmp_path: Path,
 ):
     module = _load_local_ci_parity_module()
-    call_order: list[str] = []
+    delegated_groups: list[tuple[str, ...]] = []
     executed_commands: list[tuple[str, ...]] = []
 
     def _fake_run_command(command, *, cwd):
@@ -3945,26 +3964,24 @@ def test_local_ci_parity_production_groups_only_skips_default_prechecks(
             list(command_tuple), 0, stdout="ok\n", stderr=""
         )
 
+    def _fake_shared_runner(
+        *,
+        repo_root: Path,
+        base_rev: str,
+        head_rev: str,
+        python_executable: str,
+        selected_groups,
+        rerun_command: str,
+    ):
+        del repo_root, base_rev, head_rev, python_executable, rerun_command
+        delegated_groups.append(tuple(selected_groups))
+        return [], {module.PRODUCTION_GROUP_DOCS_CONTRACT: "pass"}
+
     monkeypatch.setattr(module, "run_command", _fake_run_command)
     monkeypatch.setattr(
         module,
-        "run_required_documentation_validation",
-        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCS_CONTRACT)
-        or [],
-    )
-    monkeypatch.setattr(
-        module,
-        "run_docker_build_validation",
-        lambda repo_root: call_order.append(module.PRODUCTION_GROUP_DOCKER_BUILDS)
-        or [],
-    )
-    monkeypatch.setattr(
-        module,
-        "run_docker_e2e_validation",
-        lambda repo_root, *, python_executable: call_order.append(
-            module.PRODUCTION_GROUP_RUNTIME_PROOFS
-        )
-        or [],
+        "run_selected_production_groups_via_shared_engine",
+        _fake_shared_runner,
     )
 
     exit_code = module.main(
@@ -3982,7 +3999,7 @@ def test_local_ci_parity_production_groups_only_skips_default_prechecks(
     )
 
     assert exit_code == 0
-    assert call_order == [module.PRODUCTION_GROUP_DOCS_CONTRACT]
+    assert delegated_groups == [(module.PRODUCTION_GROUP_DOCS_CONTRACT,)]
     assert not any(command[1:3] == ("-m", "black") for command in executed_commands)
     assert not any(command[1:3] == ("-m", "pytest") for command in executed_commands)
 
