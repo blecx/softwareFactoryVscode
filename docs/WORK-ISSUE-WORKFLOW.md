@@ -51,6 +51,24 @@ If a PR has CI errors or merge-readiness problems, return to `@resolve-issue`
 to fix the root cause on the active slice, rerun the local prechecks, and then
 re-enter `@pr-merge`. Do not invent a separate “fix the PR” workflow.
 
+Default PR-error repair tactic is the fast evidence-first method codified in
+`.github/prompts/pr-error-resolve-tactic.prompt.md` and enforced by the
+workflow skills plus repository guardrails. For PR-body/template failures,
+local precheck failures, or GitHub CI/check failures:
+
+- re-anchor only enough to act safely;
+- parse the exact current failure output before rerunning anything;
+- read the exact failing file, test, assertion, method, or check step when the
+  output already identifies it;
+- reproduce the cheapest failing gate first (`Black`/formatter on touched files
+  → single failing test or file → touched-test bundle → focused local parity →
+  broader PR/merge validation); and
+- widen validation only after the narrower gate passes.
+
+Do **not** start with broad repo scans, parity-first reruns, guessed root
+causes, hallucinated helper/contract fixes, or stale-state narration when a
+narrower deterministic gate already exists.
+
 When repair is needed after a failed local validation or GitHub CI/check, the
 next repair step must quote the exact failing command or check, the relevant error text,
 and the suspected root cause from fresh evidence before another code change is attempted.
