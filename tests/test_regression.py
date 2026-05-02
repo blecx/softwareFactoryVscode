@@ -459,6 +459,49 @@ def test_issue_resolution_symbol_grounding_rules_are_documented() -> None:
     assert "symbol grounding before contract edits" in enforcement_map
 
 
+def test_workflow_repair_retries_require_exact_failure_evidence() -> None:
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+
+    for text in [
+        instructions,
+        resolve_skill,
+        merge_skill,
+        approved_plan_skill,
+        workflow_doc,
+    ]:
+        assert "exact failing command" in text or "exact failing command/check" in text
+        assert "relevant error text" in text
+        assert "suspected root cause" in text
+        assert "trial-and-error churn" in text
+        assert (
+            "second repair change without new evidence" in text
+            or "second repair change without refreshed evidence" in text
+        )
+
+    assert "GitHub CI/check" in resolve_skill
+    assert "Hand the slice back to `resolve-issue`" in merge_skill
+    assert "same canonical `@resolve-issue` → `@pr-merge` flow" in workflow_doc
+
+
 def test_interruption_recovery_assets_and_docs_exist():
     repo_root = Path(__file__).parent.parent
     workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(

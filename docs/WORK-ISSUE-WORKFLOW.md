@@ -41,8 +41,8 @@ The repository supports exactly one canonical issue-to-merge process:
 3. `@execute-approved-plan` is the bounded multi-issue wrapper that repeats the
    same `@resolve-issue` → `@pr-merge` slice path for an explicit approved set.
 4. `@execute-approved-umbrella` is a thin scope resolver for approved umbrella
-  issues; it delegates execution back into `@execute-approved-plan` and does
-  **not** define a second implementation, merge, repair, or checkpoint loop.
+   issues; it delegates execution back into `@execute-approved-plan` and does
+   **not** define a second implementation, merge, repair, or checkpoint loop.
 5. `@queue-backend` and `@queue-phase-2` are scoped/manual-checkpoint wrappers
    over that same canonical slice path; they do **not** define a different
    implementation, PR, or merge process.
@@ -50,6 +50,12 @@ The repository supports exactly one canonical issue-to-merge process:
 If a PR has CI errors or merge-readiness problems, return to `@resolve-issue`
 to fix the root cause on the active slice, rerun the local prechecks, and then
 re-enter `@pr-merge`. Do not invent a separate “fix the PR” workflow.
+
+When repair is needed after a failed local validation or GitHub CI/check, the
+next repair step must quote the exact failing command or check, the relevant error text,
+and the suspected root cause from fresh evidence before another code change is attempted.
+Do **not** make a second repair change without new evidence; trial-and-error churn is
+non-compliant with the same canonical `@resolve-issue` → `@pr-merge` flow.
 
 ## Symbol grounding before code edits
 
@@ -271,5 +277,5 @@ For a new item:
 6. When the operator has already approved a finite GitHub-backed issue set and
    wants continuous execution, use `@execute-approved-plan`.
 7. When the operator approved an umbrella issue and wants the child issue set
-  resolved and executed through the same bounded engine, use
-  `@execute-approved-umbrella`.
+   resolved and executed through the same bounded engine, use
+   `@execute-approved-umbrella`.
