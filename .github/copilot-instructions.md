@@ -64,6 +64,8 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Use bounded waits, explicit watchdog/timeout states, and deterministic stop conditions for CI polling and long-running validation. A pending timeout is a blocker, not permission to keep spinning.
 - GitHub fetch/list/view automation must also use bounded watchdogs; do not allow unbounded `gh` fetches or item-enumeration loops to wait until manual interruption.
 - Require explicit success or failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence, partial logs, or ambiguous output.
+- Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration. Do not narrate PR state from memory, stale checkpoint values, earlier terminal output, or terminal silence.
+- When a PR exists, require the GitHub PR head branch to match the current local branch and the checkpoint `active_branch`; treat any mismatch as a blocker that requires re-anchor before continuing.
 - Inspect the exact failing check, job, and step metadata before deciding on root cause. Do not guess from job titles alone.
 - After one failed hypothesis, gather new evidence before applying another code change. Do not fall into trial-and-error churn.
 - If parsing, piping, or terminal behavior makes the result ambiguous, stop and report the ambiguity instead of continuing on guessed state.

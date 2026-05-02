@@ -76,8 +76,10 @@ Routing rule:
   ```
 
 - Prefer polling the helper's JSON output over `gh pr checks --watch`, pager UI, or web/watch flows when you are inside an automation loop.
+- Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration; do not rely on stale checkpoint entries, memory, prior terminal output, or terminal silence when making PR-state claims.
 - For bounded waiting, prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600` over `gh pr checks --watch`, `gh run watch`, or other watch-style flows.
 - Treat PR readiness/check status as GitHub truth only: rely on `statusCheckRollup` / merge metadata from `./scripts/noninteractive_gh.py` or equivalent `gh ... --json ...` queries, not local PID files, process liveness, terminal idleness, or other host-side heuristics.
+- When a PR exists, verify with fresh `pr-view` output that the GitHub PR head branch matches both the current local branch and `.tmp/github-issue-queue-state.md` `active_branch`; treat any mismatch as a blocker and re-anchor before continuing.
 - If the helper returns `summary.overall = pending-timeout`, treat that as a real blocker for the current automation pass: refresh `.tmp/github-issue-queue-state.md`, report CI as still pending, and stop so the operator or a later resume can re-anchor cleanly instead of waiting indefinitely.
 - For GitHub fetch/list/view automation, require a bounded subprocess watchdog as well; use repo-owned helpers such as `scripts/noninteractive_gh.py` and `factory_runtime.agents.tooling.gh_throttle.run_gh_throttled(...)` so slow item fetches fail with a timeout instead of waiting for manual interruption.
 - If the helper does not cover a one-off query yet, use an equivalent pager-free pattern such as `GH_PAGER=cat PAGER=cat gh ... --json ...`; do not rely on the CLI deciding whether to open a pager.
@@ -106,6 +108,9 @@ Routing rule:
   - `ci_state`
   - `cleanup_state`
   - `last_github_truth`
+- `last_github_truth` is not a free-form shortcut: it must record the exact helper command(s), selector(s), and current result summary used for the latest readiness or merge claim.
+- For PR-backed work, `last_github_truth` must include the exact fresh `pr-view` / `pr-checks` command(s) and enough result summary to prove the PR head branch aligned with the current local branch plus checkpoint `active_branch` at claim time.
+- If GitHub PR head metadata disagrees with local branch or checkpoint provenance, stop and re-anchor before readiness, merge, or queue-advance narration.
 - Canonical workflows must refuse unsafe continuation, merge, or completion
   steps when the checkpoint is missing, incomplete, or lacks the required
   GitHub/cleanup evidence, and they must explain exactly what is missing.

@@ -82,6 +82,8 @@ explicit approved issue list, or an already-published bounded queue.
 - Require local CI-equivalent validation from `.github/workflows/ci.yml` before handing a slice from resolve to merge.
 - Keep `.tmp/github-issue-queue-state.md` current with `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth` before any merge or completion narration.
 - Use `./.venv/bin/python ./scripts/noninteractive_gh.py ...` or another pager-free JSON pattern for GitHub polling.
+- Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration; do not continue from memory, terminal silence, or stale checkpoint evidence.
+- When a PR exists, require the GitHub `headRefName`, the current local branch, and checkpoint `active_branch` to agree before continuing; treat any mismatch as a blocker that requires re-anchor.
 - Prefer `./.venv/bin/python` for repo Python execution; when a justified fallback is necessary, use explicit `python3`, never bare `python`.
 - Require explicit success/failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence or ambiguous logs.
 - If command output, parser behavior, or terminal state is ambiguous, stop and report the ambiguity instead of continuing on guessed state.
@@ -97,7 +99,7 @@ explicit approved issue list, or an already-published bounded queue.
 5. Delegate the active slice to the resolve workflow.
 6. When the slice becomes ready for merge, delegate to the merge workflow.
 7. Poll GitHub checks non-interactively using a bounded wait window; if the result is `pending-timeout`, stop and report the blocker instead of spinning.
-8. If checks fail, inspect exact failing metadata, return to the active issue through the canonical resolve workflow, fix the evidenced root cause, rerun required local prechecks, and retry.
+8. If checks fail, or if fresh GitHub truth shows a PR head-branch mismatch against the local/checkpoint branch provenance, inspect the exact metadata, return to the active issue through the canonical resolve workflow, fix the evidenced root cause, rerun required local prechecks, and retry.
 9. After merge, verify GitHub issue closure and queue checkpoint evidence, then advance automatically to the next approved issue.
 10. If interrupted, capture `.tmp/interruption-recovery-snapshot.md`, re-anchor, and resume from GitHub truth instead of guessing.
 
