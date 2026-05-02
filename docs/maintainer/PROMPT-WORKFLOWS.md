@@ -10,6 +10,7 @@ Start with these files when you need to review or change prompt workflow behavio
 
 - [`../../.github/prompts/execute-github-issues-in-order.prompt.md`](../../.github/prompts/execute-github-issues-in-order.prompt.md) — manual ordered-queue prompt entrypoint for the canonical issue loop.
 - [`../../.github/prompts/resume-after-interruption.prompt.md`](../../.github/prompts/resume-after-interruption.prompt.md) — interruption-recovery prompt entrypoint for deterministic re-anchoring.
+- [`../../.github/prompts/pr-error-resolve-tactic.prompt.md`](../../.github/prompts/pr-error-resolve-tactic.prompt.md) — fast evidence-first PR/CI error-resolution prompt that narrows failure handling to the cheapest failing gate before wider validation.
 - [`../../.github/agents/execute-approved-plan.md`](../../.github/agents/execute-approved-plan.md) and [`../../.github/agents/execute-approved-umbrella.md`](../../.github/agents/execute-approved-umbrella.md) — maintainer-facing agent entrypoints that generalize the bounded-plan and umbrella execution contract beyond issue-specific prompts.
 - [`../WORK-ISSUE-WORKFLOW.md`](../WORK-ISSUE-WORKFLOW.md) — canonical issue → PR → merge path and checkpoint contract.
 - [`../../.copilot/skills/resolve-issue-workflow/SKILL.md`](../../.copilot/skills/resolve-issue-workflow/SKILL.md) and [`../../.copilot/skills/interruption-recovery-workflow/SKILL.md`](../../.copilot/skills/interruption-recovery-workflow/SKILL.md) — canonical workflow modules that the prompt entrypoints route back into.
@@ -22,6 +23,7 @@ Start with these files when you need to review or change prompt workflow behavio
 | --- | --- | --- |
 | [`execute-github-issues-in-order.prompt.md`](../../.github/prompts/execute-github-issues-in-order.prompt.md) | Manual ordered queue execution with explicit stop gates, GitHub-truth rechecks, and one-issue-at-a-time discipline | Routes into the `workflow` agent and then back into the same canonical `resolve-issue` → `pr-merge` slice path. It is not a second implementation workflow. Use [`@execute-approved-plan`](../../.github/agents/execute-approved-plan.md) instead when the operator has already approved a bounded issue set that may continue automatically. |
 | [`resume-after-interruption.prompt.md`](../../.github/prompts/resume-after-interruption.prompt.md) | Deterministic recovery after restart, compaction, timeout, or operator handoff | Re-anchors from `.tmp/github-issue-queue-state.md`, writes `.tmp/interruption-recovery-snapshot.md`, and resumes the currently active workflow instead of inventing a new one. |
+| [`pr-error-resolve-tactic.prompt.md`](../../.github/prompts/pr-error-resolve-tactic.prompt.md) | Fast PR/CI failure resolution using exact output parsing, narrow reproductions, and root-cause-first repair sequencing | Routes into the `workflow` agent as a tactical accelerator for PR-error repair. It does not replace the canonical `resolve-issue` → `pr-merge` workflow; it narrows error-resolution behavior so the agent starts with the cheapest failing gate, states the exact failure evidence, and widens validation only after the fast gate passes. |
 
 ## Preferred generalized agent entrypoints
 
