@@ -511,6 +511,64 @@ def test_workflow_repair_retries_require_exact_failure_evidence() -> None:
     assert "same canonical `@resolve-issue` → `@pr-merge` flow" in workflow_doc
 
 
+def test_pr_error_resolution_defaults_to_fast_evidence_first_tactic() -> None:
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    prompt = (
+        repo_root / ".github" / "prompts" / "pr-error-resolve-tactic.prompt.md"
+    ).read_text(encoding="utf-8")
+    prompt_workflows = (
+        repo_root / "docs" / "maintainer" / "PROMPT-WORKFLOWS.md"
+    ).read_text(encoding="utf-8")
+    enforcement_map = (
+        repo_root / "docs" / "maintainer" / "AGENT-ENFORCEMENT-MAP.md"
+    ).read_text(encoding="utf-8")
+
+    for text in [
+        instructions,
+        workflow_doc,
+        resolve_skill,
+        merge_skill,
+        approved_plan_skill,
+    ]:
+        lowered = text.lower()
+        assert "cheapest failing gate" in lowered
+        assert "widen validation only after" in lowered
+        assert "broad repo scans" in lowered or "broad repo-scan" in lowered
+        assert "guess" in lowered
+        assert "trial-and-error churn" in lowered
+
+    lowered_prompt = prompt.lower()
+    lowered_prompt_workflows = prompt_workflows.lower()
+    lowered_enforcement_map = enforcement_map.lower()
+
+    assert "canonical default pr-error repair behavior" in lowered_prompt
+    assert "guardrails and workflow skills enforce the same method" in lowered_prompt
+    assert "default pr-error repair method" in lowered_prompt_workflows
+    assert "focused activation surface" in lowered_prompt_workflows
+    assert "avoid guessing or hallucinated state" in lowered_prompt_workflows
+    assert "pr-error-resolve-tactic.prompt.md" in enforcement_map
+    assert "default fast evidence-first repair method" in lowered_enforcement_map
+
+
 def test_interruption_recovery_assets_and_docs_exist():
     repo_root = Path(__file__).parent.parent
     workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(

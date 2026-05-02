@@ -46,7 +46,8 @@ repository's issue → PR → merge process.
    - `last_github_truth` must preserve the exact `pr-view` / `pr-checks` helper command(s), selector(s), and result summary used for the current claim; vague prose or stale summaries are not sufficient provenance.
    - If `headRefName`, the local branch, and checkpoint `active_branch` disagree, stop and hand the slice back for re-anchor/root-cause repair instead of narrating merge readiness.
    - If the helper reports `summary.overall = pending-timeout`, stop the automatic wait, record the still-pending CI state in `.tmp/github-issue-queue-state.md`, and return a blocker/resume point instead of continuing to poll indefinitely.
-   - If checks fail or the PR is not mergeable, do not invent a separate repair path. Hand the slice back to `resolve-issue`, quote the exact failing command/check, relevant error text, and suspected root cause from the fresh evidence, rerun local prechecks there, and then re-enter `pr-merge`.
+   - If checks fail or the PR is not mergeable, do not invent a separate repair path. Hand the slice back to `resolve-issue` using the repository's default fast evidence-first repair method: parse the exact failed check/job/step output, quote the exact failing command/check, the relevant error text, and the suspected root cause, then reproduce the cheapest failing gate first before broader parity or merge polling resumes.
+   - Do **not** send the slice back with broad repo-scan instructions, parity-first reruns, guesses, hallucinated state, or stale-memory narration. Widen validation only after the narrower gate passes.
    - Do **not** permit a second repair change without refreshed evidence from the new failure state; trial-and-error churn is non-compliant.
 5. Merge with squash and delete branch:
    `gh pr merge <PR_NUMBER> --squash --delete-branch`

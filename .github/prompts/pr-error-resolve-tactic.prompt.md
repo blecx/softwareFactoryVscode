@@ -1,5 +1,5 @@
 ---
-description: "Resolve PR/CI failures using a fast evidence-first tactic: parse current failure output, start with the cheapest failing gate, fix the root cause, and widen validation only after the fast gate passes."
+description: "Resolve PR-creation, local-precheck, and CI failures using a fast evidence-first tactic: parse current failure output, start with the cheapest failing gate, fix the root cause, and widen validation only after the fast gate passes."
 name: "PR Error Resolve Tactic"
 argument-hint: "Optional: PR number, issue number, failing check, failing command, failing file/test, or pasted terminal output"
 agent: "workflow"
@@ -8,9 +8,9 @@ model: "GPT-5 (copilot)"
 
 ## Objective
 
-Resolve PR and CI failures quickly **without** broad scanning, stale-state guessing, or trial-and-error churn.
+Resolve PR-creation, local-precheck, and CI failures quickly **without** broad scanning, stale-state guessing, hallucinated state, or trial-and-error churn.
 
-When this prompt is invoked, it takes precedence over the repository's **general broad-discovery / broad-validation habit** for PR-error resolution. It does **not** override immutable repository guardrails such as:
+This prompt now documents the repository's **canonical default PR-error repair behavior**. The guardrails and workflow skills enforce the same method even when this prompt is not explicitly invoked; using the prompt simply foregrounds that default tactic in the conversation. It does **not** override immutable repository guardrails such as:
 
 - ADR and architecture compliance
 - execution-surface discipline
@@ -23,7 +23,7 @@ Treat [repo guardrails](../copilot-instructions.md) and the [canonical issue wor
 
 ## When to Use
 
-- A PR or local validation has failed and the user wants the fastest compliant repair path.
+- A PR body/template check, local validation, or GitHub CI check has failed and the user wants the fastest compliant repair path.
 - Terminal output or CI output already names a failing file, test, assertion, method, command, or check.
 - The user explicitly says things like:
   - `parse the output`

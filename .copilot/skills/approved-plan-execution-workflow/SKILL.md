@@ -64,6 +64,8 @@ explicit approved issue list, or an already-published bounded queue.
 - **Pending-Timeout Halt**: If CI is still pending after the 10-minute bounded wait window, record the still-pending GitHub truth in `.tmp/github-issue-queue-state.md`, report a precise `pending-timeout` blocker, and stop so a later resume can re-anchor safely.
 - **Completion**: Break the loop only when every issue in the approved set is merged and GitHub-verified closed, or when a true blocker prevents safe continuation.
 - **Evidence-First Repair**: After a failed validation or CI/check, the next repair step must quote the exact failing command/check, the relevant error text, and the suspected root cause from fresh evidence before another code change is attempted.
+- **Default Fast Repair Ladder**: For PR-body/template errors, local validation failures, or GitHub CI/check failures inside the queue, use the repository default from `.github/prompts/pr-error-resolve-tactic.prompt.md`: parse exact current output first, inspect the exact failing file/test/method/check when named, reproduce the cheapest failing gate first, and widen validation only after the narrower gate passes.
+- **No Guessing or Broad-Scan Drift**: Do not start repair with broad repo scans, parity-first reruns, stale checkpoint memory, or guessed root causes when current failure evidence is already specific.
 - **No Trial-and-Error Churn**: After one failed hypothesis, gather fresh evidence before applying another code change. Do not use trial-and-error churn as a repair strategy, and do not make a second repair change without new evidence.
 
 ## Delegation Boundaries
@@ -100,7 +102,7 @@ explicit approved issue list, or an already-published bounded queue.
 5. Delegate the active slice to the resolve workflow.
 6. When the slice becomes ready for merge, delegate to the merge workflow.
 7. Poll GitHub checks non-interactively using a bounded wait window; if the result is `pending-timeout`, stop and report the blocker instead of spinning.
-8. If checks fail, or if fresh GitHub truth shows a PR head-branch mismatch against the local/checkpoint branch provenance, inspect the exact metadata, return to the active issue through the canonical resolve workflow, fix the evidenced root cause, rerun required local prechecks, and retry.
+8. If checks fail, or if fresh GitHub truth shows a PR head-branch mismatch against the local/checkpoint branch provenance, inspect the exact metadata, return to the active issue through the canonical resolve workflow, reproduce the cheapest local failing gate, fix the evidenced root cause, rerun the narrow prechecks, and retry wider validation only after those pass.
 9. After merge, verify GitHub issue closure and queue checkpoint evidence, then advance automatically to the next approved issue.
 10. If interrupted, capture `.tmp/interruption-recovery-snapshot.md`, re-anchor, and resume from GitHub truth instead of guessing.
 
