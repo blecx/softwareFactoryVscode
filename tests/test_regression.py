@@ -1054,6 +1054,14 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "GitHub truth only" in workflow_doc
     assert "not local PID files, process liveness, terminal idleness" in workflow_doc
     assert (
+        "Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration"
+        in workflow_doc
+    )
+    assert (
+        "PR head branch matches both the current local branch and `.tmp/github-issue-queue-state.md` `active_branch`"
+        in workflow_doc
+    )
+    assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
         in workflow_doc
     )
@@ -1068,6 +1076,14 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "gh run watch" in merge_skill
     assert "Treat PR readiness as GitHub truth only." in merge_skill
     assert (
+        "Refresh this GitHub truth immediately before any readiness, merge, queue-advance, or blocker narration"
+        in merge_skill
+    )
+    assert (
+        "`headRefName` reported by GitHub must match the current local branch "
+        "and `.tmp/github-issue-queue-state.md` `active_branch`" in merge_skill
+    )
+    assert (
         "Do **not** infer status from local PID files, process liveness, terminal silence"
         in merge_skill
     )
@@ -1077,6 +1093,63 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     )
     assert "./.venv/bin/python ./scripts/noninteractive_gh.py issue-list" in issue_skill
     assert "heredoc-based Python command" in resolve_skill
+
+
+def test_fresh_github_truth_and_pr_head_alignment_rules_are_documented() -> None:
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "stale checkpoint entries, memory, prior terminal output, or terminal silence"
+        in workflow_doc
+    )
+    assert (
+        "GitHub PR head metadata disagrees with local branch or checkpoint provenance"
+        in workflow_doc
+    )
+    assert "fresh `pr-view` / `pr-checks` command(s)" in workflow_doc
+
+    assert (
+        "do not continue from memory, terminal silence, or stale checkpoint evidence"
+        in approved_plan_skill
+    )
+    assert (
+        "GitHub `headRefName`, the current local branch, and checkpoint `active_branch` to agree"
+        in approved_plan_skill
+    )
+
+    assert (
+        "`last_github_truth` must preserve the exact `pr-view` / `pr-checks` helper command(s)"
+        in merge_skill
+    )
+    assert (
+        "If `headRefName`, the local branch, and checkpoint `active_branch` disagree"
+        in merge_skill
+    )
+
+    assert (
+        "Do not narrate PR state from memory, stale checkpoint values, earlier terminal output, or terminal silence"
+        in instructions
+    )
+    assert (
+        "require the GitHub PR head branch to match the current local branch and the checkpoint `active_branch`"
+        in instructions
+    )
 
 
 def test_archived_chat_session_troubleshooting_report_preserves_program_closeout() -> (
