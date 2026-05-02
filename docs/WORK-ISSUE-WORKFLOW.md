@@ -51,6 +51,21 @@ If a PR has CI errors or merge-readiness problems, return to `@resolve-issue`
 to fix the root cause on the active slice, rerun the local prechecks, and then
 re-enter `@pr-merge`. Do not invent a separate “fix the PR” workflow.
 
+## Symbol grounding before code edits
+
+- Before editing code that introduces or changes members, attributes,
+  parameters, return shapes, config keys, helper APIs, or other contracts,
+  verify the relevant definitions and repo-backed usages/references.
+- Do **not** invent members, parameters, return fields, config keys, helper
+  APIs, or data-shape fields that are not evidenced by the repository or the
+  active issue.
+- Treat missing attribute/function errors, unresolved symbols, or guessed helper
+  calls as grounding failures: stop, gather evidence from the real
+  definitions/usages, and only then continue implementation or repair.
+- This grounding rule is part of the same canonical `resolve-issue` →
+  `pr-merge` workflow; it does not create a second implementation or PR-repair
+  process.
+
 ## Execution surfaces
 
 Workflow execution surface is part of the supported contract.

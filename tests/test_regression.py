@@ -423,6 +423,42 @@ def test_queue_wrappers_share_one_canonical_issue_to_merge_process() -> None:
     assert "Do not invent a separate “fix the PR” workflow." in workflow_doc
 
 
+def test_issue_resolution_symbol_grounding_rules_are_documented() -> None:
+    repo_root = Path(__file__).parent.parent
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    enforcement_map = (
+        repo_root / "docs" / "maintainer" / "AGENT-ENFORCEMENT-MAP.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Ground symbols before editing code" in resolve_skill
+    assert (
+        "Do **not** invent members, attributes, parameters, return fields"
+        in resolve_skill
+    )
+    assert "Treat missing attribute/function errors" in resolve_skill
+    assert "grounding failures" in resolve_skill
+
+    assert "## Symbol grounding before code edits" in workflow_doc
+    assert (
+        "verify the relevant definitions and repo-backed usages/references"
+        in workflow_doc
+    )
+    assert (
+        "Do **not** invent members, parameters, return fields, config keys"
+        in workflow_doc
+    )
+    assert "grounding failures" in workflow_doc
+    assert "does not create a second implementation or PR-repair" in workflow_doc
+
+    assert "symbol-grounding failures" in enforcement_map
+    assert "symbol grounding before contract edits" in enforcement_map
+
+
 def test_interruption_recovery_assets_and_docs_exist():
     repo_root = Path(__file__).parent.parent
     workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
@@ -3818,9 +3854,14 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     capsys,
 ):
     module = _load_local_ci_parity_module()
+    python_executable = "/tmp/shared-repo/.venv/bin/python"
     snapshot_path = tmp_path / "fresh-checkout"
     snapshot_path.mkdir(parents=True, exist_ok=True)
     calls: list[tuple[tuple[str, ...], Path]] = []
+
+    monkeypatch.setattr(
+        module, "resolve_default_python_executable", lambda repo_root: python_executable
+    )
 
     monkeypatch.setattr(
         module,
@@ -3865,12 +3906,52 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     assert calls[0] == (("bash", "./setup.sh"), snapshot_path)
     child_command, child_cwd = calls[1]
     assert child_cwd == snapshot_path
-    assert child_command[:2] == ("./.venv/bin/python", "./scripts/local_ci_parity.py")
+    assert child_command[:2] == (python_executable, "./scripts/local_ci_parity.py")
     assert "--fresh-checkout" not in child_command
     assert "--python" in child_command
-    assert "./.venv/bin/python" in child_command
+    assert python_executable in child_command
     assert "snapshot_path=" in captured.out
     assert "committed HEAD only" in captured.out
+
+
+def test_local_ci_parity_resolves_shared_repo_python_from_git_common_dir(
+    monkeypatch, tmp_path: Path
+) -> None:
+    module = _load_local_ci_parity_module()
+    worktree_root = tmp_path / "queue-worktree"
+    worktree_root.mkdir(parents=True, exist_ok=True)
+    shared_checkout_root = tmp_path / "shared-checkout"
+    shared_python = shared_checkout_root / ".venv" / "bin" / "python"
+    shared_python.parent.mkdir(parents=True, exist_ok=True)
+    shared_python.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "resolve_git_common_dir",
+        lambda repo_root: shared_checkout_root / ".git",
+    )
+    monkeypatch.setattr(module.sys, "executable", "/usr/bin/python3")
+
+    resolved = module.resolve_default_python_executable(worktree_root)
+
+    assert resolved == str(shared_python.resolve())
+
+
+def test_local_ci_parity_preserves_repo_venv_entrypoint_path_without_resolving_symlink(
+    monkeypatch, tmp_path: Path
+) -> None:
+    module = _load_local_ci_parity_module()
+    repo_root = tmp_path / "queue-worktree"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    repo_python = repo_root / ".venv" / "bin" / "python"
+    repo_python.parent.mkdir(parents=True, exist_ok=True)
+    repo_python.symlink_to(Path("/usr/bin/python3"))
+
+    monkeypatch.setattr(module, "resolve_git_common_dir", lambda repo_root: None)
+
+    resolved = module.resolve_default_python_executable(repo_root)
+
+    assert resolved == str(repo_python)
 
 
 def test_local_ci_parity_fresh_checkout_reports_git_timeout_during_snapshot_creation(

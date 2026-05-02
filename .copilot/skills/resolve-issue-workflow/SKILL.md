@@ -30,6 +30,12 @@ issue → PR → merge process.
 4. Apply UX delegation policy from `.copilot/skills/ux-delegation-policy/SKILL.md` and capture required consultation outcome.
 5. Read `.github/workflows/ci.yml` and treat its checks as the minimum local precheck contract for this slice.
    - Prefer `./scripts/noninteractive_gh.py` or another pager-free `gh ... --json ...` pattern for GitHub polling in automation-heavy loops, and never combine piped JSON with a heredoc-based Python command because the heredoc consumes stdin.
+### Ground symbols before editing code
+
+- Verify the target definition and at least one repo-backed usage/reference before changing an existing contract, or verify from the issue text plus repo evidence that a genuinely new contract is required.
+- Do **not** invent members, attributes, parameters, return fields, config keys, helper APIs, or data-shape fields that are not evidenced by the repository or the issue.
+- Treat missing attribute/function errors, unresolved symbol assumptions, and guessed helper calls as grounding failures: stop, gather evidence from definitions/usages, and only then continue implementation or repair.
+
 6. Implement minimal code changes in a dedicated branch.
    - When a workflow task depends on `Host Project (Root)` or the installed-workspace contract, route it through the generated `software-factory.code-workspace` surface or the repo-owned `scripts/workspace_surface_guard.py` helper. Do not treat the source checkout as a second static runtime contract.
 7. Run required validations explicitly using the repo venv (NEVER global python), including the local equivalents of `.github/workflows/ci.yml` before opening a PR:
@@ -45,6 +51,7 @@ issue → PR → merge process.
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`
 10. Run `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md` before creating or updating the PR.
 11. Address CI failures by root cause and re-validate.
+   - If repair work hits a missing attribute/function, unresolved symbol, or mismatched contract, treat it as a grounding failure first: confirm the real definition/usages before changing signatures, fields, or helper calls.
 
 - If merge work discovers failing CI or merge-readiness issues that require code changes, stay on the same issue/branch and continue using this workflow rather than inventing a separate PR-repair path.
 
@@ -76,6 +83,7 @@ Prefer tool-driven discovery over pasting large context into chat.
 - Keep scope to small CI-safe slices (single issue, minimal domains), no architecture regressions outside scope.
 - Avoid unrelated refactors.
 - Keep diffs reviewable and DDD-compliant.
+- Ground symbol and contract changes in repo evidence before editing.
 - Follow `.copilot/skills/ux-delegation-policy/SKILL.md` as the canonical delegation rule source.
 - Treat `.github/pull_request_template.md` as mandatory output structure for PR bodies.
 - Do not ask GitHub Actions to discover preventable failures locally first; run the local CI-equivalent prechecks before PR creation.
