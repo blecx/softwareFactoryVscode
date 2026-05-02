@@ -1231,6 +1231,33 @@ def test_fresh_github_truth_and_pr_head_alignment_rules_are_documented() -> None
     )
 
 
+def test_branch_worktree_isolation_and_checkpoint_provenance_rules_are_documented() -> (
+    None
+):
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    recovery_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "interruption-recovery-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert "active branch/worktree matches that checkpoint" in instructions
+    assert "stray partial snapshot" in instructions
+    assert ".tmp/queue-worktrees/*" in workflow_doc
+    assert "active_worktree" in workflow_doc
+    assert ".tmp/github-issue-queue-state.md" in workflow_doc
+    assert "stray partial snapshot" in recovery_skill
+    assert ".tmp/github-issue-queue-state.md" in recovery_skill
+
+
 def test_archived_chat_session_troubleshooting_report_preserves_program_closeout() -> (
     None
 ):

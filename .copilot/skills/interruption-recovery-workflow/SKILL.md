@@ -20,7 +20,7 @@ Provide a deterministic resume path after a Copilot chat interruption, restart, 
 4. Re-anchor the interrupted task from the snapshot by verifying:
    - current branch
    - `git status --short --branch`
-   - active issue/PR from `.tmp/github-issue-queue-state.md`
+   - active issue/branch/worktree/PR from `.tmp/github-issue-queue-state.md`
    - current GitHub issue/PR/check state
    - `./scripts/factory_stack.py status` output when runtime-sensitive
    - whether the current editor/file/cwd is a valid execution surface or a stray partial `.tmp/queue-worktrees/*` snapshot

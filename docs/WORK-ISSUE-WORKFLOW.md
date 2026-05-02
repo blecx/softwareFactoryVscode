@@ -118,11 +118,13 @@ Routing rule:
 - Keep `.tmp/github-issue-queue-state.md` updated throughout the current issue. The minimum checkpoint fields are:
   - `active_issue`
   - `active_branch`
+  - `active_worktree`
   - `active_pr`
   - `status`
   - `last_validation`
   - `next_gate`
   - `blocker`
+- Treat the `active_worktree` recorded in `.tmp/github-issue-queue-state.md` as part of queue provenance. If the current cwd, editor path, or registered git worktree disagrees with that record, re-anchor before continuing.
 - Before invoking `@pr-merge`, narrating merge readiness, or claiming that an issue is complete, extend the checkpoint with GitHub-truth evidence:
   - `issue_state`
   - `pr_state`
@@ -165,6 +167,7 @@ Routing rule:
   `capture_recovery_snapshot.py --include-runtime-status` before assuming the
   runtime stopped or needs a fresh `start`.
 - Treat the current editor/file path as advisory only. If it points under `.tmp/queue-worktrees/*` but the top-level directory is missing repo/worktree markers such as `.git`, `docs/`, or `scripts/`, classify it as a stray partial snapshot and resume from the repository root plus `.tmp/github-issue-queue-state.md` instead of treating that path as the active worktree.
+- Compare the current execution surface with the `active_worktree` recorded in `.tmp/github-issue-queue-state.md` before resuming. If they disagree, stop and re-anchor from the checkpoint plus fresh GitHub truth instead of guessing which surface is authoritative.
 - Review the recovery snapshot and update `.tmp/github-issue-queue-state.md` before resuming implementation, merge, cleanup, or queue selection.
 
 ## Required guardrails

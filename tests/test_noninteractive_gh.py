@@ -17,6 +17,35 @@ def test_build_noninteractive_env_disables_pagers(monkeypatch) -> None:
     assert env["LESS"] == "FRX"
 
 
+def test_build_pr_view_payload_preserves_branch_provenance_fields(
+    monkeypatch,
+) -> None:
+    sample_payload: dict[str, Any] = {
+        "number": 308,
+        "title": "Example PR",
+        "state": "OPEN",
+        "isDraft": False,
+        "mergeable": "MERGEABLE",
+        "reviewDecision": "",
+        "url": "https://example.test/pr/308",
+        "headRefName": "issue-304-branch",
+        "baseRefName": "main",
+        "mergedAt": None,
+    }
+
+    monkeypatch.setattr(noninteractive_gh, "run_gh_json", lambda args: sample_payload)
+
+    payload = noninteractive_gh.build_pr_view_payload(
+        Namespace(selector="308", repo="blecx/softwareFactoryVscode")
+    )
+
+    assert payload["query"]["kind"] == "pr-view"
+    assert payload["query"]["pager_disabled"] is True
+    assert payload["pr"]["headRefName"] == "issue-304-branch"
+    assert payload["pr"]["baseRefName"] == "main"
+    assert payload["pr"]["mergeable"] == "MERGEABLE"
+
+
 def test_build_pr_checks_payload_summarizes_rollup(monkeypatch) -> None:
     sample_payload: dict[str, Any] = {
         "number": 68,
@@ -188,6 +217,57 @@ def test_build_pr_checks_payload_times_out_pending_wait(monkeypatch) -> None:
     assert payload["wait"]["timedOut"] is True
     assert payload["wait"]["attempts"] == 3
     assert payload["wait"]["elapsedSeconds"] == 10
+
+
+def test_build_pr_checks_payload_wait_stops_when_failure_appears(monkeypatch) -> None:
+    failure_payload: dict[str, Any] = {
+        "number": 68,
+        "title": "Example PR",
+        "url": "https://example.test/pr/68",
+        "statusCheckRollup": [
+            {
+                "__typename": "CheckRun",
+                "name": "Python",
+                "workflowName": "CI",
+                "status": "COMPLETED",
+                "conclusion": "FAILURE",
+                "detailsUrl": "https://example.test/python",
+                "startedAt": "2026-04-30T16:22:50Z",
+                "completedAt": "2026-04-30T16:23:00Z",
+            }
+        ],
+    }
+
+    class _Clock:
+        def __init__(self) -> None:
+            self.now = 0.0
+
+        def monotonic(self) -> float:
+            return self.now
+
+        def sleep(self, seconds: float) -> None:
+            self.now += seconds
+
+    clock = _Clock()
+    monkeypatch.setattr(noninteractive_gh, "run_gh_json", lambda args: failure_payload)
+    monkeypatch.setattr(noninteractive_gh.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(noninteractive_gh.time, "sleep", clock.sleep)
+
+    payload = noninteractive_gh.build_pr_checks_payload(
+        Namespace(
+            selector="68",
+            repo="blecx/softwareFactoryVscode",
+            wait=True,
+            poll_interval_seconds=15,
+            timeout_seconds=600,
+        )
+    )
+
+    assert payload["summary"]["overall"] == "failure"
+    assert payload["wait"]["enabled"] is True
+    assert payload["wait"]["timedOut"] is False
+    assert payload["wait"]["attempts"] == 1
+    assert payload["wait"]["elapsedSeconds"] == 0
 
 
 def test_main_pr_checks_outputs_machine_friendly_json(monkeypatch, capsys) -> None:
