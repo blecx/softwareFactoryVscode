@@ -142,6 +142,9 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
     agent = (repo_root / ".github" / "agents" / "execute-approved-plan.md").read_text(
         encoding="utf-8"
     )
+    prompt = (
+        repo_root / ".github" / "prompts" / "execute-approved-plan.prompt.md"
+    ).read_text(encoding="utf-8")
     skill = (
         repo_root
         / ".copilot"
@@ -162,6 +165,7 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
     )
 
     lowered_agent = agent.lower()
+    lowered_prompt = prompt.lower()
     lowered_skill = skill.lower()
     lowered_instructions = instructions.lower()
 
@@ -173,8 +177,13 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
         "finish the approved issue set",
     ]:
         assert phrase in lowered_agent
+        assert phrase in lowered_prompt
         assert phrase in lowered_skill
 
+    assert 'agent: "execute-approved-plan"' in prompt
+    assert "specialized approved-plan workflow" in lowered_prompt
+    assert "does **not** define a second implementation" in prompt
+    assert "generic planning chatter" in lowered_agent
     assert ".tmp/github-issue-queue-state.md" in skill
     assert "single source of truth" in lowered_skill
     assert "resolve-issue` → `pr-merge`" in skill
@@ -2293,6 +2302,7 @@ def test_maintainer_prompt_and_approval_reference_pages_track_current_sources():
     assert "index/reference" in prompt_reference
     assert "not a competing normative authority" in prompt_reference
     assert "execute-github-issues-in-order.prompt.md" in prompt_reference
+    assert "execute-approved-plan.prompt.md" in prompt_reference
     assert "resume-after-interruption.prompt.md" in prompt_reference
     assert ".tmp/github-issue-queue-state.md" in prompt_reference
     assert ".tmp/interruption-recovery-snapshot.md" in prompt_reference
@@ -2343,6 +2353,7 @@ def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sourc
     assert "queue-phase-2" in enforcement_map
     assert "Plan" in enforcement_map
     assert "execute-github-issues-in-order.prompt.md" in enforcement_map
+    assert "execute-approved-plan.prompt.md" in enforcement_map
     assert "resume-after-interruption.prompt.md" in enforcement_map
     assert ".github/ISSUE_TEMPLATE/feature_request.yml" in enforcement_map
     assert ".github/ISSUE_TEMPLATE/bug_report.yml" in enforcement_map
