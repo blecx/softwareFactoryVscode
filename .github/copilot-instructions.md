@@ -67,7 +67,8 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration. Do not narrate PR state from memory, stale checkpoint values, earlier terminal output, or terminal silence.
 - When a PR exists, require the GitHub PR head branch to match the current local branch and the checkpoint `active_branch`; treat any mismatch as a blocker that requires re-anchor before continuing.
 - Inspect the exact failing check, job, and step metadata before deciding on root cause. Do not guess from job titles alone.
-- After one failed hypothesis, gather new evidence before applying another code change. Do not fall into trial-and-error churn.
+- Before any follow-up repair change after a failed validation, quote the exact failing command, the relevant error text, and the suspected root cause from fresh evidence.
+- After one failed hypothesis, gather new evidence before applying another code change. Do not fall into trial-and-error churn, and do not make a second repair change without refreshed evidence from the new failure state.
 - If parsing, piping, or terminal behavior makes the result ambiguous, stop and report the ambiguity instead of continuing on guessed state.
 
 Remember: **You solve nothing if you fix one bug by creating architectural debt or violating design guardrails.**

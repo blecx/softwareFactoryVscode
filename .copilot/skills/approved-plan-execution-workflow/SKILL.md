@@ -63,7 +63,8 @@ explicit approved issue list, or an already-published bounded queue.
 - **Polling Rule**: Do not stop merely because CI is pending, but also do not wait indefinitely. Use bounded non-interactive polling (prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600`) and continue automatically only when checks reach terminal success within that window.
 - **Pending-Timeout Halt**: If CI is still pending after the 10-minute bounded wait window, record the still-pending GitHub truth in `.tmp/github-issue-queue-state.md`, report a precise `pending-timeout` blocker, and stop so a later resume can re-anchor safely.
 - **Completion**: Break the loop only when every issue in the approved set is merged and GitHub-verified closed, or when a true blocker prevents safe continuation.
-- **Evidence-First Repair**: After one failed hypothesis, gather fresh evidence before applying another code change. Do not use trial-and-error churn as a repair strategy.
+- **Evidence-First Repair**: After a failed validation or CI/check, the next repair step must quote the exact failing command/check, the relevant error text, and the suspected root cause from fresh evidence before another code change is attempted.
+- **No Trial-and-Error Churn**: After one failed hypothesis, gather fresh evidence before applying another code change. Do not use trial-and-error churn as a repair strategy, and do not make a second repair change without new evidence.
 
 ## Delegation Boundaries
 

@@ -51,6 +51,8 @@ issue → PR → merge process.
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`
 10. Run `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md` before creating or updating the PR.
 11. Address CI failures by root cause and re-validate.
+   - Before changing code after a failed local validation or GitHub CI/check, quote the exact failing command, the relevant error text, and the suspected root cause from the latest evidence.
+   - Do **not** make a second repair change without new evidence; trial-and-error churn is non-compliant with the canonical issue → PR → merge flow.
    - If repair work hits a missing attribute/function, unresolved symbol, or mismatched contract, treat it as a grounding failure first: confirm the real definition/usages before changing signatures, fields, or helper calls.
 
 - If merge work discovers failing CI or merge-readiness issues that require code changes, stay on the same issue/branch and continue using this workflow rather than inventing a separate PR-repair path.
