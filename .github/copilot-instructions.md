@@ -64,8 +64,14 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Use bounded waits, explicit watchdog/timeout states, and deterministic stop conditions for CI polling and long-running validation. A pending timeout is a blocker, not permission to keep spinning.
 - GitHub fetch/list/view automation must also use bounded watchdogs; do not allow unbounded `gh` fetches or item-enumeration loops to wait until manual interruption.
 - Require explicit success or failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence, partial logs, or ambiguous output.
+- Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration. Do not narrate PR state from memory, stale checkpoint values, earlier terminal output, or terminal silence.
+- When a PR exists, require the GitHub PR head branch to match the current local branch and the checkpoint `active_branch`; treat any mismatch as a blocker that requires re-anchor before continuing.
 - Inspect the exact failing check, job, and step metadata before deciding on root cause. Do not guess from job titles alone.
-- After one failed hypothesis, gather new evidence before applying another code change. Do not fall into trial-and-error churn.
+- For PR-creation, local-precheck, or GitHub CI failure repair, the repository default is the fast evidence-first ladder documented in `.github/prompts/pr-error-resolve-tactic.prompt.md`: parse the exact current failure output before rerunning anything, read the exact failing file/test/method when the output identifies it, reproduce the cheapest failing gate first, and widen validation only after the narrower gate passes.
+- Default repair ladder: touched-file formatter check → single failing test/file → touched-test bundle → focused local parity → broader PR/merge validation. Do **not** start with broad repo scans or full parity when a narrower deterministic gate already exists.
+- Guessing, hallucinating missing state, or narrating stale failure context from memory are non-compliant. If the current output is ambiguous, stop and gather clearer evidence instead of inventing a repair story.
+- Before any follow-up repair change after a failed validation, quote the exact failing command, the relevant error text, and the suspected root cause from fresh evidence.
+- After one failed hypothesis, gather new evidence before applying another code change. Do not fall into trial-and-error churn, and do not make a second repair change without refreshed evidence from the new failure state.
 - If parsing, piping, or terminal behavior makes the result ambiguous, stop and report the ambiguity instead of continuing on guessed state.
 
 Remember: **You solve nothing if you fix one bug by creating architectural debt or violating design guardrails.**

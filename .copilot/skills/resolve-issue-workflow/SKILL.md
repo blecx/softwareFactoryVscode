@@ -31,6 +31,12 @@ issue → PR → merge process.
 5. Read `.github/workflows/ci.yml` and treat its checks as the minimum local precheck contract for this slice.
    - Prefer `./scripts/noninteractive_gh.py` or another pager-free `gh ... --json ...` pattern for GitHub polling in automation-heavy loops, and never combine piped JSON with a heredoc-based Python command because the heredoc consumes stdin.
    - For PR handoff/readiness narration, the canonical local shared-engine evidence command is `./.venv/bin/python ./scripts/local_ci_parity.py --level merge`.
+
+### Ground symbols before editing code
+
+- Verify the target definition and at least one repo-backed usage/reference before changing an existing contract, or verify from the issue text plus repo evidence that a genuinely new contract is required.
+- Do **not** invent members, attributes, parameters, return fields, config keys, helper APIs, or data-shape fields that are not evidenced by the repository or the issue.
+- Treat missing attribute/function errors, unresolved symbol assumptions, and guessed helper calls as grounding failures: stop, gather evidence from definitions/usages, and only then continue implementation or repair.
 6. Implement minimal code changes in a dedicated branch.
    - When the slice is part of queue or approved-plan execution, work only from the issue's dedicated registered worktree and keep that worktree isolated from the dirty primary checkout and every other issue branch.
    - When a workflow task depends on `Host Project (Root)` or the installed-workspace contract, route it through the generated `software-factory.code-workspace` surface or the repo-owned `scripts/workspace_surface_guard.py` helper. Do not treat the source checkout as a second static runtime contract.
@@ -49,6 +55,14 @@ issue → PR → merge process.
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`
 10. Run `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md` before creating or updating the PR.
 11. Address CI failures by root cause and re-validate.
+
+- Default to the repository's fast evidence-first repair tactic from `.github/prompts/pr-error-resolve-tactic.prompt.md`, even when that prompt was not explicitly invoked.
+- Parse the exact current failure output before rerunning anything. If the output names a file, test, assertion, method, or check step, read that exact source before broader search or validation.
+- Reproduce the cheapest failing gate first: touched-file formatter check → single failing test/file → touched-test bundle → focused local parity → broader PR/merge validation. Widen validation only after the narrower gate passes.
+- Before changing code after a failed PR-body/template check, local validation, or GitHub CI/check, quote the exact failing command/check, the relevant error text, and the suspected root cause from the latest evidence.
+- Do **not** start with broad repo scans, full parity reruns, guessed fixes, hallucinated state, or stale-memory narration when a narrower deterministic gate already exists.
+- Do **not** make a second repair change without new evidence; trial-and-error churn is non-compliant with the canonical issue → PR → merge flow.
+- If repair work hits a missing attribute/function, unresolved symbol, or mismatched contract, treat it as a grounding failure first: confirm the real definition/usages before changing signatures, fields, or helper calls.
 
 - If merge work discovers failing CI or merge-readiness issues that require code changes, stay on the same issue/branch and continue using this workflow rather than inventing a separate PR-repair path.
 
@@ -81,6 +95,7 @@ Prefer tool-driven discovery over pasting large context into chat.
 - Keep scope to small CI-safe slices (single issue, minimal domains), no architecture regressions outside scope.
 - Avoid unrelated refactors.
 - Keep diffs reviewable and DDD-compliant.
+- Ground symbol and contract changes in repo evidence before editing.
 - Follow `.copilot/skills/ux-delegation-policy/SKILL.md` as the canonical delegation rule source.
 - Treat `.github/pull_request_template.md` as mandatory output structure for PR bodies.
 - Do not ask GitHub Actions to discover preventable failures locally first; run the local CI-equivalent prechecks before PR creation.

@@ -27,6 +27,8 @@ repository's issue → PR → merge process.
 1. Verify PR is open, mergeable, and not draft using pager-free JSON queries:
    `./.venv/bin/python ./scripts/noninteractive_gh.py pr-view <PR_NUMBER>`
    - Prefer this helper (or another pager-free `gh ... --json ...` pattern) over watch/web flows while you are inside an automation loop.
+   - Refresh this GitHub truth immediately before any readiness, merge, queue-advance, or blocker narration; do not rely on earlier helper output, stale checkpoint state, memory, or terminal silence.
+   - Treat PR head branch provenance as a hard gate: the `headRefName` reported by GitHub must match the current local branch and `.tmp/github-issue-queue-state.md` `active_branch` before you claim readiness or continue toward merge.
 2. Confirm the PR description follows `.github/pull_request_template.md` and validate the body locally with:
    `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md`
 3. Confirm local CI-equivalent prechecks from `.github/workflows/ci.yml` were run for the PR branch and that evidence is present in the PR body:
@@ -42,9 +44,12 @@ repository's issue → PR → merge process.
    - Prefer JSON polling over `gh pr checks --watch`, `gh run watch`, or other watch/pager UI flows; they add unnecessary terminal churn in repo automation.
    - Treat PR readiness as GitHub truth only. Do **not** infer status from local PID files, process liveness, terminal silence, or similar host-side heuristics; use `statusCheckRollup`, mergeability, and related GitHub JSON metadata instead.
    - Refresh `.tmp/github-issue-queue-state.md` from GitHub truth before merge/close narration. Record `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; that checkpoint is the shared state contract used by canonical workflows and interruption recovery.
-   - `last_github_truth` must preserve the exact helper command(s), selector(s), and current result summary behind the merge/readiness decision rather than a vague prose note.
+   - `last_github_truth` must preserve the exact `pr-view` / `pr-checks` helper command(s), selector(s), and current result summary used for the current merge/readiness claim; vague prose or stale summaries are not sufficient provenance.
+   - If `headRefName`, the local branch, and checkpoint `active_branch` disagree, stop and hand the slice back for re-anchor/root-cause repair instead of narrating merge readiness.
    - If the helper reports `summary.overall = pending-timeout`, stop the automatic wait, record the still-pending CI state in `.tmp/github-issue-queue-state.md`, and return a blocker/resume point instead of continuing to poll indefinitely.
-   - If checks fail or the PR is not mergeable, do not invent a separate repair path. Hand the slice back to `resolve-issue`, fix the root cause there, rerun local prechecks, and then re-enter `pr-merge`.
+   - If checks fail or the PR is not mergeable, do not invent a separate repair path. Hand the slice back to `resolve-issue` using the repository's default fast evidence-first repair method: parse the exact failed check/job/step output, quote the exact failing command/check, the relevant error text, and the suspected root cause, then reproduce the cheapest failing gate first before broader parity or merge polling resumes.
+   - Do **not** send the slice back with broad repo-scan instructions, parity-first reruns, guesses, hallucinated state, or stale-memory narration. Widen validation only after the narrower gate passes.
+   - Do **not** permit a second repair change without refreshed evidence from the new failure state; trial-and-error churn is non-compliant.
 5. Merge with squash and delete branch:
    `gh pr merge <PR_NUMBER> --squash --delete-branch`
 6. Comment and close linked issue (if needed).

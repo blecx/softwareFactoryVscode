@@ -312,7 +312,7 @@ def build_standard_group_replay_command(
     pytest_bundle: str | None = None,
 ) -> str:
     command = [
-        "./.venv/bin/python",
+        args.python,
         "./scripts/local_ci_parity.py",
         "--standard-group",
         group,
@@ -331,7 +331,7 @@ def build_production_group_replay_command(
     group: str,
 ) -> str:
     command = [
-        "./.venv/bin/python",
+        args.python,
         "./scripts/local_ci_parity.py",
         "--mode",
         PRODUCTION_MODE,
@@ -388,7 +388,7 @@ def build_standard_group_watchdog_remediation(
 
 def build_rerun_command(args: argparse.Namespace) -> str:
     command: list[str] = [
-        "./.venv/bin/python",
+        args.python,
         "./scripts/local_ci_parity.py",
     ]
     if args.level:
@@ -757,6 +757,46 @@ def create_fresh_checkout_snapshot(repo_root: Path, *, head_rev: str) -> Path:
     return snapshot_path
 
 
+def resolve_git_common_dir(repo_root: Path) -> Path | None:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=str(repo_root),
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=ACTIVE_COMMAND_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    raw_path = result.stdout.strip()
+    if not raw_path:
+        return None
+
+    common_dir = Path(raw_path)
+    if not common_dir.is_absolute():
+        common_dir = (repo_root / common_dir).resolve()
+    return common_dir
+
+
+def resolve_default_python_executable(repo_root: Path) -> str:
+    repo_local_python = repo_root / ".venv" / "bin" / "python"
+    if repo_local_python.is_file():
+        return str(repo_local_python)
+
+    common_dir = resolve_git_common_dir(repo_root)
+    if common_dir is not None:
+        shared_checkout_python = common_dir.parent / ".venv" / "bin" / "python"
+        if shared_checkout_python.is_file():
+            return str(shared_checkout_python)
+
+    return sys.executable
+
+
 def build_fresh_checkout_command(
     args: argparse.Namespace,
     *,
@@ -764,7 +804,7 @@ def build_fresh_checkout_command(
     head_rev: str,
 ) -> tuple[str, ...]:
     command: list[str] = [
-        "./.venv/bin/python",
+        args.python,
         "./scripts/local_ci_parity.py",
         "--repo-root",
         ".",
@@ -773,7 +813,7 @@ def build_fresh_checkout_command(
         "--head-rev",
         head_rev,
         "--python",
-        "./.venv/bin/python",
+        args.python,
     ]
 
     if args.level:
@@ -2569,6 +2609,11 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     repo_root = Path(args.repo_root).expanduser().resolve()
+    if args.python == sys.executable:
+        args.python = resolve_default_python_executable(repo_root)
+    else:
+        args.python = str(Path(args.python).expanduser())
+
     try:
         head_rev = resolve_head_revision(repo_root, args.head_rev)
         base_rev = resolve_base_rev(

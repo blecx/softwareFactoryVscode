@@ -142,6 +142,9 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
     agent = (repo_root / ".github" / "agents" / "execute-approved-plan.md").read_text(
         encoding="utf-8"
     )
+    prompt = (
+        repo_root / ".github" / "prompts" / "execute-approved-plan.prompt.md"
+    ).read_text(encoding="utf-8")
     skill = (
         repo_root
         / ".copilot"
@@ -162,6 +165,7 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
     )
 
     lowered_agent = agent.lower()
+    lowered_prompt = prompt.lower()
     lowered_skill = skill.lower()
     lowered_instructions = instructions.lower()
 
@@ -173,8 +177,13 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
         "finish the approved issue set",
     ]:
         assert phrase in lowered_agent
+        assert phrase in lowered_prompt
         assert phrase in lowered_skill
 
+    assert 'agent: "execute-approved-plan"' in prompt
+    assert "specialized approved-plan workflow" in lowered_prompt
+    assert "does **not** define a second implementation" in prompt
+    assert "generic planning chatter" in lowered_agent
     assert ".tmp/github-issue-queue-state.md" in skill
     assert "registered isolated worktree" in lowered_agent
     assert "registered isolated worktree" in lowered_skill
@@ -424,6 +433,143 @@ def test_queue_wrappers_share_one_canonical_issue_to_merge_process() -> None:
     assert "same canonical `resolve-issue` → `pr-merge` process" in phase_2_queue_skill
     assert "## Single source of truth for issue execution" in workflow_doc
     assert "Do not invent a separate “fix the PR” workflow." in workflow_doc
+
+
+def test_issue_resolution_symbol_grounding_rules_are_documented() -> None:
+    repo_root = Path(__file__).parent.parent
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    enforcement_map = (
+        repo_root / "docs" / "maintainer" / "AGENT-ENFORCEMENT-MAP.md"
+    ).read_text(encoding="utf-8")
+
+    assert "Ground symbols before editing code" in resolve_skill
+    assert (
+        "Do **not** invent members, attributes, parameters, return fields"
+        in resolve_skill
+    )
+    assert "Treat missing attribute/function errors" in resolve_skill
+    assert "grounding failures" in resolve_skill
+
+    assert "## Symbol grounding before code edits" in workflow_doc
+    assert (
+        "verify the relevant definitions and repo-backed usages/references"
+        in workflow_doc
+    )
+    assert (
+        "Do **not** invent members, parameters, return fields, config keys"
+        in workflow_doc
+    )
+    assert "grounding failures" in workflow_doc
+    assert "does not create a second implementation or PR-repair" in workflow_doc
+
+    assert "symbol-grounding failures" in enforcement_map
+    assert "symbol grounding before contract edits" in enforcement_map
+
+
+def test_workflow_repair_retries_require_exact_failure_evidence() -> None:
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+
+    for text in [
+        instructions,
+        resolve_skill,
+        merge_skill,
+        approved_plan_skill,
+        workflow_doc,
+    ]:
+        assert "exact failing command" in text or "exact failing command/check" in text
+        assert "relevant error text" in text
+        assert "suspected root cause" in text
+        assert "trial-and-error churn" in text
+        assert (
+            "second repair change without new evidence" in text
+            or "second repair change without refreshed evidence" in text
+        )
+
+    assert "GitHub CI/check" in resolve_skill
+    assert "Hand the slice back to `resolve-issue`" in merge_skill
+    assert "same canonical `@resolve-issue` → `@pr-merge` flow" in workflow_doc
+
+
+def test_pr_error_resolution_defaults_to_fast_evidence_first_tactic() -> None:
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    prompt = (
+        repo_root / ".github" / "prompts" / "pr-error-resolve-tactic.prompt.md"
+    ).read_text(encoding="utf-8")
+    prompt_workflows = (
+        repo_root / "docs" / "maintainer" / "PROMPT-WORKFLOWS.md"
+    ).read_text(encoding="utf-8")
+    enforcement_map = (
+        repo_root / "docs" / "maintainer" / "AGENT-ENFORCEMENT-MAP.md"
+    ).read_text(encoding="utf-8")
+
+    for text in [
+        instructions,
+        workflow_doc,
+        resolve_skill,
+        merge_skill,
+        approved_plan_skill,
+    ]:
+        lowered = text.lower()
+        assert "cheapest failing gate" in lowered
+        assert "widen validation only after" in lowered
+        assert "broad repo scans" in lowered or "broad repo-scan" in lowered
+        assert "guess" in lowered
+        assert "trial-and-error churn" in lowered
+
+    lowered_prompt = prompt.lower()
+    lowered_prompt_workflows = prompt_workflows.lower()
+    lowered_enforcement_map = enforcement_map.lower()
+
+    assert "canonical default pr-error repair behavior" in lowered_prompt
+    assert "guardrails and workflow skills enforce the same method" in lowered_prompt
+    assert "default pr-error repair method" in lowered_prompt_workflows
+    assert "focused activation surface" in lowered_prompt_workflows
+    assert "avoid guessing or hallucinated state" in lowered_prompt_workflows
+    assert "pr-error-resolve-tactic.prompt.md" in enforcement_map
+    assert "default fast evidence-first repair method" in lowered_enforcement_map
 
 
 def test_interruption_recovery_assets_and_docs_exist():
@@ -1102,6 +1248,14 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "GitHub truth only" in workflow_doc
     assert "not local PID files, process liveness, terminal idleness" in workflow_doc
     assert (
+        "Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration"
+        in workflow_doc
+    )
+    assert (
+        "PR head branch matches both the current local branch and `.tmp/github-issue-queue-state.md` `active_branch`"
+        in workflow_doc
+    )
+    assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600"
         in workflow_doc
     )
@@ -1127,6 +1281,14 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     assert "gh pr checks --watch" in merge_skill
     assert "gh run watch" in merge_skill
     assert "Treat PR readiness as GitHub truth only." in merge_skill
+    assert (
+        "Refresh this GitHub truth immediately before any readiness, merge, queue-advance, or blocker narration"
+        in merge_skill
+    )
+    assert (
+        "`headRefName` reported by GitHub must match the current local branch "
+        "and `.tmp/github-issue-queue-state.md` `active_branch`" in merge_skill
+    )
     assert (
         "Do **not** infer status from local PID files, process liveness, terminal silence"
         in merge_skill
@@ -1211,6 +1373,63 @@ def test_workflow_checkpoint_provenance_and_pr_evidence_are_locked() -> None:
         in pr_template
     )
     assert "./scripts/validate-pr-template.sh <pr-body-file>" in pr_template
+
+
+def test_fresh_github_truth_and_pr_head_alignment_rules_are_documented() -> None:
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "stale checkpoint entries, memory, prior terminal output, or terminal silence"
+        in workflow_doc
+    )
+    assert (
+        "GitHub PR head metadata disagrees with local branch or checkpoint provenance"
+        in workflow_doc
+    )
+    assert "fresh `pr-view` / `pr-checks` command(s)" in workflow_doc
+
+    assert (
+        "do not continue from memory, terminal silence, or stale checkpoint evidence"
+        in approved_plan_skill
+    )
+    assert (
+        "GitHub `headRefName`, the current local branch, and checkpoint `active_branch` to agree"
+        in approved_plan_skill
+    )
+
+    assert (
+        "`last_github_truth` must preserve the exact `pr-view` / `pr-checks` helper command(s)"
+        in merge_skill
+    )
+    assert (
+        "If `headRefName`, the local branch, and checkpoint `active_branch` disagree"
+        in merge_skill
+    )
+
+    assert (
+        "Do not narrate PR state from memory, stale checkpoint values, earlier terminal output, or terminal silence"
+        in instructions
+    )
+    assert (
+        "require the GitHub PR head branch to match the current local branch and the checkpoint `active_branch`"
+        in instructions
+    )
 
 
 def test_archived_chat_session_troubleshooting_report_preserves_program_closeout() -> (
@@ -2275,6 +2494,7 @@ def test_maintainer_prompt_and_approval_reference_pages_track_current_sources():
     assert "index/reference" in prompt_reference
     assert "not a competing normative authority" in prompt_reference
     assert "execute-github-issues-in-order.prompt.md" in prompt_reference
+    assert "execute-approved-plan.prompt.md" in prompt_reference
     assert "resume-after-interruption.prompt.md" in prompt_reference
     assert ".tmp/github-issue-queue-state.md" in prompt_reference
     assert ".tmp/interruption-recovery-snapshot.md" in prompt_reference
@@ -2325,6 +2545,7 @@ def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sourc
     assert "queue-phase-2" in enforcement_map
     assert "Plan" in enforcement_map
     assert "execute-github-issues-in-order.prompt.md" in enforcement_map
+    assert "execute-approved-plan.prompt.md" in enforcement_map
     assert "resume-after-interruption.prompt.md" in enforcement_map
     assert ".github/ISSUE_TEMPLATE/feature_request.yml" in enforcement_map
     assert ".github/ISSUE_TEMPLATE/bug_report.yml" in enforcement_map
@@ -3878,9 +4099,14 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     capsys,
 ):
     module = _load_local_ci_parity_module()
+    python_executable = "/tmp/shared-repo/.venv/bin/python"
     snapshot_path = tmp_path / "fresh-checkout"
     snapshot_path.mkdir(parents=True, exist_ok=True)
     calls: list[tuple[tuple[str, ...], Path]] = []
+
+    monkeypatch.setattr(
+        module, "resolve_default_python_executable", lambda repo_root: python_executable
+    )
 
     monkeypatch.setattr(
         module,
@@ -3925,12 +4151,52 @@ def test_local_ci_parity_fresh_checkout_bootstraps_and_reexecutes(
     assert calls[0] == (("bash", "./setup.sh"), snapshot_path)
     child_command, child_cwd = calls[1]
     assert child_cwd == snapshot_path
-    assert child_command[:2] == ("./.venv/bin/python", "./scripts/local_ci_parity.py")
+    assert child_command[:2] == (python_executable, "./scripts/local_ci_parity.py")
     assert "--fresh-checkout" not in child_command
     assert "--python" in child_command
-    assert "./.venv/bin/python" in child_command
+    assert python_executable in child_command
     assert "snapshot_path=" in captured.out
     assert "committed HEAD only" in captured.out
+
+
+def test_local_ci_parity_resolves_shared_repo_python_from_git_common_dir(
+    monkeypatch, tmp_path: Path
+) -> None:
+    module = _load_local_ci_parity_module()
+    worktree_root = tmp_path / "queue-worktree"
+    worktree_root.mkdir(parents=True, exist_ok=True)
+    shared_checkout_root = tmp_path / "shared-checkout"
+    shared_python = shared_checkout_root / ".venv" / "bin" / "python"
+    shared_python.parent.mkdir(parents=True, exist_ok=True)
+    shared_python.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        module,
+        "resolve_git_common_dir",
+        lambda repo_root: shared_checkout_root / ".git",
+    )
+    monkeypatch.setattr(module.sys, "executable", "/usr/bin/python3")
+
+    resolved = module.resolve_default_python_executable(worktree_root)
+
+    assert resolved == str(shared_python.resolve())
+
+
+def test_local_ci_parity_preserves_repo_venv_entrypoint_path_without_resolving_symlink(
+    monkeypatch, tmp_path: Path
+) -> None:
+    module = _load_local_ci_parity_module()
+    repo_root = tmp_path / "queue-worktree"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    repo_python = repo_root / ".venv" / "bin" / "python"
+    repo_python.parent.mkdir(parents=True, exist_ok=True)
+    repo_python.symlink_to(Path("/usr/bin/python3"))
+
+    monkeypatch.setattr(module, "resolve_git_common_dir", lambda repo_root: None)
+
+    resolved = module.resolve_default_python_executable(repo_root)
+
+    assert resolved == str(repo_python)
 
 
 def test_local_ci_parity_fresh_checkout_reports_git_timeout_during_snapshot_creation(
