@@ -8579,3 +8579,19 @@ def test_workspace_sensitive_tasks_use_surface_guard() -> None:
         "${workspaceFolder}/scripts/factory_stack.py",
         "preflight",
     ]
+
+
+def test_runtime_compose_agent_worker_exports_work_issue_quota_overrides() -> None:
+    compose_file = REPO_ROOT / "compose" / "docker-compose.factory.yml"
+    data = yaml.safe_load(compose_file.read_text(encoding="utf-8"))
+    worker_env = data.get("services", {}).get("agent-worker", {}).get("environment", {})
+
+    assert (
+        worker_env.get("WORK_ISSUE_QUOTA_CEILING_RPS")
+        == "${WORK_ISSUE_QUOTA_CEILING_RPS:-}"
+    )
+    assert (
+        worker_env.get("WORK_ISSUE_FOREGROUND_SHARE")
+        == "${WORK_ISSUE_FOREGROUND_SHARE:-}"
+    )
+    assert worker_env.get("WORK_ISSUE_RESERVE_SHARE") == "${WORK_ISSUE_RESERVE_SHARE:-}"
