@@ -2753,7 +2753,9 @@ def test_python_writer_formatter_guardrail_is_documented() -> None:
     assert "./.venv/bin/python -c '...'" in workflow_doc
     assert "python3 - <<'PY'" in workflow_doc
     assert "python -m pytest" not in pr_template
-    assert "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in pr_template
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in pr_template
+    )
     assert "run **Black itself** before treating the save as complete" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
     assert (
@@ -5538,3 +5540,21 @@ def test_local_ci_parity_install_docs_note_official_level_output_contract() -> N
     assert "stable `key=value` projection" in install_doc
     assert "selected bundles, reasons, watchdog budgets, timeout kinds" in install_doc
     assert "--fresh-checkout" in install_doc
+
+
+def test_resolve_issue_wrapper_handoff_contract() -> None:
+    repo_root = Path(__file__).parent.parent
+    resolve_wrapper = (repo_root / ".github" / "agents" / "resolve-issue.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "implementation half of the canonical `@resolve-issue` → `@pr-merge` issue → PR → merge workflow"
+        in resolve_wrapper
+    )
+    assert (
+        "Explicitly hand off the review-ready PR to `@pr-merge` rather than merging it directly"
+        in resolve_wrapper
+    )
+    assert "preparing for handoff to `@pr-merge`" in resolve_wrapper
+    assert "whether the slice is ready for `@pr-merge` handoff" in resolve_wrapper
