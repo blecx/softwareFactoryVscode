@@ -1958,6 +1958,7 @@ def run_selected_official_level_via_shared_engine(
     requested_level: str,
     pr_body_file: str,
     rerun_command: str,
+    ci_run_bundle: str = "",
 ) -> tuple[ValidationRunReport, list[Finding]]:
     print("\n▶ Shared validation runner official local mirror")
     print(f"ℹ️ {LOCAL_CI_OFFICIAL_LEVEL_WRAPPER_NOTE}")
@@ -1969,6 +1970,15 @@ def run_selected_official_level_via_shared_engine(
         context="local",
         policy=policy,
     )
+    if ci_run_bundle:
+        if ci_run_bundle not in plan.effective_atomic_bundles:
+            raise ValueError(
+                f"Requested bundle `{ci_run_bundle}` is not in the resolved plan for level `{requested_level}`."
+            )
+        import dataclasses
+
+        plan = dataclasses.replace(plan, effective_atomic_bundles=(ci_run_bundle,))
+
     request = ValidationRunnerRequest(
         repo_root=repo_root,
         plan=plan,
@@ -2460,6 +2470,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Python executable used for quality/test commands.",
     )
     parser.add_argument(
+        "--export-ci-matrix",
+        action="store_true",
+        help="Export a JSON matrix of effective atomic bundles for the resolved plan and exit. Requires --level.",
+    )
+    parser.add_argument(
+        "--ci-run-bundle",
+        default="",
+        help="Run only the specified atomic bundle ID from the resolved plan. Requires --level.",
+    )
+    parser.add_argument(
+        "--ci-level",
+        default="",
+        help="Optional CI override level (pr-update, merge, production) used with --export-ci-matrix.",
+    )
+    # End args
+    parser.add_argument(
         "--pr-body-file",
         default="",
         help="Optional PR body file to validate with scripts/validate-pr-template.sh.",
@@ -2582,6 +2608,40 @@ def main(argv: list[str] | None = None) -> int:
         args.watchdog_seconds if args.watchdog_seconds > 0 else None
     )
 
+    if args.export_ci_matrix:
+        if not args.level:
+            print("❌ `--export-ci-matrix` requires `--level`.")
+            return 2
+        try:
+            repo_root = (
+                __import__("pathlib").Path(args.repo_root).expanduser().resolve()
+            )
+            head_rev = resolve_head_revision(repo_root, args.head_rev)
+            base_rev = resolve_base_rev(
+                repo_root, base_rev=args.base_rev, head_rev=head_rev
+            )
+            from factory_runtime.agents.validation_policy import ValidationPolicy
+            from factory_runtime.agents.validation_plan_resolver import (
+                resolve_validation_plan,
+            )
+
+            policy = ValidationPolicy.load_canonical()
+            plan = resolve_validation_plan(
+                changed_paths=changed_files(
+                    repo_root, base_rev=base_rev, head_rev=head_rev
+                ),
+                requested_level=args.level,
+                context="github",
+                policy=policy,
+            )
+            import json
+
+            print(json.dumps({"bundle": list(plan.effective_atomic_bundles)}))
+            return 0
+        except Exception as exc:
+            print(f"❌ Failed to export matrix: {exc}")
+            return 2
+
     if args.level:
         conflicts = official_level_legacy_flag_conflicts(args)
         if conflicts:
@@ -2695,6 +2755,7 @@ def main(argv: list[str] | None = None) -> int:
                     requested_level=args.level,
                     pr_body_file=args.pr_body_file,
                     rerun_command=rerun_command,
+                    ci_run_bundle=args.ci_run_bundle,
                 )
             )
             print_official_local_mirror_projection(
