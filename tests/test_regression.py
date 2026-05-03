@@ -3673,11 +3673,17 @@ def test_local_ci_parity_warnings_do_not_fail_the_standard_precheck(
 ):
     module = _load_local_ci_parity_module()
 
-    def _fake_run_command(command, *, cwd):
-        del command, cwd
+    def _fake_run_command(*args, **kwargs):
+        import subprocess
         return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
 
+    monkeypatch.setattr("subprocess.run", _fake_run_command)
     monkeypatch.setattr(module, "run_command", _fake_run_command)
+    import subprocess
+    monkeypatch.setattr(module, "run_git", lambda cwd, args, **kwargs: subprocess.CompletedProcess(["git"], 0, stdout="some/file.py\n", stderr=""))
+    (tmp_path / "docs" / "ops").mkdir(parents=True, exist_ok=True)
+    for p in ["docs/PRODUCTION-READINESS.md", "docs/INSTALL.md", "docs/CHEAT_SHEET.md", "docs/ops/MONITORING.md", "docs/ops/BACKUP-RESTORE.md", "docs/ops/INCIDENT-RESPONSE.md"]:
+        (tmp_path / p).write_text("ok")
 
     exit_code = module.main(
         [

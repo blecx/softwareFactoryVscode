@@ -194,3 +194,13 @@ At minimum, the final evidence bundle must include:
 `softwareFactoryVscode` may be described as ready for **internal self-hosted production** only when all blocking requirements are implemented, the canonical internal production-readiness gate is green locally and in CI, and three consecutive clean runs have been recorded without waiving blockers.
 
 Anything less than that is a baseline, an in-progress hardening state, or a roadmap milestone — not a final production claim.
+- Production Docs Contract
+- Production Docker Build Parity
+- Production Runtime Proofs
+- Internal Production Gate — Docker Parity & Recovery Proofs
+- ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+- Production Docs Contract
+- Production Docker Build Parity
+- Production Runtime Proofs
+- Internal Production Gate — Docker Parity & Recovery Proofs
+- ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
