@@ -128,6 +128,8 @@ runner, and workflow work must keep green.
 
 ## Downstream surfaces that must consume these semantics later
 
+The shared plan resolver ([`VALIDATION-RESOLVER-CONTRACT.md`](VALIDATION-RESOLVER-CONTRACT.md)) provides the structured entrypoint for reading this policy.
+
 The following surfaces remain derivative today and must migrate intentionally in later phases instead of continuing to define shadow validation semantics:
 
 - [`../../scripts/local_ci_parity.py`](../../scripts/local_ci_parity.py)
