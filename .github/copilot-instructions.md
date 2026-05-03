@@ -75,3 +75,8 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - If parsing, piping, or terminal behavior makes the result ambiguous, stop and report the ambiguity instead of continuing on guessed state.
 
 Remember: **You solve nothing if you fix one bug by creating architectural debt or violating design guardrails.**
+
+## 8. Python Formatting and Environment Guardrails
+- **NEVER** use explicit string replacement or file editing to fix Python formatting code (Black/Isort).
+- If validation fails regarding formatting or imports, **IMMEDIATELY** invoke the `✅ Auto-Fix: Python Formatting` task to automatically resolve styling logic. Do not guess the fixes manually.
+- **NEVER** invoke global python aliases (`python` or `python3`) directly when trying to format or lint files. Always rely on the auto-fix task which enforces the `./.venv/bin/python` environment.
