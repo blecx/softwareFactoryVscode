@@ -185,6 +185,9 @@ def test_execute_approved_plan_skill_and_alias_routing_exist():
     assert "does **not** define a second implementation" in prompt
     assert "generic planning chatter" in lowered_agent
     assert ".tmp/github-issue-queue-state.md" in skill
+    assert "registered isolated worktree" in lowered_agent
+    assert "registered isolated worktree" in lowered_skill
+    assert "active_worktree" in skill
     assert "single source of truth" in lowered_skill
     assert "resolve-issue` → `pr-merge`" in skill
     assert "do not stop merely because ci is pending" in lowered_skill
@@ -1123,9 +1126,12 @@ def test_execution_surface_routing_contract_is_documented() -> None:
     assert "**Companion runtime metadata**" in workflow_doc
     assert "scripts/workspace_surface_guard.py" in workflow_doc
     assert "Host Project (Root)" in workflow_doc
+    assert "dedicated issue worktree" in workflow_doc
+    assert "active_worktree" in workflow_doc
 
     assert "scripts/workspace_surface_guard.py" in resolve_skill
     assert "source checkout as a second static runtime contract" in resolve_skill
+    assert "dedicated registered worktree" in resolve_skill
 
     assert "Respect execution surfaces" in instructions
     assert "generated `software-factory.code-workspace` surface" in instructions
@@ -1135,6 +1141,48 @@ def test_execution_surface_routing_contract_is_documented() -> None:
     assert ".tmp/github-issue-queue-state.md" in instructions
     assert "current editor path as advisory only" in instructions
     assert "stray partial snapshot" in instructions
+
+
+def test_queue_checkpoint_and_manual_prompt_require_per_issue_worktree_isolation() -> (
+    None
+):
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    approved_plan_agent = (
+        repo_root / ".github" / "agents" / "execute-approved-plan.md"
+    ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    queue_prompt = (
+        repo_root / ".github" / "prompts" / "execute-github-issues-in-order.prompt.md"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "one issue = one dedicated branch = one registered isolated worktree"
+        in workflow_doc
+    )
+    assert "active_worktree" in workflow_doc
+    assert "current registered git worktree" in workflow_doc
+
+    assert (
+        "dedicated per-issue branch **and** a registered isolated worktree"
+        in approved_plan_agent
+    )
+    assert "active issue, branch, and worktree path" in approved_plan_agent
+
+    assert "dedicated branch and registered isolated worktree" in approved_plan_skill
+    assert "active issue number, branch, and worktree path" in approved_plan_skill
+    assert "Record `active_worktree`" in approved_plan_skill
+
+    assert "dedicated branch and use a dedicated registered worktree" in queue_prompt
+    assert "active_worktree: <absolute path>" in queue_prompt
 
 
 def test_mcp_first_tool_routing_guidance_is_documented() -> None:
@@ -1213,10 +1261,22 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     )
     assert "heredoc" in workflow_doc
     assert "Long-running Docker/test output" in workflow_doc
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in workflow_doc
+    )
+    assert (
+        "`last_github_truth` is not a free-form shortcut: it must record the exact helper command(s), selector(s), and current result summary"
+        in workflow_doc
+        or "last_github_truth is not a free-form shortcut: it must record the exact helper command(s), selector(s), and current result summary"
+        in workflow_doc
+    )
 
     assert (
         "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER>"
         in merge_skill
+    )
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in merge_skill
     )
     assert "gh pr checks --watch" in merge_skill
     assert "gh run watch" in merge_skill
@@ -1239,6 +1299,80 @@ def test_noninteractive_terminal_guidance_is_documented() -> None:
     )
     assert "./.venv/bin/python ./scripts/noninteractive_gh.py issue-list" in issue_skill
     assert "heredoc-based Python command" in resolve_skill
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in resolve_skill
+    )
+    assert (
+        "exact helper command(s), selector(s), and current result summary"
+        in resolve_skill
+    )
+
+
+def test_workflow_checkpoint_provenance_and_pr_evidence_are_locked() -> None:
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    recovery_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "interruption-recovery-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    pr_template = (repo_root / ".github" / "pull_request_template.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in workflow_doc
+    )
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in resolve_skill
+    )
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in merge_skill
+    )
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge"
+        in approved_plan_skill
+    )
+
+    checkpoint_phrase = (
+        "exact helper command(s), selector(s), and current result summary"
+    )
+    assert checkpoint_phrase in workflow_doc
+    assert checkpoint_phrase in resolve_skill
+    assert checkpoint_phrase in merge_skill
+    assert checkpoint_phrase in approved_plan_skill
+    assert checkpoint_phrase in recovery_skill
+
+    assert (
+        "./.venv/bin/python ./scripts/noninteractive_gh.py issue-view <issue-number>"
+        in pr_template
+    )
+    assert (
+        "./.venv/bin/python ./scripts/noninteractive_gh.py pr-view <pr-number>"
+        in pr_template
+    )
+    assert (
+        "./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <pr-number>"
+        in pr_template
+    )
+    assert "./scripts/validate-pr-template.sh <pr-body-file>" in pr_template
 
 
 def test_fresh_github_truth_and_pr_head_alignment_rules_are_documented() -> None:
@@ -2618,9 +2752,8 @@ def test_python_writer_formatter_guardrail_is_documented() -> None:
     assert "python3 -c '...'" in workflow_doc
     assert "./.venv/bin/python -c '...'" in workflow_doc
     assert "python3 - <<'PY'" in workflow_doc
-    assert "python scripts/check_neutrality.py" not in pr_template
-    assert "python3 scripts/check_neutrality.py" in pr_template
-    assert "python3 -m pytest tests factory_runtime/tests -q --tb=short" in pr_template
+    assert "python -m pytest" not in pr_template
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in pr_template
     assert "run **Black itself** before treating the save as complete" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
     assert (

@@ -30,14 +30,15 @@ issue → PR → merge process.
 4. Apply UX delegation policy from `.copilot/skills/ux-delegation-policy/SKILL.md` and capture required consultation outcome.
 5. Read `.github/workflows/ci.yml` and treat its checks as the minimum local precheck contract for this slice.
    - Prefer `./scripts/noninteractive_gh.py` or another pager-free `gh ... --json ...` pattern for GitHub polling in automation-heavy loops, and never combine piped JSON with a heredoc-based Python command because the heredoc consumes stdin.
+   - For PR handoff/readiness narration, the canonical local shared-engine evidence command is `./.venv/bin/python ./scripts/local_ci_parity.py --level merge`.
 
 ### Ground symbols before editing code
 
 - Verify the target definition and at least one repo-backed usage/reference before changing an existing contract, or verify from the issue text plus repo evidence that a genuinely new contract is required.
 - Do **not** invent members, attributes, parameters, return fields, config keys, helper APIs, or data-shape fields that are not evidenced by the repository or the issue.
 - Treat missing attribute/function errors, unresolved symbol assumptions, and guessed helper calls as grounding failures: stop, gather evidence from definitions/usages, and only then continue implementation or repair.
-
 6. Implement minimal code changes in a dedicated branch.
+   - When the slice is part of queue or approved-plan execution, work only from the issue's dedicated registered worktree and keep that worktree isolated from the dirty primary checkout and every other issue branch.
    - When a workflow task depends on `Host Project (Root)` or the installed-workspace contract, route it through the generated `software-factory.code-workspace` surface or the repo-owned `scripts/workspace_surface_guard.py` helper. Do not treat the source checkout as a second static runtime contract.
 7. Run required validations explicitly using the repo venv (NEVER global python), including the local equivalents of `.github/workflows/ci.yml` before opening a PR:
    - `./.venv/bin/black --check factory_runtime/ scripts/ tests/`
@@ -46,8 +47,10 @@ issue → PR → merge process.
    - `./.venv/bin/pytest tests/`
    - `./tests/run-integration-test.sh`
    - Maintain `.tmp/github-issue-queue-state.md` throughout the slice and record the latest validation command/result there.
+   - When the shared checkpoint is active, keep `active_worktree` current alongside `active_issue` and `active_branch` so the slice can be resumed from the exact issue-specific execution surface.
 8. Commit with `Fixes #<issue>` and push.
    - Before handing off to merge, update `.tmp/github-issue-queue-state.md` with `status: ready-for-pr-merge` plus `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth`; that checkpoint is consumed by `pr-merge`, approved-plan execution, and interruption recovery.
+   - `last_github_truth` must record the exact helper command(s), selector(s), and current result summary used for the readiness claim, for example `./.venv/bin/python ./scripts/noninteractive_gh.py issue-view <issue>` and `./.venv/bin/python ./scripts/noninteractive_gh.py pr-view <pr>` / `pr-checks <pr>`.
 9. Create PR via GitHub CLI using the generated `.tmp` markdown file and `.github/pull_request_template.md` structure:
    `gh pr create --body-file .tmp/pr-body-<issue-number>.md --title "Fixes #<issue>: <Title>"`
 10. Run `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md` before creating or updating the PR.
@@ -76,6 +79,7 @@ Prefer tool-driven discovery over pasting large context into chat.
 ## Validation Baseline
 
 - Include command outputs/evidence in PR body.
+- For PR handoff/readiness evidence, include `./.venv/bin/python ./scripts/local_ci_parity.py --level merge` plus the exact `./.venv/bin/python ./scripts/noninteractive_gh.py ...` GitHub-truth commands that support the current checkpoint state.
 
 ## Repo Rules
 

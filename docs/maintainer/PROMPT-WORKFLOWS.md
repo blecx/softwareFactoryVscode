@@ -38,7 +38,7 @@ Start with these files when you need to review or change prompt workflow behavio
 ## Shared checkpoints and constraints
 
 - Prompt workflow entrypoints use repo-owned `.tmp/` state, never `/tmp`.
-- `.tmp/github-issue-queue-state.md` is the shared checkpoint for queue progress, active issue/branch/PR state, validation evidence, and GitHub truth.
+- `.tmp/github-issue-queue-state.md` is the shared checkpoint for queue progress, active issue/branch/worktree/PR state, validation evidence, and GitHub truth.
 - `resume-after-interruption.prompt.md` pairs that checkpoint with `./.venv/bin/python ./scripts/capture_recovery_snapshot.py` and `.tmp/interruption-recovery-snapshot.md` before implementation, merge, or queue continuation resumes.
 - Prompt entrypoints do **not** replace template discipline: issue and PR structure still comes from [`.github/ISSUE_TEMPLATE/feature_request.yml`](../../.github/ISSUE_TEMPLATE/feature_request.yml), [`.github/ISSUE_TEMPLATE/bug_report.yml`](../../.github/ISSUE_TEMPLATE/bug_report.yml), and [`.github/pull_request_template.md`](../../.github/pull_request_template.md).
 

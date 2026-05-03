@@ -22,6 +22,7 @@ Provide a deterministic resume path after a Copilot chat interruption, restart, 
    - `git status --short --branch`
    - active issue/PR from `.tmp/github-issue-queue-state.md`
    - current GitHub issue/PR/check state
+   - whether `last_github_truth` records the exact helper command(s), selector(s), and current result summary needed to reproduce the latest readiness/merge claim
    - `./scripts/factory_stack.py status` output when runtime-sensitive
    - whether the current editor/file/cwd is a valid execution surface or a stray partial `.tmp/queue-worktrees/*` snapshot
 5. Update `.tmp/github-issue-queue-state.md` before resuming implementation, merge, cleanup, or queue selection.
@@ -36,6 +37,7 @@ Provide a deterministic resume path after a Copilot chat interruption, restart, 
 
 - Use `.tmp/`, never `/tmp`.
 - Treat GitHub as the source of truth for issue state, PR state, merge state, and CI/check state.
+- Treat `./.venv/bin/python ./scripts/noninteractive_gh.py ...` as the canonical GitHub-truth helper surface when refreshing or validating checkpoint provenance.
 - Treat runtime snapshots as required when the task touched Docker, MCP, workspace activation, or lifecycle status.
 - Treat the current editor/file path as advisory only. If it points under `.tmp/queue-worktrees/*` but the top-level directory is missing repo/worktree markers such as `.git`, `docs/`, or `scripts/`, classify it as a stray partial snapshot and resume from the repository root plus `.tmp/github-issue-queue-state.md` instead.
 - Keep the recovery artifact throwaway and free of secrets.

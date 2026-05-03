@@ -22,6 +22,7 @@ Use these Copilot agents in VS Code Chat:
 ## Loop rules
 
 - One issue = one PR = one merge.
+- Approved-plan and queue execution must also keep one issue = one dedicated branch = one registered isolated worktree.
 - Stop immediately on blocked PRs, CI failures, merge conflicts, or workflow errors.
 - Default queue agents (`@queue-backend`, `@queue-phase-2`) require explicit
   operator approval before continuing to the next issue.
@@ -103,6 +104,7 @@ Routing rule:
 - If a task depends on `Host Project (Root)` or validates the installed host contract, it belongs to the generated workspace or an explicit companion runtime target, not the source checkout alone.
 - Repo-owned task wrappers must reject wrong-surface invocation with actionable guidance or require an explicit target; they must not silently fabricate a second runtime contract inside the source checkout.
 - The canonical guard for these task surfaces is `scripts/workspace_surface_guard.py`, which fails fast when the task is launched from the source checkout without a valid generated-workspace host target.
+- When the task is issue execution, treat the active execution surface as the dedicated issue worktree recorded in `.tmp/github-issue-queue-state.md`; do not reuse the dirty primary checkout or a worktree belonging to a different issue.
 
 ## Non-interactive GitHub / terminal patterns
 
@@ -136,6 +138,7 @@ Routing rule:
 - Keep `.tmp/github-issue-queue-state.md` updated throughout the current issue. The minimum checkpoint fields are:
   - `active_issue`
   - `active_branch`
+  - `active_worktree`
   - `active_pr`
   - `status`
   - `last_validation`
@@ -148,6 +151,7 @@ Routing rule:
   - `cleanup_state`
   - `last_github_truth`
 - `last_github_truth` is not a free-form shortcut: it must record the exact helper command(s), selector(s), and current result summary used for the latest readiness or merge claim.
+- For queue and approved-plan work, `active_issue`, `active_branch`, and `active_worktree` together define the canonical per-issue execution surface; if any of the three disagree with the current registered git worktree, stop and re-anchor before continuing.
 - For PR-backed work, `last_github_truth` must include the exact fresh `pr-view` / `pr-checks` command(s) and enough result summary to prove the PR head branch aligned with the current local branch plus checkpoint `active_branch` at claim time.
 - If GitHub PR head metadata disagrees with local branch or checkpoint provenance, stop and re-anchor before readiness, merge, or queue-advance narration.
 - Canonical workflows must refuse unsafe continuation, merge, or completion
@@ -191,6 +195,14 @@ Routing rule:
 - PR descriptions must follow `.github/pull_request_template.md` exactly.
 - Before opening or finalizing a PR, run the local equivalents of `.github/workflows/ci.yml`:
 
+  Canonical local PR-readiness evidence for issue handoff / merge-readiness narration:
+
+  ```text
+  ./.venv/bin/python ./scripts/local_ci_parity.py --level merge
+  ```
+
+  This is the official shared-engine local mirror entrypoint for merge-grade readiness narration. Keep using the broader parity paths below when you need the full CI-equivalent or production-grade gate.
+
   Primary one-command path:
 
   ```text
@@ -229,6 +241,7 @@ Routing rule:
 - Validate generated PR bodies locally with `./scripts/validate-pr-template.sh <pr-body-file>`
   (or `./.venv/bin/python ./scripts/local_ci_parity.py --pr-body-file <pr-body-file>`)
   before asking GitHub to enforce the same template in CI.
+- For PR/CI truth, use `./.venv/bin/python ./scripts/noninteractive_gh.py ...` as the canonical helper and carry those exact command(s), selector(s), and current result summary into `.tmp/github-issue-queue-state.md` under `last_github_truth`.
 - The canonical blocking production-grade parity command is
   `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`; it now
   includes Docker image builds plus the promoted Docker E2E runtime proof lane.
