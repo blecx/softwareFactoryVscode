@@ -61,9 +61,12 @@ local precheck failures, or GitHub CI/check failures:
 - parse the exact current failure output before rerunning anything;
 - read the exact failing file, test, assertion, method, or check step when the
   output already identifies it;
-- reproduce the cheapest failing gate first (`Black`/formatter on touched files
-  → single failing test or file → touched-test bundle → focused local parity →
-  broader PR/merge validation); and
+- use the **formatter-first** strategy as the default narrow repair path:
+  reproduce the cheapest failing gate first. When Python formatting drift is
+  plausible, run Black and isort on touched Python files before widening to
+  tests or parity. Full ladder: touched-file formatter check
+  → single failing test or file → touched-test bundle → focused local parity
+  → broader PR/merge validation; and
 - widen validation only after the narrower gate passes.
 
 Do **not** start with broad repo scans, parity-first reruns, guessed root

@@ -591,6 +591,69 @@ def test_pr_error_resolution_defaults_to_fast_evidence_first_tactic() -> None:
     assert "default fast evidence-first repair method" in lowered_enforcement_map
 
 
+def test_formatter_first_repair_path_is_explicit_and_consistent() -> None:
+    """Locks formatter-first as the named default narrow repair path across canonical workflow surfaces."""
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    resolve_skill = (
+        repo_root / ".copilot" / "skills" / "resolve-issue-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    # "formatter-first" must be the explicitly named default narrow repair path
+    # across all canonical workflow/guardrail surfaces.
+    for label, text in [
+        ("workflow_doc", workflow_doc),
+        ("instructions", instructions),
+        ("resolve_skill", resolve_skill),
+        ("merge_skill", merge_skill),
+        ("approved_plan_skill", approved_plan_skill),
+    ]:
+        lowered = text.lower()
+        assert (
+            "formatter-first" in lowered
+        ), f"{label}: missing explicit 'formatter-first' named repair path"
+        assert (
+            "touched" in lowered
+        ), f"{label}: missing touched-file concept in formatter-first guidance"
+
+    # Instructions must describe when to stay narrow vs when to widen.
+    lowered_instructions = instructions.lower()
+    assert "when python formatting drift is plausible" in lowered_instructions
+
+    # Workflow doc must explain the full ladder with formatter-first leading.
+    lowered_workflow = workflow_doc.lower()
+    assert "formatter-first" in lowered_workflow
+    assert (
+        "touched-file formatter check" in lowered_workflow
+        or "touched python files" in lowered_workflow
+    )
+
+    # Resolve skill must name the formatter-first strategy and explain widening.
+    lowered_resolve = resolve_skill.lower()
+    assert "formatter-first" in lowered_resolve
+    assert "widen" in lowered_resolve
+
+    # Merge skill must route repair back through formatter-first ladder.
+    lowered_merge = merge_skill.lower()
+    assert "formatter-first" in lowered_merge
+    assert "touched" in lowered_merge
+
+
 def test_interruption_recovery_assets_and_docs_exist():
     repo_root = Path(__file__).parent.parent
     workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
@@ -3688,14 +3751,29 @@ def test_local_ci_parity_warnings_do_not_fail_the_standard_precheck(
 
     def _fake_run_command(*args, **kwargs):
         import subprocess
+
         return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
 
     monkeypatch.setattr("subprocess.run", _fake_run_command)
     monkeypatch.setattr(module, "run_command", _fake_run_command)
     import subprocess
-    monkeypatch.setattr(module, "run_git", lambda cwd, args, **kwargs: subprocess.CompletedProcess(["git"], 0, stdout="some/file.py\n", stderr=""))
+
+    monkeypatch.setattr(
+        module,
+        "run_git",
+        lambda cwd, args, **kwargs: subprocess.CompletedProcess(
+            ["git"], 0, stdout="some/file.py\n", stderr=""
+        ),
+    )
     (tmp_path / "docs" / "ops").mkdir(parents=True, exist_ok=True)
-    for p in ["docs/PRODUCTION-READINESS.md", "docs/INSTALL.md", "docs/CHEAT_SHEET.md", "docs/ops/MONITORING.md", "docs/ops/BACKUP-RESTORE.md", "docs/ops/INCIDENT-RESPONSE.md"]:
+    for p in [
+        "docs/PRODUCTION-READINESS.md",
+        "docs/INSTALL.md",
+        "docs/CHEAT_SHEET.md",
+        "docs/ops/MONITORING.md",
+        "docs/ops/BACKUP-RESTORE.md",
+        "docs/ops/INCIDENT-RESPONSE.md",
+    ]:
         (tmp_path / p).write_text("ok")
 
     exit_code = module.main(
@@ -4967,7 +5045,9 @@ def test_local_ci_parity_default_pytest_group_runs_named_bundles_in_order(
     pytest_commands = [
         command for command in executed_commands if command[1:3] == ("-m", "pytest")
     ]
-    expected_executable = module.resolve_default_python_executable(Path(tmp_path)) or sys.executable
+    expected_executable = (
+        module.resolve_default_python_executable(Path(tmp_path)) or sys.executable
+    )
     assert pytest_commands == [
         (
             expected_executable,
@@ -5042,7 +5122,9 @@ def test_local_ci_parity_standard_group_pytest_bundle_replay_runs_only_selected_
     pytest_commands = [
         command for command in executed_commands if command[1:3] == ("-m", "pytest")
     ]
-    expected_executable = module.resolve_default_python_executable(Path(tmp_path)) or sys.executable
+    expected_executable = (
+        module.resolve_default_python_executable(Path(tmp_path)) or sys.executable
+    )
     assert pytest_commands == [
         (
             expected_executable,
