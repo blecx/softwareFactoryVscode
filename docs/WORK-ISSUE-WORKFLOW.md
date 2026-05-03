@@ -193,7 +193,9 @@ Routing rule:
 
 - Issues must follow `.github/ISSUE_TEMPLATE/feature_request.yml` or `.github/ISSUE_TEMPLATE/bug_report.yml`.
 - PR descriptions must follow `.github/pull_request_template.md` exactly.
-- Before opening or finalizing a PR, run the local equivalents of `.github/workflows/ci.yml`:
+- Before opening or finalizing a PR, run the local equivalents of `.github/workflows/ci.yml`.
+  **Rule:** Local execution uses the identical bundle composition and skip logic as the `ci.yml` pipeline. Local validation exists primarily to make GitHub CI pass by using the same official bundles first, with GitHub rerunning the same structure as final authority. Any intentional skip is an explicit exception defined in the shared resolver.
+  **Rule:** All validation is subject to the **bounded-runtime/watchdog rule** (hard cap of 45 minutes). A runtime timeout is a blocked state, not a prompt to wait indefinitely.
 
   Canonical local PR-readiness evidence for issue handoff / merge-readiness narration:
 
@@ -201,25 +203,21 @@ Routing rule:
   ./.venv/bin/python ./scripts/local_ci_parity.py --level merge
   ```
 
-  This is the official shared-engine local mirror entrypoint for merge-grade readiness narration. Keep using the broader parity paths below when you need the full CI-equivalent or production-grade gate.
+  This is the official shared-engine local mirror entrypoint for merge-grade readiness narration. The four-level validation contract exposes `focused-local`, `pr-update`, `merge`, and `production`.
 
-  Primary one-command path:
-
-  ```text
-  ./.venv/bin/python ./scripts/local_ci_parity.py
-  ```
-
-  This executes release-doc policy, release-manifest parity, Black/isort/Flake8,
-  `pytest tests/`, integration regression, and PR-template validation against
-  `.github/pull_request_template.md`.
-
-  Canonical production-grade parity:
+  For fast inner-loop checks:
 
   ```text
-  ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+  ./.venv/bin/python ./scripts/local_ci_parity.py --level focused-local
   ```
 
-  Optional build-only expansion alias:
+  For canonical internal production-grade parity (includes required-check continuity):
+
+  ```text
+  ./.venv/bin/python ./scripts/local_ci_parity.py --level production
+  ```
+
+  Legacy Optional build-only expansion alias:
 
   ```text
   ./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build
