@@ -38,6 +38,7 @@ For wiki-related maintainer work, keep the route compact: truth first, post-trut
 | What is wiki-safe, what stays repo-only, and how do approved sources map to the live wiki? | [`WIKI-MAP.md`](WIKI-MAP.md) and [`../manifests/wiki-projection-manifest.json`](../manifests/wiki-projection-manifest.json) |
 | Approved truth already exists — how do we validate or publish the live wiki safely?        | [`maintainer/WIKI-PUBLISHING.md`](maintainer/WIKI-PUBLISHING.md)                                                            |
 
+- Once the lane is already maintenance, use `@wiki-update` to prepare `.tmp/wiki-launch/live-wiki` and `@wiki-publish` to publish that canonical clone via `scripts/publish_wiki.py`.
 - [`WORK-ISSUE-WORKFLOW.md`](WORK-ISSUE-WORKFLOW.md) — canonical issue → PR → merge workflow.
 - [`setup-github-repository.md`](setup-github-repository.md) — repository protection, branch, and CI setup guidance.
 - [`maintainer/HOST-WIKI-TRUTH-CONTRACT.md`](maintainer/HOST-WIKI-TRUTH-CONTRACT.md) — future-project wiki bootstrap and ownership contract; the first stop for where host-owned truth lives, whether bootstrap is still required, and what adoption order future hosts follow.

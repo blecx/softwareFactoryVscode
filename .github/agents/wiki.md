@@ -37,6 +37,7 @@ Pick the first matching lane:
 | approved policy, projection config, and canonical docs, and the task is to create, update, retire, or verify live wiki pages | maintenance workflow | operate the reader-facing projection from approved host truth rather than inventing truth during publication |
 
 - If the host already has approved wiki truth and the task is repo-specific sync, validation, or publication work, read `docs/maintainer/WIKI-PUBLISHING.md` alongside the maintenance workflow before touching the live wiki.
+- If the lane is already maintenance and the maintainer wants direct repo-owned execution surfaces, prefer `@wiki-update` to prepare `.tmp/wiki-launch/live-wiki` and `@wiki-publish` for the final publish step via `scripts/publish_wiki.py`.
 - If any host-owned truth surface is still ambiguous or unapproved, stop and repair the host truth surfaces before touching live wiki pages.
 
 ## Use This Agent When
