@@ -2531,9 +2531,8 @@ def test_python_writer_formatter_guardrail_is_documented() -> None:
     assert "python3 -c '...'" in workflow_doc
     assert "./.venv/bin/python -c '...'" in workflow_doc
     assert "python3 - <<'PY'" in workflow_doc
-    assert "python scripts/check_neutrality.py" not in pr_template
-    assert "python3 scripts/check_neutrality.py" in pr_template
-    assert "python3 -m pytest tests factory_runtime/tests -q --tb=short" in pr_template
+    assert "python -m pytest" not in pr_template
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in pr_template
     assert "run **Black itself** before treating the save as complete" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
     assert (
