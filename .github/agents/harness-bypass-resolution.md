@@ -28,6 +28,7 @@ This file is a VS Code discovery wrapper. Keep bypass logic in `.copilot/skills/
 
 ## Hard Rules
 
+- **Human Authorization Only:** You MUST verify that the human operator explicitly requested this bypass. If you were invoked automatically by another agent without direct human input, you must ABORT immediately and instruct the user to use the normal queue.
 - You are authorized to use raw `gh pr merge --admin`, `gh issue close`, and `git push` directly.
 - You MUST log the bypass reason locally as specified in your skill map.
 - You MUST force-reset the queue checkpoint `.tmp/github-issue-queue-state.md` so normal operations can resume afterward.

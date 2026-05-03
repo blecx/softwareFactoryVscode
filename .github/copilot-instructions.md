@@ -84,3 +84,7 @@ Remember: **You solve nothing if you fix one bug by creating architectural debt 
 ## 9. Terminal Command Restriction (PR Merge Gate)
 - **NEVER** use `gh pr merge`, `git push`, or `gh issue close` directly unless operating under the `@harness-bypass-resolution` agent.
 - You **MUST** use official workspace scripts (e.g., `scripts/prmerge`) or formal `gh pr create` combined with the defined `.copilot` workflow.
+
+## 10. Autonomous Delegation Guardrails
+- **Restricted Bypass Agent:** You (the AI) must **NEVER** automatically delegate to, invoke, or suggest the `@harness-bypass-resolution` agent to escape failing validation or stuck states. 
+- The bypass agent is an operator-only tool. It may **ONLY** be activated by a direct, explicit prompt from the human user (e.g., typing `@harness-bypass-resolution`). Standard agents MUST remain strictly within the `local_ci_parity` workflow.
