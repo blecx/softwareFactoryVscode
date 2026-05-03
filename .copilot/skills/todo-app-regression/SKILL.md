@@ -82,7 +82,7 @@ The regression MUST check and report these metrics:
 6. Re-run the semantic evaluation to confirm repeat-run stability.
 7. Write the regression report and supporting artifacts inside the throwaway workspace only.
 8. Fail the run if anything outside the throwaway workspace changed unexpectedly.
-9. *(Optional — requires `--with-ci-simulation` flag)* Run the CI simulation target as described below.
+9. _(Optional — requires `--with-ci-simulation` flag)_ Run the CI simulation target as described below.
 
 ## CI simulation target
 
@@ -95,6 +95,7 @@ The CI simulation target detects **local↔remote drift** — failures that pass
 **Dockerfile:** `docker/ci-simulation/Dockerfile` — based on `python:3.13-slim` with `git`, `safe.directory=*`, and `GITHUB_ACTIONS=true`.
 
 **Flow for each simulatable bundle (`docs-contract`, `workflow-contract`):**
+
 1. Run the bundle on the **host** using `.venv/bin/python scripts/local_ci_parity.py --ci-run-bundle <bundle>`.
 2. Create a clean `git worktree --detach HEAD` inside the throwaway workspace at `artifacts/ci-simulation/sim-checkout/`.
 3. Run the same bundle inside the Docker container: bind-mount the worktree at `/repo`, execute `bash ./setup.sh` (fresh venv), then run the parity script.
