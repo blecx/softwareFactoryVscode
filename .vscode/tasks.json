@@ -400,10 +400,23 @@
       }
     },
     {
+      "label": "✅ Auto-Fix: Python Formatting",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "-c",
+        "import subprocess; subprocess.run(['./.venv/bin/python', '-m', 'black', 'factory_runtime/', 'scripts/', 'tests/']); subprocess.run(['./.venv/bin/python', '-m', 'isort', 'factory_runtime/', 'scripts/', 'tests/'])"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build"
+    },
+    {
       "label": "✅ Validate: Local CI Parity",
       "type": "shell",
       "command": "${workspaceFolder}/.venv/bin/python",
-      "args": ["${workspaceFolder}/scripts/local_ci_parity.py"],
+      "args": ["${workspaceFolder}/scripts/local_ci_parity.py", "--level", "focused-local", "--base-rev", "main"],
       "options": {
         "cwd": "${workspaceFolder}"
       },

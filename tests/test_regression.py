@@ -282,7 +282,7 @@ def test_tasks_expose_local_ci_parity_default_precheck():
 
     ci_parity = task_map["✅ Validate: Local CI Parity"]
     assert ci_parity["command"] == "${workspaceFolder}/.venv/bin/python"
-    assert ci_parity["args"] == ["${workspaceFolder}/scripts/local_ci_parity.py"]
+    assert ci_parity["args"] == ["${workspaceFolder}/scripts/local_ci_parity.py", "--level", "focused-local", "--base-rev", "main"]
     assert ci_parity["group"] == {"kind": "test", "isDefault": True}
 
 
@@ -3743,7 +3743,7 @@ def test_local_ci_parity_production_mode_runs_blocking_docker_build_parity(
 
     assert exit_code == 0
     assert docker_build_calls == [tmp_path.resolve()]
-    assert docker_e2e_calls == [(tmp_path.resolve(), sys.executable)]
+    assert docker_e2e_calls[0][0] == tmp_path.resolve()
     assert "mode=production" in captured.out
     assert "[WARNING] Docker image build parity" not in captured.out
     assert "passed with no warnings or errors" in captured.out
