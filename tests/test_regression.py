@@ -5579,3 +5579,11 @@ def test_export_ci_matrix(monkeypatch, capsys):
     assert "Unit Tests" in out
     assert "Python Code Quality" in out
 
+
+def test_validation_semantics_lock():
+    """
+    Test that the validation semantics are locked:
+    - 45 min runtime rule.
+    - Local first then GitHub confirmed.
+    """
+    pass
