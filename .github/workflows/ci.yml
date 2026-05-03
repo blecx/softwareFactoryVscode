@@ -9,10 +9,12 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  backend-quality:
-    name: "Python Code Quality (Lint & Format)"
+  classifier:
+    name: "Resolve Validation Plan"
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      level: ${{ steps.set-level.outputs.level }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -23,185 +25,47 @@ jobs:
         with:
           python-version: "3.13"
 
-
       - name: Restore/cache .venv local virtual environment
         uses: actions/cache@v4
         with:
           path: .venv
           key: ${{ runner.os }}-venv-${{ hashFiles('setup.sh', 'requirements.dev.txt', 'factory_runtime/agents/requirements.txt') }}
-          # We only cache the local .venv directory to avoid reinstalling immutable dependencies.
-          # We intentionally do not cache broader workspace outputs or `.tmp/` boundaries 
-          # because the mirroring validations strongly require structural freshness to guarantee correctness.
 
       - name: Install dependencies
         run: |
           bash ./setup.sh
 
-      - name: Resolve release policy comparison base
-        shell: bash
+      - name: Resolve CI Level
+        id: set-level
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            git fetch --no-tags origin "${{ github.base_ref }}"
-            echo "RELEASE_POLICY_BASE=$(git merge-base HEAD origin/${{ github.base_ref }})" >> "$GITHUB_ENV"
-          elif [[ -n "${{ github.event.before }}" && "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
-            echo "RELEASE_POLICY_BASE=${{ github.event.before }}" >> "$GITHUB_ENV"
+            echo "level=merge" >> "$GITHUB_OUTPUT"
           else
-            echo "RELEASE_POLICY_BASE=$(git rev-parse HEAD^)" >> "$GITHUB_ENV"
+            echo "level=production" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Enforce release docs when VERSION changes
-        run: ./.venv/bin/python ./scripts/verify_release_docs.py --repo-root . --base-rev "$RELEASE_POLICY_BASE" --head-rev HEAD
-
-      - name: Verify Git author identity
-        run: ./.venv/bin/python ./scripts/verify_git_identity.py --repo-root . --head-rev HEAD
-
-      - name: Validate release manifest matches current commit
-        run: ./.venv/bin/python ./scripts/factory_release.py write-manifest --repo-root . --repo-url https://github.com/blecx/softwareFactoryVscode.git --check
-
-      - name: Check code formatting (Black)
-        run: ./.venv/bin/black --check factory_runtime/ scripts/ tests/
-
-      - name: Check imports strictly (isort)
-        run: ./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/
-
-      - name: Lint codebase (Flake8)
-        run: ./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841
-
-      - name: Run unit tests
-        run: ./.venv/bin/pytest tests/
-
-  integration-test:
-    name: "Architectural Boundary Tests"
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v6
-      - name: Run isolated integration test
-        run: chmod +x ./tests/run-integration-test.sh && ./tests/run-integration-test.sh
-
-  template-validation:
-    name: "PR Template Conformance"
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-      - name: Validate PR Template Formatting
-        run: chmod +x ./scripts/validate-pr-template.sh && ./scripts/validate-pr-template.sh "${{ github.workspace }}/.github/pull_request_template.md"
-
-  production-docs-contract:
-    name: "Production Docs Contract"
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-
-
-      - name: Restore/cache .venv local virtual environment
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('setup.sh', 'requirements.dev.txt', 'factory_runtime/agents/requirements.txt') }}
-          # We only cache the local .venv directory to avoid reinstalling immutable dependencies.
-          # We intentionally do not cache broader workspace outputs or `.tmp/` boundaries 
-          # because the mirroring validations strongly require structural freshness to guarantee correctness.
-
-      - name: Install dependencies
+      - name: Export Matrix
+        id: set-matrix
         run: |
-          bash ./setup.sh
+          # Use PR base ref if available, else HEAD^ as standard comparison point
+          if [[ -n "${{ github.base_ref }}" ]]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            export BASE_REV="origin/${{ github.base_ref }}"
+          else
+            export BASE_REV="HEAD^"
+          fi
+          
+          MATRIX=$(./.venv/bin/python ./scripts/local_ci_parity.py --level ${{ steps.set-level.outputs.level }} --base-rev "$BASE_REV" --export-ci-matrix)
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
-      - name: Run production docs-contract diagnostics
-        run: |
-          ./.venv/bin/python ./scripts/local_ci_parity.py \
-            --mode production \
-            --production-group docs-contract \
-            --production-groups-only
-
-  production-docker-build-parity:
-    name: "Production Docker Build Parity"
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-
-
-      - name: Restore/cache .venv local virtual environment
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('setup.sh', 'requirements.dev.txt', 'factory_runtime/agents/requirements.txt') }}
-          # We only cache the local .venv directory to avoid reinstalling immutable dependencies.
-          # We intentionally do not cache broader workspace outputs or `.tmp/` boundaries 
-          # because the mirroring validations strongly require structural freshness to guarantee correctness.
-
-      - name: Install dependencies
-        run: |
-          bash ./setup.sh
-
-      - name: Run production docker-build diagnostics
-        run: |
-          ./.venv/bin/python ./scripts/local_ci_parity.py \
-            --mode production \
-            --production-group docker-builds \
-            --production-groups-only
-
-  production-runtime-proofs:
-    name: "Production Runtime Proofs"
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python 3.13
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.13"
-
-
-      - name: Restore/cache .venv local virtual environment
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: ${{ runner.os }}-venv-${{ hashFiles('setup.sh', 'requirements.dev.txt', 'factory_runtime/agents/requirements.txt') }}
-          # We only cache the local .venv directory to avoid reinstalling immutable dependencies.
-          # We intentionally do not cache broader workspace outputs or `.tmp/` boundaries 
-          # because the mirroring validations strongly require structural freshness to guarantee correctness.
-
-      - name: Install dependencies
-        run: |
-          bash ./setup.sh
-
-      - name: Run production runtime-proof diagnostics
-        run: |
-          ./.venv/bin/python ./scripts/local_ci_parity.py \
-            --mode production \
-            --production-group runtime-proofs \
-            --production-groups-only
-
-  production-readiness:
-    name: "Internal Production Gate — Docker Parity & Recovery Proofs"
-    needs:
-      - production-docs-contract
-      - production-docker-build-parity
-      - production-runtime-proofs
+  run_bundle:
+    name: "Bundle"
+    needs: classifier
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.classifier.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -212,37 +76,36 @@ jobs:
         with:
           python-version: "3.13"
 
-
       - name: Restore/cache .venv local virtual environment
         uses: actions/cache@v4
         with:
           path: .venv
           key: ${{ runner.os }}-venv-${{ hashFiles('setup.sh', 'requirements.dev.txt', 'factory_runtime/agents/requirements.txt') }}
-          # We only cache the local .venv directory to avoid reinstalling immutable dependencies.
-          # We intentionally do not cache broader workspace outputs or `.tmp/` boundaries 
-          # because the mirroring validations strongly require structural freshness to guarantee correctness.
 
       - name: Install dependencies
         run: |
           bash ./setup.sh
 
-      - name: Run canonical internal production gate (Docker parity & recovery proofs)
+      - name: Run Bundle
         run: |
-          # The canonical aggregate production gate remains the readiness
-          # authority, but CI refreshes the sign-off bundle from the already
-          # successful production-only diagnostic jobs instead of replaying
-          # Dockerfile build parity, docs-contract checks, and runtime proofs a
-          # second time on the critical path.
+          if [[ -n "${{ github.base_ref }}" ]]; then
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            export BASE_REV="origin/${{ github.base_ref }}"
+          else
+            export BASE_REV="HEAD^"
+          fi
+          
           ./.venv/bin/python ./scripts/local_ci_parity.py \
-            --mode production \
-            --production-group aggregate \
-            --production-groups-only \
-            --ci-production-readiness-bundle-only
+            --level ${{ needs.classifier.outputs.level }} \
+            --base-rev "$BASE_REV" \
+            --ci-run-bundle ${{ matrix.bundle }} \
+            --fresh-checkout
 
       - name: Upload production-readiness evidence bundle
-        if: always()
+        if: always() && matrix.bundle == 'runtime-proofs'
         uses: actions/upload-artifact@v7
         with:
           name: production-readiness-bundle
-          path: .tmp/production-readiness/
-          if-no-files-found: warn
+          path: .tmp/run-artifacts/
+          retention-days: 5
+          if-no-files-found: ignore
