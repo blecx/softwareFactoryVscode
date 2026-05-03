@@ -19,10 +19,17 @@ We mandate **local CI-parity prechecks** before remote validation is used as a m
 - **Rule:** Copilot workflows that prepare or finalize a PR MUST treat `.github/workflows/ci.yml` as the source of truth for the minimum required prechecks.
 - **Rule:** Workflow docs and Copilot skills MUST reference the local equivalents of CI, not merely say “run tests”.
 
-### 2. Prechecks Must Run Before PR Finalization
+### 2. Prechecks Must Run Before PR Finalization (The Four-Level Mirrored Validation Contract)
 
+- **Rule:** The repository uses a canonical shared validation engine. Local execution uses the identical bundle composition and skip logic as the `ci.yml` pipeline. Local validation exists primarily to make GitHub CI pass by using the same official bundles first, with GitHub rerunning the same structure as final authority.
+- **Rule:** This maintains **required-check continuity**, ensuring that all underlying prechecks are evaluated deterministically at the correct level.
 - **Rule:** Before creating or finalizing a PR, the workflow MUST run the local equivalents of the current CI checks where they are executable in the local environment.
-- **Rule:** For the current repository, the primary one-command workflow is:
+- **Rule:** The primary four-level local mirror entrypoints are invoked via `./.venv/bin/python ./scripts/local_ci_parity.py --level <level>`:
+  - `focused-local`: Strict subset for fast inner-loop checks.
+  - `pr-update`: PR-incremental checks.
+  - `merge`: Canonical PR-readiness evidence for issue handoff.
+  - `production`: Canonical internal production-readiness gate.
+- **Rule:** For the current repository, the primary one-command workflow (now mapping to the four-level contract) is:
   - `./.venv/bin/python ./scripts/local_ci_parity.py`
 - **Rule:** That local precheck workflow MUST cover at least:
   - `./.venv/bin/python ./scripts/verify_release_docs.py --repo-root . --base-rev <base> --head-rev HEAD`
@@ -35,8 +42,10 @@ We mandate **local CI-parity prechecks** before remote validation is used as a m
   - `./scripts/validate-pr-template.sh ./.github/pull_request_template.md`
   - `./scripts/validate-pr-template.sh <pr-body-file>` (when applicable)
 
-### 3. Local/CI Boundary Must Be Explicit
+### 3. Local/CI Boundary, Explicit Exceptions, and Bounded-Runtime Rule
 
+- **Rule:** Local-first then GitHub-confirmed semantics are explicit. Deviations where local execution skips a CI requirement (e.g. Docker-build dependencies on non-Docker hosts) must be explicitly managed exceptions codified within the shared resolver rules.
+- **Rule:** **Bounded-runtime/Watchdog rule:** Validation bundles are subject to a bounded-runtime guard. Each bundle runs under a hard cap of 45 minutes (2700 seconds). A runtime timeout is a blocked state and MUST result in termination rather than indefinite polling.
 - **Rule:** CI may expose diagnosable production-only jobs (for example docs-contract, docker-build parity, and runtime proofs), but the canonical internal production-readiness lane (`production-readiness`) remains the final aggregate readiness authority.
 - **Rule:** Docker image build validation remains part of the required CI production path (diagnostic lanes plus canonical aggregate gate) and may be optional in default local prechecks due host/runtime constraints.
 - **Rule:** If Docker build parity is skipped by default, the workflow/docs MUST state that boundary explicitly and provide an opt-in local path.

@@ -109,3 +109,4 @@ jobs:
           path: .tmp/run-artifacts/
           retention-days: 5
           if-no-files-found: ignore
+# Verify Git author identity

@@ -79,3 +79,4 @@ repository's issue → PR → merge process.
 - If the remote repository is not enforcing the documented branch protections and required status checks, treat that as an operational risk and report it explicitly.
   </file>
   </skill>
+<--- FULL DIFF exact helper command(s), selector(s), and current result summary -->
