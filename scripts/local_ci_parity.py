@@ -2603,6 +2603,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
+    if not args.level and not official_level_legacy_flag_conflicts(args) and not args.fresh_checkout and not args.ci_run_bundle and not args.export_ci_matrix:
+        print("\nℹ️ Promoting bare run to `--level focused-local` to enforce the fail-early principle and limit execution time.")
+        args.level = "focused-local"
+
     global ACTIVE_COMMAND_TIMEOUT_SECONDS
     ACTIVE_COMMAND_TIMEOUT_SECONDS = (
         args.watchdog_seconds if args.watchdog_seconds > 0 else None
