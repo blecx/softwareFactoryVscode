@@ -74,6 +74,25 @@ Python source, run **Black itself** before treating the save as complete.
   should apply Black-compatible formatting at save time so later
   `black --check` failures point to real drift rather than an avoidable write bug.
 
+### Audited workflow-owned Python writer surfaces
+
+The following surfaces have been audited and confirmed to call
+`normalize_repo_text_for_write(..., require_python_formatter=True)` before
+persisting Python files:
+
+| Surface | Location | Audit status |
+|---------|----------|-------------|
+| `CoderAgent._implement` (primary issue-execution write path) | `factory_runtime/agents/coder_agent.py` | ✅ confirmed |
+| `CoderAgent._validate_with_retry` (retry/repair write path) | `factory_runtime/agents/coder_agent.py` | ✅ confirmed |
+| `write_file_content_typed` (filesystem tools) | `factory_runtime/agents/tooling/filesystem_tools.py` | ✅ confirmed |
+| `FilesystemService.write_text` (repo-fundamentals MCP) | `factory_runtime/apps/mcp/repo_fundamentals/filesystem_service.py` | ✅ confirmed |
+
+Regression locks for the `coder_agent` write paths are in
+`tests/test_text_write_normalization.py` (structural AST-based audit tests).
+End-to-end formatter fidelity for the filesystem-tool and filesystem-service
+surfaces is covered by the existing `write_file_content_typed` and
+`FilesystemService.write_text` functional tests in the same file.
+
 ## Practical baseline coverage map (P0/P1/P2 lock)
 
 The practical per-workspace baseline is protected by a mix of functional and documentation regressions:
