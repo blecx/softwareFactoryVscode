@@ -40,6 +40,8 @@
       "close-issue": true,
       "execute-approved-plan": true,
       "execute-approved-umbrella": true,
+      "wiki-update": true,
+      "wiki-publish": true,
       "resolve-issue": true,
       "pr-merge": true,
       "ralph-agent": true
@@ -146,6 +148,8 @@
       "close-issue": true,
       "execute-approved-plan": true,
       "execute-approved-umbrella": true,
+      "wiki-update": true,
+      "wiki-publish": true,
       "resolve-issue": true,
       "pr-merge": true,
       "ralph-agent": true,

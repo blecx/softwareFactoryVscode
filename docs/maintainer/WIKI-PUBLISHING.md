@@ -30,6 +30,13 @@ If any answer is `no`, stop here and return to [`HOST-WIKI-TRUTH-CONTRACT.md`](H
 - confirming that the current published page set still matches approved repo truth;
 - or publishing already-approved wiki changes after the corresponding repo issue → PR → merge slice lands.
 
+## Maintainer-facing entry surfaces
+
+- Use [`../../.github/agents/wiki.md`](../../.github/agents/wiki.md) when you still need routing between bootstrap, publication-policy authoring, and maintenance.
+- Use [`../../.github/agents/wiki-update.md`](../../.github/agents/wiki-update.md) when the lane is already maintenance and you want to refresh or validate `.tmp/wiki-launch/live-wiki`, stopping at a clean ready-to-publish state.
+- Use [`../../.github/agents/wiki-publish.md`](../../.github/agents/wiki-publish.md) when the canonical wiki clone is already prepared and the remaining step is publication.
+- Use [`../../scripts/publish_wiki.py`](../../scripts/publish_wiki.py) as the repo-owned helper for the final publish push instead of teaching normal agent flows to run raw `git push`.
+
 ## Required repo-owned inputs
 
 Read these inputs before touching the live wiki:
@@ -88,6 +95,7 @@ Read these inputs before touching the live wiki:
 
 - Only push wiki edits that project already-approved canonical repo content.
 - Direct wiki edits are for projection formatting, navigation, metadata, and bounded publication work, not for inventing new canonical truth.
+- Use [`../../scripts/publish_wiki.py`](../../scripts/publish_wiki.py) for the final publish step instead of raw `git push` in normal agent flows.
 - When project naming changes on a published route or page title, update `docs/WIKI-MAP.md`, `manifests/wiki-projection-manifest.json`, and every affected live wiki link in the same slice so labels, slugs, and navigation do not drift apart.
 - If a needed change is really policy or content, update the repo first, merge it, and then resync the wiki.
 

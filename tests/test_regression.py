@@ -131,10 +131,28 @@ def test_low_friction_profile_approves_canonical_queue_agents():
     auto_approve = approval_profiles["low-friction"]["chat.tools.subagent.autoApprove"]
     assert auto_approve["execute-approved-plan"] is True
     assert auto_approve["execute-approved-umbrella"] is True
+    assert auto_approve["wiki-update"] is True
+    assert auto_approve["wiki-publish"] is True
     assert auto_approve["queue-backend"] is True
     assert auto_approve["queue-phase-2"] is True
     assert "continue-backend" not in auto_approve
     assert "continue-phase-2" not in auto_approve
+
+
+def test_trusted_workflow_profile_approves_repo_owned_wiki_execution_agents():
+    repo_root = Path(__file__).parent.parent
+    approval_profiles = json.loads(
+        (repo_root / ".copilot" / "config" / "vscode-approval-profiles.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    auto_approve = approval_profiles["trusted-workflow"][
+        "chat.tools.subagent.autoApprove"
+    ]
+
+    assert auto_approve["wiki-update"] is True
+    assert auto_approve["wiki-publish"] is True
 
 
 def test_execute_approved_plan_skill_and_alias_routing_exist():
@@ -2472,6 +2490,10 @@ def test_maintainer_wiki_publishing_runbook_keeps_wiki_repo_first():
     assert "Last synced from" in runbook
     assert "repo-only leak" in lowered
     assert "issue → PR → merge" in runbook
+    assert "wiki-update.md" in runbook
+    assert "wiki-publish.md" in runbook
+    assert "scripts/publish_wiki.py" in runbook
+    assert "ready-to-publish" in lowered
 
 
 def test_wiki_contract_and_runbook_preserve_truth_first_handoff_order() -> None:
@@ -2596,6 +2618,8 @@ def test_maintainer_prompt_and_approval_reference_pages_track_current_sources():
     assert "safe" in approval_reference
     assert "trusted-workflow" in approval_reference
     assert "low-friction" in approval_reference
+    assert "wiki-update" in approval_reference
+    assert "wiki-publish" in approval_reference
     assert "Configure Approval Profile (Safe)" in approval_reference
     assert "Configure Approval Profile (Trusted Workflow)" in approval_reference
     assert "Configure Approval Profile (Low-Friction)" in approval_reference
@@ -2614,11 +2638,14 @@ def test_agent_enforcement_map_routes_major_workflows_to_current_guardrail_sourc
     assert "not a competing normative authority" in enforcement_map
     assert "create-issue" in enforcement_map
     assert "wiki.md" in enforcement_map
+    assert "wiki-update.md" in enforcement_map
+    assert "wiki-publish.md" in enforcement_map
     assert "wiki-bootstrap-workflow" in enforcement_map
     assert "wiki-publication-policy-authoring" in enforcement_map
     assert "wiki-maintenance-workflow" in enforcement_map
     assert "HOST-WIKI-TRUTH-CONTRACT.md" in enforcement_map
     assert "WIKI-PUBLISHING.md" in enforcement_map
+    assert "publish_wiki.py" in enforcement_map
     assert "resolve-issue" in enforcement_map
     assert "pr-merge" in enforcement_map
     assert "execute-approved-plan" in enforcement_map
@@ -2662,6 +2689,9 @@ def test_wiki_agent_wrapper_stays_thin_and_requires_host_truth():
     assert "missing, incomplete, or not yet approved" in wrapper
     assert "publication-policy-authoring skill" in wrapper
     assert "issue → PR → merge workflow" in wrapper
+    assert "@wiki-update" in wrapper
+    assert "@wiki-publish" in wrapper
+    assert "scripts/publish_wiki.py" in wrapper
     assert "repo-first" in lowered
     assert "repo docs canonical" in lowered
     assert "reader-facing projection" in lowered
@@ -2700,6 +2730,31 @@ def test_wiki_agent_wrapper_keeps_exactly_three_lane_choices() -> None:
     assert chooser.index("| publication-policy-authoring skill |") < chooser.index(
         "| maintenance workflow |"
     )
+
+
+def test_wiki_update_and_publish_wrappers_define_repo_owned_execution_split() -> None:
+    repo_root = Path(__file__).parent.parent
+    update_wrapper = (repo_root / ".github" / "agents" / "wiki-update.md").read_text(
+        encoding="utf-8"
+    )
+    publish_wrapper = (repo_root / ".github" / "agents" / "wiki-publish.md").read_text(
+        encoding="utf-8"
+    )
+
+    lowered_update = update_wrapper.lower()
+    lowered_publish = publish_wrapper.lower()
+
+    assert "Provides context for the `wiki-update` AI Agent." in update_wrapper
+    assert ".tmp/wiki-launch/live-wiki" in update_wrapper
+    assert "ready-to-publish" in lowered_update
+    assert "reader-facing projection" in lowered_update
+    assert "Do not use this to invent publication policy" in update_wrapper
+
+    assert "Provides context for the `wiki-publish` AI Agent." in publish_wrapper
+    assert "scripts/publish_wiki.py" in publish_wrapper
+    assert "raw `git push`" in publish_wrapper
+    assert "clean committed `.tmp/wiki-launch/live-wiki` clone" in publish_wrapper
+    assert "repo-owned helper" in lowered_publish
 
 
 def test_docs_roadmap_separates_current_direction_from_historical_plans():
@@ -3462,6 +3517,20 @@ def _load_verify_git_identity_module():
     return module
 
 
+def _load_publish_wiki_module():
+    repo_root = Path(__file__).parent.parent
+    publish_wiki_path = repo_root / "scripts" / "publish_wiki.py"
+    spec = importlib.util.spec_from_file_location(
+        "publish_wiki_module", publish_wiki_path
+    )
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_next_pr_resolves_current_backend_repo_and_skips_placeholder_client(
     monkeypatch,
 ):
@@ -3730,6 +3799,115 @@ def test_verify_git_identity_blocks_placeholder_git_config(
     assert exit_code == 1
     assert "Configured Git identity is blocked" in captured.out
     assert "CI <ci@localhost>" in captured.out
+
+
+def test_publish_wiki_rejects_noncanonical_clone_path(tmp_path: Path) -> None:
+    module = _load_publish_wiki_module()
+
+    repo_root = tmp_path / "repo"
+    (repo_root / ".tmp" / "wiki-launch" / "live-wiki").mkdir(parents=True)
+
+    with pytest.raises(ValueError, match="canonical live wiki clone"):
+        module.resolve_wiki_dir(repo_root.resolve(), repo_root / ".tmp" / "other")
+
+
+def test_publish_wiki_dry_run_reports_clean_canonical_clone(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = _load_publish_wiki_module()
+
+    repo_root = tmp_path / "repo"
+    wiki_dir = (repo_root / ".tmp" / "wiki-launch" / "live-wiki").resolve()
+    wiki_dir.mkdir(parents=True)
+
+    def _fake_run_git(repo_root: Path, args: list[str]):
+        assert repo_root == wiki_dir
+        if args == ["rev-parse", "--is-inside-work-tree"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="true\n", stderr="")
+        if args == ["status", "--porcelain"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="", stderr="")
+        if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="master\n", stderr="")
+        if args == ["remote", "get-url", "origin"]:
+            return subprocess.CompletedProcess(
+                ["git"],
+                0,
+                stdout="https://example.test/wiki.git\n",
+                stderr="",
+            )
+        if args == ["rev-parse", "HEAD"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="abc123\n", stderr="")
+        if args == ["status", "--short", "--branch"]:
+            return subprocess.CompletedProcess(
+                ["git"],
+                0,
+                stdout="## master...origin/master [ahead 1]\n",
+                stderr="",
+            )
+        raise AssertionError(f"unexpected git command: {args}")
+
+    monkeypatch.setattr(module, "run_git", _fake_run_git)
+
+    payload = module.publish_wiki_clone(repo_root=repo_root, dry_run=True)
+
+    assert payload["dryRun"] is True
+    assert payload["pushed"] is False
+    assert payload["branch"] == "master"
+    assert payload["head"] == "abc123"
+    assert payload["wikiDir"] == str(wiki_dir)
+
+
+def test_publish_wiki_pushes_selected_branch_when_clone_is_clean(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    module = _load_publish_wiki_module()
+
+    repo_root = tmp_path / "repo"
+    wiki_dir = (repo_root / ".tmp" / "wiki-launch" / "live-wiki").resolve()
+    wiki_dir.mkdir(parents=True)
+    commands: list[tuple[Path, tuple[str, ...]]] = []
+
+    def _fake_run_git(repo_root: Path, args: list[str]):
+        commands.append((repo_root, tuple(args)))
+        if args == ["rev-parse", "--is-inside-work-tree"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="true\n", stderr="")
+        if args == ["status", "--porcelain"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="", stderr="")
+        if args == ["rev-parse", "--abbrev-ref", "HEAD"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="master\n", stderr="")
+        if args == ["remote", "get-url", "origin"]:
+            return subprocess.CompletedProcess(
+                ["git"],
+                0,
+                stdout="https://example.test/wiki.git\n",
+                stderr="",
+            )
+        if args == ["rev-parse", "HEAD"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="abc123\n", stderr="")
+        if args == ["status", "--short", "--branch"]:
+            return subprocess.CompletedProcess(
+                ["git"],
+                0,
+                stdout="## master...origin/master [ahead 1]\n",
+                stderr="",
+            )
+        if args == ["push", "origin", "master:master"]:
+            return subprocess.CompletedProcess(["git"], 0, stdout="pushed\n", stderr="")
+        raise AssertionError(f"unexpected git command: {args}")
+
+    monkeypatch.setattr(module, "run_git", _fake_run_git)
+
+    payload = module.publish_wiki_clone(repo_root=repo_root)
+
+    assert payload["pushed"] is True
+    assert payload["dryRun"] is False
+    assert payload["stdout"] == "pushed"
+    assert any(
+        repo_root_path == wiki_dir and args == ("push", "origin", "master:master")
+        for repo_root_path, args in commands
+    )
 
 
 def test_ci_workflow_enforces_git_author_identity_guard():
