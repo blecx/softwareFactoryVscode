@@ -16,6 +16,20 @@
       "response": "When running from an installed host, keep all generated files inside .copilot/softwareFactoryVscode/.tmp/todo-regression-run/workspace. The deliverable must let users add new todos, update current todos, mark tasks done or undone, remove items, show a no-todos empty state, and keep the data across refreshes."
     },
     {
+      "id": "github-claude-3-5-sonnet",
+      "provider": "github",
+      "model": "anthropic/claude-3.5-sonnet",
+      "template": false,
+      "response": "All generated files must stay inside .tmp/todo-regression-run/workspace. The todo app must support adding new todos, editing existing ones, marking tasks complete or incomplete, deleting items, showing an empty-state message when no tasks exist, and persisting all changes after reload."
+    },
+    {
+      "id": "github-llama-4-scout",
+      "provider": "github",
+      "model": "meta/meta-llama-4-scout",
+      "template": false,
+      "response": "Keep all outputs inside .tmp/todo-regression-run/workspace. The todo deliverable must implement create, edit, complete or incomplete, delete, empty state when no todos exist, and persistence across reload."
+    },
+    {
       "id": "github-generic-template",
       "provider": "github",
       "model": "*",

@@ -112,6 +112,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Print the generated report as JSON after writing it.",
     )
+    parser.add_argument(
+        "--with-ci-simulation",
+        action="store_true",
+        help=(
+            "Run the Docker-based CI simulation after the main regression. "
+            "Requires Docker. Detects local\u2194remote drift by running each "
+            "parity bundle both on the host and inside a container that mirrors "
+            "the GitHub Actions ubuntu-latest + Python 3.13 environment."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -418,7 +428,80 @@ def build_quality_metrics(
     }
 
 
-def run_regression(repo_root: Path) -> dict[str, Any]:
+# ---------------------------------------------------------------------------
+# CI simulation integration
+# ---------------------------------------------------------------------------
+
+
+def _import_ci_simulation() -> Any | None:
+    """Lazily import ``scripts/ci_simulation.py`` next to this file.
+
+    Returns the module object on success or ``None`` when the file is absent
+    (e.g. in a minimal seeded test environment that does not include it).
+    """
+    import importlib.util
+
+    scripts_dir = Path(__file__).resolve().parent
+    candidate = scripts_dir / "ci_simulation.py"
+    if not candidate.exists():
+        return None
+    spec = importlib.util.spec_from_file_location("ci_simulation", candidate)
+    if spec is None or spec.loader is None:
+        return None
+    import sys
+
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["ci_simulation"] = module
+    spec.loader.exec_module(module)  # type: ignore[union-attr]
+    return module
+
+
+_CI_SIM_NOT_REQUESTED: dict[str, Any] = {
+    "available": False,
+    "skipped": True,
+    "skip_reason": "CI simulation not requested in this run.",
+    "image_tag": "",
+    "dockerfile_path": str(Path("docker") / "ci-simulation" / "Dockerfile"),
+    "bundles_simulated": [],
+    "bundles_skipped": [],
+    "local_results": [],
+    "ci_results": [],
+    "drift_findings": [],
+    "drift_detected": False,
+    "os_note": "",
+    "elapsed_seconds": 0.0,
+}
+
+
+def _run_ci_simulation_for_report(
+    repo_root: Path,
+    throwaway_root: Path,
+    factory_root: Path,
+) -> dict[str, Any]:
+    """Invoke the CI simulation engine and return a report-ready dict.
+
+    This thin wrapper exists so that contract tests can monkeypatch it without
+    spawning Docker or running real bundles.
+    """
+    ci_sim = _import_ci_simulation()
+    if ci_sim is None:
+        return {
+            **_CI_SIM_NOT_REQUESTED,
+            "skip_reason": "ci_simulation module not found next to todo_app_regression.py.",
+        }
+    python_bin = str(factory_root / ".venv" / "bin" / "python")
+    if not Path(python_bin).exists():
+        python_bin = "./.venv/bin/python"
+    return ci_sim.run_ci_simulation(
+        repo_root,
+        throwaway_root,
+        python_bin=python_bin,
+    )
+
+
+def run_regression(
+    repo_root: Path, *, include_ci_simulation: bool = False
+) -> dict[str, Any]:
     factory_root, mode = detect_factory_layout(repo_root)
     throwaway_root = resolve_throwaway_root(repo_root, mode)
     workspace_root = ensure_clean_throwaway_workspace(throwaway_root)
@@ -435,6 +518,13 @@ def run_regression(repo_root: Path) -> dict[str, Any]:
     )
     active_case = build_active_config_case(
         factory_root, generic_case, active_workspace_marker
+    )
+    # Determine whether the active model has a dedicated named case or falls
+    # through to the generic template.  Operators see this in the report so they
+    # know the coverage level without inspecting the cases file manually.
+    active_model_id = active_case.get("model", "")
+    active_model_named_case = any(
+        c.get("model") == active_model_id for c in fixed_cases
     )
     compatibility_cases = [*fixed_cases, active_case]
     first_results, second_results = evaluate_cases_twice(
@@ -476,12 +566,26 @@ def run_regression(repo_root: Path) -> dict[str, Any]:
         second_results=second_results,
         unexpected_changes=unexpected_changes,
     )
+    # Optionally run the Docker-based CI simulation
+    if include_ci_simulation:
+        ci_simulation_result = _run_ci_simulation_for_report(
+            repo_root, throwaway_root, factory_root
+        )
+    else:
+        ci_simulation_result = dict(_CI_SIM_NOT_REQUESTED)
+
+    quality_all_pass = all(value == 1.0 for value in quality_metrics.values())
+    drift_detected = ci_simulation_result.get("drift_detected", False)
+
+    if not quality_all_pass:
+        status = "failed"
+    elif drift_detected:
+        status = "drift-warning"
+    else:
+        status = "passed"
+
     report = {
-        "status": (
-            "passed"
-            if all(value == 1.0 for value in quality_metrics.values())
-            else "failed"
-        ),
+        "status": status,
         "mode": mode,
         "repo_root": str(repo_root),
         "factory_root": str(factory_root),
@@ -498,7 +602,9 @@ def run_regression(repo_root: Path) -> dict[str, Any]:
         "active_config": {
             "provider": active_case["provider"],
             "model": active_case["model"],
+            "named_case_coverage": active_model_named_case,
         },
+        "ci_simulation": ci_simulation_result,
     }
 
     report_path = workspace_root / REPORT_RELATIVE
@@ -512,7 +618,7 @@ def run_regression(repo_root: Path) -> dict[str, Any]:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     repo_root = resolve_repo_root(args.repo_root)
-    report = run_regression(repo_root)
+    report = run_regression(repo_root, include_ci_simulation=args.with_ci_simulation)
 
     print("============================================================")
     print("Todo-app throwaway regression")
@@ -526,10 +632,21 @@ def main(argv: list[str] | None = None) -> int:
         for change in report["unexpected_changes_outside_throwaway"]:
             print(f"- {change}")
 
+    ci_sim = report.get("ci_simulation", {})
+    if ci_sim.get("skipped"):
+        print(f"ci_simulation=skipped ({ci_sim.get('skip_reason', '')})")
+    else:
+        drift_findings = ci_sim.get("drift_findings", [])
+        print(
+            f"ci_simulation=ran  drift_detected={ci_sim.get('drift_detected', False)}"
+        )
+        for finding in drift_findings:
+            print(f"  [{finding['category']}] {finding['bundle']}: {finding['detail']}")
+
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
 
-    return 0 if report["status"] == "passed" else 1
+    return 0 if report["status"] in ("passed", "drift-warning") else 1
 
 
 if __name__ == "__main__":

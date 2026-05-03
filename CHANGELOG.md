@@ -9,7 +9,134 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Unreleased Summary
 
-No unreleased changes recorded yet after `2.6`.
+No unreleased changes recorded yet after `2.7`.
+
+## [2.7] — 2026-05-03
+
+### Summary for 2.7
+
+Release 2.7 is a workflow-governance and validation-infrastructure maturity
+release built on the 2.6 production-readiness baseline. The factory now ships
+a fully classifier-driven CI system with a four-level local mirror wrapper, an
+explicit formatter-first repair ladder enforced as a canonical guardrail, a
+session-ownership contract that isolates concurrent agent sessions, hardened
+autonomous-delegation rules that restrict the harness-bypass agent to
+human-only activation, and a mature wiki-workflow surface with three routing
+lanes. Ninety-three commits over thirty-plus addressed issues close this cycle.
+
+### Added in 2.7
+
+- **Four-level local CI mirror wrapper** — `scripts/local_ci_parity.py` was
+  refactored into a four-level (`pr`, `focused-local`, `merge`, `production`)
+  mirror of the GitHub CI hierarchy; each level maps to a bounded validation
+  bundle with explicit output semantics, watchdog timeouts, and local/CI parity
+  narration (issues #238, #239).
+- **Classifier-driven CI bundle jobs** — `ci.yml` now routes validation work
+  through official classifier-driven bundle jobs (`docs-contract`,
+  `focused-local`, `merge`, `production`) with concurrency cancellation and
+  dependency caching, eliminating duplicated parity work and giving each bundle
+  a diagnosable identity (issues #277, #316, #317, #318).
+- **Formatter-first canonical repair gate** — the narrowest deterministic
+  repair path (touched-file formatter check before widening to tests or full
+  parity) is now named, documented, tested in regression, and enforced as the
+  official PR-repair sequence across guardrails, workflow skill, and operator
+  docs (issues #342, #345, #346).
+- **Session-unique execution surface ownership** — the queue checkpoint now
+  requires an `execution_lease_id` field; mismatched or absent IDs are
+  treated as blockers, preventing concurrent agent sessions from silently
+  stealing each other's execution surface (issue #344).
+- **Harness-bypass agent manual-only restriction** — the bypass agent is now
+  documented as an operator-only escape hatch that standard agents must never
+  invoke autonomously; regression tests lock the enforcement text (issue #338,
+  #339).
+- **Autonomous delegation guardrail phases 1–4** — four sequential guardrail
+  phases were landed: explicit escape-hatch documentation (phase 1), terminal
+  command restriction for merge/push (phase 2), validation output as structured
+  state input (phase 3), and state-consistency contracts (phase 4) (issues
+  #322–#325, #334–#337).
+- **VS Code task optimizations and agent smart defaults** — new tasks for
+  targeted parity and auto-format; agent behavior restrictions and script engine
+  smart defaults reduce manual operator overhead (issues #327–#329, #331–#333).
+- **Wiki workflow surface** — three-lane wiki routing (bootstrap, authoring,
+  maintenance), wiki bootstrap workflow, reusable wiki skill boundary
+  documentation, improved router guidance, and regression coverage for all
+  wiki lanes (issues #249, #252–#254, #259–#262).
+- **Canonical PR error resolve tactic prompt** — a dedicated
+  `.github/prompts/pr-error-resolve-tactic.prompt.md` formalises the
+  evidence-first narrow-gate repair ladder so all workflow agents share one
+  authoritative resolution sequence (issue #311).
+- **Non-authoritative agent surfaces for validation policy** — lightweight
+  agent-facing wrappers consume the canonical validation policy without
+  duplicating policy definitions, keeping the policy contract in one place
+  (issue #321).
+- **Shared validation runner and compatibility adapters** — `ValidationRunner`
+  plus compatibility shims allow the four-level mirror to be consumed from
+  multiple entry points without duplicating bundle logic (issues #234–#236).
+- **Validation policy schema, bundle taxonomy, and lock tests** — the
+  canonical policy schema, official bundle taxonomy, and a regression test suite
+  that locks the policy contract were all landed together (issues #226–#228,
+  #283, #285).
+
+### Fixed in 2.7
+
+- **Work-issue quota overrides not reaching agent-worker** — documented
+  per-work-issue quota override values were not being forwarded into
+  `agent-worker`; the pass-through was restored (issue #314).
+- **Watchdog metadata contract gaps** — watchdog state objects now carry
+  explicit metadata (deadline, bundle name, last-seen timestamp) so operators
+  can diagnose stuck or expired runs without guessing (issues #230, #286).
+- **Bounded CI-critical readiness waits** — unbounded CI-polling and PR-check
+  waits were replaced with event-driven watchdogs that emit structured
+  diagnostic output and fail deterministically at a hard deadline (issues #231,
+  #232, #276).
+- **Clean-main Black and local-parity baseline drift** — accumulated formatting
+  drift on `main` was repaired and a fast-fail formatter gate was added to the
+  CI flow to prevent recurrence (issues #281, #282).
+- **execute-approved-plan routing gaps** — stray execution paths, missing
+  re-anchor steps, and ambiguous plan-selection logic were tightened so the
+  planner always reads `github-issue-queue-state.md` before acting (issue #305,
+  #310).
+- **resolve-issue → @pr-merge handoff** — the resolve-issue wrapper now
+  explicitly hands off to `@pr-merge` after implementation completes rather
+  than leaving the operator to remember the merge step (issue #315).
+- **Fresh GitHub truth and symbol-grounding requirements** — workflow agents
+  must now refresh GitHub truth before readiness claims and must ground edits
+  in verified symbol definitions, preventing stale-state narration (issues
+  #301–#303, #306–#308).
+- **Wiki naming and Home re-entry loop** — the wiki maintainer surface no
+  longer emits a cyclical Home redirect; wiki section names were canonicalised
+  (issue #269, #270).
+
+### Changed in 2.7
+
+- **`local_ci_parity.py` is now a four-level local mirror** — the legacy
+  no-flags baseline remains callable for backward compatibility; the canonical
+  entry point is `--level {pr|focused-local|merge|production}` which mirrors
+  the GitHub CI hierarchy exactly.
+- **CI workflow is classifier-driven** — `ci.yml` no longer runs ad-hoc
+  commands; all validation work flows through the classifier and official bundle
+  definitions, keeping local and CI parity in lock-step.
+- **Formatter-first is the official PR-repair ladder** — the four-step
+  evidence-first sequence (formatter → single failing test → touched bundle →
+  broader validation) is the canonical repair sequence and is referenced by
+  name across guardrails, skills, and operator docs.
+- **Workflow checkpoint requires `execution_lease_id`** — any session that
+  reads or writes `.tmp/github-issue-queue-state.md` must carry a matching
+  lease id; absent or mismatched ids are architectural blockers.
+- **Shared runner watchdog output enriched** — watchdog failures now emit
+  bundle name, deadline, elapsed time, and last-seen output excerpt so
+  operators can triage without re-running the full bundle.
+
+### Operational Notes for 2.7
+
+- The canonical local precheck remains
+  `./.venv/bin/python ./scripts/local_ci_parity.py --level focused-local --base-rev main`.
+- The full local parity gate before merge is
+  `./.venv/bin/python ./scripts/local_ci_parity.py --level merge --base-rev main`.
+- Formatter-first repair: run the touched-file formatter check first, confirm
+  it is green, then widen to single failing test, touched bundle, and full parity.
+- Session ownership: include a unique `execution_lease_id` in
+  `.tmp/github-issue-queue-state.md` before beginning any issue slice.
 
 ## [2.6] — 2026-04-27
 
