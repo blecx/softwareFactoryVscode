@@ -94,10 +94,16 @@ def test_model_compatibility_cases_include_fixed_variants_and_generic_template()
     cases = payload["cases"]
 
     assert payload["schema_version"] == 1
-    assert len(cases) == 3
+    # Use >= 3 so the matrix can grow without breaking this test.
+    assert len(cases) >= 3
     assert any(case["model"] == "openai/gpt-4o" for case in cases)
     assert any(case["model"] == "openai/gpt-4o-mini" for case in cases)
     assert any(case["template"] is True and case["model"] == "*" for case in cases)
+    # Ensure at least one Anthropic and one Meta named case exist.
+    assert any(
+        "anthropic/" in case["model"] and not case.get("template") for case in cases
+    )
+    assert any("meta/" in case["model"] and not case.get("template") for case in cases)
 
 
 def test_tests_readme_mentions_todo_regression_contract():
@@ -252,6 +258,36 @@ def test_run_regression_accepts_active_config_model_not_in_fixed_fixture_matrix(
     assert report["status"] == "passed"
     assert report["active_config"]["provider"] == "github"
     assert report["active_config"]["model"] == "anthropic/claude-3.7-sonnet"
+    # claude-3.7-sonnet is intentionally NOT a named case; the report must
+    # surface this so operators know they are relying on the generic template.
+    assert report["active_config"]["named_case_coverage"] is False
+
+
+def test_report_named_case_coverage_is_true_for_model_in_fixed_matrix(
+    tmp_path: Path,
+):
+    """active_config.named_case_coverage must be True when llm.default.json names
+    a model that has a dedicated entry in model-compatibility-cases.json."""
+    module = _load_todo_regression_module()
+    repo_root = _seed_source_checkout(tmp_path / "source-repo")
+    # gpt-4o is a known fixed case in the cases file.
+    (repo_root / "configs" / "llm.default.json").write_text(
+        json.dumps(
+            {
+                "provider": "github",
+                "model": "openai/gpt-4o",
+                "temperature": 0.0,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    report = module.run_regression(repo_root)
+
+    assert report["status"] == "passed"
+    assert report["active_config"]["named_case_coverage"] is True
 
 
 def test_run_regression_uses_host_factory_tmp_root_for_installed_mode(tmp_path: Path):

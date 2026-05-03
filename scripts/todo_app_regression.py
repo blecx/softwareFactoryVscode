@@ -436,6 +436,13 @@ def run_regression(repo_root: Path) -> dict[str, Any]:
     active_case = build_active_config_case(
         factory_root, generic_case, active_workspace_marker
     )
+    # Determine whether the active model has a dedicated named case or falls
+    # through to the generic template.  Operators see this in the report so they
+    # know the coverage level without inspecting the cases file manually.
+    active_model_id = active_case.get("model", "")
+    active_model_named_case = any(
+        c.get("model") == active_model_id for c in fixed_cases
+    )
     compatibility_cases = [*fixed_cases, active_case]
     first_results, second_results = evaluate_cases_twice(
         compatibility_cases,
@@ -498,6 +505,7 @@ def run_regression(repo_root: Path) -> dict[str, Any]:
         "active_config": {
             "provider": active_case["provider"],
             "model": active_case["model"],
+            "named_case_coverage": active_model_named_case,
         },
     }
 

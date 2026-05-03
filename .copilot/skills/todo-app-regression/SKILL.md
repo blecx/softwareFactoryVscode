@@ -22,6 +22,16 @@ Provide one canonical, `.copilot`-owned definition for the release-grade todo-ap
 - All runtime reports, generated artifacts, and temporary evidence MUST stay inside the approved throwaway workspace.
 - Never write regression artifacts outside the approved throwaway workspace roots.
 
+### Mode detection
+
+Use this deterministic algorithm before creating any throwaway workspace:
+
+1. Check if `scripts/install_factory.py` **AND** `.copilot/skills/` both exist at the working-directory root → **source-checkout mode**; throwaway root = `.tmp/todo-regression-run/workspace`.
+2. Check if `.copilot/softwareFactoryVscode/scripts/install_factory.py` exists at the working-directory root → **installed-host mode**; throwaway root = `.copilot/softwareFactoryVscode/.tmp/todo-regression-run/workspace`.
+3. If neither condition holds, abort with a clear error explaining which markers were checked.
+
+The canonical Python implementation of this algorithm is `scripts/todo_app_regression.py::detect_factory_layout()`. Use it to verify or cross-check manual detection.
+
 ## Minimum todo-app contract
 
 The regression MUST validate that a candidate todo-app deliverable covers all of the following behaviors:
@@ -64,7 +74,7 @@ The regression MUST check and report these metrics:
 
 ## Execution steps
 
-1. Resolve whether the runner is operating from a source checkout or an installed host repository.
+1. Detect the execution mode using the **Mode detection** algorithm in the Throwaway execution paths section above. Log the detected mode and resolved throwaway root as the first entry in the regression report.
 2. Create a fresh throwaway workspace under the approved ignored root.
 3. Audit the canonical skill contract for required sections, minimum feature list, Definition of Done terms, and quality metrics.
 4. Evaluate the model compatibility cases with the semantic rubric.
