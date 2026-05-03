@@ -50,7 +50,7 @@ set that should continue automatically within the set, use
 4. Select the next issue in canonical order unless the user explicitly approves a different order:
    - backend-first
    - then lowest issue number
-5. Never edit on `main`. Create a dedicated branch before implementation.
+5. Never edit on `main`. Create a dedicated branch and use a dedicated registered worktree for the active issue before implementation.
 6. Use `.tmp/`, never `/tmp`.
 7. Maintain a checkpoint file at `.tmp/github-issue-queue-state.md` and update it at every major state change.
 8. Treat interruptions as expected, not exceptional. After any interruption, timeout, compaction, or tool uncertainty, re-anchor before continuing by checking:
@@ -95,6 +95,7 @@ set that should continue automatically within the set, use
 
    - active_issue: <number>
    - active_branch: <branch>
+   - active_worktree: <absolute path>
    - active_pr: <number or none>
    - status: selected | implementing | validating | pr-open | blocked | merged
    - last_validation: <command or none>

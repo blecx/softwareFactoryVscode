@@ -34,6 +34,8 @@ This file is a VS Code discovery wrapper. Keep bounded plan-execution logic in `
 - Keep one issue per PR and one PR per merge.
 - Reuse the canonical `resolve-issue` → `pr-merge` slice path for every issue in the plan; do not invent a plan-specific implementation or merge process.
 - At each issue start, re-anchor from `.tmp/github-issue-queue-state.md` and fresh GitHub truth before implementation, validation, or merge narration.
+- Require a dedicated per-issue branch **and** a registered isolated worktree for the active slice; do not reuse a dirty primary checkout or another issue's worktree.
+- Confirm the active issue, branch, and worktree path agree with the queue checkpoint before any implementation, validation, or merge step.
 - Prefer `./.venv/bin/python` for repository Python commands; if a justified fallback is required, use explicit `python3`, never bare `python`.
 - Use `.tmp/`, never `/tmp`.
 - Stop on real blockers, not just because CI is still polling.
@@ -44,5 +46,5 @@ This file is a VS Code discovery wrapper. Keep bounded plan-execution logic in `
 
 ## Completion Contract
 
-Return the approved queue that was executed, the last resolved issue, the current active issue or final completion state, and the precise blocker if automatic continuation had to stop.
+Return the approved queue that was executed, the last resolved issue, the active branch/worktree pair, the current active issue or final completion state, and the precise blocker if automatic continuation had to stop.
 ```

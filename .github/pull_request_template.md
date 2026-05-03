@@ -15,11 +15,11 @@
 
 ## Validation / evidence
 
-- `python3 scripts/check_neutrality.py`:
-- `python3 scripts/check_variable_contract.py`:
-- `python3 scripts/check_boundaries.py`:
-- `python3 scripts/check_vscode_workspace.py`:
-- `python3 -m pytest tests factory_runtime/tests -q --tb=short`:
+- `./.venv/bin/python ./scripts/local_ci_parity.py --level merge`:
+- `./.venv/bin/python ./scripts/noninteractive_gh.py issue-view <issue-number>`:
+- `./.venv/bin/python ./scripts/noninteractive_gh.py pr-view <pr-number>`:
+- `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <pr-number>`:
+- `./scripts/validate-pr-template.sh <pr-body-file>`:
 
 ## Cross-repo impact
 

@@ -18,10 +18,10 @@ Start with these files when you need to review or change prompt workflow behavio
 
 ## Current prompt workflow surfaces
 
-| Prompt entrypoint | What it is for | How it fits the current workflow graph |
-| --- | --- | --- |
+| Prompt entrypoint                                                                                            | What it is for                                                                                                     | How it fits the current workflow graph                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`execute-github-issues-in-order.prompt.md`](../../.github/prompts/execute-github-issues-in-order.prompt.md) | Manual ordered queue execution with explicit stop gates, GitHub-truth rechecks, and one-issue-at-a-time discipline | Routes into the `workflow` agent and then back into the same canonical `resolve-issue` → `pr-merge` slice path. It is not a second implementation workflow. Use [`@execute-approved-plan`](../../.github/agents/execute-approved-plan.md) instead when the operator has already approved a bounded issue set that may continue automatically. |
-| [`resume-after-interruption.prompt.md`](../../.github/prompts/resume-after-interruption.prompt.md) | Deterministic recovery after restart, compaction, timeout, or operator handoff | Re-anchors from `.tmp/github-issue-queue-state.md`, writes `.tmp/interruption-recovery-snapshot.md`, and resumes the currently active workflow instead of inventing a new one. |
+| [`resume-after-interruption.prompt.md`](../../.github/prompts/resume-after-interruption.prompt.md)           | Deterministic recovery after restart, compaction, timeout, or operator handoff                                     | Re-anchors from `.tmp/github-issue-queue-state.md`, writes `.tmp/interruption-recovery-snapshot.md`, and resumes the currently active workflow instead of inventing a new one.                                                                                                                                                                |
 
 ## Preferred generalized agent entrypoints
 
@@ -32,7 +32,7 @@ Start with these files when you need to review or change prompt workflow behavio
 ## Shared checkpoints and constraints
 
 - Prompt workflow entrypoints use repo-owned `.tmp/` state, never `/tmp`.
-- `.tmp/github-issue-queue-state.md` is the shared checkpoint for queue progress, active issue/branch/PR state, validation evidence, and GitHub truth.
+- `.tmp/github-issue-queue-state.md` is the shared checkpoint for queue progress, active issue/branch/worktree/PR state, validation evidence, and GitHub truth.
 - `resume-after-interruption.prompt.md` pairs that checkpoint with `./.venv/bin/python ./scripts/capture_recovery_snapshot.py` and `.tmp/interruption-recovery-snapshot.md` before implementation, merge, or queue continuation resumes.
 - Prompt entrypoints do **not** replace template discipline: issue and PR structure still comes from [`.github/ISSUE_TEMPLATE/feature_request.yml`](../../.github/ISSUE_TEMPLATE/feature_request.yml), [`.github/ISSUE_TEMPLATE/bug_report.yml`](../../.github/ISSUE_TEMPLATE/bug_report.yml), and [`.github/pull_request_template.md`](../../.github/pull_request_template.md).
 

@@ -80,8 +80,13 @@ explicit approved issue list, or an already-published bounded queue.
 - Only continue queue work backed by template-compliant GitHub issues.
 - Treat `.github/pull_request_template.md` and `./scripts/validate-pr-template.sh` as mandatory PR handoff gates.
 - Require local CI-equivalent validation from `.github/workflows/ci.yml` before handing a slice from resolve to merge.
+- Treat the execution surface as part of the approved-plan contract: every active issue must run from its own dedicated branch and registered isolated worktree, typically under `.tmp/queue-worktrees/`, and must not reuse the dirty primary checkout or another issue's worktree.
+- Before any implementation, validation, merge narration, or automatic continuation step, confirm the active issue number, branch, and worktree path all agree with `.tmp/github-issue-queue-state.md`.
 - Keep `.tmp/github-issue-queue-state.md` current with `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth` before any merge or completion narration.
+- Record `active_worktree` in `.tmp/github-issue-queue-state.md` alongside `active_issue` and `active_branch` so the canonical resume point preserves the exact per-issue execution surface.
+- Treat `./.venv/bin/python ./scripts/local_ci_parity.py --level merge` as the canonical local PR-readiness evidence for slice handoff/readiness narration.
 - Use `./.venv/bin/python ./scripts/noninteractive_gh.py ...` or another pager-free JSON pattern for GitHub polling.
+- Require `last_github_truth` to capture the exact helper command(s), selector(s), and current result summary behind the current queue checkpoint.
 - Prefer `./.venv/bin/python` for repo Python execution; when a justified fallback is necessary, use explicit `python3`, never bare `python`.
 - Require explicit success/failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence or ambiguous logs.
 - If command output, parser behavior, or terminal state is ambiguous, stop and report the ambiguity instead of continuing on guessed state.
@@ -93,7 +98,7 @@ explicit approved issue list, or an already-published bounded queue.
 1. Re-anchor from GitHub truth and `.tmp/github-issue-queue-state.md`.
 2. Resolve the bounded approved issue set.
 3. Publish the remaining queue order and identify the active issue.
-4. Before each issue slice, update `.tmp/github-issue-queue-state.md` with the active issue, branch, status, validation evidence, and next gate.
+4. Before each issue slice, update `.tmp/github-issue-queue-state.md` with the active issue, branch, worktree path, status, validation evidence, and next gate.
 5. Delegate the active slice to the resolve workflow.
 6. When the slice becomes ready for merge, delegate to the merge workflow.
 7. Poll GitHub checks non-interactively using a bounded wait window; if the result is `pending-timeout`, stop and report the blocker instead of spinning.
@@ -121,6 +126,7 @@ Return:
 
 - approved queue order,
 - last resolved issue,
+- active branch/worktree pair,
 - current active issue or final completion state,
 - validation/CI status,
 - and the precise blocker when automatic continuation stops.

@@ -22,6 +22,7 @@ Use these Copilot agents in VS Code Chat:
 ## Loop rules
 
 - One issue = one PR = one merge.
+- Approved-plan and queue execution must also keep one issue = one dedicated branch = one registered isolated worktree.
 - Stop immediately on blocked PRs, CI failures, merge conflicts, or workflow errors.
 - Default queue agents (`@queue-backend`, `@queue-phase-2`) require explicit
   operator approval before continuing to the next issue.
@@ -41,8 +42,8 @@ The repository supports exactly one canonical issue-to-merge process:
 3. `@execute-approved-plan` is the bounded multi-issue wrapper that repeats the
    same `@resolve-issue` → `@pr-merge` slice path for an explicit approved set.
 4. `@execute-approved-umbrella` is a thin scope resolver for approved umbrella
-  issues; it delegates execution back into `@execute-approved-plan` and does
-  **not** define a second implementation, merge, repair, or checkpoint loop.
+   issues; it delegates execution back into `@execute-approved-plan` and does
+   **not** define a second implementation, merge, repair, or checkpoint loop.
 5. `@queue-backend` and `@queue-phase-2` are scoped/manual-checkpoint wrappers
    over that same canonical slice path; they do **not** define a different
    implementation, PR, or merge process.
@@ -64,6 +65,7 @@ Routing rule:
 - If a task depends on `Host Project (Root)` or validates the installed host contract, it belongs to the generated workspace or an explicit companion runtime target, not the source checkout alone.
 - Repo-owned task wrappers must reject wrong-surface invocation with actionable guidance or require an explicit target; they must not silently fabricate a second runtime contract inside the source checkout.
 - The canonical guard for these task surfaces is `scripts/workspace_surface_guard.py`, which fails fast when the task is launched from the source checkout without a valid generated-workspace host target.
+- When the task is issue execution, treat the active execution surface as the dedicated issue worktree recorded in `.tmp/github-issue-queue-state.md`; do not reuse the dirty primary checkout or a worktree belonging to a different issue.
 
 ## Non-interactive GitHub / terminal patterns
 
@@ -95,6 +97,7 @@ Routing rule:
 - Keep `.tmp/github-issue-queue-state.md` updated throughout the current issue. The minimum checkpoint fields are:
   - `active_issue`
   - `active_branch`
+  - `active_worktree`
   - `active_pr`
   - `status`
   - `last_validation`
@@ -106,6 +109,8 @@ Routing rule:
   - `ci_state`
   - `cleanup_state`
   - `last_github_truth`
+- `last_github_truth` is not a free-form shortcut: it must record the exact helper command(s), selector(s), and current result summary used for the latest readiness or merge claim.
+- For queue and approved-plan work, `active_issue`, `active_branch`, and `active_worktree` together define the canonical per-issue execution surface; if any of the three disagree with the current registered git worktree, stop and re-anchor before continuing.
 - Canonical workflows must refuse unsafe continuation, merge, or completion
   steps when the checkpoint is missing, incomplete, or lacks the required
   GitHub/cleanup evidence, and they must explain exactly what is missing.
@@ -147,6 +152,14 @@ Routing rule:
 - PR descriptions must follow `.github/pull_request_template.md` exactly.
 - Before opening or finalizing a PR, run the local equivalents of `.github/workflows/ci.yml`:
 
+  Canonical local PR-readiness evidence for issue handoff / merge-readiness narration:
+
+  ```text
+  ./.venv/bin/python ./scripts/local_ci_parity.py --level merge
+  ```
+
+  This is the official shared-engine local mirror entrypoint for merge-grade readiness narration. Keep using the broader parity paths below when you need the full CI-equivalent or production-grade gate.
+
   Primary one-command path:
 
   ```text
@@ -185,6 +198,7 @@ Routing rule:
 - Validate generated PR bodies locally with `./scripts/validate-pr-template.sh <pr-body-file>`
   (or `./.venv/bin/python ./scripts/local_ci_parity.py --pr-body-file <pr-body-file>`)
   before asking GitHub to enforce the same template in CI.
+- For PR/CI truth, use `./.venv/bin/python ./scripts/noninteractive_gh.py ...` as the canonical helper and carry those exact command(s), selector(s), and current result summary into `.tmp/github-issue-queue-state.md` under `last_github_truth`.
 - The canonical blocking production-grade parity command is
   `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`; it now
   includes Docker image builds plus the promoted Docker E2E runtime proof lane.
@@ -251,5 +265,5 @@ For a new item:
 6. When the operator has already approved a finite GitHub-backed issue set and
    wants continuous execution, use `@execute-approved-plan`.
 7. When the operator approved an umbrella issue and wants the child issue set
-  resolved and executed through the same bounded engine, use
-  `@execute-approved-umbrella`.
+   resolved and executed through the same bounded engine, use
+   `@execute-approved-umbrella`.
