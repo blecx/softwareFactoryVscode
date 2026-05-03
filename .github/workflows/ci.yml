@@ -59,7 +59,7 @@ jobs:
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
   run_bundle:
-    name: "Bundle"
+    name: "${{ matrix.name }}"
     needs: classifier
     runs-on: ubuntu-latest
     timeout-minutes: 45
