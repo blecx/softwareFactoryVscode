@@ -1721,9 +1721,10 @@ def test_install_doc_locks_practical_per_workspace_baseline():
 def test_readme_tracks_version_aware_copilot_setup():
     repo_root = Path(__file__).parent.parent
     readme = (repo_root / "README.md").read_text(encoding="utf-8")
+    version = (repo_root / "VERSION").read_text(encoding="utf-8").strip()
 
-    assert "**Latest release:** `2.6`" in readme
-    assert ".github/releases/v2.6.md" in readme
+    assert f"**Latest release:** `{version}`" in readme
+    assert f".github/releases/v{version}.md" in readme
     assert "docs/ROADMAP.md" in readme
     assert "docs/README.md" in readme
     assert "VS Code `1.116+`" in readme
@@ -1834,30 +1835,46 @@ def test_docs_readme_routes_audiences_without_competing_authority():
         "Accepted ADRs and current contract documents are intentionally not listed"
         in docs_readme
     )
-    assert "[`ROADMAP.md`](ROADMAP.md) | Active roadmap |" in docs_readme
+    # Table rows use aligned column padding; normalize whitespace before comparing.
+    _norm = _normalize_text(docs_readme)
+    assert _normalize_text("[`ROADMAP.md`](ROADMAP.md) | Active roadmap |") in _norm
     assert (
-        "[`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | "
-        "Active supporting plan |" in docs_readme
+        _normalize_text(
+            "[`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | "
+            "Active supporting plan |"
+        )
+        in _norm
     )
     assert (
-        "[`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`]"
-        "(archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical "
-        "sequencing |" in docs_readme
+        _normalize_text(
+            "[`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`]"
+            "(archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical "
+            "sequencing |"
+        )
+        in _norm
     )
     assert (
-        "[`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`]"
-        "(archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) | Historical "
-        "sequencing |" in docs_readme
+        _normalize_text(
+            "[`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`]"
+            "(archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) | Historical "
+            "sequencing |"
+        )
+        in _norm
     )
     assert (
-        "[`archive/MCP-RUNTIME-MITIGATION-PLAN.md`]"
-        "(archive/MCP-RUNTIME-MITIGATION-PLAN.md) | Historical sequencing |"
-        in docs_readme
+        _normalize_text(
+            "[`archive/MCP-RUNTIME-MITIGATION-PLAN.md`]"
+            "(archive/MCP-RUNTIME-MITIGATION-PLAN.md) | Historical sequencing |"
+        )
+        in _norm
     )
     assert (
-        "[`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`]"
-        "(architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md) | Historical "
-        "sequencing |" in docs_readme
+        _normalize_text(
+            "[`architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md`]"
+            "(architecture/MCP-RUNTIME-MANAGER-IMPLEMENTATION-PLAN.md) | Historical "
+            "sequencing |"
+        )
+        in _norm
     )
     assert "## Historical and reference material" in docs_readme
     assert "archive/CHAT-SESSION-TROUBLESHOOTING-REPORT.md" in docs_readme
@@ -2705,6 +2722,7 @@ def test_wiki_agent_wrapper_keeps_exactly_three_lane_choices() -> None:
 def test_docs_roadmap_separates_current_direction_from_historical_plans():
     repo_root = Path(__file__).parent.parent
     roadmap = (repo_root / "docs" / "ROADMAP.md").read_text(encoding="utf-8")
+    version = (repo_root / "VERSION").read_text(encoding="utf-8").strip()
 
     assert "# Active roadmap summary" in roadmap
     assert "## Status" in roadmap
@@ -2712,7 +2730,7 @@ def test_docs_roadmap_separates_current_direction_from_historical_plans():
     assert "current high-level roadmap" in roadmap
     assert "historical implementation plans" in roadmap
     assert "accepted ADRs remain the authority" in roadmap
-    assert "released `2.6` story remains intact" in roadmap
+    assert f"released `{version}` story remains intact" in roadmap
     assert "umbrella issue `#163`" in roadmap
     assert "active-vs-historical classification of planning documents" in roadmap
     assert "PRODUCTION-READINESS.md" in roadmap
@@ -2729,6 +2747,7 @@ def test_production_readiness_plan_is_marked_as_active_supporting_plan() -> None
         encoding="utf-8"
     )
     normalized_plan_doc = " ".join(plan_doc.split())
+    version = (repo_root / "VERSION").read_text(encoding="utf-8").strip()
 
     assert "# Internal Production Readiness Plan" in plan_doc
     assert "## Status" in plan_doc
@@ -2737,7 +2756,7 @@ def test_production_readiness_plan_is_marked_as_active_supporting_plan() -> None
         "program" in normalized_plan_doc
     )
     assert (
-        "remaining readiness work within the released `2.6` guardrails"
+        f"remaining readiness work within the released `{version}` guardrails"
         in normalized_plan_doc
     )
     assert "It is not an ADR, not a release surface" in normalized_plan_doc
