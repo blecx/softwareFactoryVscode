@@ -281,6 +281,16 @@ multi-workspace activation truth.
 
 These are not optional style notes; they are the historical guardrails defined by `docs/architecture/ADR-001-AI-Workflow-Guardrails.md`, reinforced by `docs/architecture/ADR-005-Strong-Templating-Enforcement.md` and `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md`, plus `.copilot/skills/a2a-communication/SKILL.md`, `.github/workflows/ci.yml`, and the remote protection guidance in `docs/setup-github-repository.md`.
 
+## Emergency Harness Bypass Protocol
+
+When the standard pipeline fails conceptually or technically (e.g. `local_ci_parity` hangs unconditionally, or GitHub API state drifts in a way the queue cannot recover), operators may use the explicit **Emergency Escape Hatch**.
+
+1. **Invoke the Bypass Agent:** Call the `@harness-bypass-resolution` agent to handle the current stuck task.
+2. **Authorized Overrides:** This specific agent is authorized to use `gh pr merge`, `gh issue close`, and skip all validation layers.
+3. **Audit Trail:** The agent will append the bypass rationale to `.tmp/emergency-bypass.log`.
+4. **Queue Reset:** Following the bypass, the agent will gracefully clear `.tmp/github-issue-queue-state.md` and return the working tree to `main` so the standard queue tracking can resume unaffected.
+5. **Restriction:** Regular agents (`@resolve-issue`, `@pr-merge`, `@execute-approved-plan`) are strictly forbidden from performing these destructive overrides.
+
 ## Legacy path status
 
 The following legacy scripts are **not** the canonical workflow and should not be used for normal issue execution:
