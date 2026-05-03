@@ -58,7 +58,7 @@ issue → PR → merge process.
 
 - Default to the repository's fast evidence-first repair tactic from `.github/prompts/pr-error-resolve-tactic.prompt.md`, even when that prompt was not explicitly invoked.
 - Parse the exact current failure output before rerunning anything. If the output names a file, test, assertion, method, or check step, read that exact source before broader search or validation.
-- Reproduce the cheapest failing gate first: touched-file formatter check → single failing test/file → touched-test bundle → focused local parity → broader PR/merge validation. Widen validation only after the narrower gate passes.
+- Use the **formatter-first** strategy as the default narrow repair path: reproduce the cheapest failing gate first. When Python formatting drift is plausible, run Black and isort on touched Python files before broader tests or parity. Ladder: touched-file formatter check → single failing test/file → touched-test bundle → focused local parity → broader PR/merge validation. Widen validation only after the narrower gate passes.
 - Before changing code after a failed PR-body/template check, local validation, or GitHub CI/check, quote the exact failing command/check, the relevant error text, and the suspected root cause from the latest evidence.
 - Do **not** start with broad repo scans, full parity reruns, guessed fixes, hallucinated state, or stale-memory narration when a narrower deterministic gate already exists.
 - Do **not** make a second repair change without new evidence; trial-and-error churn is non-compliant with the canonical issue → PR → merge flow.
