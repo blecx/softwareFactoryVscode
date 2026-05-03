@@ -2634,9 +2634,26 @@ def main(argv: list[str] | None = None) -> int:
                 context="github",
                 policy=policy,
             )
+
+            bundle_name_map = {
+                "release-contract": "Release Docs Enforcer",
+                "python-quality": "Python Code Quality (Lint & Format)",
+                "pytest": "Unit Tests",
+                "integration": "Architectural Boundary Tests",
+                "pr-template": "PR Template Conformance",
+                "docs-contract": "Production Docs Contract",
+                "docker-builds": "Production Docker Build Parity",
+                "runtime-proofs": "Production Runtime Proofs",
+                "aggregate": "Internal Production Gate — Docker Parity & Recovery Proofs",
+            }
+
             import json
 
-            print(json.dumps({"bundle": list(plan.effective_atomic_bundles)}))
+            matrix_include = [
+                {"bundle": b, "name": bundle_name_map.get(b, b)}
+                for b in plan.effective_atomic_bundles
+            ]
+            print(json.dumps({"include": matrix_include}))
             return 0
         except Exception as exc:
             print(f"❌ Failed to export matrix: {exc}")

@@ -5558,3 +5558,24 @@ def test_resolve_issue_wrapper_handoff_contract() -> None:
     )
     assert "preparing for handoff to `@pr-merge`" in resolve_wrapper
     assert "whether the slice is ready for `@pr-merge` handoff" in resolve_wrapper
+
+def test_export_ci_matrix(monkeypatch, capsys):
+    import factory_runtime.agents.validation_plan_resolver
+    class DummyPlan:
+        effective_atomic_bundles = {"pytest", "python-quality"}
+    def dummy_resolve(*args, **kwargs):
+        return DummyPlan()
+    monkeypatch.setattr(factory_runtime.agents.validation_plan_resolver, "resolve_validation_plan", dummy_resolve)
+    
+    from scripts import local_ci_parity
+    import sys
+    monkeypatch.setattr(sys, "argv", ["local_ci_parity.py", "--level", "production", "--export-ci-matrix"])
+    try:
+        local_ci_parity.main()
+    except SystemExit:
+        pass
+    
+    out = capsys.readouterr().out
+    assert "Unit Tests" in out
+    assert "Python Code Quality" in out
+
