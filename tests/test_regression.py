@@ -282,7 +282,13 @@ def test_tasks_expose_local_ci_parity_default_precheck():
 
     ci_parity = task_map["✅ Validate: Local CI Parity"]
     assert ci_parity["command"] == "${workspaceFolder}/.venv/bin/python"
-    assert ci_parity["args"] == ["${workspaceFolder}/scripts/local_ci_parity.py", "--level", "focused-local", "--base-rev", "main"]
+    assert ci_parity["args"] == [
+        "${workspaceFolder}/scripts/local_ci_parity.py",
+        "--level",
+        "focused-local",
+        "--base-rev",
+        "main",
+    ]
     assert ci_parity["group"] == {"kind": "test", "isDefault": True}
 
 
@@ -5559,22 +5565,36 @@ def test_resolve_issue_wrapper_handoff_contract() -> None:
     assert "preparing for handoff to `@pr-merge`" in resolve_wrapper
     assert "whether the slice is ready for `@pr-merge` handoff" in resolve_wrapper
 
+
 def test_export_ci_matrix(monkeypatch, capsys):
     import factory_runtime.agents.validation_plan_resolver
+
     class DummyPlan:
         effective_atomic_bundles = {"pytest", "python-quality"}
+
     def dummy_resolve(*args, **kwargs):
         return DummyPlan()
-    monkeypatch.setattr(factory_runtime.agents.validation_plan_resolver, "resolve_validation_plan", dummy_resolve)
-    
-    from scripts import local_ci_parity
+
+    monkeypatch.setattr(
+        factory_runtime.agents.validation_plan_resolver,
+        "resolve_validation_plan",
+        dummy_resolve,
+    )
+
     import sys
-    monkeypatch.setattr(sys, "argv", ["local_ci_parity.py", "--level", "production", "--export-ci-matrix"])
+
+    from scripts import local_ci_parity
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["local_ci_parity.py", "--level", "production", "--export-ci-matrix"],
+    )
     try:
         local_ci_parity.main()
     except SystemExit:
         pass
-    
+
     out = capsys.readouterr().out
     assert "Unit Tests" in out
     assert "Python Code Quality" in out
@@ -5587,3 +5607,24 @@ def test_validation_semantics_lock():
     - Local first then GitHub confirmed.
     """
     pass
+
+
+def test_same_issue_concurrent_session_blocker_guardrail_present():
+    """
+    Ensure the same-issue concurrent-session ownership rule is explicitly documented as a blocker.
+    """
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    assert "execution_lease_id" in workflow_doc
+    assert "another session appears to hold the lease" in workflow_doc
+
+    copilot_instructions = (
+        repo_root / ".github" / "copilot-instructions.md"
+    ).read_text(encoding="utf-8")
+    assert "execution_lease_id" in copilot_instructions
+    assert "Isolate same-issue concurrent sessions" in copilot_instructions

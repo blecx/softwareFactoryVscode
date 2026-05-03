@@ -137,6 +137,7 @@ Routing rule:
   workflow path and are outside the supported contract.
 - Keep `.tmp/github-issue-queue-state.md` updated throughout the current issue. The minimum checkpoint fields are:
   - `active_issue`
+  - `execution_lease_id`
   - `active_branch`
   - `active_worktree`
   - `active_pr`
@@ -318,3 +319,12 @@ For a new item:
 7. When the operator approved an umbrella issue and wants the child issue set
    resolved and executed through the same bounded engine, use
    `@execute-approved-umbrella`.
+
+## Concurrent session isolation
+
+- To prevent same-issue collisions when multiple active sessions execute the same issue/queue simultaneously, the execution surface must be locked.
+- The `execution_lease_id` acts as a session-unique ownership token (e.g., `session-a1b2c3`).
+- Before mutating an issue execution surface (branch, worktree, checkpoint), a session must verify it owns the `execution_lease_id`.
+- If another session appears to hold the lease (e.g., the checkpoint `execution_lease_id` belongs to another session or the branch/worktree suffix does not match this session), stop and treat it as a blocker. Do not steal, overwrite, or silently reuse another session's execution surface.
+- Re-anchor, request an explicit handoff from the user, or create a fresh session-unique dedicated surface.
+
