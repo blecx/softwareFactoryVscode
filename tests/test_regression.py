@@ -4954,9 +4954,10 @@ def test_local_ci_parity_default_pytest_group_runs_named_bundles_in_order(
     pytest_commands = [
         command for command in executed_commands if command[1:3] == ("-m", "pytest")
     ]
+    expected_executable = module.resolve_default_python_executable(Path(tmp_path)) or sys.executable
     assert pytest_commands == [
         (
-            sys.executable,
+            expected_executable,
             "-m",
             "pytest",
             *module.PYTEST_FAST_FAIL_ARGS,
@@ -4972,8 +4973,9 @@ def test_local_ci_parity_python_quality_pytest_lane_uses_fast_fail() -> None:
     args = module.parse_args(["--repo-root", ".", "--base-rev", "base-sha"])
     pytest_step = module.build_python_quality_steps(args)[-1]
 
+    expected_executable = args.python
     assert pytest_step.command == (
-        sys.executable,
+        expected_executable,
         "-m",
         "pytest",
         *module.PYTEST_FAST_FAIL_ARGS,
@@ -5027,9 +5029,10 @@ def test_local_ci_parity_standard_group_pytest_bundle_replay_runs_only_selected_
     pytest_commands = [
         command for command in executed_commands if command[1:3] == ("-m", "pytest")
     ]
+    expected_executable = module.resolve_default_python_executable(Path(tmp_path)) or sys.executable
     assert pytest_commands == [
         (
-            sys.executable,
+            expected_executable,
             "-m",
             "pytest",
             *module.PYTEST_FAST_FAIL_ARGS,

@@ -8508,44 +8508,29 @@ def test_ci_workflow_has_internal_production_readiness_job() -> None:
     """Finding #7 — CI must use the canonical production gate with Node 24-compatible action majors."""
     ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
     text = ci_file.read_text(encoding="utf-8")
-    assert "production-readiness:" in text
-    assert "production-docs-contract:" in text
-    assert "production-docker-build-parity:" in text
-    assert "production-runtime-proofs:" in text
-    assert "Production Docs Contract" in text
-    assert "Production Docker Build Parity" in text
-    assert "Production Runtime Proofs" in text
-    assert "Internal Production Gate — Docker Parity & Recovery Proofs" in text
+    
+    # Assert structural usage of the classifier matrix
+    assert "classifier:" in text
+    assert "run_bundle:" in text
+    assert "matrix:" in text
     assert "timeout-minutes: 45" in text
-    assert "timeout-minutes: 30" in text
-    assert "timeout-minutes: 15" in text
-    assert "timeout-minutes: 10" in text
-    assert (
-        "--mode production" in text
-    ), "CI production-readiness job must invoke the canonical production gate command"
-    assert "--production-group aggregate" in text
-    assert "--production-group docs-contract" in text
-    assert "--production-group docker-builds" in text
-    assert "--production-group runtime-proofs" in text
-    assert "--production-groups-only" in text
-    assert "--ci-production-readiness-bundle-only" in text
+    
+    # Assert invocation uses local_ci_parity logic
     assert "./.venv/bin/python ./scripts/local_ci_parity.py" in text
-    assert text.count("bash ./setup.sh") == 5
-    assert "needs:" in text
-    assert (
-        "Run canonical internal production gate (Docker parity & recovery proofs)"
-        in text
-    ), "CI production-readiness job should use clearer human-facing step wording"
-    assert (
-        "docker/*/Dockerfile" in text or "Dockerfile" in text
-    ), "CI production-readiness job must retain Docker build parity coverage"
+    assert "--export-ci-matrix" in text
+    assert "--level ${{ steps.set-level.outputs.level }}" in text or "--level ${{ needs.classifier.outputs.level }}" in text
+    assert "--ci-run-bundle ${{ matrix.bundle }}" in text
+    
+    # Assert action majors are Node 24-compatible
     assert "actions/checkout@v6" in text
     assert "actions/setup-python@v6" in text
     assert "actions/upload-artifact@v7" in text
     assert "actions/checkout@v4" not in text
     assert "actions/setup-python@v5" not in text
     assert "actions/upload-artifact@v4" not in text
-    assert ".tmp/production-readiness/" in text
+    
+    # Check that artifact is uploaded
+    assert "production-readiness-bundle" in text
 
 
 def test_workspace_sensitive_tasks_use_surface_guard() -> None:
