@@ -280,16 +280,29 @@ def test_tasks_expose_local_ci_parity_default_precheck():
     )
     task_map = {task["label"]: task for task in tasks["tasks"]}
 
+    # The CI-parity task must mirror the remote CI level (merge = all bundles).
     ci_parity = task_map["✅ Validate: Local CI Parity"]
     assert ci_parity["command"] == "${workspaceFolder}/.venv/bin/python"
     assert ci_parity["args"] == [
+        "${workspaceFolder}/scripts/local_ci_parity.py",
+        "--level",
+        "merge",
+        "--base-rev",
+        "main",
+    ]
+    assert ci_parity["group"] == "test"
+
+    # The fast inner-loop task uses focused-local and is the default.
+    fast_check = task_map["✅ Validate: Quick Check (focused-local)"]
+    assert fast_check["command"] == "${workspaceFolder}/.venv/bin/python"
+    assert fast_check["args"] == [
         "${workspaceFolder}/scripts/local_ci_parity.py",
         "--level",
         "focused-local",
         "--base-rev",
         "main",
     ]
-    assert ci_parity["group"] == {"kind": "test", "isDefault": True}
+    assert fast_check["group"] == {"kind": "test", "isDefault": True}
 
 
 def test_source_checkout_does_not_commit_static_mcp_server_urls():
