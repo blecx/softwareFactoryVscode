@@ -110,3 +110,5 @@ jobs:
           retention-days: 5
           if-no-files-found: ignore
 # Verify Git author identity
+      - name: Verify Git author identity
+        run: ./scripts/verify_git_identity.py --repo-root . --head-rev HEAD

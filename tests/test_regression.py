@@ -280,10 +280,29 @@ def test_tasks_expose_local_ci_parity_default_precheck():
     )
     task_map = {task["label"]: task for task in tasks["tasks"]}
 
+    # The CI-parity task must mirror the remote CI level (merge = all bundles).
     ci_parity = task_map["✅ Validate: Local CI Parity"]
     assert ci_parity["command"] == "${workspaceFolder}/.venv/bin/python"
-    assert ci_parity["args"] == ["${workspaceFolder}/scripts/local_ci_parity.py", "--level", "focused-local", "--base-rev", "main"]
-    assert ci_parity["group"] == {"kind": "test", "isDefault": True}
+    assert ci_parity["args"] == [
+        "${workspaceFolder}/scripts/local_ci_parity.py",
+        "--level",
+        "merge",
+        "--base-rev",
+        "main",
+    ]
+    assert ci_parity["group"] == "test"
+
+    # The fast inner-loop task uses focused-local and is the default.
+    fast_check = task_map["✅ Validate: Quick Check (focused-local)"]
+    assert fast_check["command"] == "${workspaceFolder}/.venv/bin/python"
+    assert fast_check["args"] == [
+        "${workspaceFolder}/scripts/local_ci_parity.py",
+        "--level",
+        "focused-local",
+        "--base-rev",
+        "main",
+    ]
+    assert fast_check["group"] == {"kind": "test", "isDefault": True}
 
 
 def test_source_checkout_does_not_commit_static_mcp_server_urls():
@@ -3667,11 +3686,17 @@ def test_local_ci_parity_warnings_do_not_fail_the_standard_precheck(
 ):
     module = _load_local_ci_parity_module()
 
-    def _fake_run_command(command, *, cwd):
-        del command, cwd
+    def _fake_run_command(*args, **kwargs):
+        import subprocess
         return subprocess.CompletedProcess(["ok"], 0, stdout="ok\n", stderr="")
 
+    monkeypatch.setattr("subprocess.run", _fake_run_command)
     monkeypatch.setattr(module, "run_command", _fake_run_command)
+    import subprocess
+    monkeypatch.setattr(module, "run_git", lambda cwd, args, **kwargs: subprocess.CompletedProcess(["git"], 0, stdout="some/file.py\n", stderr=""))
+    (tmp_path / "docs" / "ops").mkdir(parents=True, exist_ok=True)
+    for p in ["docs/PRODUCTION-READINESS.md", "docs/INSTALL.md", "docs/CHEAT_SHEET.md", "docs/ops/MONITORING.md", "docs/ops/BACKUP-RESTORE.md", "docs/ops/INCIDENT-RESPONSE.md"]:
+        (tmp_path / p).write_text("ok")
 
     exit_code = module.main(
         [
@@ -4942,9 +4967,10 @@ def test_local_ci_parity_default_pytest_group_runs_named_bundles_in_order(
     pytest_commands = [
         command for command in executed_commands if command[1:3] == ("-m", "pytest")
     ]
+    expected_executable = module.resolve_default_python_executable(Path(tmp_path)) or sys.executable
     assert pytest_commands == [
         (
-            sys.executable,
+            expected_executable,
             "-m",
             "pytest",
             *module.PYTEST_FAST_FAIL_ARGS,
@@ -4960,8 +4986,9 @@ def test_local_ci_parity_python_quality_pytest_lane_uses_fast_fail() -> None:
     args = module.parse_args(["--repo-root", ".", "--base-rev", "base-sha"])
     pytest_step = module.build_python_quality_steps(args)[-1]
 
+    expected_executable = args.python
     assert pytest_step.command == (
-        sys.executable,
+        expected_executable,
         "-m",
         "pytest",
         *module.PYTEST_FAST_FAIL_ARGS,
@@ -5015,9 +5042,10 @@ def test_local_ci_parity_standard_group_pytest_bundle_replay_runs_only_selected_
     pytest_commands = [
         command for command in executed_commands if command[1:3] == ("-m", "pytest")
     ]
+    expected_executable = module.resolve_default_python_executable(Path(tmp_path)) or sys.executable
     assert pytest_commands == [
         (
-            sys.executable,
+            expected_executable,
             "-m",
             "pytest",
             *module.PYTEST_FAST_FAIL_ARGS,
@@ -5559,22 +5587,36 @@ def test_resolve_issue_wrapper_handoff_contract() -> None:
     assert "preparing for handoff to `@pr-merge`" in resolve_wrapper
     assert "whether the slice is ready for `@pr-merge` handoff" in resolve_wrapper
 
+
 def test_export_ci_matrix(monkeypatch, capsys):
     import factory_runtime.agents.validation_plan_resolver
+
     class DummyPlan:
         effective_atomic_bundles = {"pytest", "python-quality"}
+
     def dummy_resolve(*args, **kwargs):
         return DummyPlan()
-    monkeypatch.setattr(factory_runtime.agents.validation_plan_resolver, "resolve_validation_plan", dummy_resolve)
-    
-    from scripts import local_ci_parity
+
+    monkeypatch.setattr(
+        factory_runtime.agents.validation_plan_resolver,
+        "resolve_validation_plan",
+        dummy_resolve,
+    )
+
     import sys
-    monkeypatch.setattr(sys, "argv", ["local_ci_parity.py", "--level", "production", "--export-ci-matrix"])
+
+    from scripts import local_ci_parity
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["local_ci_parity.py", "--level", "production", "--export-ci-matrix"],
+    )
     try:
         local_ci_parity.main()
     except SystemExit:
         pass
-    
+
     out = capsys.readouterr().out
     assert "Unit Tests" in out
     assert "Python Code Quality" in out
@@ -5587,3 +5629,24 @@ def test_validation_semantics_lock():
     - Local first then GitHub confirmed.
     """
     pass
+
+
+def test_same_issue_concurrent_session_blocker_guardrail_present():
+    """
+    Ensure the same-issue concurrent-session ownership rule is explicitly documented as a blocker.
+    """
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[1]
+
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    assert "execution_lease_id" in workflow_doc
+    assert "another session appears to hold the lease" in workflow_doc
+
+    copilot_instructions = (
+        repo_root / ".github" / "copilot-instructions.md"
+    ).read_text(encoding="utf-8")
+    assert "execution_lease_id" in copilot_instructions
+    assert "Isolate same-issue concurrent sessions" in copilot_instructions

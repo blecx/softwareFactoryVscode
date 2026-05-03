@@ -21,6 +21,7 @@ Provide a deterministic resume path after a Copilot chat interruption, restart, 
    - current branch
    - `git status --short --branch`
    - active issue/PR from `.tmp/github-issue-queue-state.md`
+   - `execution_lease_id` ownership to ensure no other session has taken over
    - current GitHub issue/PR/check state
    - whether `last_github_truth` records the exact helper command(s), selector(s), and current result summary needed to reproduce the latest readiness/merge claim
    - `./scripts/factory_stack.py status` output when runtime-sensitive
@@ -36,6 +37,7 @@ Provide a deterministic resume path after a Copilot chat interruption, restart, 
 ## Guardrails
 
 - Use `.tmp/`, never `/tmp`.
+- Treat same-issue concurrent-session collisions as blockers. If the `execution_lease_id` belongs to another session, stop and request handoff or a fresh surface.
 - Treat GitHub as the source of truth for issue state, PR state, merge state, and CI/check state.
 - Treat `./.venv/bin/python ./scripts/noninteractive_gh.py ...` as the canonical GitHub-truth helper surface when refreshing or validating checkpoint provenance.
 - Treat runtime snapshots as required when the task touched Docker, MCP, workspace activation, or lifecycle status.

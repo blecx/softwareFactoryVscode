@@ -413,7 +413,7 @@
       "group": "build"
     },
     {
-      "label": "✅ Validate: Local CI Parity",
+      "label": "✅ Validate: Quick Check (focused-local)",
       "type": "shell",
       "command": "${workspaceFolder}/.venv/bin/python",
       "args": ["${workspaceFolder}/scripts/local_ci_parity.py", "--level", "focused-local", "--base-rev", "main"],
@@ -425,6 +425,23 @@
         "kind": "test",
         "isDefault": true
       },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": true,
+        "clear": true
+      }
+    },
+    {
+      "label": "✅ Validate: Local CI Parity",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": ["${workspaceFolder}/scripts/local_ci_parity.py", "--level", "merge", "--base-rev", "main"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": "test",
       "presentation": {
         "reveal": "always",
         "panel": "shared",

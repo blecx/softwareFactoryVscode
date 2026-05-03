@@ -50,6 +50,7 @@ def test_capture_recovery_snapshot_writes_required_sections(tmp_path):
                 "# GitHub issue queue state",
                 "",
                 "- active_issue: 63",
+                "- execution_lease_id: session-a1b2c3",
                 "- active_branch: issue-63-interruption-recovery",
                 "- active_pr: 77",
                 "- status: implementing",

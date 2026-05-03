@@ -86,11 +86,12 @@ explicit approved issue list, or an already-published bounded queue.
 - Treat the execution surface as part of the approved-plan contract: every active issue must run from its own dedicated branch and registered isolated worktree, typically under `.tmp/queue-worktrees/`, and must not reuse the dirty primary checkout or another issue's worktree.
 - Before any implementation, validation, merge narration, or automatic continuation step, confirm the active issue number, branch, and worktree path all agree with `.tmp/github-issue-queue-state.md`.
 - Keep `.tmp/github-issue-queue-state.md` current with `issue_state`, `pr_state`, `ci_state`, `cleanup_state`, and `last_github_truth` before any merge or completion narration.
-- Record `active_worktree` in `.tmp/github-issue-queue-state.md` alongside `active_issue` and `active_branch` so the canonical resume point preserves the exact per-issue execution surface.
+- Record `active_worktree` in `.tmp/github-issue-queue-state.md` alongside `active_issue`, `execution_lease_id`, and `active_branch` so the canonical resume point preserves the exact per-issue execution surface.
 - Treat `./.venv/bin/python ./scripts/local_ci_parity.py --level merge` as the canonical local PR-readiness evidence for slice handoff/readiness narration.
 - Use `./.venv/bin/python ./scripts/noninteractive_gh.py ...` or another pager-free JSON pattern for GitHub polling.
 - Require `last_github_truth` to capture the exact helper command(s), selector(s), and current result summary behind the current queue checkpoint.
 - Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration; do not continue from memory, terminal silence, or stale checkpoint evidence.
+- Treat same-issue concurrent-session execution surface collisions as blockers. If the `execution_lease_id` or branch/worktree suffix belongs to another session, stop and request re-anchor, handoff, or a fresh surface.
 - When a PR exists, require the GitHub `headRefName`, the current local branch, and checkpoint `active_branch` to agree before continuing; treat any mismatch as a blocker that requires re-anchor.
 - Prefer `./.venv/bin/python` for repo Python execution; when a justified fallback is necessary, use explicit `python3`, never bare `python`.
 - Require explicit success/failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence or ambiguous logs.
