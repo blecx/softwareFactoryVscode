@@ -3,7 +3,7 @@
 ## Status
 
 Active roadmap for the current documentation/readiness direction inside the
-released `2.6` guardrails.
+released `2.7` guardrails.
 
 Use this page for high-level routing and current direction. Use `docs/README.md`
 for the current active-vs-historical classification of planning documents, and
@@ -19,7 +19,7 @@ architecture guardrails and terminology.
 
 ## Current baseline
 
-The released `2.6` story remains intact:
+The released `2.7` story remains intact:
 
 - namespace-first install/update under `.copilot/softwareFactoryVscode/` per
   `ADR-012`;
@@ -79,7 +79,7 @@ surfaces over hidden automation. For the current model, start with:
 
 This page does **not** mean the repository is reopening or weakening:
 
-- the released `2.6` release surfaces;
+- the released `2.7` release surfaces;
 - accepted ADR authority and guardrails;
 - the bounded internal self-hosted production/readiness story; or
 - external hosted multi-tenant SaaS ambitions that remain out of scope.

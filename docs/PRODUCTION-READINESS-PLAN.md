@@ -4,7 +4,7 @@
 
 Active supporting plan for the current internal, self-hosted readiness program.
 
-This document sequences remaining readiness work within the released `2.6`
+This document sequences remaining readiness work within the released `2.7`
 guardrails. It is not an ADR, not a release surface, and not permission to
 broaden the supported production boundary beyond `docs/PRODUCTION-READINESS.md`,
 accepted ADRs, and verified implementation.

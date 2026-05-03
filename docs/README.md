@@ -79,7 +79,7 @@ roadmap/plan status entries.
 | Document | Classification | Use it for |
 | --- | --- | --- |
 | [`ROADMAP.md`](ROADMAP.md) | Active roadmap | Current high-level direction, routing, and boundaries for active documentation/readiness work. |
-| [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | Active supporting plan | Current readiness sequencing within the shipped `2.6` guardrails and the scope defined by `PRODUCTION-READINESS.md`. |
+| [`PRODUCTION-READINESS-PLAN.md`](PRODUCTION-READINESS-PLAN.md) | Active supporting plan | Current readiness sequencing within the shipped `2.7` guardrails and the scope defined by `PRODUCTION-READINESS.md`. |
 | [`archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md`](archive/HARNESS-NAMESPACE-MIGRATION-MITIGATION-PLAN.md) | Historical sequencing | Trace the delivered namespace migration and mitigation work without treating it as a current execution plan. |
 | [`archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md`](archive/HARNESS-NAMESPACE-IMPLEMENTATION-BACKLOG.md) | Historical sequencing | Review the completed migration backlog and phased delivery notes for repository archaeology only. |
 | [`archive/MCP-RUNTIME-MITIGATION-PLAN.md`](archive/MCP-RUNTIME-MITIGATION-PLAN.md) | Historical sequencing | Trace the closed runtime/readiness mitigation program and its closeout context. |
