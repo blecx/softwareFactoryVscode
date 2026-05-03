@@ -5,12 +5,26 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TODO_REGRESSION_SCRIPT = REPO_ROOT / "scripts" / "todo_app_regression.py"
+CI_SIMULATION_SCRIPT = REPO_ROOT / "scripts" / "ci_simulation.py"
 
 
 def _load_todo_regression_module():
     spec = importlib.util.spec_from_file_location(
         "todo_app_regression_under_test",
         TODO_REGRESSION_SCRIPT,
+    )
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _load_ci_simulation_module():
+    spec = importlib.util.spec_from_file_location(
+        "ci_simulation_under_test",
+        CI_SIMULATION_SCRIPT,
     )
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
@@ -310,4 +324,293 @@ def test_run_regression_uses_host_factory_tmp_root_for_installed_mode(tmp_path: 
         / "workspace"
         / "reports"
         / "todo-app-regression-report.json"
+    )
+
+
+# ---------------------------------------------------------------------------
+# CI simulation contract tests
+# ---------------------------------------------------------------------------
+
+
+def test_ci_simulation_dockerfile_exists_at_canonical_path():
+    """The CI simulation Dockerfile must exist and declare python:3.13 as base."""
+    dockerfile = REPO_ROOT / "docker" / "ci-simulation" / "Dockerfile"
+
+    assert dockerfile.exists(), f"Dockerfile not found at {dockerfile}"
+    text = dockerfile.read_text(encoding="utf-8")
+    assert "FROM python:3.13" in text, "Dockerfile must use python:3.13 base image"
+    assert "git" in text, "Dockerfile must install git"
+    assert "GITHUB_ACTIONS" in text, "Dockerfile must set GITHUB_ACTIONS env var"
+
+
+def test_ci_simulation_module_exposes_required_interface():
+    """ci_simulation.py must expose all public symbols consumed by the regression."""
+    module = _load_ci_simulation_module()
+
+    required_attrs = [
+        "BundleSimResult",
+        "DriftFinding",
+        "detect_docker_available",
+        "build_ci_simulation_image",
+        "run_bundle_local",
+        "run_bundle_in_container",
+        "compute_drift",
+        "create_simulation_checkout",
+        "cleanup_simulation_checkout",
+        "run_ci_simulation",
+        "SIMULATABLE_BUNDLES",
+        "DRIFT_LOCAL_PASS_CI_FAIL",
+        "DRIFT_LOCAL_FAIL_CI_PASS",
+        "CONSISTENT_PASS",
+        "CONSISTENT_FAIL",
+        "DOCKERFILE_REL",
+    ]
+    for attr in required_attrs:
+        assert hasattr(
+            module, attr
+        ), f"ci_simulation module is missing attribute: {attr}"
+
+    # SIMULATABLE_BUNDLES must be a non-empty tuple containing the core bundles
+    bundles = module.SIMULATABLE_BUNDLES
+    assert isinstance(bundles, tuple) and len(bundles) >= 1
+    assert "docs-contract" in bundles
+    assert "workflow-contract" in bundles
+
+
+def test_compute_drift_classifies_local_pass_ci_fail():
+    """Drift categorisation: bundle passes locally but fails in CI → LOCAL_PASS_CI_FAIL."""
+    module = _load_ci_simulation_module()
+    local = [
+        module.BundleSimResult(
+            bundle="docs-contract",
+            exit_code=0,
+            passed=True,
+            stdout="all good",
+            stderr="",
+            elapsed_seconds=1.0,
+        )
+    ]
+    ci = [
+        module.BundleSimResult(
+            bundle="docs-contract",
+            exit_code=1,
+            passed=False,
+            stdout="",
+            stderr="FAILED 2 tests",
+            elapsed_seconds=2.0,
+        )
+    ]
+
+    findings = module.compute_drift(local, ci)
+
+    assert len(findings) == 1
+    assert findings[0].category == module.DRIFT_LOCAL_PASS_CI_FAIL
+    assert findings[0].local_passed is True
+    assert findings[0].ci_passed is False
+    assert "docs-contract" in findings[0].detail
+
+
+def test_compute_drift_classifies_local_fail_ci_pass():
+    """Drift categorisation: bundle fails locally but passes in CI → LOCAL_FAIL_CI_PASS."""
+    module = _load_ci_simulation_module()
+    local = [
+        module.BundleSimResult(
+            bundle="workflow-contract",
+            exit_code=1,
+            passed=False,
+            stdout="",
+            stderr="local failure",
+            elapsed_seconds=1.5,
+        )
+    ]
+    ci = [
+        module.BundleSimResult(
+            bundle="workflow-contract",
+            exit_code=0,
+            passed=True,
+            stdout="all good",
+            stderr="",
+            elapsed_seconds=1.8,
+        )
+    ]
+
+    findings = module.compute_drift(local, ci)
+
+    assert len(findings) == 1
+    assert findings[0].category == module.DRIFT_LOCAL_FAIL_CI_PASS
+    assert findings[0].local_passed is False
+    assert findings[0].ci_passed is True
+
+
+def test_compute_drift_classifies_consistent_pass():
+    """Both environments pass → CONSISTENT_PASS, no drift."""
+    module = _load_ci_simulation_module()
+    local = [
+        module.BundleSimResult(
+            bundle="docs-contract",
+            exit_code=0,
+            passed=True,
+            stdout="ok",
+            stderr="",
+            elapsed_seconds=1.0,
+        )
+    ]
+    ci = [
+        module.BundleSimResult(
+            bundle="docs-contract",
+            exit_code=0,
+            passed=True,
+            stdout="ok",
+            stderr="",
+            elapsed_seconds=1.0,
+        )
+    ]
+
+    findings = module.compute_drift(local, ci)
+
+    assert len(findings) == 1
+    assert findings[0].category == module.CONSISTENT_PASS
+
+
+def test_compute_drift_classifies_consistent_fail():
+    """Both environments fail → CONSISTENT_FAIL, no drift but still a problem."""
+    module = _load_ci_simulation_module()
+    local = [
+        module.BundleSimResult(
+            bundle="docs-contract",
+            exit_code=1,
+            passed=False,
+            stdout="",
+            stderr="fail",
+            elapsed_seconds=1.0,
+        )
+    ]
+    ci = [
+        module.BundleSimResult(
+            bundle="docs-contract",
+            exit_code=1,
+            passed=False,
+            stdout="",
+            stderr="fail",
+            elapsed_seconds=1.0,
+        )
+    ]
+
+    findings = module.compute_drift(local, ci)
+
+    assert len(findings) == 1
+    assert findings[0].category == module.CONSISTENT_FAIL
+
+
+def test_run_ci_simulation_skips_gracefully_when_docker_unavailable(
+    tmp_path: Path, monkeypatch
+):
+    """run_ci_simulation must return a SKIPPED report when Docker is unavailable."""
+    module = _load_ci_simulation_module()
+    monkeypatch.setattr(module, "detect_docker_available", lambda: False)
+
+    result = module.run_ci_simulation(tmp_path, tmp_path / ".tmp")
+
+    assert result["skipped"] is True
+    assert result["drift_detected"] is False
+    assert result["available"] is False
+    assert "Docker" in result["skip_reason"]
+    assert result["bundles_skipped"] == list(module.SIMULATABLE_BUNDLES)
+    assert result["local_results"] == []
+    assert result["ci_results"] == []
+
+
+def test_run_regression_report_always_includes_ci_simulation_key(tmp_path: Path):
+    """run_regression() must always include ci_simulation in the report.
+
+    When include_ci_simulation is not set (default=False), the key must be
+    present and report the simulation as skipped — so callers never need to
+    guard against a missing key.
+    """
+    module = _load_todo_regression_module()
+    repo_root = _seed_source_checkout(tmp_path / "source-repo")
+
+    report = module.run_regression(repo_root)  # default: include_ci_simulation=False
+
+    assert "ci_simulation" in report
+    ci_sim = report["ci_simulation"]
+    assert ci_sim["skipped"] is True
+    assert ci_sim["drift_detected"] is False
+    # Status must still be "passed" when CI simulation was not requested
+    assert report["status"] == "passed"
+
+
+def test_run_regression_with_ci_simulation_mocked_skipped(tmp_path: Path, monkeypatch):
+    """When include_ci_simulation=True but Docker is unavailable, status stays 'passed'."""
+    module = _load_todo_regression_module()
+    repo_root = _seed_source_checkout(tmp_path / "source-repo")
+
+    # Monkeypatch the wrapper so Docker is never invoked in the test
+    mock_ci_result = {
+        "available": False,
+        "skipped": True,
+        "skip_reason": "Docker unavailable (mocked for test).",
+        "image_tag": "",
+        "dockerfile_path": "docker/ci-simulation/Dockerfile",
+        "bundles_simulated": [],
+        "bundles_skipped": ["docs-contract", "workflow-contract"],
+        "local_results": [],
+        "ci_results": [],
+        "drift_findings": [],
+        "drift_detected": False,
+        "os_note": "",
+        "elapsed_seconds": 0.0,
+    }
+    monkeypatch.setattr(
+        module, "_run_ci_simulation_for_report", lambda *a, **kw: mock_ci_result
+    )
+
+    report = module.run_regression(repo_root, include_ci_simulation=True)
+
+    assert "ci_simulation" in report
+    assert report["ci_simulation"]["skipped"] is True
+    # Skipped CI simulation + all quality metrics pass → overall status is "passed"
+    assert report["status"] == "passed"
+
+
+def test_run_regression_with_ci_simulation_drift_detected_yields_drift_warning(
+    tmp_path: Path, monkeypatch
+):
+    """When include_ci_simulation=True and drift is detected, status is 'drift-warning'."""
+    module = _load_todo_regression_module()
+    repo_root = _seed_source_checkout(tmp_path / "source-repo")
+
+    mock_ci_result = {
+        "available": True,
+        "skipped": False,
+        "skip_reason": "",
+        "image_tag": "factory-ci-simulation:abc123",
+        "dockerfile_path": "docker/ci-simulation/Dockerfile",
+        "bundles_simulated": ["docs-contract"],
+        "bundles_skipped": [],
+        "local_results": [{"bundle": "docs-contract", "passed": True, "exit_code": 0}],
+        "ci_results": [{"bundle": "docs-contract", "passed": False, "exit_code": 1}],
+        "drift_findings": [
+            {
+                "bundle": "docs-contract",
+                "category": "LOCAL_PASS_CI_FAIL",
+                "local_passed": True,
+                "ci_passed": False,
+                "detail": "Bundle 'docs-contract' passes locally but FAILS in the CI simulation.",
+            }
+        ],
+        "drift_detected": True,
+        "os_note": "python:3.13-slim vs ubuntu-latest",
+        "elapsed_seconds": 42.0,
+    }
+    monkeypatch.setattr(
+        module, "_run_ci_simulation_for_report", lambda *a, **kw: mock_ci_result
+    )
+
+    report = module.run_regression(repo_root, include_ci_simulation=True)
+
+    assert report["status"] == "drift-warning"
+    assert report["ci_simulation"]["drift_detected"] is True
+    assert (
+        report["ci_simulation"]["drift_findings"][0]["category"] == "LOCAL_PASS_CI_FAIL"
     )
