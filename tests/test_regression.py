@@ -147,6 +147,22 @@ def test_trusted_workflow_profile_approves_repo_owned_wiki_execution_agents():
     assert auto_approve["wiki-publish"] is True
 
 
+def test_plan_workflow_requires_adr_013() -> None:
+    from pathlib import Path
+
+    repo_root = Path(__file__).parent.parent
+    """Plan workflow must use ADR-013 for authority-sensitive planning."""
+    plan_agent = (repo_root / ".github" / "agents" / "Plan.md").read_text(
+        encoding="utf-8"
+    )
+    assert "ADR-013" in plan_agent, "Plan agent wrapper must mention ADR-013"
+
+    plan_skill = (
+        repo_root / ".copilot" / "skills" / "plan-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "ADR-013" in plan_skill, "Plan skill must mention ADR-013"
+
+
 def test_execute_approved_plan_skill_and_alias_routing_exist():
     repo_root = Path(__file__).parent.parent
     agent = (repo_root / ".github" / "agents" / "execute-approved-plan.md").read_text(

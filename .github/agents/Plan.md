@@ -30,6 +30,7 @@ This file is a VS Code discovery wrapper. Keep planning logic in `.copilot/skill
 ## Hard Rules
 
 - Keep discovery bounded and high-signal.
+- Apply ADR-013-first authority classification for authority-sensitive plans.
 - Do not implement code or merge/close PRs in this mode.
 - Use `.tmp/`, never `/tmp`, for optional plan artifacts.
 
