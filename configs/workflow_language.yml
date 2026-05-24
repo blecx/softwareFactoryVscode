@@ -1,45 +1,243 @@
 terms:
-  - term_id: "accepted_adr"
-    definition: "An accepted architecture decision record that defines normative architecture rules, terminology, and guardrails."
-    authority_sources: ["ADR-013"]
-    allowed_phrases: ["accepted adr", "architecture guardrail", "normative architecture rule"]
-    forbidden_interpretations: ["implementation plan", "synthesis document", "derived operator doc"]
-    required_evidence: ["presence of accepted 'Status' in the ADR file"]
-    classifier_task_kind: "validation"
-    ambiguity_action: "Stop and escalate to explicit architectural decision."
-
-  - term_id: "derived_projection"
-    definition: "Non-normative materials such as operator docs, handouts, and checklists that project architecture into guidance but do not override ADRs."
-    authority_sources: ["ADR-013"]
-    allowed_phrases: ["derived operator document", "operator guide", "cheat sheet", "handout"]
-    forbidden_interpretations: ["normative guardrail", "source of architecture truth"]
-    required_evidence: ["alignment with corresponding accepted ADRs"]
-    classifier_task_kind: "validation"
-    ambiguity_action: "Treat as drift and correct the projection to match accepted ADRs."
-
-  - term_id: "implementation_authority"
-    definition: "Implementation plans that sequence work and hardening steps but do not redefine architecture."
-    authority_sources: ["ADR-013"]
-    allowed_phrases: ["implementation plan", "sequencing document", "implementation target"]
-    forbidden_interpretations: ["architecture override", "shadow architecture document"]
-    required_evidence: ["reference to accepted ADRs for terminology"]
-    classifier_task_kind: "validation"
-    ambiguity_action: "Treat any architecture redefinition as a violation and defer to accepted ADRs."
-
-  - term_id: "readiness_projection"
-    definition: "Assessments or plans outlining what remains to achieve a quality standard, not to be confused with final production-ready approval."
-    authority_sources: ["ADR-013"]
-    allowed_phrases: ["readiness plan", "quality tracker", "test matrix projection", "delivery status snapshot"]
-    forbidden_interpretations: ["final authority on production release", "architecture waiver"]
-    required_evidence: ["links to test executions or coverage gaps"]
-    classifier_task_kind: "validation"
-    ambiguity_action: "Validate against CI and pipeline reality before proceeding."
-
-  - term_id: "production_readiness_claim"
-    definition: "The formal claim that a release or system state meets the complete definition of done for production."
-    authority_sources: ["ADR-013"]
-    allowed_phrases: ["production ready", "release quality", "quality metric pass"]
-    forbidden_interpretations: ["incomplete release bump", "local test success only"]
-    required_evidence: ["all current-release surfaces agree on version", "release guardrail pass rate = 100%"]
-    classifier_task_kind: "validation"
-    ambiguity_action: "Refuse the claim and halt release actions until surfaces align."
+- term_id: accepted_adr
+  definition: An accepted architecture decision record that defines normative architecture
+    rules, terminology, and guardrails.
+  authority_sources:
+  - ADR-013
+  allowed_phrases:
+  - accepted adr
+  - architecture guardrail
+  - normative architecture rule
+  forbidden_interpretations:
+  - implementation plan
+  - synthesis document
+  - derived operator doc
+  required_evidence:
+  - presence of accepted 'Status' in the ADR file
+  classifier_task_kind: validation
+  ambiguity_action: Stop and escalate to explicit architectural decision.
+- term_id: derived_projection
+  definition: Non-normative materials such as operator docs, handouts, and checklists
+    that project architecture into guidance but do not override ADRs.
+  authority_sources:
+  - ADR-013
+  allowed_phrases:
+  - derived operator document
+  - operator guide
+  - cheat sheet
+  - handout
+  forbidden_interpretations:
+  - normative guardrail
+  - source of architecture truth
+  required_evidence:
+  - alignment with corresponding accepted ADRs
+  classifier_task_kind: validation
+  ambiguity_action: Treat as drift and correct the projection to match accepted ADRs.
+- term_id: implementation_authority
+  definition: Implementation plans that sequence work and hardening steps but do not
+    redefine architecture.
+  authority_sources:
+  - ADR-013
+  allowed_phrases:
+  - implementation plan
+  - sequencing document
+  - implementation target
+  forbidden_interpretations:
+  - architecture override
+  - shadow architecture document
+  required_evidence:
+  - reference to accepted ADRs for terminology
+  classifier_task_kind: validation
+  ambiguity_action: Treat any architecture redefinition as a violation and defer to
+    accepted ADRs.
+- term_id: readiness_projection
+  definition: Assessments or plans outlining what remains to achieve a quality standard,
+    not to be confused with final production-ready approval.
+  authority_sources:
+  - ADR-013
+  allowed_phrases:
+  - readiness plan
+  - quality tracker
+  - test matrix projection
+  - delivery status snapshot
+  forbidden_interpretations:
+  - final authority on production release
+  - architecture waiver
+  required_evidence:
+  - links to test executions or coverage gaps
+  classifier_task_kind: validation
+  ambiguity_action: Validate against CI and pipeline reality before proceeding.
+- term_id: production_readiness_claim
+  definition: The formal claim that a release or system state meets the complete definition
+    of done for production.
+  authority_sources:
+  - ADR-013
+  allowed_phrases:
+  - production ready
+  - release quality
+  - quality metric pass
+  forbidden_interpretations:
+  - incomplete release bump
+  - local test success only
+  required_evidence:
+  - all current-release surfaces agree on version
+  - release guardrail pass rate = 100%
+  classifier_task_kind: validation
+  ambiguity_action: Refuse the claim and halt release actions until surfaces align.
+- term_id: approved_plan
+  definition: A finite GitHub-backed issue set, umbrella issue, or queue checkpoint
+    that makes the target plan unambiguous.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  allowed_phrases:
+  - approved plan
+  - approved queue
+  - approved issue set
+  - approved backlog
+  forbidden_interpretations:
+  - ad-hoc conversational planning
+  - guessing which plan the operator means
+  required_evidence:
+  - existence of a GitHub issue, umbrella issue, or .tmp/github-issue-queue-state.md
+    checkpoint
+  classifier_task_kind: validation
+  ambiguity_action: Do not guess which plan the operator means; ask which issue set
+    is approved.
+- term_id: issue_slice
+  definition: A single issue-to-PR execution scoped to the implementation of one specific
+    task.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  allowed_phrases:
+  - issue slice
+  - resolve issue
+  forbidden_interpretations:
+  - processing siblings
+  - umbrella closeout in the same subagent
+  required_evidence:
+  - single active issue designated for the current execution lease
+  classifier_task_kind: validation
+  ambiguity_action: Halt execution if boundaries blur with siblings; escalate to human.
+- term_id: execution_surface
+  definition: The targeted environment where the work is performed, primarily the
+    canonical checkpoint execution anchor.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  - ADR-006
+  allowed_phrases:
+  - execution surface
+  - active branch/worktree state
+  forbidden_interpretations:
+  - stray partial snapshot
+  - guessing which surface is authoritative
+  required_evidence:
+  - match between checkpoint, branch/worktree state, and editor path that contains
+    repo markers
+  classifier_task_kind: validation
+  ambiguity_action: Stop, re-anchor from .tmp/github-issue-queue-state.md, and explain
+    the mismatch.
+- term_id: github_truth
+  definition: The definitive state recorded on GitHub, retrieved via explicit API/CLI
+    queries.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  allowed_phrases:
+  - github truth
+  - metadata from github
+  - fresh github data
+  forbidden_interpretations:
+  - stale checkpoint values
+  - narrating PR state from memory or terminal silence
+  required_evidence:
+  - recent output from gh api / gh cli confirming exact data
+  classifier_task_kind: validation
+  ambiguity_action: Refresh github truth using gh cli/api before proceeding.
+- term_id: checkpoint_truth
+  definition: The exact structured contents of current checkpoint files representing
+    offline queue execution states.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  allowed_phrases:
+  - checkpoint truth
+  - .tmp/github-issue-queue-state.md data
+  forbidden_interpretations:
+  - making assumptions based on memory instead of the file content
+  - missing checkpoints
+  required_evidence:
+  - file contents of .tmp/github-issue-queue-state.md matching current state
+  classifier_task_kind: validation
+  ambiguity_action: Re-read the checkpoint file before any operation.
+- term_id: blocker
+  definition: A condition that strictly prevents further workflow execution without
+    resolution.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  allowed_phrases:
+  - blocker
+  - failing check
+  - timeout state
+  - mismatch
+  forbidden_interpretations:
+  - something to bypass or ignore out of convenience
+  - permission to spin indefinitely
+  required_evidence:
+  - explicit failure evidence from exit status, artifacts, or GitHub metadata
+  classifier_task_kind: validation
+  ambiguity_action: Stop and report the blocker immediately; do not fake successful
+    progression.
+- term_id: pending_timeout
+  definition: Exceeding the bounded timeout duration for an expected check or validation.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  allowed_phrases:
+  - pending timeout
+  - timeout out
+  - spin expiration
+  forbidden_interpretations:
+  - permission to keep spinning or polling
+  - minor delay to be ignored
+  required_evidence:
+  - exceeded watchdog deadline or timeout cap
+  classifier_task_kind: validation
+  ambiguity_action: Treat the timeout as a firm blocker and abort the waiting process.
+- term_id: bypass
+  definition: Explicit operator action to override standard constraints, restricted
+    exclusively to the @harness-bypass-resolution agent.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  allowed_phrases:
+  - bypass
+  - bypass resolution
+  forbidden_interpretations:
+  - autonomous AI fallback
+  - something to suggest to the user to escape a failure
+  required_evidence:
+  - explicit direct prompt invocation by the human user via @harness-bypass-resolution
+  classifier_task_kind: validation
+  ambiguity_action: Do not execute bypass or suggest bypass; remain within ci_parity
+    pipeline constraints.
+- term_id: closeout
+  definition: The step where umbrella issues or multiple parent goals are fully complete
+    and verifiably closed.
+  authority_sources:
+  - ADR-013
+  - .github/copilot-instructions.md
+  allowed_phrases:
+  - closeout
+  - umbrella closeout
+  forbidden_interpretations:
+  - single issue slice behavior
+  - closing the current issue in an unrelated session
+  required_evidence:
+  - all child issues successfully merged and verified as closed in github_truth
+  classifier_task_kind: validation
+  ambiguity_action: Do not execute closeout if any child execution state is uncertain
+    or in-progress.
