@@ -5034,6 +5034,24 @@ def test_local_ci_parity_install_docs_note_official_level_output_contract() -> N
     assert "--fresh-checkout" in install_doc
 
 
+def test_local_ci_parity_help_distinguishes_official_from_legacy_mode() -> None:
+    import subprocess
+    import sys
+
+    repo_root = Path(__file__).parent.parent
+    result = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "local_ci_parity.py"), "--help"],
+        capture_output=True,
+        text=True,
+        check=True
+    )
+
+    stdout = result.stdout
+    assert "Legacy compatibility/diagnostic surface" in stdout
+    assert "Official four-level local mirror entrypoint" in stdout
+    assert "use `--level`" in stdout
+
+
 def test_resolve_issue_wrapper_handoff_contract() -> None:
     repo_root = Path(__file__).parent.parent
     resolve_wrapper = (repo_root / ".github" / "agents" / "resolve-issue.md").read_text(

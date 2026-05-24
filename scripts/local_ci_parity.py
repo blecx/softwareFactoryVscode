@@ -2505,10 +2505,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=(STANDARD_MODE, PRODUCTION_MODE),
         default=STANDARD_MODE,
         help=(
-            "Validation mode. `standard` keeps Docker build parity optional for "
-            "faster local iteration; `production` is the canonical blocking parity "
-            "path and includes Docker image builds plus the promoted Docker E2E "
-            "runtime proof lane by default."
+            "Legacy compatibility/diagnostic surface. `standard` keeps Docker build parity optional "
+            "for faster local iteration; `production` includes Docker image builds plus the "
+            "promoted Docker E2E runtime proof lane. For the official workflow entrypoint, "
+            "use `--level` instead."
         ),
     )
     parser.add_argument(
