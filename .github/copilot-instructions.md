@@ -19,6 +19,7 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 
 ## 2. ADR and Architectural Awareness
 
+- **ADR-013-First Assessment Gate:** You MUST explicitly apply `docs/architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md` first before making any production-readiness, architecture-authority, workflow-harness, or agent-routing assessments. Treat operator docs, handouts, and maps as derived projections unless an accepted ADR explicitly says otherwise.
 - Explicitly check `docs/architecture/` before mutating or refactoring installation paths, namespaces (e.g., `.copilot` vs root rules), communication protocols, or directory boundaries.
 - Treat boundaries like the `.copilot` subsystem directory and workspace environmental constraints (`.tmp`, `.factory.env`) as immutable mature structures that the code must defensively adapt to, not things you can discard when convenient.
 - When queue execution or interruption recovery is in play, treat `.tmp/github-issue-queue-state.md` plus a registered git worktree as the canonical execution anchor; a stale editor tab or stray `.tmp` snapshot is never enough evidence to resume work.

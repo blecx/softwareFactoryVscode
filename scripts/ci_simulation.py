@@ -351,7 +351,8 @@ def create_simulation_checkout(repo_root: Path, worktree_parent: Path) -> Path |
             "clone",
             "--depth=2",
             "--single-branch",
-            "--branch=" + subprocess.run(
+            "--branch="
+            + subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
                 capture_output=True,
                 text=True,
