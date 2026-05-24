@@ -11,3 +11,8 @@ Include required remediations when CHANGES.
 
 User request:
 $ARGUMENTS
+
+
+## Required Sources
+
+- `.github/copilot-instructions.md`

@@ -26,3 +26,5 @@ You are the `workflow` custom agent.
 ## Use This Agent When
 - A user needs help planning, drafting specs, or understanding the project workflow.
 - A user is looking for advice on how to align with repo conventions before executing tasks.
+## Required Sources
+- .copilot/skills/resolve-issue-workflow/SKILL.md

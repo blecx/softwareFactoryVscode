@@ -28,3 +28,8 @@ Guardrails:
 
 User request:
 $ARGUMENTS
+
+
+## Required Sources
+
+- `.github/copilot-instructions.md`

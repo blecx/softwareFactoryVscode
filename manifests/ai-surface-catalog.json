@@ -1,0 +1,764 @@
+[
+  {
+    "file": ".copilot/skills/ux-responsive/SKILL.md",
+    "form": "Form B",
+    "name": "ux-responsive",
+    "description": "Workflow or rule module extracted from .copilot/skills/ux-responsive/SKILL.md",
+    "domain": "ux-responsive",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-responsive/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/interruption-recovery-workflow/SKILL.md",
+    "form": "Form A",
+    "name": "SKILL",
+    "description": "",
+    "domain": "interruption-recovery-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/ux-delegation-policy/SKILL.md",
+    "form": "Form B",
+    "name": "ux-delegation-policy",
+    "description": "Workflow or rule module extracted from .copilot/skills/ux-delegation-policy/SKILL.md",
+    "domain": "ux-delegation-policy",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-delegation-policy/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/resolve-issue-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "resolve-issue-workflow",
+    "description": "Workflow or rule module extracted from .copilot/skills/resolve-issue-workflow/SKILL.md",
+    "domain": "resolve-issue-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/pull_request_template.md",
+      ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".github/prompts/pr-error-resolve-tactic.prompt.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/release-bump-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "release-bump-workflow",
+    "description": "Canonical release bump workflow for `softwareFactoryVscode`. Use when cutting or publishing a release, bumping `VERSION`, updating current-release surfaces, verifying Definition of Done and quality metrics, or checking that historical release references do not leak into public current-release docs.",
+    "domain": "release-bump-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/releases/v2.5.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/backend-queue-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "backend-queue-workflow",
+    "description": "Orchestrates the continuous loop for backend implementation issues, delegating actual work to core workflows.",
+    "domain": "backend-queue-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/pr-merge-workflow/SKILL.md",
+      ".copilot/skills/a2a-communication/SKILL.md",
+      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md",
+      ".github/pull_request_template.md",
+      "docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md",
+      ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+      "docs/architecture/ADR-001-AI-Workflow-Guardrails.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "approved-plan-execution-workflow",
+    "description": "Execute a bounded approved GitHub-backed issue plan. Use when the operator says execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set.",
+    "domain": "approved-plan-execution-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/pr-merge-workflow/SKILL.md",
+      ".copilot/skills/a2a-communication/SKILL.md",
+      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md",
+      ".copilot/skills/issue-creation-workflow/SKILL.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md",
+      ".github/pull_request_template.md",
+      "docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md",
+      ".github/copilot-instructions.md",
+      ".github/prompts/pr-error-resolve-tactic.prompt.md",
+      ".copilot/skills/interruption-recovery-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/phase-2-queue-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "phase-2-queue-workflow",
+    "description": "Orchestrates the continuous loop for Phase 2 integration issues, delegating actual work to core workflows.",
+    "domain": "phase-2-queue-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".copilot/skills/pr-merge-workflow/SKILL.md",
+      ".copilot/skills/a2a-communication/SKILL.md",
+      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md",
+      ".github/pull_request_template.md",
+      "docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md",
+      ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+      "docs/architecture/ADR-001-AI-Workflow-Guardrails.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/prompt-quality-baseline/SKILL.md",
+    "form": "Form B",
+    "name": "prompt-quality-baseline",
+    "description": "Prompt quality baseline: enforces structural requirements, explicit contracts, and MCP tool precedence for operational prompts.",
+    "domain": "prompt-quality-baseline",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/ux-a11y-basics/SKILL.md",
+    "form": "Form B",
+    "name": "ux-a11y-basics",
+    "description": "Workflow or rule module extracted from .copilot/skills/ux-a11y-basics/SKILL.md",
+    "domain": "ux-a11y-basics",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-a11y-basics/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/cross-repo-coordination-checklist/SKILL.md",
+    "form": "Form B",
+    "name": "cross-repo-coordination-checklist",
+    "description": "Active execution contract for maintaining API and UI synchronization between the backend and Client repositories.",
+    "domain": "cross-repo-coordination-checklist",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/close-issue-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "close-issue-workflow",
+    "description": "Workflow or rule module for closing GitHub issues with verified outcome, template-backed comments, and traceability.",
+    "domain": "close-issue-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".github/issue-closing-template.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/plan-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "plan-workflow",
+    "description": "Workflow or rule module for bounded implementation planning, issue sizing, and dependency mapping.",
+    "domain": "plan-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/wiki-publication-policy-authoring/SKILL.md",
+    "form": "Form B",
+    "name": "wiki-publication-policy-authoring",
+    "description": "Use when creating, reviewing, or updating a host-owned wiki publication policy such as docs/WIKI-MAP.md while keeping project-specific truth in the host repository.",
+    "domain": "wiki-publication-policy-authoring",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/tutorial-review-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "tutorial-review-workflow",
+    "description": "Skill for tutorial review workflow",
+    "domain": "tutorial-review-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/wiki-maintenance-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "wiki-maintenance-workflow",
+    "description": "Use when creating, updating, retiring, or verifying a GitHub wiki projection while keeping host-owned publication policy, projection config, and canonical docs authoritative.",
+    "domain": "wiki-maintenance-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/blecs-workflow-authority/SKILL.md",
+    "form": "Form B",
+    "name": "blecs-workflow-authority",
+    "description": "blecs workflow authority: keeps project workflow truth and provides normalized context packets for other agents.",
+    "domain": "blecs-workflow-authority",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/tutorial-writer-expert/SKILL.md",
+    "form": "Form B",
+    "name": "tutorial-writer-expert",
+    "description": "Skill for tutorial writer expert",
+    "domain": "tutorial-writer-expert",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/ux-consult-request/SKILL.md",
+    "form": "Form B",
+    "name": "ux-consult-request",
+    "description": "Workflow or rule module extracted from .copilot/skills/ux-consult-request/SKILL.md",
+    "domain": "ux-consult-request",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-consult-request/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/pr-merge-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "pr-merge-workflow",
+    "description": "Workflow or rule module for reviewing, validating, and merging GitHub PRs.",
+    "domain": "pr-merge-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/pull_request_template.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/multi-step-planning-checklist/SKILL.md",
+    "form": "Form B",
+    "name": "multi-step-planning-checklist",
+    "description": "A checklist for producing thorough implementation plans and requirements coverage matrices.",
+    "domain": "multi-step-planning-checklist",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/blecs-ux-authority/SKILL.md",
+    "form": "Form B",
+    "name": "blecs-ux-authority",
+    "description": "blecs UX authority: mandatory consultation for navigation, graphical design, responsive behavior, modern React/Vite/Tailwind UI patterns, and UX/a11y review.",
+    "domain": "blecs-ux-authority",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-ia-navigation/SKILL.md",
+      ".copilot/skills/ux-a11y-basics/SKILL.md",
+      ".copilot/skills/ux-artifact-grouping/SKILL.md",
+      ".copilot/skills/ux-responsive/SKILL.md",
+      ".copilot/skills/ux-pr-checklist/SKILL.md",
+      ".copilot/skills/ux-consult-request/SKILL.md",
+      ".copilot/skills/ux-context-sources/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/harness-bypass/SKILL.md",
+    "form": "Form A",
+    "name": "SKILL",
+    "description": "",
+    "domain": "harness-bypass",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/react-ts-testing-practices/SKILL.md",
+    "form": "Form A",
+    "name": "SKILL",
+    "description": "",
+    "domain": "react-ts-testing-practices",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/ux-ia-navigation/SKILL.md",
+    "form": "Form B",
+    "name": "ux-ia-navigation",
+    "description": "Workflow or rule module extracted from .copilot/skills/ux-ia-navigation/SKILL.md",
+    "domain": "ux-ia-navigation",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-ia-navigation/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/todo-app-regression/SKILL.md",
+    "form": "Form B",
+    "name": "todo-app-regression",
+    "description": "Canonical todo-app regression workflow for release protection. Use when validating the full todo-app regression, checking throwaway execution paths, verifying Definition of Done and quality metrics, or confirming a different supported GitHub model still satisfies the todo-app semantic contract.",
+    "domain": "todo-app-regression",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/ux-context-sources/SKILL.md",
+    "form": "Form B",
+    "name": "ux-context-sources",
+    "description": "Workflow or rule module extracted from .copilot/skills/ux-context-sources/SKILL.md",
+    "domain": "ux-context-sources",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-context-sources/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/a2a-communication/SKILL.md",
+    "form": "Form A",
+    "name": "SKILL",
+    "description": "",
+    "domain": "a2a-communication",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/pull_request_template.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/ux-pr-checklist/SKILL.md",
+    "form": "Form B",
+    "name": "ux-pr-checklist",
+    "description": "Workflow or rule module extracted from .copilot/skills/ux-pr-checklist/SKILL.md",
+    "domain": "ux-pr-checklist",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-pr-checklist/SKILL.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/wiki-bootstrap-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "wiki-bootstrap-workflow",
+    "description": "Use when bootstrapping first-time host-owned wiki truth surfaces such as docs/WIKI-MAP.md and manifests/wiki-projection-manifest.json before publication-policy authoring or wiki maintenance can begin.",
+    "domain": "wiki-bootstrap-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/wiki-publication-policy-authoring/assets/wiki-map-template.md"
+    ]
+  },
+  {
+    "file": ".copilot/skills/issue-creation-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "issue-creation-workflow",
+    "description": "Workflow or rule module for creating new issues via GitHub CLI.",
+    "domain": "issue-creation-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".copilot/skills/ux-artifact-grouping/SKILL.md",
+    "form": "Form B",
+    "name": "ux-artifact-grouping",
+    "description": "Workflow or rule module extracted from .copilot/skills/ux-artifact-grouping/SKILL.md",
+    "domain": "ux-artifact-grouping",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-artifact-grouping/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/prompts/execute-github-issues-in-order.prompt.md",
+    "form": "Form B",
+    "name": "Execute GitHub Issues In Order",
+    "description": "Run GitHub issues in canonical repo order with interruption-safe checkpoints, one-issue-per-PR discipline, GitHub-truth verification, and repo-owned .tmp state.",
+    "domain": "prompts",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/prompts/resume-after-interruption.prompt.md"
+    ]
+  },
+  {
+    "file": ".github/prompts/resume-after-interruption.prompt.md",
+    "form": "Form B",
+    "name": "Resume After Interruption",
+    "description": "Re-anchor an interrupted issue/PR workflow from repo-owned checkpoint state, live GitHub truth, and optional runtime diagnostics.",
+    "domain": "prompts",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".github/prompts/pr-error-resolve-tactic.prompt.md",
+    "form": "Form B",
+    "name": "PR Error Resolve Tactic",
+    "description": "Resolve PR-creation, local-precheck, and CI failures using a fast evidence-first tactic: parse current failure output, start with the cheapest failing gate, fix the root cause, and widen validation only after the fast gate passes.",
+    "domain": "prompts",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".github/prompts/apply-canonical-validation-policy.prompt.md",
+    "form": "Form B",
+    "name": "Apply Canonical Validation Policy",
+    "description": "Apply the canonical validation policy for the current task without becoming a second authority source.",
+    "domain": "prompts",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".github/prompts/execute-approved-plan.prompt.md",
+    "form": "Form B",
+    "name": "Execute Approved Plan",
+    "description": "Route explicit approved-plan requests like execute the plan, continue the plan, or run the approved queue into the specialized execute-approved-plan workflow instead of generic planning drift.",
+    "domain": "prompts",
+    "authority_owner": "Unknown",
+    "authority_references": []
+  },
+  {
+    "file": ".github/agents/tutorial-author.md",
+    "form": "Form C",
+    "name": "tutorial-author",
+    "description": "Generates, updates, and maintains tutorials from scratch or existing documentation.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/tutorial-writer-expert/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/wiki.md",
+    "form": "Form C",
+    "name": "wiki",
+    "description": "Routes wiki bootstrap, publication-policy authoring, and wiki-maintenance requests through reusable wiki skills while requiring host-owned policy, config, and canonical docs.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/wiki-maintenance-workflow/SKILL.md",
+      ".copilot/skills/prompt-quality-baseline/SKILL.md",
+      ".copilot/skills/wiki-bootstrap-workflow/SKILL.md",
+      ".copilot/skills/wiki-publication-policy-authoring/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/execute-approved-umbrella.md",
+    "form": "Form C",
+    "name": "execute-approved-umbrella",
+    "description": "Resolves an approved umbrella issue into a bounded ordered child issue set and delegates execution to execute-approved-plan.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/agents/execute-approved-plan.md",
+      ".github/copilot-instructions.md",
+      ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+      ".copilot/skills/interruption-recovery-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/agents-catalog-maintainer.md",
+    "form": "Form A",
+    "name": "agents-catalog-maintainer",
+    "description": "",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/agents/AUTOMATIONS.md"
+    ]
+  },
+  {
+    "file": ".github/agents/create-issue.md",
+    "form": "Form C",
+    "name": "create-issue",
+    "description": "Creates template-compliant issues without implementation side effects using the canonical .copilot workflow.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/prompt-quality-baseline/SKILL.md",
+      ".copilot/skills/issue-creation-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/execute-approved-plan.md",
+    "form": "Form C",
+    "name": "execute-approved-plan",
+    "description": "Specialized bounded-plan executor for requests like execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set; route those aliases here instead of generic planning drift.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/pr-merge-workflow/SKILL.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md",
+      ".github/copilot-instructions.md",
+      ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+      ".copilot/skills/interruption-recovery-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/close-issue.md",
+    "form": "Form B",
+    "name": "close-issue",
+    "description": "Closes issues with verified outcome and canonical template-backed traceability rules from .copilot.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".github/issue-closing-template.md",
+      ".copilot/skills/close-issue-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/queue-backend.md",
+    "form": "Form C",
+    "name": "queue-backend",
+    "description": "Manual backend queue wrapper that reuses the canonical resolve-issue \u2192 pr-merge process one slice at a time.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/pr-merge-workflow/SKILL.md",
+      ".copilot/skills/backend-queue-workflow/SKILL.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/ralph-agent.md",
+    "form": "Form C",
+    "name": "ralph-agent",
+    "description": "High-discipline issue resolver with skill and review gates.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/workflow.md",
+    "form": "Form C",
+    "name": "workflow",
+    "description": "",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/wiki-update.md",
+    "form": "Form C",
+    "name": "wiki-update",
+    "description": "Refreshes and validates the repo-owned live wiki clone from approved host truth, stopping at a ready-to-publish state instead of overloading the @wiki router.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/prompt-quality-baseline/SKILL.md",
+      ".copilot/skills/wiki-maintenance-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/harness-bypass-resolution.md",
+    "form": "Form C",
+    "name": "harness-bypass-resolution",
+    "description": "Explicit break-glass agent to bypass stuck harness governance. Overrides queue locks and allows raw PR merges.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/harness-bypass/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/queue-phase-2.md",
+    "form": "Form C",
+    "name": "queue-phase-2",
+    "description": "Manual Phase 2 queue wrapper that reuses the canonical resolve-issue \u2192 pr-merge process one slice at a time.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/pr-merge-workflow/SKILL.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md",
+      ".copilot/skills/phase-2-queue-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/resolve-issue.md",
+    "form": "Form C",
+    "name": "resolve-issue",
+    "description": "Resolves one scoped issue into a reviewable PR using the canonical .copilot workflow.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/prompt-quality-baseline/SKILL.md",
+      ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".github/copilot-instructions.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/Plan.md",
+    "form": "Form C",
+    "name": "Plan",
+    "description": "Builds compact implementation plans with bounded discovery using the canonical .copilot planning workflow.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/cross-repo-coordination-checklist/SKILL.md",
+      ".copilot/skills/plan-workflow/SKILL.md",
+      ".copilot/skills/multi-step-planning-checklist/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/wiki-publish.md",
+    "form": "Form C",
+    "name": "wiki-publish",
+    "description": "Publishes an already-prepared live wiki clone safely using the repo-owned helper and maintainer runbook instead of raw git push instructions.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/prompt-quality-baseline/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/pr-merge.md",
+    "form": "Form C",
+    "name": "pr-merge",
+    "description": "Merges a ready PR safely using the canonical .copilot merge workflow and issue-close rules.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/prompt-quality-baseline/SKILL.md",
+      ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".copilot/skills/pr-merge-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/tutorial-audit.md",
+    "form": "Form C",
+    "name": "tutorial-audit",
+    "description": "Audits and validates existing tutorials for accuracy without modifying them.",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/tutorial-review-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/factory-operator.md",
+    "form": "Form C",
+    "name": "factory-operator",
+    "description": "",
+    "domain": "agents",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/speckit/speckit.plan.md",
+    "form": "Form D",
+    "name": "speckit.plan",
+    "description": "Create technical implementation plan from spec.",
+    "domain": "speckit",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/speckit/speckit.tasks.md",
+    "form": "Form D",
+    "name": "speckit.tasks",
+    "description": "Generate actionable task list from plan.",
+    "domain": "speckit",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/speckit/speckit.constitution.md",
+    "form": "Form D",
+    "name": "speckit.constitution",
+    "description": "Create or update project constitution and governing principles.",
+    "domain": "speckit",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/speckit/speckit.implement.md",
+    "form": "Form D",
+    "name": "speckit.implement",
+    "description": "Execute tasks according to spec and plan.",
+    "domain": "speckit",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/speckit/speckit.specify.md",
+    "form": "Form D",
+    "name": "speckit.specify",
+    "description": "Define what to build (requirements and user stories).",
+    "domain": "speckit",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/blecs/blecs.ux.review.md",
+    "form": "Form D",
+    "name": "blecs.ux.review",
+    "description": "blecs extension - run UX authority compliance review for UI-affecting changes.",
+    "domain": "blecs",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/blecs/blecs.ux.plan.md",
+    "form": "Form D",
+    "name": "blecs.ux.plan",
+    "description": "blecs extension - produce UX/navigation plan for a feature.",
+    "domain": "blecs",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/blecs/blecs.workflow.sync.md",
+    "form": "Form D",
+    "name": "blecs.workflow.sync",
+    "description": "blecs extension - build workflow context packet for downstream agents.",
+    "domain": "blecs",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/blecs/blecs.setup.dev-stack.md",
+    "form": "Form D",
+    "name": "blecs.setup.dev-stack",
+    "description": "blecs extension - start and validate backend+client dev stack with docker parity checks.",
+    "domain": "blecs",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".github/copilot-instructions.md"
+    ]
+  },
+  {
+    "file": ".github/agents/blecs/blecs.queue-backend.md",
+    "form": "Form D",
+    "name": "blecs.queue-backend",
+    "description": "blecs extension - execute the repeatable backend issue queue to PR to merge loop.",
+    "domain": "blecs",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/backend-queue-workflow/SKILL.md"
+    ]
+  },
+  {
+    "file": ".github/agents/blecs/blecs.queue-phase-2.md",
+    "form": "Form D",
+    "name": "blecs.queue-phase-2",
+    "description": "blecs extension - execute the repeatable Phase 2 issue queue to PR to merge loop.",
+    "domain": "blecs",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/phase-2-queue-workflow/SKILL.md"
+    ]
+  }
+]
