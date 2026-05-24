@@ -22,6 +22,7 @@ Use this skill as the canonical implementation source for `Plan`.
 - Follow DDD boundaries and repository conventions.
 - Use `.tmp/`, never `/tmp`, for optional plan artifacts.
 - Do not implement code or open/merge PRs in this mode.
+- Apply ADR-013-first authority classification before planning authority-sensitive tasks
 
 ## Completion Contract
 Return a concise plan summary that includes:
