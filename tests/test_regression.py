@@ -5279,3 +5279,50 @@ def test_runtime_authority_traceability_matrix_anchors() -> None:
     assert "Test / Proof" in traceability_doc
     assert "Derived Docs" in traceability_doc
     assert "**Evidence gap**" in traceability_doc
+
+
+def test_production_fresh_checkout_command_construction_preserves_boundaries() -> None:
+    import argparse
+
+    from scripts.local_ci_parity import build_fresh_checkout_command
+
+    args = argparse.Namespace(
+        python="/explicit/venv/bin/python",
+        level="production",
+        mode="standard",
+        standard_group=[],
+        production_group=[],
+        pytest_bundle=None,
+        include_docker_build=False,
+        pr_body_file=" .tmp/pr-body.md ",
+        skip_integration=False,
+        skip_pr_template_check=False,
+        production_groups_only=False,
+        watchdog_seconds=1200,
+    )
+
+    cmd = build_fresh_checkout_command(
+        args,
+        base_rev="origin/main",
+        head_rev="feature-branch",
+    )
+
+    assert cmd[0] == "/explicit/venv/bin/python"
+    assert cmd[1] == "./scripts/local_ci_parity.py"
+
+    assert "--base-rev" in cmd
+    assert cmd[cmd.index("--base-rev") + 1] == "origin/main"
+    assert "--head-rev" in cmd
+    assert cmd[cmd.index("--head-rev") + 1] == "feature-branch"
+
+    assert "--repo-root" in cmd
+    assert cmd[cmd.index("--repo-root") + 1] == "."
+
+    assert "--pr-body-file" in cmd
+    assert cmd[cmd.index("--pr-body-file") + 1] == ".tmp/pr-body.md"
+
+    assert "--fresh-checkout" not in cmd
+    assert "--skip-integration" not in cmd
+
+    assert "--watchdog-seconds" in cmd
+    assert cmd[cmd.index("--watchdog-seconds") + 1] == "1200"
