@@ -93,3 +93,37 @@ def test_workflow_config_exists_and_validates(workflow_schema):
     # Check that all expected terms are defined
     missing_terms = expected_terms - found_terms
     assert not missing_terms, f"Missing required terms in config: {missing_terms}"
+
+
+def test_execution_terms_coverage(workflow_schema):
+    import yaml
+
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    found_terms = {term["term_id"]: term for term in config["terms"]}
+
+    execution_terms = [
+        "approved_plan",
+        "issue_slice",
+        "execution_surface",
+        "github_truth",
+        "checkpoint_truth",
+        "blocker",
+        "pending_timeout",
+        "bypass",
+        "closeout",
+    ]
+
+    for term in execution_terms:
+        assert term in found_terms, f"Missing execution term: {term}"
+        term_data = found_terms[term]
+
+        # Test exact hallucination / ambiguity gap coverage based on Acceptance Criteria
+        assert (
+            len(term_data.get("required_evidence", [])) > 0
+        ), f"{term} needs required_evidence"
+        assert (
+            len(term_data.get("forbidden_interpretations", [])) > 0
+        ), f"{term} needs forbidden_interpretations"
+        assert "ambiguity_action" in term_data, f"{term} needs ambiguity_action"
