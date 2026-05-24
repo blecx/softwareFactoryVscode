@@ -4,9 +4,13 @@ from pathlib import Path
 
 import jsonschema
 import pytest
+import yaml
 
 SCHEMA_PATH = (
     Path(__file__).resolve().parent.parent / "schemas" / "workflow-language.schema.json"
+)
+CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent / "configs" / "workflow_language.yml"
 )
 
 
@@ -59,3 +63,33 @@ def test_workflow_schema_rejects_missing_ambiguity_action(workflow_schema):
     with pytest.raises(jsonschema.exceptions.ValidationError) as exc_info:
         jsonschema.validate(instance=invalid_term, schema=workflow_schema)
     assert "'ambiguity_action' is a required property" in str(exc_info.value)
+
+
+def test_workflow_config_exists_and_validates(workflow_schema):
+    assert CONFIG_PATH.exists(), f"Config file not found at {CONFIG_PATH}"
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    assert "terms" in config, "Config must contain a 'terms' list"
+    assert isinstance(config["terms"], list), "'terms' must be a list"
+
+    expected_terms = {
+        "accepted_adr",
+        "derived_projection",
+        "implementation_authority",
+        "readiness_projection",
+        "production_readiness_claim",
+    }
+    found_terms = set()
+
+    for term in config["terms"]:
+        # Validate against schema
+        jsonschema.validate(instance=term, schema=workflow_schema)
+
+        # Verify required specific terms based on Acceptance Criteria
+        if "term_id" in term:
+            found_terms.add(term["term_id"])
+
+    # Check that all expected terms are defined
+    missing_terms = expected_terms - found_terms
+    assert not missing_terms, f"Missing required terms in config: {missing_terms}"

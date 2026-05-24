@@ -1,0 +1,45 @@
+terms:
+  - term_id: "accepted_adr"
+    definition: "An accepted architecture decision record that defines normative architecture rules, terminology, and guardrails."
+    authority_sources: ["ADR-013"]
+    allowed_phrases: ["accepted adr", "architecture guardrail", "normative architecture rule"]
+    forbidden_interpretations: ["implementation plan", "synthesis document", "derived operator doc"]
+    required_evidence: ["presence of accepted 'Status' in the ADR file"]
+    classifier_task_kind: "validation"
+    ambiguity_action: "Stop and escalate to explicit architectural decision."
+
+  - term_id: "derived_projection"
+    definition: "Non-normative materials such as operator docs, handouts, and checklists that project architecture into guidance but do not override ADRs."
+    authority_sources: ["ADR-013"]
+    allowed_phrases: ["derived operator document", "operator guide", "cheat sheet", "handout"]
+    forbidden_interpretations: ["normative guardrail", "source of architecture truth"]
+    required_evidence: ["alignment with corresponding accepted ADRs"]
+    classifier_task_kind: "validation"
+    ambiguity_action: "Treat as drift and correct the projection to match accepted ADRs."
+
+  - term_id: "implementation_authority"
+    definition: "Implementation plans that sequence work and hardening steps but do not redefine architecture."
+    authority_sources: ["ADR-013"]
+    allowed_phrases: ["implementation plan", "sequencing document", "implementation target"]
+    forbidden_interpretations: ["architecture override", "shadow architecture document"]
+    required_evidence: ["reference to accepted ADRs for terminology"]
+    classifier_task_kind: "validation"
+    ambiguity_action: "Treat any architecture redefinition as a violation and defer to accepted ADRs."
+
+  - term_id: "readiness_projection"
+    definition: "Assessments or plans outlining what remains to achieve a quality standard, not to be confused with final production-ready approval."
+    authority_sources: ["ADR-013"]
+    allowed_phrases: ["readiness plan", "quality tracker", "test matrix projection", "delivery status snapshot"]
+    forbidden_interpretations: ["final authority on production release", "architecture waiver"]
+    required_evidence: ["links to test executions or coverage gaps"]
+    classifier_task_kind: "validation"
+    ambiguity_action: "Validate against CI and pipeline reality before proceeding."
+
+  - term_id: "production_readiness_claim"
+    definition: "The formal claim that a release or system state meets the complete definition of done for production."
+    authority_sources: ["ADR-013"]
+    allowed_phrases: ["production ready", "release quality", "quality metric pass"]
+    forbidden_interpretations: ["incomplete release bump", "local test success only"]
+    required_evidence: ["all current-release surfaces agree on version", "release guardrail pass rate = 100%"]
+    classifier_task_kind: "validation"
+    ambiguity_action: "Refuse the claim and halt release actions until surfaces align."
