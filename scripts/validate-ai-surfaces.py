@@ -46,7 +46,7 @@ def extract_authority_references(content):
     refs = re.findall(
         r"((?:\.copilot|\.github|docs/architecture)/[a-zA-Z0-9_\-\./\\]+\.md)", content
     )
-    return list(set(refs))
+    return sorted(list(set(refs)))
 
 
 def validate_file(filepath, repo_root):
