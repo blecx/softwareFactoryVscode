@@ -8508,19 +8508,22 @@ def test_ci_workflow_has_internal_production_readiness_job() -> None:
     """Finding #7 — CI must use the canonical production gate with Node 24-compatible action majors."""
     ci_file = REPO_ROOT / ".github" / "workflows" / "ci.yml"
     text = ci_file.read_text(encoding="utf-8")
-    
+
     # Assert structural usage of the classifier matrix
     assert "classifier:" in text
     assert "run_bundle:" in text
     assert "matrix:" in text
     assert "timeout-minutes: 45" in text
-    
+
     # Assert invocation uses local_ci_parity logic
     assert "./.venv/bin/python ./scripts/local_ci_parity.py" in text
     assert "--export-ci-matrix" in text
-    assert "--level ${{ steps.set-level.outputs.level }}" in text or "--level ${{ needs.classifier.outputs.level }}" in text
+    assert (
+        "--level ${{ steps.set-level.outputs.level }}" in text
+        or "--level ${{ needs.classifier.outputs.level }}" in text
+    )
     assert "--ci-run-bundle ${{ matrix.bundle }}" in text
-    
+
     # Assert action majors are Node 24-compatible
     assert "actions/checkout@v6" in text
     assert "actions/setup-python@v6" in text
@@ -8528,7 +8531,7 @@ def test_ci_workflow_has_internal_production_readiness_job() -> None:
     assert "actions/checkout@v4" not in text
     assert "actions/setup-python@v5" not in text
     assert "actions/upload-artifact@v4" not in text
-    
+
     # Check that artifact is uploaded
     assert "production-readiness-bundle" in text
 

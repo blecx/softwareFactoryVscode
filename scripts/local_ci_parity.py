@@ -2603,8 +2603,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
 
-    if not args.level and not official_level_legacy_flag_conflicts(args) and not args.fresh_checkout and not args.ci_run_bundle and not args.export_ci_matrix:
-        print("\nℹ️ Promoting bare run to `--level focused-local` to enforce the fail-early principle and limit execution time.")
+    if (
+        not args.level
+        and not official_level_legacy_flag_conflicts(args)
+        and not args.fresh_checkout
+        and not args.ci_run_bundle
+        and not args.export_ci_matrix
+    ):
+        print(
+            "\nℹ️ Promoting bare run to `--level focused-local` to enforce the fail-early principle and limit execution time."
+        )
         args.level = "focused-local"
 
     global ACTIVE_COMMAND_TIMEOUT_SECONDS
@@ -2624,10 +2632,10 @@ def main(argv: list[str] | None = None) -> int:
             base_rev = resolve_base_rev(
                 repo_root, base_rev=args.base_rev, head_rev=head_rev
             )
-            from factory_runtime.agents.validation_policy import ValidationPolicy
             from factory_runtime.agents.validation_plan_resolver import (
                 resolve_validation_plan,
             )
+            from factory_runtime.agents.validation_policy import ValidationPolicy
 
             policy = ValidationPolicy.load_canonical()
             plan = resolve_validation_plan(

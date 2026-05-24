@@ -52,32 +52,7 @@ If a PR has CI errors or merge-readiness problems, return to `@resolve-issue`
 to fix the root cause on the active slice, rerun the local prechecks, and then
 re-enter `@pr-merge`. Do not invent a separate “fix the PR” workflow.
 
-Default PR-error repair tactic is the fast evidence-first method codified in
-`.github/prompts/pr-error-resolve-tactic.prompt.md` and enforced by the
-workflow skills plus repository guardrails. For PR-body/template failures,
-local precheck failures, or GitHub CI/check failures:
-
-- re-anchor only enough to act safely;
-- parse the exact current failure output before rerunning anything;
-- read the exact failing file, test, assertion, method, or check step when the
-  output already identifies it;
-- use the **formatter-first** strategy as the default narrow repair path:
-  reproduce the cheapest failing gate first. When Python formatting drift is
-  plausible, run Black and isort on touched Python files before widening to
-  tests or parity. Full ladder: touched-file formatter check
-  → single failing test or file → touched-test bundle → focused local parity
-  → broader PR/merge validation; and
-- widen validation only after the narrower gate passes.
-
-Do **not** start with broad repo scans, parity-first reruns, guessed root
-causes, hallucinated helper/contract fixes, or stale-state narration when a
-narrower deterministic gate already exists.
-
-When repair is needed after a failed local validation or GitHub CI/check, the
-next repair step must quote the exact failing command or check, the relevant error text,
-and the suspected root cause from fresh evidence before another code change is attempted.
-Do **not** make a second repair change without new evidence; trial-and-error churn is
-non-compliant with the same canonical `@resolve-issue` → `@pr-merge` flow.
+See `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md` for shared cross-cutting rules: the fast evidence-first and formatter-first repair tactics, and fresh GitHub truth requirements. Do not invent a different implementation or repair ladder.
 
 ## Symbol grounding before code edits
 
@@ -120,11 +95,7 @@ Routing rule:
   ```
 
 - Prefer polling the helper's JSON output over `gh pr checks --watch`, pager UI, or web/watch flows when you are inside an automation loop.
-- Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration; do not rely on stale checkpoint entries, memory, prior terminal output, or terminal silence when making PR-state claims.
-- For bounded waiting, prefer `./.venv/bin/python ./scripts/noninteractive_gh.py pr-checks <PR_NUMBER> --wait --timeout-seconds 600` over `gh pr checks --watch`, `gh run watch`, or other watch-style flows.
-- Treat PR readiness/check status as GitHub truth only: rely on `statusCheckRollup` / merge metadata from `./scripts/noninteractive_gh.py` or equivalent `gh ... --json ...` queries, not local PID files, process liveness, terminal idleness, or other host-side heuristics.
-- When a PR exists, verify with fresh `pr-view` output that the GitHub PR head branch matches both the current local branch and `.tmp/github-issue-queue-state.md` `active_branch`; treat any mismatch as a blocker and re-anchor before continuing.
-- If the helper returns `summary.overall = pending-timeout`, treat that as a real blocker for the current automation pass: refresh `.tmp/github-issue-queue-state.md`, report CI as still pending, and stop so the operator or a later resume can re-anchor cleanly instead of waiting indefinitely.
+- See ADR-006. Rely only on fresh GitHub truth (e.g. `pr-view` / `pr-checks`). Do not narrate from memory, terminal silence, or stale checkpoints. GitHub PR head branch MUST match checkpoint.
 - For GitHub fetch/list/view automation, require a bounded subprocess watchdog as well; use repo-owned helpers such as `scripts/noninteractive_gh.py` and `factory_runtime.agents.tooling.gh_throttle.run_gh_throttled(...)` so slow item fetches fail with a timeout instead of waiting for manual interruption.
 - If the helper does not cover a one-off query yet, use an equivalent pager-free pattern such as `GH_PAGER=cat PAGER=cat gh ... --json ...`; do not rely on the CLI deciding whether to open a pager.
 - When transforming JSON in shell automation, pipe into `python3 -c '...'`, `./.venv/bin/python -c '...'`, or a dedicated script. Do **not** combine a pipe with a heredoc-based Python command such as `... | python3 - <<'PY'`, because the heredoc replaces stdin and the piped JSON never reaches `sys.stdin`.
