@@ -127,3 +127,38 @@ def test_execution_terms_coverage(workflow_schema):
             len(term_data.get("forbidden_interpretations", [])) > 0
         ), f"{term} needs forbidden_interpretations"
         assert "ambiguity_action" in term_data, f"{term} needs ambiguity_action"
+
+
+def test_ambiguity_sensitive_phrases_coverage():
+    import yaml
+
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    required_phrases = [
+        "plan",
+        "continue",
+        "ready",
+        "closeout",
+        "bypass",
+        "production ready",
+    ]
+
+    found_phrases = set()
+    for term in config["terms"]:
+        term_strings = [term.get("term_id", "")] + term.get("allowed_phrases", [])
+        for req in required_phrases:
+            if any(req in ts.lower() for ts in term_strings):
+                found_phrases.add(req)
+                assert (
+                    len(term.get("forbidden_interpretations", [])) > 0
+                ), f"Term mapping '{req}' lacks forbidden_interpretations"
+                assert (
+                    len(term.get("required_evidence", [])) > 0
+                ), f"Term mapping '{req}' lacks required_evidence"
+                assert (
+                    "ambiguity_action" in term
+                ), f"Term mapping '{req}' lacks ambiguity_action"
+
+    missing = set(required_phrases) - found_phrases
+    assert not missing, f"Missing coverage for ambiguity-sensitive phrases: {missing}"

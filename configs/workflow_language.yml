@@ -95,6 +95,8 @@ terms:
   - approved queue
   - approved issue set
   - approved backlog
+  - continue the plan
+  - continue execution
   forbidden_interpretations:
   - ad-hoc conversational planning
   - guessing which plan the operator means
