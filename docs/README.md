@@ -5,7 +5,7 @@ It is a navigation aid, not a competing authority source.
 
 ## Authority note
 
-Per `ADR-013`, accepted ADRs are the normative architecture source for guardrails and terminology. Synthesis docs, implementation plans, handouts, checklists, and historical reports explain or sequence work, but they do not override accepted ADRs.
+Per `ADR-013`, accepted ADRs are the normative architecture source for guardrails and terminology. Synthesis docs, implementation plans, readiness material, handouts, checklists, and historical reports explain or sequence work; they do not override accepted ADRs. Readiness material is maintained as derived operator-facing projections.
 
 ## Start here by audience
 

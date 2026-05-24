@@ -86,9 +86,11 @@ historical sequencing plans the default first stop.
 The four primary docs split responsibilities on purpose:
 
 - **This `README.md`** — project/release orientation and high-level routing.
-- **[`docs/INSTALL.md`](docs/INSTALL.md)** — full install/update/readiness authority.
+- **[`docs/INSTALL.md`](docs/INSTALL.md)** — derived install/update readiness projection.
 - **[`docs/HANDOUT.md`](docs/HANDOUT.md)** — guided first-run operator walkthrough.
 - **[`docs/CHEAT_SHEET.md`](docs/CHEAT_SHEET.md)** — terse task and command reference.
+
+Per [ADR-013](docs/architecture/ADR-013-Architecture-Authority-and-Plan-Separation.md), accepted Architecture Decision Records (ADRs) are the normative source for guardrails and terminology; readiness docs such as these are derived operator projections.
 
 Start with the route that matches your goal:
 
