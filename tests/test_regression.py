@@ -2691,6 +2691,32 @@ def test_adr_014_clarifies_current_suspend_boundary() -> None:
     assert "`resume-safe`, `resume-unsafe`, or `manual-recovery-required`" in adr_014
 
 
+def test_release_manifest_contains_production_signoff_pointer():
+    import json
+    from pathlib import Path
+
+    repo_root = Path(__file__).parent.parent
+    manifest_path = repo_root / "manifests" / "release-manifest.json"
+    assert manifest_path.exists()
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    assert manifest["schema_version"] == 1
+    assert "production_signoff_pointer" in manifest["latest"]
+    assert (
+        manifest["latest"]["production_signoff_pointer"]
+        == ".tmp/production-readiness/latest.json"
+    )
+
+    for channel in manifest["channels"].values():
+        assert "production_signoff_pointer" in channel
+        assert (
+            channel["production_signoff_pointer"]
+            == ".tmp/production-readiness/latest.json"
+        )
+
+
 def test_release_template_distinguishes_practical_vs_open_rollout_scope():
     repo_root = Path(__file__).parent.parent
     release_template = (repo_root / ".github" / "releases" / "TEMPLATE.md").read_text(
