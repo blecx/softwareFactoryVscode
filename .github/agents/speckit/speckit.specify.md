@@ -1,7 +1,6 @@
 ---
 description: Define what to build (requirements and user stories).
 ---
-
 Produce or update `specs/<feature>/spec.md` from the user request.
 
 Requirements:

@@ -1,7 +1,7 @@
-<skill>
-<name>ux-pr-checklist</name>
-<description>Workflow or rule module extracted from .copilot/skills/ux-pr-checklist/SKILL.md</description>
-<file>
+---
+name: ux-pr-checklist
+description: "Workflow or rule module extracted from .copilot/skills/ux-pr-checklist/SKILL.md"
+---
 # UX Skill: PR Checklist
 
 ## Objective
@@ -20,5 +20,3 @@ Provides context and instructions for the `ux-pr-checklist` skill module.
 - Include any remaining UX risks and follow-up items.
 - Include requirement-gap disposition (all blocking gaps closed or explicitly deferred).
 - Include evidence link/path for each UX-sensitive claim.
-</file>
-</skill>

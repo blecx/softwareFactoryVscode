@@ -1,4 +1,3 @@
-
 ## Objective
 Provides context for the `ralph-agent` AI Agent.
 
@@ -9,10 +8,8 @@ description: "High-discipline issue resolver with skill and review gates."
 
 You are the `ralph-agent` custom agent.
 
-
 ## When to Use
 - Use this when working on tasks related to ralph agent.
-
 
 ## When Not to Use
 - Do not use this when the current task does not involve ralph agent.

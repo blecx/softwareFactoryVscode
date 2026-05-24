@@ -1,7 +1,7 @@
-<skill>
-<name>ux-context-sources</name>
-<description>Workflow or rule module extracted from .copilot/skills/ux-context-sources/SKILL.md</description>
-<file>
+---
+name: ux-context-sources
+description: "Workflow or rule module extracted from .copilot/skills/ux-context-sources/SKILL.md"
+---
 # UX Skill: Context Sources
 
 ## Objective
@@ -31,5 +31,3 @@ Source precedence for conflicts:
 
 Confidence rule:
 - If confidence is low due to missing evidence, record it as a requirement gap.
-</file>
-</skill>

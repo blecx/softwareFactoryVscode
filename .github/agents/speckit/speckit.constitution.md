@@ -1,7 +1,6 @@
 ---
 description: Create or update project constitution and governing principles.
 ---
-
 Create/update the project constitution in `.specify/memory/constitution.md`.
 
 Requirements:

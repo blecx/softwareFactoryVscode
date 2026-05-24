@@ -1,7 +1,7 @@
-<skill>
-<name>cross-repo-coordination-checklist</name>
-<description>Active execution contract for maintaining API and UI synchronization between the backend and Client repositories.</description>
-<file>
+---
+name: cross-repo-coordination-checklist
+description: "Active execution contract for maintaining API and UI synchronization between the backend and Client repositories."
+---
 # Cross-Repo Coordination Checklist
 
 ## Objective
@@ -15,7 +15,6 @@ Provides actionable instructions for coordinating API contract changes between t
 - Do not use this when the current task is isolated to pure internal backend logic, CLI tools, or documentation that does not affect the frontend API contract.
 
 ## Instructions
-
 ### 1. Impact Detection
 Whenever a backend API contract (in `apps/api/routers/*.py` or `models.py`) is modified, verify the frontend impact:
 - Search for impacted frontend API clients using `grep`:
@@ -39,6 +38,3 @@ Before finalizing any cross-repo changes, validate the full stack works together
 - **Phase 1:** Deliver backend changes first. Prefer backward-compatible API additions (e.g., adding a new optional field).
 - **Phase 2:** Deliver client integration updates after the backend is merged.
 - **Phase 3:** If breaking changes are unavoidable, coordinate the deprecation pipeline and document the rollback strategy.
-
-</file>
-</skill>

@@ -1,7 +1,7 @@
-<skill>
-<name>tutorial-writer-expert</name>
-<description>Skill for tutorial writer expert</description>
-<file>
+---
+name: tutorial-writer-expert
+description: "Skill for tutorial writer expert"
+---
 # Tutorial Writer Expert Skill
 
 ## Objective
@@ -12,9 +12,9 @@ Dictates the required steps, tone, and process for authoring and maintaining tec
 - An existing tutorial needs a major update, rewrite, or expansion.
 - The operator mentions different types of tutorials to be drafted (e.g., Quickstart, Deep Dive, API Guide).
 
-
 ## When Not to Use
 - Do not use this when not working directly on tutorial writer expert.
+
 ## Instructions
 1. **Clarify Intent:** If the user hasn't specified, ask what kind of tutorial they want to write.
 2. **Gather Context:** Read relevant source code, existing markdown docs, and APIs related to the tutorial subject.
@@ -29,6 +29,3 @@ Dictates the required steps, tone, and process for authoring and maintaining tec
 - **Write mode:** This skill inherently requires file modification or creation via standard tools.
 - Place tutorials in the standard documentation path for the project (e.g., `docs/` or comparable directories based on project structure).
 - Do not commit changes yourself; leave the git operations (like PRs) to the appropriate workflow agents unless instructed otherwise.
-
-</file>
-</skill>

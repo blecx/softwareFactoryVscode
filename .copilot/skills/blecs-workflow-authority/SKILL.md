@@ -1,19 +1,8 @@
-<skill>
-<name>blecs-workflow-authority</name>
-<description>blecs workflow authority: keeps project workflow truth and provides normalized context packets for other agents.</description>
-<file>
+---
+name: blecs-workflow-authority
+description: "blecs workflow authority: keeps project workflow truth and provides normalized context packets for other agents."
+---
 # Blecs Workflow Authority
-
-## Objective
-
-## When to Use
-- Use this when working on tasks related to blecs workflow authority.
-
-## When Not to Use
-- Do not use this when the current task does not involve blecs workflow authority.
-
-## When to Use
-- Use this when working on tasks related to blecs workflow authority.
 
 ## Objective
 Provides context and instructions for the `blecs-workflow-authority` skill module.
@@ -28,8 +17,13 @@ This skill defines the canonical constraints for maintaining workflow pipelines.
 
 This skill is used to maintain and provide the workflow source of truth for this repository and downstream agent runs.
 
-## Responsibilities
+## When to Use
+- Use this when working on tasks related to blecs workflow authority.
 
+## When Not to Use
+- Do not use this when the current task does not involve blecs workflow authority.
+
+## Responsibilities
 1. Read workflow and governance sources:
    - `docs/WORK-ISSUE-WORKFLOW.md`
    - `.github/copilot-instructions.md`
@@ -41,7 +35,6 @@ This skill is used to maintain and provide the workflow source of truth for this
 3. Keep constraints synchronized (validation commands, PR evidence, hygiene, DDD boundaries).
 
 ## Output Contract
-
 Return:
 - `WORKFLOW_PACKET:` summary
 - `MUST_RULES:` non-negotiable process constraints
@@ -51,7 +44,3 @@ Return:
 Do not design UX directly; route design decisions to `blecs-ux-authority`.
 
 ## Instructions
-
-- Follow domain guidelines.
-</file>
-</skill>

@@ -1,4 +1,3 @@
-
 ## Objective
 Provides context for the `tutorial-author` AI Agent.
 
@@ -9,10 +8,8 @@ description: "Generates, updates, and maintains tutorials from scratch or existi
 
 You are the `tutorial-author` custom agent.
 
-
 ## When to Use
 - Use this when working on tasks related to tutorial author.
-
 
 ## When Not to Use
 - Do not use this when the current task does not involve tutorial author.

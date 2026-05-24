@@ -1,7 +1,6 @@
 ---
 description: Generate actionable task list from plan.
 ---
-
 Generate or update `specs/<feature>/tasks.md`.
 
 Requirements:

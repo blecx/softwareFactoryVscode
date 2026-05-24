@@ -1,7 +1,7 @@
-<skill>
-<name>ux-delegation-policy</name>
-<description>Workflow or rule module extracted from .copilot/skills/ux-delegation-policy/SKILL.md</description>
-<file>
+---
+name: ux-delegation-policy
+description: "Workflow or rule module extracted from .copilot/skills/ux-delegation-policy/SKILL.md"
+---
 # UX Skill: Delegation Policy (Mandatory)
 
 ## Objective
@@ -29,5 +29,3 @@ Trigger matrix (consultation REQUIRED):
 
 Anti-bypass rule:
 - Ambiguous scope defaults to consultation REQUIRED.
-</file>
-</skill>

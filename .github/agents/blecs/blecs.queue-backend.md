@@ -1,7 +1,6 @@
 ---
 description: blecs extension - execute the repeatable backend issue queue to PR to merge loop.
 ---
-
 # blecs.queue-backend
 
 Run `/queue-backend` for iterative backend implementation work.

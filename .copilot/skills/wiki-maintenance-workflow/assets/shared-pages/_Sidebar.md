@@ -1,13 +1,11 @@
 # Sidebar template
 
 ## Start here
-
 - [[Home]]
 - [[primary route]]
 - [[reference index]]
 
 ## Additional paths
-
 - [[operational guide]]
 - [[architecture or reference page]]
 - [[faq or troubleshooting page]]

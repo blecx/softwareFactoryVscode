@@ -1,29 +1,43 @@
-<skill>
-<name>resolve-issue-workflow</name>
-<description>Workflow or rule module extracted from .copilot/skills/resolve-issue-workflow/SKILL.md</description>
-<file>
+---
+name: resolve-issue-workflow
+description: "Workflow or rule module extracted from .copilot/skills/resolve-issue-workflow/SKILL.md"
+---
 # Resolve Issue Workflow
 
 ## Objective
-
 Provides context and instructions for the `resolve-issue-workflow` skill module.
 
 This is the canonical implementation and PR-preparation half of the repository's
 issue → PR → merge process.
 
 ## When to Use
-
 - A specific issue number is provided for implementation.
 - The user asks to pick the next issue and execute one issue-to-PR slice.
 - A PR or branch failed CI and needs implementation fixes before returning to
   merge readiness.
 
 ## When Not to Use
-
 - Do not use this when the current task is NOT focused on implementing an active issue and turning it into a PR.
 
-## Instructions
+## Guardrails
+- Validate issue spec (strict sections + body-size limit) for roadmap specs.
+- Keep scope to small CI-safe slices (single issue, minimal domains), no architecture regressions outside scope.
+- Avoid unrelated refactors.
+- Keep diffs reviewable and DDD-compliant.
+- Ground symbol and contract changes in repo evidence before editing.
+- Follow `.copilot/skills/ux-delegation-policy/SKILL.md` as the canonical delegation rule source.
+- Treat `.github/pull_request_template.md` as mandatory output structure for PR bodies.
+- Do not ask GitHub Actions to discover preventable failures locally first; run the local CI-equivalent prechecks before PR creation.
 
+## Completion Contract
+Return a concise result that states:
+
+- implemented issue,
+- validation status,
+- PR or blocking condition,
+- any follow-up split/dependency if scope exceeded the slice.
+
+## Instructions
 1. Select issue (backend-first, lowest number) and confirm scope.
 2. Write compact plan: goal, scope, AC, files, validation commands.
 3. Reject or reformat work that does not follow `.github/ISSUE_TEMPLATE/feature_request.yml` or `.github/ISSUE_TEMPLATE/bug_report.yml`.
@@ -67,7 +81,6 @@ issue → PR → merge process.
 - If merge work discovers failing CI or merge-readiness issues that require code changes, stay on the same issue/branch and continue using this workflow rather than inventing a separate PR-repair path.
 
 ## Required Planning Shape
-
 - Goal
 - Scope / non-goals
 - Acceptance criteria
@@ -77,36 +90,12 @@ issue → PR → merge process.
 Prefer tool-driven discovery over pasting large context into chat.
 
 ## Validation Baseline
-
 - Include command outputs/evidence in PR body.
 - For PR handoff/readiness evidence, include `./.venv/bin/python ./scripts/local_ci_parity.py --level merge` plus the exact `./.venv/bin/python ./scripts/noninteractive_gh.py ...` GitHub-truth commands that support the current checkpoint state.
 
 ## Repo Rules
-
 - Select backend/TUI/CLI issues before client/UX issues.
 - Keep one issue per PR.
 - Use `.tmp/`, never `/tmp`.
 - Never touch `projectDocs/` or `configs/llm.json`.
 - Apply the canonical UX delegation policy before finalizing UI/UX-impacting work.
-
-## Guardrails
-
-- Validate issue spec (strict sections + body-size limit) for roadmap specs.
-- Keep scope to small CI-safe slices (single issue, minimal domains), no architecture regressions outside scope.
-- Avoid unrelated refactors.
-- Keep diffs reviewable and DDD-compliant.
-- Ground symbol and contract changes in repo evidence before editing.
-- Follow `.copilot/skills/ux-delegation-policy/SKILL.md` as the canonical delegation rule source.
-- Treat `.github/pull_request_template.md` as mandatory output structure for PR bodies.
-- Do not ask GitHub Actions to discover preventable failures locally first; run the local CI-equivalent prechecks before PR creation.
-
-## Completion Contract
-
-Return a concise result that states:
-
-- implemented issue,
-- validation status,
-- PR or blocking condition,
-- any follow-up split/dependency if scope exceeded the slice.
-  </file>
-  </skill>

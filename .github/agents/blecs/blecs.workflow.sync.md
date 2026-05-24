@@ -1,7 +1,6 @@
 ---
 description: blecs extension - build workflow context packet for downstream agents.
 ---
-
 Read workflow and repo governance documents and output a compact packet:
 
 - `WORKFLOW_PACKET:`
