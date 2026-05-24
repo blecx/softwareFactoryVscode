@@ -197,13 +197,3 @@ At minimum, the final evidence bundle must include:
 
 Anything less than that is a baseline, an in-progress hardening state, or a roadmap milestone — not a final production claim.
 
-- Production Docs Contract
-- Production Docker Build Parity
-- Production Runtime Proofs
-- Internal Production Gate — Docker Parity & Recovery Proofs
-- ./.venv/bin/python ./scripts/local_ci_parity.py --mode production
-- Production Docs Contract
-- Production Docker Build Parity
-- Production Runtime Proofs
-- Internal Production Gate — Docker Parity & Recovery Proofs
-- ./.venv/bin/python ./scripts/local_ci_parity.py --mode production

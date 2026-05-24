@@ -3998,9 +3998,11 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
         encoding="utf-8"
     )
     assert (
-        "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
         in readiness_doc
     )
+    assert "--mode production" not in readiness_doc
+    assert "--mode" not in readiness_doc  # Make sure legacy mode isn't described as competing canonical authority
     assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in readiness_doc
     assert "stop_cleanup_retains_images_and_supports_restart" in readiness_doc
     assert (
@@ -4010,10 +4012,6 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
     assert ".tmp/production-readiness/latest.md" in readiness_doc
     assert "three consecutive clean runs" in readiness_doc
     assert "--fresh-checkout" in readiness_doc
-    assert "Production Docs Contract" in readiness_doc
-    assert "Production Docker Build Parity" in readiness_doc
-    assert "Production Runtime Proofs" in readiness_doc
-    assert "Internal Production Gate — Docker Parity & Recovery Proofs" in readiness_doc
 
 
 def test_local_ci_parity_production_mode_reports_missing_required_docs_as_blocking(
