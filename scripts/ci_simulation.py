@@ -324,32 +324,45 @@ def compute_drift(
 
 
 def create_simulation_checkout(repo_root: Path, worktree_parent: Path) -> Path | None:
-    """Create a clean git worktree for the Docker container to write into.
+    """Create a clean git clone for the Docker container to write into.
+
+    Uses a shallow clone instead of git worktree because:
+    - Git worktree creates a .git FILE that references the main repo's worktree directory
+    - When mounted into Docker, this reference becomes invalid (path resolution changes)
+    - A shallow clone is self-contained and works correctly when bind-mounted
 
     The container runs ``setup.sh`` which creates a ``.venv`` directory.
-    Using a fresh worktree keeps the host ``.venv`` completely untouched.
-    Returns the worktree path on success, ``None`` on failure.
+    Using a fresh clone keeps the host ``.venv`` completely untouched.
+    Returns the clone path on success, ``None`` on failure.
     """
     worktree_parent.mkdir(parents=True, exist_ok=True)
     checkout_path = worktree_parent / "sim-checkout"
 
-    # Remove any leftover worktree from a previous (possibly interrupted) run
+    # Remove any leftover clone from a previous (possibly interrupted) run
     if checkout_path.exists():
-        subprocess.run(
-            ["git", "worktree", "remove", "--force", str(checkout_path)],
-            capture_output=True,
-            cwd=repo_root,
-            timeout=30,
-        )
-        if checkout_path.exists():
-            shutil.rmtree(checkout_path, ignore_errors=True)
+        shutil.rmtree(checkout_path, ignore_errors=True)
 
+    # Create shallow clone of the current HEAD
+    # depth=1 and --single-branch minimize disk usage while maintaining a valid git repo
     result = subprocess.run(
-        ["git", "worktree", "add", "--detach", str(checkout_path), "HEAD"],
+        [
+            "git",
+            "clone",
+            "--depth=1",
+            "--single-branch",
+            "--branch=" + subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=repo_root,
+                timeout=10,
+            ).stdout.strip(),
+            str(repo_root),
+            str(checkout_path),
+        ],
         capture_output=True,
         text=True,
-        cwd=repo_root,
-        timeout=60,
+        timeout=120,
     )
     if result.returncode != 0:
         return None
@@ -357,13 +370,8 @@ def create_simulation_checkout(repo_root: Path, worktree_parent: Path) -> Path |
 
 
 def cleanup_simulation_checkout(repo_root: Path, checkout_path: Path) -> None:
-    """Remove the simulation git worktree and any leftover files."""
-    subprocess.run(
-        ["git", "worktree", "remove", "--force", str(checkout_path)],
-        capture_output=True,
-        cwd=repo_root,
-        timeout=30,
-    )
+    """Remove the simulation git clone and any leftover files."""
+    # Simply remove the directory (clone-based, not worktree-based)
     if checkout_path.exists():
         shutil.rmtree(checkout_path, ignore_errors=True)
 
