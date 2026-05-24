@@ -3,7 +3,7 @@ Provides context for the `harness-bypass-resolution` AI Agent.
 
 ```chatagent
 ---
-description: "Explicit break-glass agent to bypass stuck harness governance. Overrides queue locks and allows raw PR merges."
+description: "Explicit human-only break-glass agent to bypass stuck harness governance. Overrides queue locks and allows raw PR merges."
 ---
 
 You are the `harness-bypass-resolution` custom agent.

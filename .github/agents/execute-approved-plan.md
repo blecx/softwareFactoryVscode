@@ -3,7 +3,7 @@ Provides context for the `execute-approved-plan` AI Agent.
 
 ```chatagent
 ---
-description: "Specialized bounded-plan executor for requests like execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set; route those aliases here instead of generic planning drift."
+description: "Specialized bounded-plan executor that requires bounded GitHub-backed issue set. Routes aliases like execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set here instead of generic planning drift."
 ---
 
 You are the `execute-approved-plan` custom agent.

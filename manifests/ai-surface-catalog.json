@@ -472,7 +472,7 @@
     "file": ".github/agents/execute-approved-plan.md",
     "form": "Form C",
     "name": "execute-approved-plan",
-    "description": "Specialized bounded-plan executor for requests like execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set; route those aliases here instead of generic planning drift.",
+    "description": "Specialized bounded-plan executor that requires bounded GitHub-backed issue set. Routes aliases like execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set here instead of generic planning drift.",
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
@@ -547,7 +547,7 @@
     "file": ".github/agents/harness-bypass-resolution.md",
     "form": "Form C",
     "name": "harness-bypass-resolution",
-    "description": "Explicit break-glass agent to bypass stuck harness governance. Overrides queue locks and allows raw PR merges.",
+    "description": "Explicit human-only break-glass agent to bypass stuck harness governance. Overrides queue locks and allows raw PR merges.",
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
@@ -571,7 +571,7 @@
     "file": ".github/agents/resolve-issue.md",
     "form": "Form C",
     "name": "resolve-issue",
-    "description": "Resolves one scoped issue into a reviewable PR using the canonical .copilot workflow.",
+    "description": "Resolves one scoped issue into a reviewable PR using the canonical .copilot workflow. Expects one issue -> PR only.",
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
@@ -609,7 +609,7 @@
     "file": ".github/agents/pr-merge.md",
     "form": "Form C",
     "name": "pr-merge",
-    "description": "Merges a ready PR safely using the canonical .copilot merge workflow and issue-close rules.",
+    "description": "Merges a ready PR safely using the canonical .copilot merge workflow and issue-close rules. Performs validation/merge only and no implementation fixes.",
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
