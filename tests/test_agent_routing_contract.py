@@ -63,3 +63,19 @@ def test_invalid_forbidden_field(routing_schema):
     }
     with pytest.raises(jsonschema.exceptions.ValidationError):
         jsonschema.validate(instance=invalid_data, schema=routing_schema)
+
+
+def test_manifest_file_validates(routing_schema):
+    manifest_path = os.path.join(
+        os.path.dirname(__file__), "..", "manifests", "agent-routing-contract.json"
+    )
+    if not os.path.exists(manifest_path):
+        pytest.skip("Manifest file not found, skipping validation test")
+
+    with open(manifest_path, "r") as f:
+        manifest_data = json.load(f)
+
+    assert isinstance(manifest_data, list), "Manifest must be a JSON array"
+
+    for agent_data in manifest_data:
+        jsonschema.validate(instance=agent_data, schema=routing_schema)
