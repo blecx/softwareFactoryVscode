@@ -38,9 +38,9 @@
     "domain": "resolve-issue-workflow",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".github/prompts/pr-error-resolve-tactic.prompt.md",
       ".copilot/skills/ux-delegation-policy/SKILL.md",
       ".github/pull_request_template.md",
+      ".github/prompts/pr-error-resolve-tactic.prompt.md",
       ".copilot/skills/resolve-issue-workflow/SKILL.md"
     ]
   },
@@ -63,14 +63,14 @@
     "domain": "backend-queue-workflow",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/a2a-communication/SKILL.md",
       ".github/pull_request_template.md",
-      "docs/architecture/ADR-001-AI-Workflow-Guardrails.md",
-      ".copilot/skills/resolve-issue-workflow/SKILL.md",
       ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+      ".copilot/skills/a2a-communication/SKILL.md",
       ".copilot/skills/pr-merge-workflow/SKILL.md",
+      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md",
       "docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md",
-      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md"
+      "docs/architecture/ADR-001-AI-Workflow-Guardrails.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
     ]
   },
   {
@@ -81,16 +81,16 @@
     "domain": "approved-plan-execution-workflow",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/a2a-communication/SKILL.md",
       ".github/pull_request_template.md",
-      ".github/prompts/pr-error-resolve-tactic.prompt.md",
-      ".copilot/skills/resolve-issue-workflow/SKILL.md",
-      ".github/copilot-instructions.md",
       ".copilot/skills/issue-creation-workflow/SKILL.md",
+      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md",
+      ".github/copilot-instructions.md",
+      ".copilot/skills/a2a-communication/SKILL.md",
       ".copilot/skills/pr-merge-workflow/SKILL.md",
+      ".github/prompts/pr-error-resolve-tactic.prompt.md",
       ".copilot/skills/interruption-recovery-workflow/SKILL.md",
       "docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md",
-      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md"
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
     ]
   },
   {
@@ -101,15 +101,15 @@
     "domain": "phase-2-queue-workflow",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/a2a-communication/SKILL.md",
       ".github/pull_request_template.md",
-      "docs/architecture/ADR-001-AI-Workflow-Guardrails.md",
-      ".copilot/skills/resolve-issue-workflow/SKILL.md",
       ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
       ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".copilot/skills/a2a-communication/SKILL.md",
       ".copilot/skills/pr-merge-workflow/SKILL.md",
+      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md",
       "docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md",
-      "docs/architecture/ADR-005-Strong-Templating-Enforcement.md"
+      "docs/architecture/ADR-001-AI-Workflow-Guardrails.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
     ]
   },
   {
@@ -149,8 +149,8 @@
     "domain": "close-issue-workflow",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".github/issue-closing-template.md",
-      ".copilot/skills/ux-delegation-policy/SKILL.md"
+      ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".github/issue-closing-template.md"
     ]
   },
   {
@@ -249,11 +249,11 @@
     "authority_owner": "Unknown",
     "authority_references": [
       ".copilot/skills/ux-responsive/SKILL.md",
-      ".copilot/skills/ux-consult-request/SKILL.md",
-      ".copilot/skills/ux-a11y-basics/SKILL.md",
-      ".copilot/skills/ux-context-sources/SKILL.md",
       ".copilot/skills/ux-ia-navigation/SKILL.md",
       ".copilot/skills/ux-artifact-grouping/SKILL.md",
+      ".copilot/skills/ux-context-sources/SKILL.md",
+      ".copilot/skills/ux-a11y-basics/SKILL.md",
+      ".copilot/skills/ux-consult-request/SKILL.md",
       ".copilot/skills/ux-pr-checklist/SKILL.md"
     ]
   },
@@ -426,9 +426,9 @@
     "authority_owner": "Unknown",
     "authority_references": [
       ".copilot/skills/prompt-quality-baseline/SKILL.md",
+      ".copilot/skills/wiki-maintenance-workflow/SKILL.md",
       ".copilot/skills/wiki-publication-policy-authoring/SKILL.md",
-      ".copilot/skills/wiki-bootstrap-workflow/SKILL.md",
-      ".copilot/skills/wiki-maintenance-workflow/SKILL.md"
+      ".copilot/skills/wiki-bootstrap-workflow/SKILL.md"
     ]
   },
   {
@@ -441,8 +441,8 @@
     "authority_references": [
       ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
       ".copilot/skills/interruption-recovery-workflow/SKILL.md",
-      ".github/copilot-instructions.md",
-      ".github/agents/execute-approved-plan.md"
+      ".github/agents/execute-approved-plan.md",
+      ".github/copilot-instructions.md"
     ]
   },
   {
@@ -464,8 +464,8 @@
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/issue-creation-workflow/SKILL.md",
-      ".copilot/skills/prompt-quality-baseline/SKILL.md"
+      ".copilot/skills/prompt-quality-baseline/SKILL.md",
+      ".copilot/skills/issue-creation-workflow/SKILL.md"
     ]
   },
   {
@@ -476,11 +476,11 @@
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/resolve-issue-workflow/SKILL.md",
-      ".github/copilot-instructions.md",
       ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+      ".github/copilot-instructions.md",
       ".copilot/skills/pr-merge-workflow/SKILL.md",
-      ".copilot/skills/interruption-recovery-workflow/SKILL.md"
+      ".copilot/skills/interruption-recovery-workflow/SKILL.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
     ]
   },
   {
@@ -491,9 +491,9 @@
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".github/issue-closing-template.md",
       ".copilot/skills/ux-delegation-policy/SKILL.md",
-      ".copilot/skills/close-issue-workflow/SKILL.md"
+      ".copilot/skills/close-issue-workflow/SKILL.md",
+      ".github/issue-closing-template.md"
     ]
   },
   {
@@ -505,8 +505,8 @@
     "authority_owner": "Unknown",
     "authority_references": [
       ".copilot/skills/pr-merge-workflow/SKILL.md",
-      ".copilot/skills/resolve-issue-workflow/SKILL.md",
-      ".copilot/skills/backend-queue-workflow/SKILL.md"
+      ".copilot/skills/backend-queue-workflow/SKILL.md",
+      ".copilot/skills/resolve-issue-workflow/SKILL.md"
     ]
   },
   {
@@ -539,8 +539,8 @@
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/prompt-quality-baseline/SKILL.md",
-      ".copilot/skills/wiki-maintenance-workflow/SKILL.md"
+      ".copilot/skills/wiki-maintenance-workflow/SKILL.md",
+      ".copilot/skills/prompt-quality-baseline/SKILL.md"
     ]
   },
   {
@@ -562,9 +562,9 @@
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/phase-2-queue-workflow/SKILL.md",
+      ".copilot/skills/pr-merge-workflow/SKILL.md",
       ".copilot/skills/resolve-issue-workflow/SKILL.md",
-      ".copilot/skills/pr-merge-workflow/SKILL.md"
+      ".copilot/skills/phase-2-queue-workflow/SKILL.md"
     ]
   },
   {
@@ -575,8 +575,8 @@
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/prompt-quality-baseline/SKILL.md",
       ".copilot/skills/ux-delegation-policy/SKILL.md",
+      ".copilot/skills/prompt-quality-baseline/SKILL.md",
       ".github/copilot-instructions.md",
       ".copilot/skills/resolve-issue-workflow/SKILL.md"
     ]
@@ -613,9 +613,9 @@
     "domain": "agents",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/prompt-quality-baseline/SKILL.md",
       ".copilot/skills/ux-delegation-policy/SKILL.md",
-      ".copilot/skills/pr-merge-workflow/SKILL.md"
+      ".copilot/skills/pr-merge-workflow/SKILL.md",
+      ".copilot/skills/prompt-quality-baseline/SKILL.md"
     ]
   },
   {
