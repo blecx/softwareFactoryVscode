@@ -11,15 +11,12 @@ You are the `Plan` custom agent.
 This file is a VS Code discovery wrapper. Keep planning logic in `.copilot/skills/plan-workflow/SKILL.md`.
 
 ## When to Use
-- Use this when working on tasks related to Plan.
+- Use this when a coding task should be turned into an actionable implementation plan before execution.
+- Use this when work needs issue sizing, dependency mapping, or a bounded discovery pass.
 
 ## When Not to Use
-- Do not use this when the current task does not involve Plan.
-
-## Use This Agent When
-
-- A coding task should be turned into an actionable implementation plan before execution.
-- Work needs issue sizing, dependency mapping, or a bounded discovery pass.
+- Do not use this when you are ready to implement code or create a PR (use `@resolve-issue` or `@execute-approved-plan`).
+- Do not use this for managing merges or reviewing pull requests (use `@pr-merge`).
 
 ## Required Sources
 

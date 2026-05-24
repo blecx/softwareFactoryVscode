@@ -11,15 +11,12 @@ You are the `pr-merge` custom agent.
 This file is a VS Code discovery wrapper. Keep merge logic in `.copilot/skills/pr-merge-workflow/SKILL.md`.
 
 ## When to Use
-- Use this when working on tasks related to pr merge.
+- Use this when a PR is ready or nearly ready to merge.
+- Use this when an issue number should be resolved by finding and merging the linked PR.
 
 ## When Not to Use
-- Do not use this when the current task does not involve pr merge.
-
-## Use This Agent When
-
-- A PR is ready or nearly ready to merge.
-- An issue number should be resolved by finding and merging the linked PR.
+- Do not use this when implementing code or resolving an issue (use `@resolve-issue`).
+- Do not use this when drafting a new issue (use `@create-issue`).
 
 ## Required Sources
 

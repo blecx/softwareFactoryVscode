@@ -11,15 +11,12 @@ You are the `create-issue` custom agent.
 This file is a VS Code discovery wrapper. Keep issue-drafting logic in `.copilot/skills/issue-creation-workflow/SKILL.md`.
 
 ## When to Use
-- Use this when working on tasks related to create issue.
+- Use this when a new issue should be drafted or created.
+- Use this when large work should be split into reviewable issue slices.
 
 ## When Not to Use
-- Do not use this when the current task does not involve create issue.
-
-## Use This Agent When
-
-- A new issue should be drafted or created.
-- Large work should be split into reviewable issue slices.
+- Do not use this when actively implementing code for an existing issue (use `@resolve-issue` or `@execute-approved-plan`).
+- Do not use this when closing or reporting an outcome for a merged PR (use `@close-issue`).
 
 ## Required Sources
 
