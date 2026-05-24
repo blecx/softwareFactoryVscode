@@ -54,9 +54,7 @@ ACTIVE_COMMAND_TIMEOUT_SECONDS: int | None = None
 CANONICAL_PRODUCTION_PARITY_COMMAND = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
 )
-FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND = (
-    "./.venv/bin/python ./scripts/local_ci_parity.py --level production --fresh-checkout"
-)
+FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND = "./.venv/bin/python ./scripts/local_ci_parity.py --level production --fresh-checkout"
 DOCKER_BUILD_COMPATIBILITY_ALIAS = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build"
 )
@@ -211,6 +209,7 @@ class ProductionReadinessBundle:
     current_green_streak: int
     required_green_runs: int
     final_signoff_status: str
+    durable_evidence_hint: str
 
 
 class CommandTimeoutError(RuntimeError):
@@ -2227,6 +2226,7 @@ def build_production_readiness_summary_markdown(
         f"- Result source: `{report_data['result_source']}`",
         f"- Current run status: `{report_data['status']}`",
         f"- Final sign-off status: `{report_data['final_signoff_status']}`",
+        f"- Durable evidence pointer: `{report_data.get('durable_evidence_hint', 'none')}`",
         (
             "- Consecutive clean runs: "
             f"`{report_data['current_green_streak']}/{report_data['required_green_runs']}`"
@@ -2357,6 +2357,7 @@ def write_production_readiness_bundle(
         "status": "pass" if passed_run else "fail",
         "green_run": green_run,
         "final_signoff_status": final_signoff_status,
+        "durable_evidence_hint": f"ci-artifact-proof-{timestamp}-{head_rev[:8]}",
         "required_green_runs": PRODUCTION_READINESS_REQUIRED_GREEN_RUNS,
         "current_green_streak": current_green_streak,
         "base_rev": base_rev,
@@ -2393,6 +2394,7 @@ def write_production_readiness_bundle(
             "status": report_data["status"],
             "green_run": green_run,
             "final_signoff_status": final_signoff_status,
+            "durable_evidence_hint": report_data["durable_evidence_hint"],
             "current_green_streak": current_green_streak,
             "run_directory": str(run_directory),
         }
@@ -2413,6 +2415,7 @@ def write_production_readiness_bundle(
         current_green_streak=current_green_streak,
         required_green_runs=PRODUCTION_READINESS_REQUIRED_GREEN_RUNS,
         final_signoff_status=final_signoff_status,
+        durable_evidence_hint=report_data["durable_evidence_hint"],
     )
 
 
@@ -2434,6 +2437,7 @@ def print_production_readiness_bundle_summary(
         f"{bundle.current_green_streak}/{bundle.required_green_runs}"
     )
     print(f"final_signoff={bundle.final_signoff_status}")
+    print(f"durable_evidence_hint={bundle.durable_evidence_hint}")
 
 
 def parse_watchdog_seconds(value: str) -> int:
