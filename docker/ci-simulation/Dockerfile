@@ -13,9 +13,10 @@ LABEL factory.ci_simulation="true"
 LABEL factory.ci_simulation.github_ci_base="ubuntu-latest"
 LABEL factory.ci_simulation.python_version="3.13"
 
-# Install git — required by setup.sh, local_ci_parity.py, and pytest helpers
+# Install git and build tools — git required by setup.sh and pytest helpers;
+# build-essential required by numpy and other packages that compile C extensions
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends git build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Trust any bind-mounted repository path so git commands work inside the container
