@@ -100,6 +100,7 @@ def test_validation_runner_executes_resolved_baseline_plan_and_emits_structured_
         "required-internal-production-docs",
         "release-docs-policy",
         "release-manifest-parity",
+        "validate-ai-surfaces",
         "pytest-docs-workflow",
     )
     assert workflow_steps == (
