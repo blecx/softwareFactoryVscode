@@ -5112,3 +5112,29 @@ def test_no_duplicate_headings_in_ai_surfaces() -> None:
             assert (
                 not dupes
             ), f"File {p.relative_to(repo_root)} has duplicate headings: {dupes}"
+
+
+def test_adr_013_assessment_gate_is_enforced():
+    repo_root = Path(__file__).parent.parent
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    lowered = instructions.lower()
+
+    assert (
+        "adr-013-first assessment gate" in lowered
+    ), "Missing explicit ADR-013 gate title"
+    assert (
+        "production-readiness" in lowered
+    ), "Missing production-readiness in ADR-013 gate scope"
+    assert (
+        "architecture-authority" in lowered
+    ), "Missing architecture-authority in ADR-013 gate scope"
+    assert (
+        "workflow-harness" in lowered
+    ), "Missing workflow-harness in ADR-013 gate scope"
+    assert "agent-routing" in lowered, "Missing agent-routing in ADR-013 gate scope"
+    assert (
+        "derived projections unless an accepted adr explicitly says otherwise"
+        in lowered
+    ), "Missing rule for derived docs/handouts/maps"
