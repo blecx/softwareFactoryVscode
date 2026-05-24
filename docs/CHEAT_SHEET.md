@@ -4,7 +4,7 @@ A quick operator reference for the current namespace-first runtime model.
 
 Use this page when the install already exists and you want the shortest
 task/command lookup. For the first-time guided path, see
-[`HANDOUT.md`](HANDOUT.md); for the full install/update/readiness authority,
+[`HANDOUT.md`](HANDOUT.md); for the derived install/update readiness projection,
 see [`INSTALL.md`](INSTALL.md).
 
 ## 📋 VS Code tasks you will actually use

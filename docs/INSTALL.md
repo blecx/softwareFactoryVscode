@@ -4,7 +4,7 @@ This guide provides exactly how to install and bootstrap the `softwareFactoryVsc
 
 The Factory is designed to operate seamlessly via a "Harness Namespace Integration Model." When installed, it places itself under a `.copilot/softwareFactoryVscode/` hidden directory within your target project. It does **not** overwrite or pollute your existing `.vscode/`, `.github/`, or project files.
 
-Use this guide when you need the full install/update/readiness authority. The
+Use this guide when you need the derived install/update readiness projection. The
 primary docs intentionally split roles: [`../README.md`](../README.md) orients
 new readers, [`HANDOUT.md`](HANDOUT.md) walks through the first-run operator
 path, and [`CHEAT_SHEET.md`](CHEAT_SHEET.md) keeps the terse day-to-day command

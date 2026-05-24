@@ -1394,7 +1394,7 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     repo_root = Path(__file__).parent.parent
     install_doc = (repo_root / "docs" / "INSTALL.md").read_text(encoding="utf-8")
     assert (
-        "Use this guide when you need the full install/update/readiness authority."
+        "Use this guide when you need the derived install/update readiness projection."
         in install_doc
     )
     assert "This page keeps the long-form baseline in one place" in install_doc
@@ -1474,6 +1474,8 @@ def test_readme_tracks_version_aware_copilot_setup():
     assert "project/release orientation and high-level routing" in readme
     assert "guided first-run operator walkthrough" in readme
     assert "terse task and command reference" in readme
+    assert "Architecture Decision Records (ADRs) are the normative source" in readme
+    assert "readiness docs such as these are derived" in readme
     assert "promoted Docker E2E runtime proof lane" in readme
 
 
@@ -1483,9 +1485,9 @@ def test_primary_docs_use_summary_plus_linking_for_distinct_roles():
     install_doc = (repo_root / "docs" / "INSTALL.md").read_text(encoding="utf-8")
     handout = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
     cheat_sheet = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(encoding="utf-8")
-    assert "full install/update/readiness authority" in readme
+    assert "derived install/update readiness projection" in readme
     assert (
-        "Use this guide when you need the full install/update/readiness authority."
+        "Use this guide when you need the derived install/update readiness projection."
         in install_doc
     )
     assert "This handout is the guided first-run path" in handout
@@ -1496,7 +1498,7 @@ def test_primary_docs_use_summary_plus_linking_for_distinct_roles():
         in cheat_sheet
     )
     assert "For the first-time guided path" in cheat_sheet
-    assert "for the full install/update/readiness authority" in cheat_sheet
+    assert "for the derived install/update readiness projection" in cheat_sheet
 
 
 def test_overview_docs_route_to_operator_runbooks() -> None:
@@ -5165,3 +5167,13 @@ def test_production_readiness_adr013_alignment():
     assert "derived, operator-facing projection" in readiness_doc
     assert "not** override accepted ADRs" in readiness_doc
     assert "ADR-013" in readiness_doc
+
+
+def test_docs_readme_enforces_adr013_readiness_projection():
+    repo_root = Path(__file__).parent.parent
+    docs_readme = (repo_root / "docs" / "README.md").read_text(encoding="utf-8")
+    assert "Per `ADR-013`" in docs_readme
+    assert (
+        "Readiness material is maintained as derived operator-facing projections."
+        in docs_readme
+    )
