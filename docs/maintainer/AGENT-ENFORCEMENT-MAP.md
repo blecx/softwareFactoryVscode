@@ -22,6 +22,15 @@ and validation scripts remain the real source of truth.
   focused prompt surface for the same default fast evidence-first repair method
   already enforced by `@resolve-issue`, `@pr-merge`, and `@execute-approved-plan`.
 
+## AI surface authority and form reminder
+
+- Accepted ADRs own the AI-surface authority chain and the approved four-form canonical matrix.
+- This map is a plain-markdown maintainer index, not a discovery wrapper or authority source.
+- `.github/prompts/*` and canonical `.copilot/skills/*` belong to the structured module form; `.github/agents/*` wrappers belong either to the `chatagent` discovery-wrapper form or the thin discoverability-card form.
+- Preserve `chatagent` fences where the wrapper participates in active VS Code custom-agent discovery/runtime behavior.
+- Historical `<skill>` wrappers, duplicate headings, and other mixed metadata hybrids are drift to normalize, not extra approved forms.
+- Start new architecture decisions from `templates/docs/adr-template.md` and new derived surfaces from `templates/docs/ai-surface-template-checklist.md`.
+
 ## Major agent and workflow map
 
 | Workflow / entrypoint                                                             | Primary enforcement responsibility                                                                                                                                                                                                                     | Governing wrappers / skills                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Prompt entrypoints                                                                                                                                                                              | Templates / checkpoints / validation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Major ADRs / repo guardrails                                                                                                                                                                                                                                                                                                                                             |

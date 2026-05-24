@@ -22,6 +22,9 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Explicitly check `docs/architecture/` before mutating or refactoring installation paths, namespaces (e.g., `.copilot` vs root rules), communication protocols, or directory boundaries.
 - Treat boundaries like the `.copilot` subsystem directory and workspace environmental constraints (`.tmp`, `.factory.env`) as immutable mature structures that the code must defensively adapt to, not things you can discard when convenient.
 - When queue execution or interruption recovery is in play, treat `.tmp/github-issue-queue-state.md` plus a registered git worktree as the canonical execution anchor; a stale editor tab or stray `.tmp` snapshot is never enough evidence to resume work.
+- For AI-facing markdown surfaces (`.copilot/skills/*`, `.github/prompts/*`, `.github/agents/*`, and maintainer/reference docs), treat accepted ADRs as the only source that may define authority order or the approved four-form canonical matrix.
+- Preserve active discovery syntax such as fenced `chatagent` blocks unless an accepted ADR explicitly changes the discovery contract; do not strip or normalize wrappers on assumption alone.
+- When authoring new ADR-backed AI surfaces, start from `templates/docs/adr-template.md` for architecture decisions and `templates/docs/ai-surface-template-checklist.md` for downstream prompts, skills, and wrappers.
 
 ## 3. MCP-First Tool Routing
 

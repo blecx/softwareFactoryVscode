@@ -742,6 +742,97 @@ def test_new_adrs_capture_template_and_local_ci_contracts():
     assert "--include-docker-build" in adr_006
 
 
+def test_ai_surface_authority_chain_and_form_matrix_are_adr_backed() -> None:
+    repo_root = Path(__file__).parent.parent
+    adr_013 = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-013-Architecture-Authority-and-Plan-Separation.md"
+    ).read_text(encoding="utf-8")
+    adr_005 = (
+        repo_root / "docs" / "architecture" / "ADR-005-Strong-Templating-Enforcement.md"
+    ).read_text(encoding="utf-8")
+    instructions = (repo_root / ".github" / "copilot-instructions.md").read_text(
+        encoding="utf-8"
+    )
+    prompt_workflows = (
+        repo_root / "docs" / "maintainer" / "PROMPT-WORKFLOWS.md"
+    ).read_text(encoding="utf-8")
+    enforcement_map = (
+        repo_root / "docs" / "maintainer" / "AGENT-ENFORCEMENT-MAP.md"
+    ).read_text(encoding="utf-8")
+
+    assert "AI-facing markdown" in adr_013
+    assert "precedence order for AI-facing surfaces" in adr_013
+    assert ".github/copilot-instructions.md" in adr_013
+    assert ".copilot/skills/*" in adr_013
+    assert ".github/prompts/*" in adr_013
+    assert ".github/agents/*" in adr_013
+    assert "`chatagent` discovery wrapper" in adr_013
+    assert "embedded `<skill>` wrappers" in adr_013
+
+    assert "templates/docs/adr-template.md" in adr_005
+    assert "templates/docs/ai-surface-template-checklist.md" in adr_005
+    assert "placeholder instruction text" in adr_005
+
+    assert "approved four-form canonical matrix" in instructions
+    assert "chatagent" in instructions
+    assert "templates/docs/adr-template.md" in instructions
+    assert "templates/docs/ai-surface-template-checklist.md" in instructions
+
+    assert "structured module form" in prompt_workflows
+    assert "chatagent" in prompt_workflows
+    assert "templates/docs/adr-template.md" in prompt_workflows
+    assert "templates/docs/ai-surface-template-checklist.md" in prompt_workflows
+
+    assert "approved four-form canonical matrix" in enforcement_map
+    assert "Historical `<skill>` wrappers" in enforcement_map
+    assert "templates/docs/adr-template.md" in enforcement_map
+    assert "templates/docs/ai-surface-template-checklist.md" in enforcement_map
+
+
+def test_ai_surface_template_family_exists_with_required_forms() -> None:
+    repo_root = Path(__file__).parent.parent
+    adr_template = (repo_root / "templates" / "docs" / "adr-template.md").read_text(
+        encoding="utf-8"
+    )
+    surface_template = (
+        repo_root / "templates" / "docs" / "ai-surface-template-checklist.md"
+    ).read_text(encoding="utf-8")
+
+    for heading in [
+        "# ADR-XXX:",
+        "## Status",
+        "## Context",
+        "## Decision",
+        "## Downstream projections",
+        "## Consequences",
+    ]:
+        assert heading in adr_template
+
+    for marker in [
+        "## Choose the approved canonical form",
+        "Form A",
+        "Form B",
+        "Form C",
+        "Form D",
+        "## Structured module template",
+        "## `chatagent` discovery wrapper template",
+        "## Thin discoverability card template",
+        "## Anti-drift checklist",
+    ]:
+        assert marker in surface_template
+
+    normalized_surface = _normalize_text(surface_template)
+    assert "placeholder instruction text" in normalized_surface
+    assert "duplicate headings" in normalized_surface
+    assert "accepted adr" in normalized_surface
+    assert ".github/prompts/*" in surface_template
+    assert ".copilot/skills/*" in surface_template
+    assert ".github/agents/*" in surface_template
+
+
 def test_queue_skills_reference_historical_guardrails():
     repo_root = Path(__file__).parent.parent
     for path in [
