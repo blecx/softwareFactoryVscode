@@ -126,7 +126,7 @@ tests and opt-in Docker-backed proofs:
 | Reload / reopen recovery           | `test_build_runtime_config_preserves_persisted_ports_when_workspace_reopens` in `tests/test_factory_install.py`                                       | Not required for the practical baseline; this is metadata/config recovery rather than live container truth.           | Reopening a workspace preserves the persisted port/runtime contract without implying hidden auto-start behavior.                                       |
 
 The canonical production-grade parity command
-`./.venv/bin/python ./scripts/local_ci_parity.py --mode production` now runs a
+`./.venv/bin/python ./scripts/local_ci_parity.py --level production` now runs a
 promoted blocking subset of these Docker-backed lifecycle proofs:
 
 - `test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks`
@@ -145,12 +145,12 @@ is:
 
 ```bash
 ./.venv/bin/pytest tests/test_regression.py -v
-./.venv/bin/python ./scripts/local_ci_parity.py
-./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+./.venv/bin/python ./scripts/local_ci_parity.py --level merge
+./.venv/bin/python ./scripts/local_ci_parity.py --level production
 RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace" -v
 ```
 
-`./.venv/bin/python ./scripts/local_ci_parity.py --mode production` now covers
+`./.venv/bin/python ./scripts/local_ci_parity.py --level production` now covers
 the promoted strict-tenant, stop/cleanup, and backup/restore Docker E2E scenarios.
 Use the extra `RUN_DOCKER_E2E=1` command when the claim also depends on the
 multi-workspace activation / switch-back proof.

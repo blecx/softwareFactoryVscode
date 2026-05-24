@@ -177,10 +177,10 @@ overview to action, these are the canonical operator runbooks:
 
 ```bash
 # Default faster local parity baseline (Docker build parity stays a warning-only skip here)
-./.venv/bin/python ./scripts/local_ci_parity.py
+./.venv/bin/python ./scripts/local_ci_parity.py --level merge
 
 # Canonical internal production gate — Docker parity & recovery proofs (blocking Docker image builds + promoted Docker E2E runtime proofs + sign-off bundle)
-./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+./.venv/bin/python ./scripts/local_ci_parity.py --level production
 
 # CI exposes diagnosable production jobs first, then the canonical aggregate gate:
 # - Production Docs Contract
@@ -188,7 +188,7 @@ overview to action, these are the canonical operator runbooks:
 # - Production Runtime Proofs
 # - Internal Production Gate — Docker Parity & Recovery Proofs
 
-# Diagnostic production-group replay surfaces (do not refresh canonical sign-off bundle)
+# Diagnostic production-group replay surfaces (compatibility aliases, do not refresh canonical sign-off bundle)
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group docs-contract
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group docker-builds
 ./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group runtime-proofs
@@ -231,8 +231,8 @@ and sign-off discipline, see [`INSTALL.md`](INSTALL.md) and
 
 ```bash
 ./.venv/bin/pytest tests/test_regression.py -v
-./.venv/bin/python ./scripts/local_ci_parity.py
-./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+./.venv/bin/python ./scripts/local_ci_parity.py --level merge
+./.venv/bin/python ./scripts/local_ci_parity.py --level production
 RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace" -v
 ```
 

@@ -52,10 +52,10 @@ GIT_IDENTITY_GUARD_COMMAND = "./scripts/verify_git_identity.py"
 DEFAULT_WATCHDOG_SECONDS = 45 * 60
 ACTIVE_COMMAND_TIMEOUT_SECONDS: int | None = None
 CANONICAL_PRODUCTION_PARITY_COMMAND = (
-    "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+    "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
 )
 FRESH_CHECKOUT_PRODUCTION_PARITY_COMMAND = (
-    "./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout"
+    "./.venv/bin/python ./scripts/local_ci_parity.py --level production --fresh-checkout"
 )
 DOCKER_BUILD_COMPATIBILITY_ALIAS = (
     "./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build"
@@ -2891,7 +2891,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 "\nℹ️ "
-                f"{warning} Run `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` "
+                f"{warning} Run `./.venv/bin/python ./scripts/local_ci_parity.py --level production` "
                 "(or `--include-docker-build`) for blocking container-build parity."
             )
             findings.append(

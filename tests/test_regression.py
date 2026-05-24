@@ -1422,9 +1422,9 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     assert "closes the MCP harness readiness baseline" in install_doc
     assert "Reproducible closeout evidence for this baseline is:" in install_doc
     assert "./.venv/bin/pytest tests/test_regression.py -v" in install_doc
-    assert "./.venv/bin/python ./scripts/local_ci_parity.py" in install_doc
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in install_doc
     assert (
-        "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
         in install_doc
     )
     assert (
@@ -2537,7 +2537,7 @@ def test_python_writer_formatter_guardrail_is_documented() -> None:
     assert "run **Black itself** before treating the save as complete" in tests_readme
     assert "not silently upgraded into the default local-CI-parity" in tests_readme
     assert (
-        "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
         in tests_readme
     )
     assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in tests_readme
@@ -2628,9 +2628,9 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "Retained images after `stop` or `cleanup` are expected" in cheat_sheet
     assert "## ✅ Readiness closeout evidence" in cheat_sheet
     assert "./.venv/bin/pytest tests/test_regression.py -v" in cheat_sheet
-    assert "./.venv/bin/python ./scripts/local_ci_parity.py" in cheat_sheet
+    assert "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in cheat_sheet
     assert (
-        "./.venv/bin/python ./scripts/local_ci_parity.py --mode production"
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
         in cheat_sheet
     )
     assert "--mode production --production-group docs-contract" in cheat_sheet
@@ -3490,7 +3490,7 @@ def test_local_ci_parity_warnings_do_not_fail_the_standard_precheck(
     assert exit_code == 0
     assert "Summary: 0 error(s), 1 warning(s)." in captured.out
     assert "[WARNING] Docker image build parity" in captured.out
-    assert "--mode production" in captured.out
+    assert "--level production" in captured.out
     assert "Improvement plan" in captured.out
     assert "passed with 1 warning(s)" in captured.out
 
@@ -3586,7 +3586,7 @@ def test_local_ci_parity_production_mode_reports_docker_build_failures_as_blocki
     assert exit_code == 1
     assert "[ERROR] Docker image build parity" in captured.out
     assert "demo-service" in captured.out
-    assert "--mode production" in captured.out
+    assert "--level production" in captured.out
     assert not docker_e2e_called
 
 
@@ -4426,7 +4426,7 @@ def test_local_ci_parity_production_mode_missing_docker_cli_mentions_canonical_c
     assert (
         "Docker CLI is required for blocking Docker image build parity" in captured.out
     )
-    assert "--mode production" in captured.out
+    assert "--level production" in captured.out
     assert "--include-docker-build" in captured.out
 
 

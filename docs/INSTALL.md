@@ -95,8 +95,8 @@ Reproducible closeout evidence for this baseline is:
 
 ```text
 ./.venv/bin/pytest tests/test_regression.py -v
-./.venv/bin/python ./scripts/local_ci_parity.py
-./.venv/bin/python ./scripts/local_ci_parity.py --mode production
+./.venv/bin/python ./scripts/local_ci_parity.py --level merge
+./.venv/bin/python ./scripts/local_ci_parity.py --level production
 RUN_DOCKER_E2E=1 ./.venv/bin/pytest tests/test_throwaway_runtime_docker.py -k "activate_switch_back_keeps_one_active_workspace" -v
 ```
 
@@ -139,9 +139,9 @@ For local validation, rely on the **four-level mirrored validation contract**. L
 
 - `./.venv/bin/python ./scripts/local_ci_parity.py --level <focused-local|pr-update|merge|production>` is the canonical shared-engine local mirror entrypoint. It prints a stable `key=value` projection of the resolved official bundle structure so operators can see selected bundles, reasons, watchdog budgets, timeout kinds, applicable local-vs-GitHub exceptions, and when `--fresh-checkout` is the exact GitHub-parity replay surface.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --level production` is the canonical internal production-readiness gate, surfaced in CI as `Internal Production Gate — Docker Parity & Recovery Proofs`, and includes blocking Docker image builds, the promoted Docker E2E runtime proof lane (including backup/restore roundtrip evidence), required internal-production docs/runbooks presence checks, and a concise sign-off bundle under `.tmp/production-readiness/`.
-- `./.venv/bin/python ./scripts/local_ci_parity.py` (no flags) is the legacy faster local precheck (superseded by `--level merge` and `--level pr-update`).
-- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group <docs-contract|docker-builds|runtime-proofs>` runs one named production-only diagnostic slice at a time without redefining readiness authority; these diagnostic runs are for targeted replay and do **not** refresh the canonical sign-off bundle.
-- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout` replays that same production gate from a clean git worktree after `./setup.sh`, which is the closest local match to GitHub Actions when you want merge-grade parity evidence before pushing.
+- `./.venv/bin/python ./scripts/local_ci_parity.py` (no flags) is a compatibility/diagnostic alias for the legacy faster local precheck (superseded by `--level merge` and `--level pr-update`).
+- `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --production-group <docs-contract|docker-builds|runtime-proofs>` is a compatibility/diagnostic surface that runs one named production-only diagnostic slice at a time without redefining readiness authority; these diagnostic runs are for targeted replay and do **not** refresh the canonical sign-off bundle.
+- `./.venv/bin/python ./scripts/local_ci_parity.py --level production --fresh-checkout` replays that same production gate from a clean git worktree after `./setup.sh`, which is the closest local match to GitHub Actions when you want merge-grade parity evidence before pushing.
 - `./.venv/bin/python ./scripts/local_ci_parity.py --include-docker-build` remains available as a compatibility alias when you only need the Docker build expansion path without the promoted Docker E2E lane.
 
 In GitHub Actions, production checks are now exposed as diagnosable jobs (`Production Docs Contract`, `Production Docker Build Parity`, and `Production Runtime Proofs`) followed by the canonical aggregate gate (`Internal Production Gate — Docker Parity & Recovery Proofs`). The aggregate gate remains the contract-facing sign-off authority, but CI now refreshes that sign-off bundle from the successful production diagnostics instead of replaying the same production lanes again on the critical path.
