@@ -10,10 +10,12 @@ You are the `close-issue` custom agent.
 This file is a VS Code discovery wrapper. Keep closure logic in `.copilot/skills/close-issue-workflow/SKILL.md`.
 
 ## When to Use
-- Use this when working on tasks related to close issue.
+- Use this when an issue outcome is already decided and should be closed with correct traceability.
+- Use this when a merged PR should be reflected in a high-quality issue closing comment.
 
 ## When Not to Use
-- Do not use this when the current task does not involve close issue.
+- Do not use this when implementing code or resolving an issue into a PR (use `@resolve-issue`).
+- Do not use this when drafting a new issue (use `@create-issue`).
 
 ## Required Sources
 - `.copilot/skills/close-issue-workflow/SKILL.md`
@@ -28,7 +30,3 @@ This file is a VS Code discovery wrapper. Keep closure logic in `.copilot/skills
 
 ## Completion Contract
 Return the issue number, verified outcome, close reason, PR or commit traceability, and final close status or blocker.
-
-## Use This Agent When
-- An issue outcome is already decided and should be closed with correct traceability.
-- A merged PR should be reflected in a high-quality issue closing comment.

@@ -104,3 +104,49 @@ def test_p0_routing_phrases():
         pytest.fail(
             "Found missing required P0 routing phrases:\n" + "\n".join(failures)
         )
+
+
+def test_weak_body_patterns():
+    if not CATALOG_PATH.exists():
+        pytest.skip(f"Catalog not found at {CATALOG_PATH}")
+
+    with open(CATALOG_PATH, "r", encoding="utf-8") as f:
+        catalog = json.load(f)
+
+    failures = []
+
+    # We want to check P1 wrappers specifically, but we can just check all agents
+    # that are not in UX/tutorial (since the issue said "Do not touch UX/tutorial surfaces in this slice").
+    # For now, let's just check `.github/agents/*.md` excluding `tutorial-*.md`
+    for entry in catalog:
+        file_path = entry.get("file", "")
+
+        # Only check .github/agents
+        if not file_path.startswith(".github/agents/"):
+            continue
+
+        if (
+            "tutorial-" in file_path
+            or "ralph-agent" in file_path
+            or "wiki" in file_path
+        ):
+            continue
+
+        full_path = REPO_ROOT / file_path
+        if not full_path.exists():
+            continue
+
+        with open(full_path, "r", encoding="utf-8") as f:
+            body = f.read()
+
+        for pattern in [r"tasks related to", r"current task does not involve"]:
+            if re.search(pattern, body, re.IGNORECASE):
+                failures.append(
+                    f"{file_path}: matched weak pattern '{pattern}' inside body."
+                )
+                break
+
+    if failures:
+        pytest.fail(
+            "Found generic wording inside AI surface body:\n" + "\n".join(failures)
+        )
