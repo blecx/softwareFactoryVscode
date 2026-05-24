@@ -1,6 +1,8 @@
 # Internal Production Readiness Contract
 
-This document is the canonical operator-facing contract for when `softwareFactoryVscode` may be described as production ready.
+This document is a derived, operator-facing projection over the repository's accepted architecture decision records (ADRs), implementation evidence, and verified configuration scripts. It explains when `softwareFactoryVscode` may be practically described as production ready.
+
+It does **not** override accepted ADRs, redefine architectural terminology, or serve as the normative source of architecture guardrails. Per `ADR-013`, if this document conflicts with an accepted ADR, the ADR is the authoritative source of truth.
 
 `docs/PRODUCTION-READINESS-PLAN.md` is the implementation roadmap for reaching this contract. It is not the readiness authority by itself.
 
@@ -194,6 +196,7 @@ At minimum, the final evidence bundle must include:
 `softwareFactoryVscode` may be described as ready for **internal self-hosted production** only when all blocking requirements are implemented, the canonical internal production-readiness gate is green locally and in CI, and three consecutive clean runs have been recorded without waiving blockers.
 
 Anything less than that is a baseline, an in-progress hardening state, or a roadmap milestone — not a final production claim.
+
 - Production Docs Contract
 - Production Docker Build Parity
 - Production Runtime Proofs

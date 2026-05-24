@@ -5154,3 +5154,14 @@ def test_adr_013_assessment_gate_is_enforced():
         "derived projections unless an accepted adr explicitly says otherwise"
         in lowered
     ), "Missing rule for derived docs/handouts/maps"
+
+
+def test_production_readiness_adr013_alignment():
+    """Ensure PRODUCTION-READINESS.md claims it is an ADR-derived projection and does not override ADRs per ADR-013."""
+    repo_root = Path(__file__).parent.parent
+    readiness_doc = (repo_root / "docs" / "PRODUCTION-READINESS.md").read_text(
+        encoding="utf-8"
+    )
+    assert "derived, operator-facing projection" in readiness_doc
+    assert "not** override accepted ADRs" in readiness_doc
+    assert "ADR-013" in readiness_doc
