@@ -5352,3 +5352,29 @@ def test_adr_016_workflow_language_policy_present():
         encoding="utf-8"
     )
     assert "ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md" in adr_index
+
+
+def test_workflow_ubiquitous_language_guide_anchors():
+    """Ensure the WORKFLOW-UBIQUITOUS-LANGUAGE maintainer guide exists, is non-normative, and lists required ambiguous examples."""
+    from pathlib import Path
+
+    guide_path = (
+        Path(__file__).parent.parent
+        / "docs"
+        / "maintainer"
+        / "WORKFLOW-UBIQUITOUS-LANGUAGE.md"
+    )
+    assert guide_path.exists(), "WORKFLOW-UBIQUITOUS-LANGUAGE.md guide must exist"
+    content = guide_path.read_text(encoding="utf-8")
+
+    assert "ADR-013" in content, "Guide must reference ADR-013 for non-normative status"
+    assert "ADR-016" in content, "Guide must reference ADR-016 for policy"
+    assert "config" in content.lower(), "Guide must mention workflow language config"
+
+    # Assert expected examples are represented
+    assert "execute the plan" in content.lower()
+    assert "continue" in content.lower()
+    assert "ready" in content.lower()
+    assert "closeout" in content.lower()
+    assert "bypass" in content.lower()
+    assert "production ready" in content.lower()
