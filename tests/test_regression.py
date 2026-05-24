@@ -5242,6 +5242,9 @@ def test_production_readiness_checklist_anchors():
     assert (
         "non-normative" in content
     ), "Checklist must declare itself explicitly non-normative"
+    assert (
+        "production_readiness_score.py" in content
+    ), "Checklist must explicitly demand script execution"
 
 
 def test_production_readiness_review_template_fields() -> None:
@@ -5255,7 +5258,8 @@ def test_production_readiness_review_template_fields() -> None:
     assert "derived docs checked" in template.lower()
     assert "mismatch classification" in template.lower()
     assert "signoff evidence" in template.lower()
-    assert "score" in template.lower()
+    assert "score (required)" in template.lower()
+    assert "production_readiness_score.py" in template.lower()
     assert "blockers" in template.lower()
     assert "adr_013_loaded" in template.lower()
     assert (
@@ -5388,6 +5392,7 @@ def test_subagent_no_op_fallback_routing_rule_is_documented():
     assert "silent subagent no-op triggers exactly one targeted retry" in workflow_doc
     assert "direct per-issue routing or a hard blocker" in workflow_doc
     assert (
-        "not** silently drift back into unbounded `execute-approved-plan`" in workflow_doc
+        "not** silently drift back into unbounded `execute-approved-plan`"
+        in workflow_doc
     )
     assert "forbids drifting to bypass or unbounded plan execution" in workflow_doc

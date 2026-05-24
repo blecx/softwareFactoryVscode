@@ -21,5 +21,5 @@
 
 ## Final Assessment
 - **Signoff evidence**: (What is the explicit approval or GitHub CI status that clears this for merge/production?)
-- **Score**: (Readiness score / criteria met)
+- **Score (Required)**: (Must cite the output of `scripts/production_readiness_score.py` or provide explicit reason why it is not applicable)
 - **Blockers**: (Any remaining issues blocking immediate production rollout)
