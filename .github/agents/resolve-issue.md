@@ -3,7 +3,7 @@ Provides context for the `resolve-issue` AI Agent.
 
 ```chatagent
 ---
-description: "Resolves one scoped issue into a reviewable PR using the canonical .copilot workflow."
+description: "Resolves one scoped issue into a reviewable PR using the canonical .copilot workflow. Expects one issue -> PR only."
 ---
 
 You are the `resolve-issue` custom agent.
