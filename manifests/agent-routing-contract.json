@@ -1,0 +1,74 @@
+[
+  {
+    "agent": "@plan",
+    "task_kinds": ["planning"],
+    "authority_rank": 10,
+    "canonical_skill": ".copilot/skills/plan-workflow/SKILL.md",
+    "requirements": ["issue_number"],
+    "forbidden_routes": ["@harness-bypass-resolution"],
+    "human_only": false
+  },
+  {
+    "agent": "@resolve-issue",
+    "task_kinds": ["implementation", "workflow"],
+    "authority_rank": 10,
+    "canonical_skill": ".copilot/skills/resolve-issue-workflow/SKILL.md",
+    "requirements": ["issue_number"],
+    "forbidden_routes": ["@harness-bypass-resolution"],
+    "human_only": false
+  },
+  {
+    "agent": "@pr-merge",
+    "task_kinds": ["workflow", "merge"],
+    "authority_rank": 10,
+    "canonical_skill": ".copilot/skills/pr-merge-workflow/SKILL.md",
+    "requirements": ["ready_pr"],
+    "forbidden_routes": ["@harness-bypass-resolution"],
+    "human_only": false
+  },
+  {
+    "agent": "@execute-approved-plan",
+    "task_kinds": ["workflow", "orchestration"],
+    "authority_rank": 5,
+    "canonical_skill": ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+    "requirements": ["approved_plan"],
+    "forbidden_routes": ["@harness-bypass-resolution"],
+    "human_only": false
+  },
+  {
+    "agent": "@execute-approved-umbrella",
+    "task_kinds": ["workflow", "orchestration"],
+    "authority_rank": 5,
+    "canonical_skill": ".copilot/skills/approved-plan-execution-workflow/SKILL.md",
+    "requirements": ["approved_umbrella"],
+    "forbidden_routes": ["@harness-bypass-resolution"],
+    "human_only": false
+  },
+  {
+    "agent": "@queue-backend",
+    "task_kinds": ["workflow", "orchestration"],
+    "authority_rank": 5,
+    "canonical_skill": ".copilot/skills/backend-queue-workflow/SKILL.md",
+    "requirements": ["queue_checkpoint"],
+    "forbidden_routes": ["@harness-bypass-resolution"],
+    "human_only": false
+  },
+  {
+    "agent": "@queue-phase-2",
+    "task_kinds": ["workflow", "orchestration"],
+    "authority_rank": 5,
+    "canonical_skill": ".copilot/skills/phase-2-queue-workflow/SKILL.md",
+    "requirements": ["queue_checkpoint"],
+    "forbidden_routes": ["@harness-bypass-resolution"],
+    "human_only": false
+  },
+  {
+    "agent": "@harness-bypass-resolution",
+    "task_kinds": ["bypass", "recovery"],
+    "authority_rank": 0,
+    "canonical_skill": ".copilot/skills/harness-bypass/SKILL.md",
+    "requirements": [],
+    "forbidden_routes": [],
+    "human_only": true
+  }
+]
