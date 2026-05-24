@@ -12,3 +12,8 @@ This packet is consumed by implementation/review agents and `blecs-ux-authority`
 
 User request:
 $ARGUMENTS
+
+
+## Required Sources
+
+- `.github/copilot-instructions.md`

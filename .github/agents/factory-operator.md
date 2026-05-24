@@ -26,3 +26,5 @@ You are the `factory-operator` custom agent.
 ## Use This Agent When
 - A user wants to run specific Factory Python scripts, interact with the API, or modify agent implementations in `agents/`.
 - Heavy administrative tasks, validations, and test suites need to be orchestrated via the integrated terminal.
+## Required Sources
+- .copilot/skills/resolve-issue-workflow/SKILL.md

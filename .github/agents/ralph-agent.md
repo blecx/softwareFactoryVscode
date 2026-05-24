@@ -28,4 +28,7 @@ This file is a VS Code discovery wrapper. Keep execution logic aligned with `age
 
 - Enforce strict acceptance validation.
 - Block PR completion until all review gates are satisfied.
+## Required Sources
+
+- `.github/copilot-instructions.md`
 ```

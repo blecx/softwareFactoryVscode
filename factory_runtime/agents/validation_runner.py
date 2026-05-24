@@ -539,6 +539,19 @@ class ValidationRunner:
                         "--check",
                     ),
                 ),
+                lambda deadline: self._execute_subprocess_step(
+                    request,
+                    bundle,
+                    deadline,
+                    step_id="validate-ai-surfaces",
+                    summary="Validate AI surface structure and write catalog manifest.",
+                    command=(
+                        request.python_executable,
+                        "./scripts/validate-ai-surfaces.py",
+                        "--repo-root",
+                        ".",
+                    ),
+                ),
                 lambda deadline: self._execute_cached_step(
                     "pytest-docs-workflow",
                     lambda: self._execute_subprocess_step(
