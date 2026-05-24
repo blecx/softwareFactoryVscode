@@ -216,11 +216,11 @@ Routing rule:
   before asking GitHub to enforce the same template in CI.
 - For PR/CI truth, use `./.venv/bin/python ./scripts/noninteractive_gh.py ...` as the canonical helper and carry those exact command(s), selector(s), and current result summary into `.tmp/github-issue-queue-state.md` under `last_github_truth`.
 - The canonical blocking production-grade parity command is
-  `./.venv/bin/python ./scripts/local_ci_parity.py --mode production`; it now
+  `./.venv/bin/python ./scripts/local_ci_parity.py --level production`; it now
   includes Docker image builds plus the promoted Docker E2E runtime proof lane.
 - When you need the closest local replay of GitHub's checkout/bootstrap surface
   before merge, run
-  `./.venv/bin/python ./scripts/local_ci_parity.py --mode production --fresh-checkout`.
+  `./.venv/bin/python ./scripts/local_ci_parity.py --level production --fresh-checkout`.
 - Docker image build parity remains intentionally optional for the default
   local precheck path due host/runtime constraints.
 - `--include-docker-build` remains the build-only compatibility alias when you
@@ -249,7 +249,7 @@ evidence bundle is:
 ```
 
 The promoted strict-tenant plus stop/cleanup subset is already part of
-`./.venv/bin/python ./scripts/local_ci_parity.py --mode production`. Add the
+`./.venv/bin/python ./scripts/local_ci_parity.py --level production`. Add the
 targeted `RUN_DOCKER_E2E=1` lifecycle proofs from `tests/README.md` whenever
 the slice depends on other real container/image state, such as explicit
 multi-workspace activation truth.
