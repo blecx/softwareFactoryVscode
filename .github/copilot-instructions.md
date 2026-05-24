@@ -35,7 +35,7 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 
 ## 4. Defensive and Resilient Coding
 
-- Mature components expect hostile environments. Do not assume folders (like `.tmp`) haven't been deleted or that environment variables won't behave unexpectedly.
+
 - Write defensive code that seamlessly recovers from transient state loss (e.g., `mkdir -p` before acting) rather than failing the toolchain when things aren't "perfect".
 - For generated or rewritten Python source, use the repository's **actual formatter** with an explicit interpreter (`./.venv/bin/python -m black`, `python3 -m black`, or the Black library) before treating the write as complete. Do **not** hand-format Python output, rely on bare `python`, or treat newline-only normalization as a substitute for Black.
 - Repo-owned writer surfaces that persist Python files for issue resolution should invoke Black-compatible formatting at save time when formatter-enforced mode is required, so later `black --check` acts as confirmation rather than surprise.
@@ -71,12 +71,7 @@ When diagnosing and fixing issues, you must prioritize compliance with the repos
 - Refresh GitHub truth immediately before readiness, merge, queue-advance, or blocker narration. Do not narrate PR state from memory, stale checkpoint values, earlier terminal output, or terminal silence.
 - When a PR exists, require the GitHub PR head branch to match the current local branch and the checkpoint `active_branch`; treat any mismatch as a blocker that requires re-anchor before continuing.
 - Inspect the exact failing check, job, and step metadata before deciding on root cause. Do not guess from job titles alone.
-- For PR-creation, local-precheck, or GitHub CI failure repair, the repository default is the fast evidence-first ladder documented in `.github/prompts/pr-error-resolve-tactic.prompt.md`: parse the exact current failure output before rerunning anything, read the exact failing file/test/method when the output identifies it, reproduce the cheapest failing gate first, and widen validation only after the narrower gate passes.
-- Default repair ladder (**formatter-first**): touched-file formatter check → single failing test/file → touched-test bundle → focused local parity → broader PR/merge validation. When Python formatting drift is plausible, prove the formatter gate is green before widening to tests or parity. Do **not** start with broad repo scans or full parity when a narrower deterministic gate already exists.
-- Guessing, hallucinating missing state, or narrating stale failure context from memory are non-compliant. If the current output is ambiguous, stop and gather clearer evidence instead of inventing a repair story.
-- Before any follow-up repair change after a failed validation, quote the exact failing command, the relevant error text, and the suspected root cause from fresh evidence.
-- After one failed hypothesis, gather new evidence before applying another code change. Do not fall into trial-and-error churn, and do not make a second repair change without refreshed evidence from the new failure state.
-- If parsing, piping, or terminal behavior makes the result ambiguous, stop and report the ambiguity instead of continuing on guessed state.
+- See `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md` for shared cross-cutting rules: `.tmp` usage, the fast evidence-first and formatter-first repair tactics, and fresh GitHub-truth requirements.
 
 Remember: **You solve nothing if you fix one bug by creating architectural debt or violating design guardrails.**
 

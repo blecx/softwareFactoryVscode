@@ -64,6 +64,14 @@ We mandate **local CI-parity prechecks** before remote validation is used as a m
 - **Rule:** Local prechecks are required not only for code quality but also to reduce avoidable GitHub Actions consumption, shorten feedback loops, and lower operational cost.
 - **Rule:** Future workflow simplifications MUST preserve this cost-control principle.
 
+
+### 6. Shared Diagnostic and Execution State Rules (Deduplicated Cross-Cutting Rules)
+
+- **Rule (Evidence-First):** For PR-creation, local-precheck, or GitHub CI failure repair, workflows MUST use the fast evidence-first repair tactic. Parse exact failing commands/output, reproduce the cheapest failing gate first, and widen validation only after the narrower gate passes. Avoid trial-and-error churn, guessing, or broad repo scans.
+- **Rule (Formatter-First):** The explicit default narrow repair path is **formatter-first**. For Python formatting drift, run Black/isort on touched Python files to prove the formatter gate is green before widening to tests or parity.
+- **Rule (GitHub Truth):** Workflows must rely on exact, fresh GitHub truth (e.g., `pr-view`, `pr-checks`) immediately before readiness or merge narration. Do not rely on stale checkpoint values, memory, prior terminal output, or terminal silence. The GitHub PR head branch MUST match the current local branch and the checkpoint `active_branch`.
+- **Rule (Workspace Isolation):** Generation and state persistence MUST use the repository-owned `.tmp/` directory to preserve artifact boundaries. Workflows must NEVER use the system `/tmp` directory.
+
 ## Consequences
 
 - PR readiness now includes “expected CI compatibility has been demonstrated locally.”
