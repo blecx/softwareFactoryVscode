@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Agent Routing Contract",
+  "description": "Schema for defining machine-readable agent routing rules.",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "type": "string",
+      "description": "The name or identifier of the agent."
+    },
+    "task_kinds": {
+      "type": "array",
+      "description": "List of task categories this agent is meant to handle.",
+      "items": { "type": "string" }
+    },
+    "authority_rank": {
+      "type": "integer",
+      "description": "Rank of the agent's authority."
+    },
+    "canonical_skill": {
+      "type": "string",
+      "description": "The path or reference to the canonical skill module documentation."
+    },
+    "requirements": {
+      "type": "array",
+      "description": "A list of prerequisite requirements for executing this agent's task.",
+      "items": { "type": "string" }
+    },
+    "forbidden_routes": {
+      "type": "array",
+      "description": "A list of routes or paths that this agent is strictly forbidden to take.",
+      "items": { "type": "string" }
+    },
+    "human_only": {
+      "type": "boolean",
+      "description": "Flag to mark if the agent can only be explicitly invoked by human operators."
+    }
+  },
+  "required": [
+    "agent",
+    "task_kinds",
+    "authority_rank",
+    "canonical_skill",
+    "requirements",
+    "forbidden_routes"
+  ],
+  "additionalProperties": false
+}
