@@ -5205,3 +5205,23 @@ def test_production_readiness_checklist_anchors():
     assert (
         "non-normative" in content
     ), "Checklist must declare itself explicitly non-normative"
+
+
+def test_production_readiness_review_template_fields() -> None:
+    repo_root = Path(__file__).parent.parent
+    template = (
+        repo_root / "templates" / "docs" / "production-readiness-review.md"
+    ).read_text(encoding="utf-8")
+    assert "ADR sources" in template or "adr sources" in template.lower()
+    assert "implementation sources" in template.lower()
+    assert "validation sources" in template.lower()
+    assert "derived docs checked" in template.lower()
+    assert "mismatch classification" in template.lower()
+    assert "signoff evidence" in template.lower()
+    assert "score" in template.lower()
+    assert "blockers" in template.lower()
+    assert "adr_013_loaded" in template.lower()
+    assert (
+        "authority-chain" in template.lower() or "authority chain" in template.lower()
+    )
+    assert "docs-only assessment is" in template.lower() and "invalid" in template.lower()
