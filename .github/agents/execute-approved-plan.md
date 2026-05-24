@@ -31,6 +31,7 @@ This wrapper is the hardened specialized entry surface for approved-plan aliases
 
 ## Hard Rules
 
+- Require executing workflow preflight or manifest-backed routing checks before action.
 - Only run a bounded, explicit, GitHub-backed issue set.
 - Keep one issue per PR and one PR per merge.
 - Reuse the canonical `resolve-issue` → `pr-merge` slice path for every issue in the plan; do not invent a plan-specific implementation or merge process.
