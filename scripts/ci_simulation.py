@@ -343,12 +343,13 @@ def create_simulation_checkout(repo_root: Path, worktree_parent: Path) -> Path |
         shutil.rmtree(checkout_path, ignore_errors=True)
 
     # Create shallow clone of the current HEAD
-    # depth=1 and --single-branch minimize disk usage while maintaining a valid git repo
+    # depth=2 is needed because validation runs with base_rev=HEAD^ (parent commit)
+    # depth=1 would make HEAD^ unavailable, causing git to fail finding changed files
     result = subprocess.run(
         [
             "git",
             "clone",
-            "--depth=1",
+            "--depth=2",
             "--single-branch",
             "--branch=" + subprocess.run(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"],
