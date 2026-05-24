@@ -127,3 +127,46 @@ def test_execution_terms_coverage(workflow_schema):
             len(term_data.get("forbidden_interpretations", [])) > 0
         ), f"{term} needs forbidden_interpretations"
         assert "ambiguity_action" in term_data, f"{term} needs ambiguity_action"
+
+
+def test_ambiguity_sensitive_terms_have_guardrails(workflow_schema):
+    import yaml
+
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    required_phrases = {
+        "plan",
+        "continue",
+        "ready",
+        "closeout",
+        "bypass",
+        "production ready",
+    }
+    found_phrases = set()
+
+    for term in config["terms"]:
+        term_phrases = term.get("allowed_phrases", [])
+
+        # Check if this term covers any of the required phrases
+        is_ambiguity_sensitive = False
+        for phrase in required_phrases:
+            if phrase in term_phrases:
+                found_phrases.add(phrase)
+                is_ambiguity_sensitive = True
+
+        if is_ambiguity_sensitive:
+            assert (
+                len(term.get("forbidden_interpretations", [])) > 0
+            ), f"Ambiguity-sensitive term '{term['term_id']}' lacks forbidden interpretations."
+            assert (
+                len(term.get("required_evidence", [])) > 0
+            ), f"Ambiguity-sensitive term '{term['term_id']}' lacks required evidence."
+            assert (
+                "ambiguity_action" in term
+            ), f"Ambiguity-sensitive term '{term['term_id']}' lacks ambiguity_action."
+
+    missing_phrases = required_phrases - found_phrases
+    assert (
+        not missing_phrases
+    ), f"Missing term coverage for ambiguity-sensitive phrases: {missing_phrases}"

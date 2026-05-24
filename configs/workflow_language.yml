@@ -57,6 +57,7 @@ terms:
   - ADR-013
   allowed_phrases:
   - readiness plan
+  - ready
   - quality tracker
   - test matrix projection
   - delivery status snapshot
@@ -92,6 +93,10 @@ terms:
   - .github/copilot-instructions.md
   allowed_phrases:
   - approved plan
+  - build plan
+  - execute plan
+  - plan
+  - continue
   - approved queue
   - approved issue set
   - approved backlog
