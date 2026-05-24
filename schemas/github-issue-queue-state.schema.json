@@ -37,7 +37,9 @@
     "active_issue",
     "execution_lease_id",
     "branch",
-    "worktree"
+    "worktree",
+    "status",
+    "github_truth_summary"
   ],
   "additionalProperties": true
 }
