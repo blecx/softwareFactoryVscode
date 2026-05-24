@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workflow Ubiquitous Language Schema",
+  "description": "Schema for machine-readable ubiquitous-language terms.",
+  "type": "object",
+  "properties": {
+    "term_id": {
+      "type": "string",
+      "description": "The unique identifier for the term."
+    },
+    "definition": {
+      "type": "string",
+      "description": "The exact definition of the term."
+    },
+    "authority_sources": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "ADRs or canonical sources that define this term."
+    },
+    "allowed_phrases": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Acceptable aliases or phrases referencing this term."
+    },
+    "forbidden_interpretations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Negative examples or contexts where this term does not apply."
+    },
+    "required_evidence": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Validation artifacts or signals required to prove this term is active."
+    },
+    "classifier_task_kind": {
+      "type": "string",
+      "description": "The expected action categorization, e.g., validation, generation, extraction."
+    },
+    "ambiguity_action": {
+      "type": "string",
+      "description": "Fallback action required immediately if meaning or intent is ambiguous."
+    }
+  },
+  "required": [
+    "term_id",
+    "definition",
+    "authority_sources",
+    "allowed_phrases",
+    "forbidden_interpretations",
+    "required_evidence",
+    "classifier_task_kind",
+    "ambiguity_action"
+  ]
+}
