@@ -17,6 +17,8 @@ Without an explicit authority hierarchy, implementation plans can accidentally s
 
 That ambiguity is especially risky for terms such as `installed`, `running`, and `active`, where implementation details, operator guidance, and architecture constraints all need to stay aligned without letting planning documents silently redefine the architecture.
 
+The same risk now applies to AI-facing markdown surfaces such as `.copilot/skills/*`, `.github/prompts/*`, `.github/agents/*`, and maintainer/reference docs. Without an ADR-backed precedence order and approved form matrix, thin discovery wrappers or workflow summaries can accidentally look like architecture owners.
+
 ## Decision
 
 We adopt an explicit document-authority hierarchy.
@@ -51,9 +53,32 @@ We adopt an explicit document-authority hierarchy.
 - **Rule:** If implementation conflicts with an accepted ADR unintentionally, the implementation must be treated as drift until an explicit architectural decision says otherwise.
 - **Rule:** Plans and synthesis documents may describe the mismatch, but they MUST NOT resolve the mismatch by redefining architecture terms on their own.
 
+### 6. AI-facing markdown must use one ADR-backed authority chain and one approved form matrix
+
+- **Rule:** For AI-facing markdown, accepted ADRs are priority 1 for architecture rules, terminology, precedence, and canonical-form ownership.
+- **Rule:** The precedence order for AI-facing surfaces is:
+  1. accepted ADRs;
+  2. `.github/copilot-instructions.md` as the repo-wide behavioral projection of those ADRs;
+  3. canonical workflow skills under `.copilot/skills/*` for operational mechanics;
+  4. prompt and agent wrappers under `.github/prompts/*` and `.github/agents/*` as activation/discovery surfaces only; and
+  5. maintainer/reference docs under `docs/maintainer/` as non-normative indexes, maps, and runbooks.
+- **Rule:** Lower-ranked surfaces may summarize, delegate, or enforce, but they MUST NOT redefine architecture terms, precedence, or canonical-form ownership.
+
+#### Approved AI-surface canonical form matrix
+
+| Canonical form | Shape | Allowed surface families | Notes |
+| --- | --- | --- | --- |
+| Form A — authority markdown | plain Markdown with standard headings and links; no prompt metadata block or runtime wrapper | accepted ADRs, maintainer/reference docs, operator runbooks | An accepted ADR is normative; non-ADR docs in this form remain explanatory only. |
+| Form B — structured module | YAML frontmatter followed by Markdown sections | `.github/prompts/*`, canonical `.copilot/skills/*`, and frontmatter-based agent wrappers such as `.github/agents/close-issue.md` | Use for operational modules or thin wrappers that do not need embedded `chatagent` metadata. |
+| Form C — `chatagent` discovery wrapper | thin Markdown wrapper that contains a fenced `chatagent` metadata block plus brief routing sections | `.github/agents/*` wrappers that participate in VS Code custom-agent discovery/runtime behavior | Preserve existing `chatagent` fences unless an accepted ADR explicitly changes that discovery contract. |
+| Form D — thin discoverability card | minimal frontmatter plus a short delegation body | alias/namespace wrappers such as `.github/agents/blecs/*`, `.github/agents/speckit/*`, or other non-canonical discovery stubs | These cards may point at the canonical wrapper or skill, but they MUST NOT become the canonical owner of workflow rules. |
+
+- **Rule:** Historical hybrids such as embedded `<skill>` wrappers, duplicated headings, or mixed metadata patterns are drift to normalize, not new approved forms.
+
 ## Consequences
 
 - Reviewers can distinguish architecture guardrails from implementation sequencing.
 - Plans can remain actionable without becoming shadow architecture documents.
 - Derived operator docs can be rewritten aggressively to reflect current behavior without threatening architectural authority.
 - Future terminology disputes can be resolved by pointing to one accepted ADR rather than debating which planning or guidance document "won."
+- AI-facing markdown can now be normalized against one approved precedence chain and one approved form matrix without guessing which wrapper or doc "won."
