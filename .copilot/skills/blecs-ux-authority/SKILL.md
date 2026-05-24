@@ -1,19 +1,8 @@
-<skill>
-<name>blecs-ux-authority</name>
-<description>blecs UX authority: mandatory consultation for navigation, graphical design, responsive behavior, modern React/Vite/Tailwind UI patterns, and UX/a11y review.</description>
-<file>
+---
+name: blecs-ux-authority
+description: "blecs UX authority: mandatory consultation for navigation, graphical design, responsive behavior, modern React/Vite/Tailwind UI patterns, and UX/a11y review."
+---
 # Blecs Ux Authority
-
-## Objective
-
-## When to Use
-- Use this when working on tasks related to blecs ux authority.
-
-## When Not to Use
-- Do not use this when the current task does not involve frontend UI, styling, or blecs ux authority.
-
-## When to Use
-- Use this when working on tasks related to blecs ux authority.
 
 ## Objective
 Provides context and instructions for the `blecs-ux-authority` skill module.
@@ -32,13 +21,17 @@ You are the single authority for:
 - Modern styling (React, Vite, Tailwind CSS, shadcn/ui patterns)
 - Component generation standards and accessibility UX requirements
 
-## Required Consultation Scope
+## When to Use
+- Use this when working on tasks related to blecs ux authority.
 
+## When Not to Use
+- Do not use this when the current task does not involve frontend UI, styling, or blecs ux authority.
+
+## Required Consultation Scope
 Any AI assistant or agent that plans, implements, reviews, or merges changes that affect UI/UX must consult this skill first.
 Consultation is mandatory for navigation structure changes, new/updated screens or panels, responsive layout changes, component grouping and interaction model changes, and PR reviews touching UX-sensitive paths.
 
 ## 1. Core Rules & Navigation Architecture
-
 1. Produce a **navigation plan first** (IA/sitemap + primary/secondary nav model).
 2. Reject "one tile per object" anti-patterns when object interactions require grouped flows.
 3. Enforce mobile-first responsive behavior with full-width usage and no cut-off content.
@@ -66,7 +59,6 @@ When writing UI components for React/Vite environments:
 - Meet WCAG AA contrast ratios minimum for text against backgrounds.
 
 ## Required Modules
-
 Use and enforce:
 - `.copilot/skills/ux-ia-navigation/SKILL.md`
 - `.copilot/skills/ux-responsive/SKILL.md`
@@ -77,7 +69,6 @@ Use and enforce:
 - `.copilot/skills/ux-context-sources/SKILL.md`
 
 ## Output Contract
-
 Return a strict decision header on first line:
 - `UX_DECISION: PASS`
 - `UX_DECISION: CHANGES`
@@ -96,7 +87,3 @@ Required sections after decision header:
 - `Required Changes:` (if CHANGES)
 
 ## Instructions
-
-- Follow domain guidelines.
-</file>
-</skill>

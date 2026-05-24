@@ -1,29 +1,25 @@
-<skill>
-<name>prompt-quality-baseline</name>
-<description>Workflow or rule module extracted from .copilot/skills/prompt-quality-baseline/SKILL.md</description>
-<file>
+---
+name: prompt-quality-baseline
+description: "Workflow or rule module extracted from .copilot/skills/prompt-quality-baseline/SKILL.md"
+---
 # Prompt Quality Baseline
 
 ## Objective
+Provides context and instructions for the `prompt-quality-baseline` skill module.
 
 ## When to Use
-
 - Use this when working on tasks related to prompt quality baseline.
 
 ## When Not to Use
-
 - Do not use this when the current task does not involve prompt quality baseline.
 
-## When to Use
-
-- Use this when working on tasks related to prompt quality baseline.
-
-## Objective
-
-Provides context and instructions for the `prompt-quality-baseline` skill module.
+## Anti-Patterns
+- Monolithic prompts with duplicated instructions
+- Missing output contract
+- Vague completion criteria ("done when done")
+- Cross-repo instructions without merge/deploy order
 
 ## Required Sections
-
 Each operational prompt (non-README) should include:
 
 - Objective
@@ -35,13 +31,11 @@ Each operational prompt (non-README) should include:
 - Completion Criteria
 
 ## Docs Grounding Guardrail (Context7)
-
 - For external API/library/framework behavior, prompts must require Context7-backed documentation grounding.
 - For internal architecture and implementation details, prompts must prioritize repository conventions and local codebase facts.
 - If version-specific docs are ambiguous, prompts must require explicit assumptions in output.
 
 ## MCP Tool Arbitration Hard Rules
-
 When more than one MCP server or generic execution path could complete a task, prompts must enforce this
 precedence and usage model:
 
@@ -75,26 +69,13 @@ precedence and usage model:
 Prompts must treat these as hard rules, not preferences.
 
 ## Size Guidance
-
 - `agents/*.md`: target <= 100 lines
 - Non-agent prompts: keep concise; split if > 200 lines
 - Exceptions must include a short justification in-file
 
-## Anti-Patterns
-
-- Monolithic prompts with duplicated instructions
-- Missing output contract
-- Vague completion criteria ("done when done")
-- Cross-repo instructions without merge/deploy order
-
 ## Validation
-
 - Run: `python scripts/check_prompt_quality.py`
 - Run: `python scripts/check_context7_guardrails.py`
 - Verify links: `rg -n "\]\(.*\)" .copilot/skills --glob '*.md'`
 
 ## Instructions
-
-- Follow domain guidelines.
-  </file>
-  </skill>

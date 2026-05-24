@@ -1,5 +1,4 @@
 ## Objective
-
 Provides context for the `queue-phase-2` AI Agent.
 
 ```chatagent

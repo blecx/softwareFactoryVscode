@@ -1,7 +1,7 @@
-<skill>
-<name>ux-consult-request</name>
-<description>Workflow or rule module extracted from .copilot/skills/ux-consult-request/SKILL.md</description>
-<file>
+---
+name: ux-consult-request
+description: "Workflow or rule module extracted from .copilot/skills/ux-consult-request/SKILL.md"
+---
 # UX Skill: Consult Request Template
 
 ## Objective
@@ -46,5 +46,3 @@ CONSTRAINTS:
 KNOWN_RISKS:
 EVIDENCE_PATHS:
 ```
-</file>
-</skill>

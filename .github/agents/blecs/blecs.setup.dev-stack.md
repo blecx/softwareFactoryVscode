@@ -1,7 +1,6 @@
 ---
 description: blecs extension - start and validate backend+client dev stack with docker parity checks.
 ---
-
 # blecs.setup.dev-stack
 
 Run the standardized setup + startup + validation loop for this multirepo workspace.

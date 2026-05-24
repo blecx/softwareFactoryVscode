@@ -1,7 +1,7 @@
-<skill>
-<name>ux-responsive</name>
-<description>Workflow or rule module extracted from .copilot/skills/ux-responsive/SKILL.md</description>
-<file>
+---
+name: ux-responsive
+description: "Workflow or rule module extracted from .copilot/skills/ux-responsive/SKILL.md"
+---
 # UX Skill: Responsive Rules
 
 ## Objective
@@ -19,5 +19,3 @@ Provides context and instructions for the `ux-responsive` skill module.
 - Use full available width for primary content while preserving readable density.
 - Ensure interaction targets are mobile-usable and keyboard-accessible.
 - Document breakpoint assumptions when proposing layout changes.
-</file>
-</skill>

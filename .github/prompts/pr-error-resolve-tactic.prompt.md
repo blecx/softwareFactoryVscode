@@ -7,7 +7,6 @@ model: "GPT-5 (copilot)"
 ---
 
 ## Objective
-
 Resolve PR-creation, local-precheck, and CI failures quickly **without** broad scanning, stale-state guessing, hallucinated state, or trial-and-error churn.
 
 This prompt now documents the repository's **canonical default PR-error repair behavior**. The guardrails and workflow skills enforce the same method even when this prompt is not explicitly invoked; using the prompt simply foregrounds that default tactic in the conversation. It does **not** override immutable repository guardrails such as:
@@ -22,7 +21,6 @@ This prompt now documents the repository's **canonical default PR-error repair b
 Treat [repo guardrails](../copilot-instructions.md) and the [canonical issue workflow](../../docs/WORK-ISSUE-WORKFLOW.md) as binding constraints. This prompt only narrows **how** error resolution should proceed so the agent finds the root cause faster.
 
 ## When to Use
-
 - A PR body/template check, local validation, or GitHub CI check has failed and the user wants the fastest compliant repair path.
 - Terminal output or CI output already names a failing file, test, assertion, method, command, or check.
 - The user explicitly says things like:
@@ -34,13 +32,49 @@ Treat [repo guardrails](../copilot-instructions.md) and the [canonical issue wor
   - `formatter first`
 
 ## When Not to Use
-
 - The task is broad feature development with no concrete failure yet.
 - The user wants a full exploratory repo audit.
 - The task is architecture design rather than failure resolution.
 
-## Controlling Tactic
+## Output Format
+Return results in this structure:
 
+### Active surface
+
+- worktree / branch / issue / PR actually used
+- changed files inspected
+
+### Exact failure evidence
+
+- failing command or check
+- relevant error text
+- failing file / test / method / assertion
+
+### Root cause
+
+- the single best current explanation grounded in the output and source
+
+### Fix applied
+
+- files changed
+- why the patch addresses the root cause rather than the last symptom
+
+### Validation ladder
+
+- which fast gate was run first
+- which rung passed next
+- what remains before merge / completion
+
+## Completion Criteria
+This prompt is complete only when:
+
+- the failure is reproduced or parsed from exact current output
+- the root cause is stated before the patch
+- the first rerun is the narrowest relevant validation gate
+- no broad scan or broad parity run was used prematurely
+- the final recommendation or next step is based on current evidence, not memory
+
+## Controlling Tactic
 ### 1. Re-anchor only enough to fix the failure
 
 Start with the **minimum** state needed to act safely:
@@ -144,7 +178,6 @@ Incorrect order:
 - broad repo scans before reading the failing method
 
 ## Required Working Method
-
 1. Re-anchor on the active worktree and exact diff.
 2. Parse the current failure output.
 3. Read the exact failing method / assertion / file before editing.
@@ -155,7 +188,6 @@ Incorrect order:
 8. Update checkpoint / PR state only after the local root cause is actually resolved.
 
 ## Fast-Path Defaults
-
 ### For formatter-led failures
 
 - run `Black --check` on touched Python files first
@@ -173,43 +205,3 @@ Incorrect order:
 - inspect the exact failed check/job/step first
 - reproduce the equivalent local command on the narrowest relevant surface
 - do not infer root cause from workflow title alone
-
-## Output Format
-
-Return results in this structure:
-
-### Active surface
-
-- worktree / branch / issue / PR actually used
-- changed files inspected
-
-### Exact failure evidence
-
-- failing command or check
-- relevant error text
-- failing file / test / method / assertion
-
-### Root cause
-
-- the single best current explanation grounded in the output and source
-
-### Fix applied
-
-- files changed
-- why the patch addresses the root cause rather than the last symptom
-
-### Validation ladder
-
-- which fast gate was run first
-- which rung passed next
-- what remains before merge / completion
-
-## Completion Criteria
-
-This prompt is complete only when:
-
-- the failure is reproduced or parsed from exact current output
-- the root cause is stated before the patch
-- the first rerun is the narrowest relevant validation gate
-- no broad scan or broad parity run was used prematurely
-- the final recommendation or next step is based on current evidence, not memory

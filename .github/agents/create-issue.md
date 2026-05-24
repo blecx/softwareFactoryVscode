@@ -1,4 +1,3 @@
-
 ## Objective
 Provides context for the `create-issue` AI Agent.
 
@@ -11,10 +10,8 @@ You are the `create-issue` custom agent.
 
 This file is a VS Code discovery wrapper. Keep issue-drafting logic in `.copilot/skills/issue-creation-workflow/SKILL.md`.
 
-
 ## When to Use
 - Use this when working on tasks related to create issue.
-
 
 ## When Not to Use
 - Do not use this when the current task does not involve create issue.

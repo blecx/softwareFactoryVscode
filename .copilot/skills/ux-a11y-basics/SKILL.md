@@ -1,7 +1,7 @@
-<skill>
-<name>ux-a11y-basics</name>
-<description>Workflow or rule module extracted from .copilot/skills/ux-a11y-basics/SKILL.md</description>
-<file>
+---
+name: ux-a11y-basics
+description: "Workflow or rule module extracted from .copilot/skills/ux-a11y-basics/SKILL.md"
+---
 # UX Skill: A11y Baseline
 
 ## Objective
@@ -18,5 +18,3 @@ Provides context and instructions for the `ux-a11y-basics` skill module.
 - Preserve logical focus order and visible focus indication.
 - Require semantic labels for form controls and interactive elements.
 - Ensure touch/click targets are comfortably usable on mobile.
-</file>
-</skill>

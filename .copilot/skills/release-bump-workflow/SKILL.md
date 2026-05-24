@@ -2,17 +2,14 @@
 name: release-bump-workflow
 description: Canonical release bump workflow for `softwareFactoryVscode`. Use when cutting or publishing a release, bumping `VERSION`, updating current-release surfaces, verifying Definition of Done and quality metrics, or checking that historical release references do not leak into public current-release docs.
 ---
-
 # Release bump workflow
 
 ## Objective
-
 Provide one canonical, `.copilot`-owned definition for cutting a release in
 `softwareFactoryVscode` without leaving stale prior-version artifacts on the
 current-release surfaces.
 
 ## Canonical ownership
-
 - The canonical release workflow contract lives under
   `.copilot/skills/release-bump-workflow/`.
 - Release notes are source-controlled under `.github/releases/`; GitHub's
@@ -23,7 +20,6 @@ current-release surfaces.
   NOT be rewritten as part of a new release bump.
 
 ## Current-release surfaces
-
 The active release is defined by the synchronized state of all of the following:
 
 - `VERSION`
@@ -37,7 +33,6 @@ Any prior-version string on those current-release surfaces is a release defect,
 even if the older version still appears correctly in historical files.
 
 ## Definition of done
-
 The release workflow is done only when all of the following are true:
 
 - all current-release surfaces point at the same version
@@ -55,7 +50,6 @@ The release workflow is done only when all of the following are true:
   artifacts
 
 ## Quality metrics
-
 The release workflow MUST evaluate and report these metrics:
 
 - current-release surface consistency: 100%
@@ -65,7 +59,6 @@ The release workflow MUST evaluate and report these metrics:
 - historical-artifact isolation: 100%
 
 ## Execution steps
-
 1. Resolve the target version and read the existing release surfaces before
    editing.
 2. Update `VERSION`, `README.md` `## Current Release`, `CHANGELOG.md`,
@@ -84,7 +77,6 @@ The release workflow MUST evaluate and report these metrics:
 9. Re-audit the public README / current-release surfaces after publication.
 
 ## Validation contract
-
 Minimum guardrail validation:
 
 ```text
@@ -99,7 +91,6 @@ Recommended release-grade validation:
 ```
 
 ## Failure modes to prevent
-
 - `VERSION` updated while `README.md` still advertises the prior release
 - release notes published for the new version while `README.md` still links to
   the prior release-notes file

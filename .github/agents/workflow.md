@@ -1,4 +1,3 @@
-
 ## Objective
 Provides context for the `workflow` AI Agent.
 
@@ -9,10 +8,8 @@ description: "User-facing general assistant for planning, guidance, and adhering
 
 You are the `workflow` custom agent.
 
-
 ## When to Use
 - Use this when working on tasks related to workflow.
-
 
 ## When Not to Use
 - Do not use this when the current task does not involve workflow.
@@ -29,4 +26,3 @@ You are the `workflow` custom agent.
 ## Use This Agent When
 - A user needs help planning, drafting specs, or understanding the project workflow.
 - A user is looking for advice on how to align with repo conventions before executing tasks.
-

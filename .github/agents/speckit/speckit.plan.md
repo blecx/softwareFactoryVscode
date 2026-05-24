@@ -1,7 +1,6 @@
 ---
 description: Create technical implementation plan from spec.
 ---
-
 Produce or update `specs/<feature>/plan.md` based on the current spec.
 
 Requirements:

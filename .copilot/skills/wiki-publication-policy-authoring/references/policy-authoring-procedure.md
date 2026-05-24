@@ -1,7 +1,6 @@
 # Wiki publication-policy authoring procedure
 
 ## Input contract
-
 Before drafting or editing a host publication-policy file, gather the following host-owned inputs in order:
 
 1. authority docs — accepted ADRs or equivalent rules that define documentation truth and authority boundaries;
@@ -12,7 +11,6 @@ Before drafting or editing a host publication-policy file, gather the following 
 Do not author the policy from reusable assumptions when those host inputs are missing.
 
 ## Create or update flow
-
 1. Start with a short authority note that states repo docs remain canonical and the wiki remains a projection.
 2. Define export defaults that explain how unlisted content is treated.
 3. Inventory candidate source docs or doc groups and classify each one as wiki-safe, repo-only, or unresolved.
@@ -22,7 +20,6 @@ Do not author the policy from reusable assumptions when those host inputs are mi
 7. Re-read the whole file to ensure it defines policy only and does not drift into implementation procedure or canonical content.
 
 ## Host contract shape
-
 A strong host publication-policy file should make the following split obvious:
 
 - publication policy decides what may be projected;
@@ -31,7 +28,6 @@ A strong host publication-policy file should make the following split obvious:
 - the live wiki remains the reader-facing output.
 
 ## Review checklist
-
 - The file names host-owned truth surfaces explicitly.
 - The authority note does not suggest the wiki is canonical.
 - Wiki-safe items are bounded and reviewable.
@@ -39,7 +35,6 @@ A strong host publication-policy file should make the following split obvious:
 - The file does not become a second documentation index, release surface, or implementation plan.
 
 ## Evidence expectations
-
 A bounded policy-authoring change should leave a reviewable trail:
 
 - which host authority docs were read;

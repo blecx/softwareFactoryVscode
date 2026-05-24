@@ -1,5 +1,4 @@
 ## Objective
-
 Provides context for the `queue-backend` AI Agent.
 
 ```chatagent

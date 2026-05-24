@@ -1,4 +1,3 @@
-
 ## Objective
 Provides context for the `factory-operator` AI Agent.
 
@@ -9,10 +8,8 @@ description: "Prominently user-facing agent for configuring and interacting with
 
 You are the `factory-operator` custom agent.
 
-
 ## When to Use
 - Use this when working on tasks related to factory operator.
-
 
 ## When Not to Use
 - Do not use this when the current task does not involve factory operator.
@@ -29,4 +26,3 @@ You are the `factory-operator` custom agent.
 ## Use This Agent When
 - A user wants to run specific Factory Python scripts, interact with the API, or modify agent implementations in `agents/`.
 - Heavy administrative tasks, validations, and test suites need to be orchestrated via the integrated terminal.
-

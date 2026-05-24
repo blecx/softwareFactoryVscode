@@ -2,21 +2,17 @@
 name: todo-app-regression
 description: Canonical todo-app regression workflow for release protection. Use when validating the full todo-app regression, checking throwaway execution paths, verifying Definition of Done and quality metrics, or confirming a different supported GitHub model still satisfies the todo-app semantic contract.
 ---
-
 # Todo-app regression workflow
 
 ## Objective
-
 Provide one canonical, `.copilot`-owned definition for the release-grade todo-app regression workflow used by `softwareFactoryVscode`.
 
 ## Canonical ownership
-
 - The canonical contract lives under `.copilot/skills/todo-app-regression/`.
 - Runtime evidence is disposable and MUST NOT become the canonical definition.
 - The regression MUST NOT introduce a new host-root ownership surface.
 
 ## Throwaway execution paths
-
 - **Source checkout mode:** `.tmp/todo-regression-run/workspace`
 - **Installed host mode:** `.copilot/softwareFactoryVscode/.tmp/todo-regression-run/workspace`
 - All runtime reports, generated artifacts, and temporary evidence MUST stay inside the approved throwaway workspace.
@@ -33,7 +29,6 @@ Use this deterministic algorithm before creating any throwaway workspace:
 The canonical Python implementation of this algorithm is `scripts/todo_app_regression.py::detect_factory_layout()`. Use it to verify or cross-check manual detection.
 
 ## Minimum todo-app contract
-
 The regression MUST validate that a candidate todo-app deliverable covers all of the following behaviors:
 
 - create todo
@@ -44,7 +39,6 @@ The regression MUST validate that a candidate todo-app deliverable covers all of
 - persistence across reload/restart
 
 ## Definition of done
-
 The todo-app regression is considered done only when all of the following are true:
 
 - canonical skill committed under `.copilot`
@@ -55,7 +49,6 @@ The todo-app regression is considered done only when all of the following are tr
 - no unexpected filesystem changes outside throwaway workspace
 
 ## Quality metrics
-
 The regression MUST check and report these metrics:
 
 - skill contract coverage: 100%
@@ -65,7 +58,6 @@ The regression MUST check and report these metrics:
 - repeat-run stability: 100%
 
 ## Model and provider compatibility checks
-
 - The current repository supports GitHub Models via `provider=github`.
 - Changing to a different supported GitHub model MUST still pass when the semantic rubric is satisfied.
 - Do not rely on exact wording from model output.
@@ -73,7 +65,6 @@ The regression MUST check and report these metrics:
 - Treat unsupported providers as an intentional regression failure.
 
 ## Execution steps
-
 1. Detect the execution mode using the **Mode detection** algorithm in the Throwaway execution paths section above. Log the detected mode and resolved throwaway root as the first entry in the regression report.
 2. Create a fresh throwaway workspace under the approved ignored root.
 3. Audit the canonical skill contract for required sections, minimum feature list, Definition of Done terms, and quality metrics.
@@ -85,7 +76,6 @@ The regression MUST check and report these metrics:
 9. _(Optional — requires `--with-ci-simulation` flag)_ Run the CI simulation target as described below.
 
 ## CI simulation target
-
 The CI simulation target detects **local↔remote drift** — failures that pass the local parity check but fail on GitHub CI — by replaying the parity bundles inside a Docker container that mirrors GitHub's `ubuntu-latest` + Python 3.13 environment.
 
 **Activation:** pass `--with-ci-simulation` to `scripts/todo_app_regression.py`, or call `run_regression(repo_root, include_ci_simulation=True)`.
@@ -109,7 +99,6 @@ The CI simulation target detects **local↔remote drift** — failures that pass
 **Report key:** `ci_simulation` — always present. Contains `drift_detected`, `drift_findings`, `bundles_simulated`, and per-bundle `local_results` / `ci_results` with stdout/stderr tails. When drift is detected the top-level `status` becomes `"drift-warning"` (not `"failed"`) to signal an observation input for further improvements.
 
 ## Reporting contract
-
 - Write the JSON report to `workspace/reports/todo-app-regression-report.json`.
 - Write supporting artifacts to `workspace/artifacts/`.
 - Include mode, throwaway root, quality metrics, Definition of Done coverage, active model/provider details, semantic compatibility results, unexpected-change findings, and the `ci_simulation` result dict.

@@ -1,7 +1,6 @@
 ---
 description: blecs extension - execute the repeatable Phase 2 issue queue to PR to merge loop.
 ---
-
 # blecs.queue-phase-2
 
 Run `/queue-phase-2` for iterative Phase 2 integration work.

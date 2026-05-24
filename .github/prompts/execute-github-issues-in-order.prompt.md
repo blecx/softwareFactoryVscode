@@ -7,13 +7,11 @@ model: "GPT-5 (copilot)"
 ---
 
 ## Objective
-
 Execute GitHub issues in the repository's canonical order without workflow drift.
 
 You cannot assume the session will remain uninterrupted. Instead, guarantee **deterministic recovery and ordered resumption** by re-anchoring from GitHub truth and a repo-owned `.tmp` checkpoint whenever continuity is lost.
 
 ## When to Use
-
 - The user wants GitHub issues executed in the correct order.
 - The user wants a one-issue-at-a-time issue → PR → merge loop.
 - The user wants interruption-safe queue work with clear stop gates.
@@ -24,22 +22,12 @@ set that should continue automatically within the set, use
 `@execute-approved-plan` instead.
 
 ## When Not to Use
-
 - The task is only to create a new issue.
 - The task is only to merge or close an already-ready PR.
 - The work is not tied to GitHub issues.
 - The user wants ad-hoc coding outside the canonical workflow.
 
-## Inputs
-
-- Optional starting issue number.
-- Optional label, milestone, or scope filter.
-- Optional queue preference such as `backend`, `phase-2`, or an explicit approved issue list.
-- Optional stop condition such as `one issue`, `until blocked`, or `N issues`.
-- Optional approved override to the default repository ordering.
-
 ## Constraints
-
 1. Use [the canonical workflow](../../docs/WORK-ISSUE-WORKFLOW.md) and [repo guardrails](../copilot-instructions.md) as binding policy.
 2. Use GitHub as the source of truth for:
    - issue state
@@ -83,39 +71,14 @@ set that should continue automatically within the set, use
 
 14. Do not start the next issue automatically after a merge. Require an explicit operator checkpoint and approval.
 
-## Required Working Method
-
-1. Discover the candidate issue set from GitHub.
-2. Publish the ordered queue and explain why that order is valid.
-3. Select only the first executable issue.
-4. Write or update `.tmp/github-issue-queue-state.md` with at least:
-
-   ```md
-   # GitHub issue queue state
-
-   - active_issue: <number>
-   - active_branch: <branch>
-   - active_worktree: <absolute path>
-   - active_pr: <number or none>
-   - status: selected | implementing | validating | pr-open | blocked | merged
-   - last_validation: <command or none>
-   - next_gate: <what must happen next>
-   - blocker: <none or explanation>
-   ```
-
-5. Execute the current issue only.
-   - Use the same canonical `resolve-issue` → `pr-merge` slice path as every
-     other repository workflow.
-6. Before any handoff, interruption recovery, or completion claim, re-check GitHub truth.
-   - If continuity was lost, capture `.tmp/interruption-recovery-snapshot.md` before resuming.
-7. End each iteration with one of these states only:
-   - `blocked`
-   - `waiting-for-approval`
-   - `ready-for-pr-merge`
-   - `merged-and-closed`
+## Inputs
+- Optional starting issue number.
+- Optional label, milestone, or scope filter.
+- Optional queue preference such as `backend`, `phase-2`, or an explicit approved issue list.
+- Optional stop condition such as `one issue`, `until blocked`, or `N issues`.
+- Optional approved override to the default repository ordering.
 
 ## Output Format
-
 Produce responses in this structure:
 
 ### Queue order
@@ -146,7 +109,6 @@ Produce responses in this structure:
 - the precise next action required
 
 ## Completion Criteria
-
 The prompt is complete only when all of the following are true:
 
 - the queue order is derived from GitHub truth and stated explicitly
@@ -155,3 +117,33 @@ The prompt is complete only when all of the following are true:
 - any interruption is handled by re-anchoring instead of guessing
 - the workflow stops at a safe gate instead of drifting into the next issue
 - no completion claim is made without merged-PR and issue-state confirmation on GitHub
+
+## Required Working Method
+1. Discover the candidate issue set from GitHub.
+2. Publish the ordered queue and explain why that order is valid.
+3. Select only the first executable issue.
+4. Write or update `.tmp/github-issue-queue-state.md` with at least:
+
+   ```md
+   # GitHub issue queue state
+
+   - active_issue: <number>
+   - active_branch: <branch>
+   - active_worktree: <absolute path>
+   - active_pr: <number or none>
+   - status: selected | implementing | validating | pr-open | blocked | merged
+   - last_validation: <command or none>
+   - next_gate: <what must happen next>
+   - blocker: <none or explanation>
+   ```
+
+5. Execute the current issue only.
+   - Use the same canonical `resolve-issue` → `pr-merge` slice path as every
+     other repository workflow.
+6. Before any handoff, interruption recovery, or completion claim, re-check GitHub truth.
+   - If continuity was lost, capture `.tmp/interruption-recovery-snapshot.md` before resuming.
+7. End each iteration with one of these states only:
+   - `blocked`
+   - `waiting-for-approval`
+   - `ready-for-pr-merge`
+   - `merged-and-closed`

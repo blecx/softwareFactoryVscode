@@ -1,5 +1,4 @@
 ## Objective
-
 Provides context for the `wiki-publish` AI Agent.
 
 ```chatagent

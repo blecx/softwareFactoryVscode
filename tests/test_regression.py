@@ -6020,3 +6020,27 @@ def test_same_issue_concurrent_session_blocker_guardrail_present():
     ).read_text(encoding="utf-8")
     assert "execution_lease_id" in copilot_instructions
     assert "Isolate same-issue concurrent sessions" in copilot_instructions
+
+
+def test_no_duplicate_headings_in_ai_surfaces() -> None:
+    import re
+    from pathlib import Path
+
+    repo_root = Path(__file__).parent.parent
+    directories = [
+        repo_root / ".copilot" / "skills",
+        repo_root / ".github" / "prompts",
+        repo_root / ".github" / "agents",
+    ]
+
+    for directory in directories:
+        for p in directory.rglob("*.md"):
+            content = p.read_text(encoding="utf-8")
+            # match lines starting with exactly "## "
+            headings = re.findall(r"^##\s+(.*)$", content, re.MULTILINE)
+            # Normalize casing for uniqueness checks
+            normalized = [h.strip().lower() for h in headings]
+            dupes = [h for h in set(normalized) if normalized.count(h) > 1]
+            assert (
+                not dupes
+            ), f"File {p.relative_to(repo_root)} has duplicate headings: {dupes}"

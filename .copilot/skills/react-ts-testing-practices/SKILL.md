@@ -2,7 +2,6 @@
 name: react-ts-testing-practices
 description: Best practices for React, TypeScript strict mode, and Vitest mocking learned from previous iterations. Use this when writing or refactoring React components or unit tests to prevent known regressions.
 ---
-
 # React, TypeScript, and Testing Best Practices
 
 These rules were empirically gathered from issue resolutions in strict-mode React single-page applications. Always adhere to these practices to prevent CI failures.

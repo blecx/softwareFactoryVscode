@@ -1,5 +1,4 @@
 ## Objective
-
 Provides context for the `execute-approved-umbrella` AI Agent.
 
 ```chatagent

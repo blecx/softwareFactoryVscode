@@ -1,7 +1,6 @@
 ---
 description: Execute tasks according to spec and plan.
 ---
-
 Implement tasks from `specs/<feature>/tasks.md`.
 
 Requirements:

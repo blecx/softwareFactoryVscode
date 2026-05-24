@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_updated": "2026-04-06T09:00:24.837530",
+  "last_updated": "2026-05-24T08:47:59.595069",
   "completed_issues": [],
   "patterns": {
     "avg_time_multiplier": 1.0,
@@ -10,8 +10,8 @@
   },
   "recommendations": {
     "last_selected": {
-      "issue_number": 23,
-      "selected_at": "2026-04-06T09:00:24.837499",
+      "issue_number": 351,
+      "selected_at": "2026-05-24T08:47:59.595033",
       "reason": "Next in Unknown, all blockers resolved (verified via GitHub)",
       "github_state": "OPEN"
     }
