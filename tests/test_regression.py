@@ -5177,3 +5177,31 @@ def test_docs_readme_enforces_adr013_readiness_projection():
         "Readiness material is maintained as derived operator-facing projections."
         in docs_readme
     )
+
+
+def test_production_readiness_checklist_anchors():
+    repo_root = Path(__file__).parent.parent
+    checklist_path = (
+        repo_root / "docs" / "maintainer" / "PRODUCTION-READINESS-REVIEW-CHECKLIST.md"
+    )
+    assert checklist_path.exists(), "Maintainer checklist must exist"
+    content = checklist_path.read_text(encoding="utf-8")
+
+    assert "ADR-013" in content, "Checklist must explicitly reference ADR-013"
+    assert (
+        "Drift Classification" in content
+    ), "Checklist must require drift classification"
+    assert "adr drift" in content.lower(), "Checklist must classify ADR drift"
+    assert (
+        "implementation drift" in content.lower()
+    ), "Checklist must classify Implementation drift"
+    assert (
+        "validation drift" in content.lower()
+    ), "Checklist must classify Validation drift"
+    assert (
+        "derived-doc drift" in content.lower()
+    ), "Checklist must classify Derived-doc drift"
+    assert "evidence gap" in content.lower(), "Checklist must classify Evidence gaps"
+    assert (
+        "non-normative" in content
+    ), "Checklist must declare itself explicitly non-normative"
