@@ -25,6 +25,27 @@ def test_approved_plan():
     assert not result["clarification_flag"]
 
 
+def test_vague_execute_plan():
+    classifier = WorkflowTaskClassifier()
+    result = classifier.classify("execute the plan", False)
+    assert result["clarification_flag"]
+    assert result["task_kind"] == "unknown"
+
+
+def test_production_readiness_review():
+    classifier = WorkflowTaskClassifier()
+    result = classifier.classify("is this ready for production?", False)
+    assert result["task_kind"] == "production_readiness"
+    assert not result["clarification_flag"]
+
+
+def test_stale_ambiguous_continuation():
+    classifier = WorkflowTaskClassifier()
+    result = classifier.classify("continue from last time", False)
+    assert result["clarification_flag"]
+    assert result["task_kind"] == "recovery"
+
+
 def test_bypass_blocked_without_human():
     classifier = WorkflowTaskClassifier()
     result = classifier.classify("@harness-bypass-resolution fix this", False)

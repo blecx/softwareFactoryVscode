@@ -18,6 +18,11 @@ class WorkflowTaskClassifier:
                 "approved_plan",
                 "default",
             ),
+            (
+                r"(?i)ready for production|production read(?:y|iness)",
+                "production_readiness",
+                "default",
+            ),
             (r"(?i)@harness-bypass-resolution", "bypass", "@harness-bypass-resolution"),
         ]
 
@@ -54,6 +59,12 @@ class WorkflowTaskClassifier:
                 result["clarification_flag"] = False
                 result["blocked"] = False
                 return result
+
+        # Check for stale/ambiguous continuation mapping to recovery
+        if re.search(r"(?i)continue from last time|stale continuation", request_text):
+            result["task_kind"] = "recovery"
+            result["clarification_flag"] = True
+            return result
 
         best_match = None
         for pattern, kind, default_agent in self.rules:
