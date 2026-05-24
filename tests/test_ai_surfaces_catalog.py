@@ -43,10 +43,10 @@ def test_validate_form_b_valid(tmp_path):
 
 def test_validate_form_b_missing_sections(tmp_path):
     f = tmp_path / "invalid.md"
-    f.write_text("---\nname: Foo\n---\n# Foo\n## Objective\n1", encoding="utf-8")
+    f.write_text("---\nname: Foo\n---\n# Foo\n## When to Use\n1", encoding="utf-8")
 
     res = validate_ai_surfaces.validate_file(f, tmp_path)
-    assert "Expected exactly one '## When to Use', found 0" in res["errors"]
+    assert "Expected exactly one '## Objective', found 0" in res["errors"]
 
 
 def test_validate_placeholder(tmp_path):
