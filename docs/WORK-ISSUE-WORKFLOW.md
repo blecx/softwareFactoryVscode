@@ -133,6 +133,14 @@ Routing rule:
   steps when the checkpoint is missing, incomplete, or lacks the required
   GitHub/cleanup evidence, and they must explain exactly what is missing.
 
+## Subagent result guard and fallback routing
+
+When delegating to a subagent, the workflow must enforce a strict no-op detection response. The explicit fallback direct-routing rule for no-op subagents is:
+- A silent subagent no-op triggers exactly one targeted retry.
+- If the retry also results in a no-op, the workflow escalates to direct per-issue routing or a hard blocker.
+- The rule forbids drifting to bypass or unbounded plan execution. You must **not** silently drift back into unbounded `execute-approved-plan` execution.
+
+
 ## Resume after interruption
 
 - After a timeout, restart, compaction event, or tool uncertainty, re-anchor before resuming the current issue.

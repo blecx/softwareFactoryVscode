@@ -5378,3 +5378,16 @@ def test_workflow_ubiquitous_language_guide_anchors():
     assert "closeout" in content.lower()
     assert "bypass" in content.lower()
     assert "production ready" in content.lower()
+
+
+def test_subagent_no_op_fallback_routing_rule_is_documented():
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    assert "silent subagent no-op triggers exactly one targeted retry" in workflow_doc
+    assert "direct per-issue routing or a hard blocker" in workflow_doc
+    assert (
+        "not** silently drift back into unbounded `execute-approved-plan`" in workflow_doc
+    )
+    assert "forbids drifting to bypass or unbounded plan execution" in workflow_doc
