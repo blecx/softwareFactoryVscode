@@ -5309,6 +5309,7 @@ def test_runtime_authority_traceability_matrix_anchors() -> None:
     assert "Test / Proof" in traceability_doc
     assert "Derived Docs" in traceability_doc
     assert "**Evidence gap**" in traceability_doc
+    assert "tests/test_factory_stack_diagnostics.py" in traceability_doc
 
 
 def test_production_fresh_checkout_command_construction_preserves_boundaries() -> None:
