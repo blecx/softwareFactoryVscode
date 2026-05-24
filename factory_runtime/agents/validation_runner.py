@@ -38,6 +38,7 @@ VALIDATION_RUN_REPORT_SCHEMA_VERSION = 1
 PYTEST_FAST_FAIL_ARGS = ("-x",)
 DOCS_WORKFLOW_TEST_FILES = (
     "tests/test_regression.py",
+    "tests/test_ai_surface_drift.py",
     "tests/test_todo_regression_contract.py",
     "tests/test_noninteractive_gh.py",
     "tests/test_recovery_snapshot.py",
