@@ -121,7 +121,7 @@ intentionally no longer the primary path for first-time readers.
 
 The explicit runtime mode selector is `FACTORY_RUNTIME_MODE` in the installed `.factory.env`. `development` remains the deterministic default, while `production` selects the manager-backed fail-closed internal-production profile that surfaces `runtime_mode=production` in `preflight` / `status` and disables silent mock fallback.
 
-For local validation, `./.venv/bin/python ./scripts/local_ci_parity.py` remains the faster default baseline, while `./.venv/bin/python ./scripts/local_ci_parity.py --mode production` is the canonical production-grade parity path with blocking Docker image builds and the promoted Docker E2E runtime proof lane.
+For local validation, `./.venv/bin/python ./scripts/local_ci_parity.py --level merge` remains the faster default baseline, while `./.venv/bin/python ./scripts/local_ci_parity.py --level production` is the canonical production-grade parity path with blocking Docker image builds and the promoted Docker E2E runtime proof lane.
 
 ### Architecture Notes
 
