@@ -76,3 +76,35 @@ def test_unknown_task():
     result = classifier.classify("build the docker image", False)
     assert result["task_kind"] == "unknown"
     assert result["clarification_flag"]
+
+
+def test_vague_prompts_return_term_evidence():
+    classifier = WorkflowTaskClassifier()
+    # "plan" alone should map to vague approved_plan and have clarification message
+    res1 = classifier.classify("What is the plan?", False)
+    assert res1["clarification_flag"] is True
+    assert res1["task_kind"] == "unknown"
+    assert "clarification_message" in res1
+    assert "Do not guess which plan the operator means" in res1["clarification_message"]
+
+    res2 = classifier.classify("Is it ready?", False)
+    assert res2["clarification_flag"] is True
+    assert res2["task_kind"] == "unknown"
+    assert "clarification_message" in res2
+    assert (
+        "Validate against CI and pipeline reality before proceeding."
+        in res2["clarification_message"]
+        or "Refuse the claim and halt release actions until surfaces align."
+        in res2["clarification_message"]
+    )
+
+
+def test_bypass_blocked_returns_evidence():
+    classifier = WorkflowTaskClassifier()
+    res = classifier.classify("i need to bypass this issue", False)
+    assert res["blocked"] is True
+    assert "clarification_message" in res
+    assert (
+        "Halt execution" in res["clarification_message"]
+        or len(res["clarification_message"]) > 5
+    )
