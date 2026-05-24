@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GitHub Issue Queue State",
+  "description": "Schema for validating queue checkpoint state.",
+  "type": "object",
+  "properties": {
+    "active_issue": {
+      "type": ["string", "integer"],
+      "description": "The active GitHub issue number or identifier."
+    },
+    "execution_lease_id": {
+      "type": "string",
+      "description": "Unique identifier for the current execution session."
+    },
+    "branch": {
+      "type": "string",
+      "description": "The git branch associated with this queue state."
+    },
+    "worktree": {
+      "type": "string",
+      "description": "The local path to the isolated worktree for this session."
+    },
+    "pr": {
+      "type": ["string", "null", "integer"],
+      "description": "The PR number or URL, if any."
+    },
+    "status": {
+      "type": "string",
+      "description": "The current status of the execution."
+    },
+    "github_truth_summary": {
+      "type": "string",
+      "description": "Snapshot of relevant GitHub API context to prevent stale continuations."
+    }
+  },
+  "required": [
+    "active_issue",
+    "execution_lease_id",
+    "branch",
+    "worktree"
+  ],
+  "additionalProperties": true
+}

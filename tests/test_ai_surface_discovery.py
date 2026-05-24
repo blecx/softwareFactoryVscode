@@ -63,20 +63,28 @@ def test_weak_descriptions():
             "Found weak AI surface discovery descriptions:\n" + "\n".join(failures)
         )
 
+
 def test_p0_routing_phrases():
     if not CATALOG_PATH.exists():
         pytest.skip(f"Catalog not found at {CATALOG_PATH}")
 
     with open(CATALOG_PATH, "r", encoding="utf-8") as f:
         catalog = json.load(f)
-        
-    catalog_by_file = {entry.get("file", "").replace("\\", "/"): entry.get("description", "") for entry in catalog}
+
+    catalog_by_file = {
+        entry.get("file", "").replace("\\", "/"): entry.get("description", "")
+        for entry in catalog
+    }
 
     required = {
         ".github/agents/resolve-issue.md": [r"one issue -> PR only"],
-        ".github/agents/pr-merge.md": [r"validation/merge only and no implementation fixes"],
-        ".github/agents/execute-approved-plan.md": [r"requires bounded GitHub-backed issue set"],
-        ".github/agents/harness-bypass-resolution.md": [r"human-only"]
+        ".github/agents/pr-merge.md": [
+            r"validation/merge only and no implementation fixes"
+        ],
+        ".github/agents/execute-approved-plan.md": [
+            r"requires bounded GitHub-backed issue set"
+        ],
+        ".github/agents/harness-bypass-resolution.md": [r"human-only"],
     }
 
     failures = []
@@ -84,11 +92,15 @@ def test_p0_routing_phrases():
         if file_path not in catalog_by_file:
             failures.append(f"{file_path}: missing from catalog")
             continue
-            
+
         desc = catalog_by_file[file_path]
         for pattern in patterns:
             if not re.search(pattern, desc, re.IGNORECASE):
-                failures.append(f"{file_path}: missing required pattern '{pattern}' in description")
-                
+                failures.append(
+                    f"{file_path}: missing required pattern '{pattern}' in description"
+                )
+
     if failures:
-        pytest.fail("Found missing required P0 routing phrases:\n" + "\n".join(failures))
+        pytest.fail(
+            "Found missing required P0 routing phrases:\n" + "\n".join(failures)
+        )
