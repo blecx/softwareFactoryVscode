@@ -5264,3 +5264,18 @@ def test_production_readiness_review_template_fields() -> None:
     assert (
         "docs-only assessment is" in template.lower() and "invalid" in template.lower()
     )
+
+
+def test_runtime_authority_traceability_matrix_anchors() -> None:
+    repo_root = Path(__file__).parent.parent
+    traceability_doc = (
+        repo_root / "docs" / "maintainer" / "RUNTIME-AUTHORITY-TRACEABILITY.md"
+    ).read_text(encoding="utf-8")
+    assert "**Non-normative.**" in traceability_doc
+    assert "ADR-013" in traceability_doc
+    assert "Blocking Requirement" in traceability_doc
+    assert "ADR Authority" in traceability_doc
+    assert "Implementation Surface" in traceability_doc
+    assert "Test / Proof" in traceability_doc
+    assert "Derived Docs" in traceability_doc
+    assert "**Evidence gap**" in traceability_doc
