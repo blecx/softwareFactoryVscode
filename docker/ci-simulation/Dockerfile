@@ -13,10 +13,11 @@ LABEL factory.ci_simulation="true"
 LABEL factory.ci_simulation.github_ci_base="ubuntu-latest"
 LABEL factory.ci_simulation.python_version="3.13"
 
-# Install git and build tools — git required by setup.sh and pytest helpers;
-# build-essential required by numpy and other packages that compile C extensions
+# Install git, build tools, and virtualenv — git required by setup.sh and pytest helpers;
+# build-essential required by numpy and other packages that compile C extensions;
+# virtualenv needed as fallback in setup.sh if python -m venv fails
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git build-essential \
+    && apt-get install -y --no-install-recommends git build-essential virtualenv \
     && rm -rf /var/lib/apt/lists/*
 
 # Trust any bind-mounted repository path so git commands work inside the container

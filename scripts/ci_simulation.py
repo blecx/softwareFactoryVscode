@@ -368,6 +368,13 @@ def create_simulation_checkout(repo_root: Path, worktree_parent: Path) -> Path |
     )
     if result.returncode != 0:
         return None
+
+    # Clean up any .venv in the clone (if somehow git tracked it, which shouldn't happen)
+    # This ensures Docker gets a fresh environment, not a host-compiled .venv
+    venv_path = checkout_path / ".venv"
+    if venv_path.exists():
+        shutil.rmtree(venv_path, ignore_errors=True)
+
     return checkout_path
 
 

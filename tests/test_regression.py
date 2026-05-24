@@ -2808,7 +2808,7 @@ def test_adr_catalog_summarizes_current_architecture_authority() -> None:
     assert "## Status summary" in adr_index
     assert "| Accepted ADRs | 15 |" in adr_index
     assert "| Superseded historical ADR notes | 1 |" in adr_index
-    assert "| Proposed ADRs | 0 |" in adr_index
+    assert "| Proposed ADRs | 1 |" in adr_index
     assert "## Accepted ADR catalog" in adr_index
     assert "ADR-001-AI-Workflow-Guardrails.md" in adr_index
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in adr_index
@@ -5326,3 +5326,29 @@ def test_production_fresh_checkout_command_construction_preserves_boundaries() -
 
     assert "--watchdog-seconds" in cmd
     assert cmd[cmd.index("--watchdog-seconds") + 1] == "1200"
+
+
+def test_adr_016_workflow_language_policy_present():
+    from pathlib import Path
+
+    repo_root = Path(__file__).parent.parent
+    """Ensure ADR-016 skeleton exists and enforces ubiquitous language per ADR-013."""
+    adr_path = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md"
+    )
+    assert adr_path.exists(), "ADR-016 must exist"
+    content = adr_path.read_text(encoding="utf-8")
+    assert "ADR-013" in content, "ADR-016 must reference ADR-013"
+    assert (
+        "MUST NOT redefine workflow architecture terms" in content
+        or "cannot define architecture language" in content.lower()
+        or "must not redefine" in content.lower()
+    )
+
+    adr_index = (repo_root / "docs" / "architecture" / "ADR-INDEX.md").read_text(
+        encoding="utf-8"
+    )
+    assert "ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md" in adr_index

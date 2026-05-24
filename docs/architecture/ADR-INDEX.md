@@ -15,7 +15,7 @@ Maintained synthesis docs, implementation plans, and historical notes remain sub
 | --- | ---: | --- |
 | Accepted ADRs | 15 | Current normative architecture guardrails and terminology. |
 | Superseded historical ADR notes | 1 | Historical traceability only; not a current authority source. |
-| Proposed ADRs | 0 | None currently listed in `docs/architecture/`. |
+| Proposed ADRs | 1 | Current candidate in `docs/architecture/`. |
 
 ## Accepted ADR catalog
 
@@ -42,3 +42,9 @@ Maintained synthesis docs, implementation plans, and historical notes remain sub
 [`ADR-007-Multi-Workspace-and-Shared-Services.md`](ADR-007-Multi-Workspace-and-Shared-Services.md) remains in this directory as a **Superseded** historical note.
 It is not part of the accepted catalog and must not be used as a current architecture authority.
 Keep using the accepted [`ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md`](ADR-007-Workspace-Port-Allocation-and-Generated-MCP-Endpoints.md) when you need the current ADR-007 source.
+
+## Proposed ADR catalog
+
+| ADR | Status | What it means | Why it matters |
+| --- | --- | --- | --- |
+| [`ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md`](ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md) | Proposed | Defines workflow ubiquitous language policy. | Prevents ambiguous workflow terminology from drifting in derived docs. |
