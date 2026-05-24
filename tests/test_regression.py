@@ -1422,7 +1422,9 @@ def test_install_doc_locks_practical_per_workspace_baseline():
     assert "closes the MCP harness readiness baseline" in install_doc
     assert "Reproducible closeout evidence for this baseline is:" in install_doc
     assert "./.venv/bin/pytest tests/test_regression.py -v" in install_doc
-    assert "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in install_doc
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in install_doc
+    )
     assert (
         "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
         in install_doc
@@ -2628,7 +2630,9 @@ def test_handout_and_cheat_sheet_reflect_explicit_runtime_lifecycle():
     assert "Retained images after `stop` or `cleanup` are expected" in cheat_sheet
     assert "## ✅ Readiness closeout evidence" in cheat_sheet
     assert "./.venv/bin/pytest tests/test_regression.py -v" in cheat_sheet
-    assert "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in cheat_sheet
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level merge" in cheat_sheet
+    )
     assert (
         "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
         in cheat_sheet
@@ -4002,7 +4006,9 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
         in readiness_doc
     )
     assert "--mode production" not in readiness_doc
-    assert "--mode" not in readiness_doc  # Make sure legacy mode isn't described as competing canonical authority
+    assert (
+        "--mode" not in readiness_doc
+    )  # Make sure legacy mode isn't described as competing canonical authority
     assert "strict_tenant_mode_blocks_cross_tenant_approval_leaks" in readiness_doc
     assert "stop_cleanup_retains_images_and_supports_restart" in readiness_doc
     assert (
@@ -4012,7 +4018,6 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
     assert ".tmp/production-readiness/latest.md" in readiness_doc
     assert "three consecutive clean runs" in readiness_doc
     assert "--fresh-checkout" in readiness_doc
-
 
 
 def test_workflow_doc_locks_production_level_wording():
@@ -4095,10 +4100,13 @@ def test_local_ci_parity_production_mode_writes_signoff_bundle_and_tracks_green_
     assert latest_report["status"] == "pass"
     assert latest_report["green_run"] is True
     assert latest_report["current_green_streak"] == 2
+    assert "durable_evidence_hint" in latest_report
+    assert latest_report["durable_evidence_hint"].startswith("ci-artifact-proof-")
     assert (
         latest_report["final_signoff_status"] == "pending-three-consecutive-green-runs"
     )
     assert "Consecutive clean runs: `2/3`" in latest_summary
+    assert "Durable evidence pointer: `ci-artifact-proof-" in latest_summary
     assert (
         "Internal production gate — Docker parity & recovery proofs" in latest_summary
     )
@@ -5054,7 +5062,7 @@ def test_local_ci_parity_help_distinguishes_official_from_legacy_mode() -> None:
         [sys.executable, str(repo_root / "scripts" / "local_ci_parity.py"), "--help"],
         capture_output=True,
         text=True,
-        check=True
+        check=True,
     )
 
     stdout = result.stdout
@@ -5253,4 +5261,6 @@ def test_production_readiness_review_template_fields() -> None:
     assert (
         "authority-chain" in template.lower() or "authority chain" in template.lower()
     )
-    assert "docs-only assessment is" in template.lower() and "invalid" in template.lower()
+    assert (
+        "docs-only assessment is" in template.lower() and "invalid" in template.lower()
+    )
