@@ -4014,6 +4014,19 @@ def test_production_readiness_docs_name_promoted_docker_e2e_gate():
     assert "--fresh-checkout" in readiness_doc
 
 
+
+def test_workflow_doc_locks_production_level_wording():
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    assert (
+        "./.venv/bin/python ./scripts/local_ci_parity.py --level production"
+        in workflow_doc
+    )
+    assert "--mode production" not in workflow_doc
+
+
 def test_local_ci_parity_production_mode_reports_missing_required_docs_as_blocking(
     monkeypatch, tmp_path: Path, capsys
 ):
