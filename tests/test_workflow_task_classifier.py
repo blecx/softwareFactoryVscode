@@ -108,3 +108,9 @@ def test_bypass_blocked_returns_evidence():
         "Halt execution" in res["clarification_message"]
         or len(res["clarification_message"]) > 5
     )
+
+
+def test_missing_language_config_flag():
+    classifier = WorkflowTaskClassifier(config_path="missing_file.yml")
+    result = classifier.classify("resolve issue 123", False)
+    assert result["language_config_missing"] is True
