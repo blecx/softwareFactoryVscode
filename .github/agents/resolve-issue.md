@@ -36,7 +36,7 @@ This file is a VS Code discovery wrapper. Keep workflow logic in `.copilot/skill
 
 ## Hard Rules
 
-- Require executing workflow preflight or manifest-backed routing checks before action.
+- Require executing workflow preflight or manifest-backed routing checks before action, and cite preflight result evidence in handoff or closeout narration.
 - Keep one issue per PR.
 - Explicitly hand off the review-ready PR to `@pr-merge` rather than merging it directly.
 - Re-anchor from `.tmp/github-issue-queue-state.md`, the active worktree/branch, and fresh GitHub truth before implementation, repair, validation, or PR narration on an in-flight slice.

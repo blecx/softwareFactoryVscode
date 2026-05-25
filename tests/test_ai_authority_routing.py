@@ -144,9 +144,7 @@ def test_p0_wrappers_require_preflight():
     ]
     failures = []
     required_phrases = [
-        "workflow preflight",
-        "routing-manifest",
-        "manifest-backed routing",
+        "preflight result evidence",
     ]
     for wrapper in p0_wrappers:
         full_path = REPO_ROOT / wrapper
@@ -154,11 +152,11 @@ def test_p0_wrappers_require_preflight():
             content = full_path.read_text(encoding="utf-8").lower()
             if not any(phrase in content for phrase in required_phrases):
                 failures.append(
-                    f"{wrapper}: missing workflow preflight or manifest-backed routing checks lock"
+                    f"{wrapper}: missing requirement for preflight result evidence in handoff"
                 )
 
     if failures:
         pytest.fail(
-            "P0 wrappers must explicitly mention workflow preflight or manifest-backed routing checks before action:\n"
+            "P0 wrappers must require preflight result evidence in handoff or closeout:\n"
             + "\n".join(failures)
         )

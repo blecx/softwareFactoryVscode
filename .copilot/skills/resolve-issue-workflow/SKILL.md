@@ -91,7 +91,7 @@ Prefer tool-driven discovery over pasting large context into chat.
 
 ## Validation Baseline
 - Include command outputs/evidence in PR body.
-- For PR handoff/readiness evidence, include `./.venv/bin/python ./scripts/local_ci_parity.py --level merge` plus the exact `./.venv/bin/python ./scripts/noninteractive_gh.py ...` GitHub-truth commands that support the current checkpoint state.
+- For PR handoff/readiness evidence, include preflight result evidence,  `./.venv/bin/python ./scripts/local_ci_parity.py --level merge` plus the exact `./.venv/bin/python ./scripts/noninteractive_gh.py ...` GitHub-truth commands that support the current checkpoint state.
 
 ## Repo Rules
 - Select backend/TUI/CLI issues before client/UX issues.
