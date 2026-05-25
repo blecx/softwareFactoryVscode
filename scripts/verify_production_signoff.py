@@ -320,6 +320,51 @@ class NormalizedRunEvidence:
     jobs: List[JobEvidence]
 
 
+def classify_run(
+    run: NormalizedRunEvidence,
+    target_branch: str,
+    target_sha: str,
+    required_jobs: List[str],
+) -> Tuple[str, str]:
+    if run.branch != target_branch:
+        return (
+            "non_production_lane",
+            f"Run branch '{run.branch}' does not match target '{target_branch}'",
+        )
+
+    if run.status != "completed":
+        return "pending", f"Run status is '{run.status}'"
+
+    if run.conclusion == "skipped":
+        return "skipped", "Run was skipped entirely"
+
+    if run.conclusion == "cancelled":
+        if run.head_sha != target_sha:
+            return (
+                "cancelled_superseded",
+                f"Cancelled run for superseded SHA '{run.head_sha}'",
+            )
+        else:
+            return "cancelled_blocking_unknown", "Run for target SHA was cancelled"
+
+    if run.conclusion == "success":
+        run_jobs_map = {j.name: j for j in run.jobs}
+        for rj in required_jobs:
+            if rj not in run_jobs_map:
+                return "skipped", f"Required job '{rj}' is missing"
+            if run_jobs_map[rj].conclusion == "skipped":
+                return "skipped", f"Required job '{rj}' was skipped"
+            if run_jobs_map[rj].conclusion != "success":
+                return (
+                    "eligible_failure",
+                    f"Required job '{rj}' failed with conclusion '{run_jobs_map[rj].conclusion}'",
+                )
+
+        return "eligible_success", "Run succeeded and all required jobs are successful"
+
+    return "eligible_failure", f"Run failed with conclusion '{run.conclusion}'"
+
+
 def compute_green_streak(
     history: List[NormalizedRunEvidence],
     target_branch: str,
@@ -330,38 +375,29 @@ def compute_green_streak(
     blockers = []
 
     for run in history:
-        if run.branch != target_branch:
-            continue
-
-        if run.head_sha != target_sha:
+        classification, reason = classify_run(
+            run, target_branch, target_sha, required_jobs
+        )
+        if classification == "eligible_success":
+            streak += 1
+        elif classification == "eligible_failure":
+            blockers.append(f"Run {run.run_id} failed: {reason}")
             break
-
-        if run.status != "completed":
-            blockers.append(
-                f"Run {run.run_id} is pending/unknown (status: {run.status})."
-            )
+        elif classification == "cancelled_blocking_unknown":
+            blockers.append(f"Run {run.run_id} cancelled: {reason}")
             break
-
-        if run.conclusion != "success":
-            blockers.append(f"Run {run.run_id} failed (conclusion: {run.conclusion}).")
+        elif classification == "pending":
+            blockers.append(f"Run {run.run_id} pending: {reason}")
             break
-
-        run_jobs_map = {j.name: j for j in run.jobs}
-        job_failed = False
-        for rj in required_jobs:
-            if rj not in run_jobs_map:
-                blockers.append(f"Run {run.run_id} missing required job: {rj}")
-                job_failed = True
-            elif run_jobs_map[rj].conclusion != "success":
-                blockers.append(f"Run {run.run_id} required job {rj} failed")
-                job_failed = True
-
-        if job_failed:
-            break
-
-        streak += 1
-
-    return streak, blockers
+        elif classification == "cancelled_superseded":
+            pass
+        elif classification == "skipped":
+            if run.head_sha == target_sha:
+                blockers.append(f"Run {run.run_id} skipped: {reason}")
+                break
+            # older runs being skipped do not interrupt streak, we keep evaluating older ones
+        elif classification == "non_production_lane":
+            pass
 
 
 def get_github_history(branch: str, workflow_name: str) -> List[NormalizedRunEvidence]:
@@ -435,64 +471,6 @@ def fetch_github_history(
             for j in jobs_data.get("jobs", []):
                 jobs.append(
                     JobEvidence(name=j.get("name"), conclusion=j.get("conclusion"))
-                )
-        except Exception:
-            pass
-
-        history.append(
-            NormalizedRunEvidence(
-                run_id=str(r["databaseId"]),
-                branch=r.get("headBranch", ""),
-                head_sha=r.get("headSha", ""),
-                status=r.get("status", ""),
-                conclusion=r.get("conclusion", ""),
-                jobs=jobs,
-            )
-        )
-
-    return history
-
-
-def fetch_github_history(
-    branch: str, workflow_name: str, limit: int = 10
-) -> List[NormalizedRunEvidence]:
-    import json
-    import subprocess
-
-    cmd = [
-        "gh",
-        "run",
-        "list",
-        "--branch",
-        branch,
-        "--workflow",
-        workflow_name,
-        "--limit",
-        str(limit),
-        "--json",
-        "databaseId,headSha,headBranch,status,conclusion",
-    ]
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        runs_data = json.loads(res.stdout)
-    except Exception:
-        return []
-
-    history = []
-    for r in runs_data:
-        jobs = []
-        try:
-            cmd_jobs = ["gh", "run", "view", str(r["databaseId"]), "--json", "jobs"]
-            res_jobs = subprocess.run(
-                cmd_jobs, capture_output=True, text=True, check=True
-            )
-            jobs_data = json.loads(res_jobs.stdout)
-            for j in jobs_data.get("jobs", []):
-                jobs.append(
-                    JobEvidence(
-                        name=str(j.get("name", "")),
-                        conclusion=str(j.get("conclusion", "")),
-                    )
                 )
         except Exception:
             pass

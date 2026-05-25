@@ -350,3 +350,135 @@ def test_verify_ci_evidence_cancelled_run(mock_run):
     assert any(
         "GitHub run 12345 conclusion is not success" in b for b in result["blockers"]
     )
+
+
+import pytest
+
+from scripts.verify_production_signoff import (
+    JobEvidence,
+    NormalizedRunEvidence,
+    classify_run,
+)
+
+
+def test_classify_non_production_lane():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="feature",
+        head_sha="abc",
+        status="completed",
+        conclusion="success",
+        jobs=[],
+    )
+    classification, reason = classify_run(run, "main", "abc", [])
+    assert classification == "non_production_lane"
+    assert "does not match target" in reason
+
+
+def test_classify_pending():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="main",
+        head_sha="abc",
+        status="in_progress",
+        conclusion="",
+        jobs=[],
+    )
+    classification, reason = classify_run(run, "main", "abc", [])
+    assert classification == "pending"
+
+
+def test_classify_skipped_entirely():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="main",
+        head_sha="abc",
+        status="completed",
+        conclusion="skipped",
+        jobs=[],
+    )
+    classification, reason = classify_run(run, "main", "abc", [])
+    assert classification == "skipped"
+
+
+def test_classify_superseded_cancellation():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="main",
+        head_sha="old_sha",
+        status="completed",
+        conclusion="cancelled",
+        jobs=[],
+    )
+    classification, reason = classify_run(run, "main", "new_sha", [])
+    assert classification == "cancelled_superseded"
+    assert "superseded SHA 'old_sha'" in reason
+
+
+def test_classify_unknown_cancellation():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="main",
+        head_sha="target_sha",
+        status="completed",
+        conclusion="cancelled",
+        jobs=[],
+    )
+    classification, reason = classify_run(run, "main", "target_sha", [])
+    assert classification == "cancelled_blocking_unknown"
+    assert "target SHA was cancelled" in reason
+
+
+def test_classify_skipped_required_job():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="main",
+        head_sha="abc",
+        status="completed",
+        conclusion="success",
+        jobs=[JobEvidence(name="test", conclusion="skipped")],
+    )
+    classification, reason = classify_run(run, "main", "abc", ["test"])
+    assert classification == "skipped"
+    assert "Required job 'test' was skipped" in reason
+
+
+def test_classify_missing_required_job():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="main",
+        head_sha="abc",
+        status="completed",
+        conclusion="success",
+        jobs=[],
+    )
+    classification, reason = classify_run(run, "main", "abc", ["test"])
+    assert classification == "skipped"
+    assert "Required job 'test' is missing" in reason
+
+
+def test_classify_failed_required_job():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="main",
+        head_sha="abc",
+        status="completed",
+        conclusion="success",
+        jobs=[JobEvidence(name="test", conclusion="failure")],
+    )
+    classification, reason = classify_run(run, "main", "abc", ["test"])
+    assert classification == "eligible_failure"
+    assert "Required job 'test' failed" in reason
+
+
+def test_classify_success():
+    run = NormalizedRunEvidence(
+        run_id="1",
+        branch="main",
+        head_sha="abc",
+        status="completed",
+        conclusion="success",
+        jobs=[JobEvidence(name="test", conclusion="success")],
+    )
+    classification, reason = classify_run(run, "main", "abc", ["test"])
+    assert classification == "eligible_success"
