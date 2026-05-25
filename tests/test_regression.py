@@ -5271,6 +5271,16 @@ def test_production_readiness_checklist_anchors():
     assert (
         "production_readiness_score.py" in content
     ), "Checklist must explicitly demand script execution"
+    assert (
+        ">90 percent production gate" in content.lower()
+    ), "Checklist must include >90 percent gate"
+    assert (
+        "traceability complete" in content.lower()
+    ), "Checklist must check for traceability gaps"
+    assert "runtime proof" in content.lower(), "Checklist must check for runtime proof"
+    assert (
+        "signoff evidence" in content.lower()
+    ), "Checklist must check for signoff evidence"
 
 
 def test_production_readiness_review_template_fields() -> None:
@@ -5283,8 +5293,10 @@ def test_production_readiness_review_template_fields() -> None:
     assert "validation sources" in template.lower()
     assert "derived docs checked" in template.lower()
     assert "mismatch classification" in template.lower()
-    assert "signoff evidence" in template.lower()
-    assert "score (required)" in template.lower()
+    assert "signoff evidence (required for >90% gate)" in template.lower()
+    assert "score (required for >90% gate)" in template.lower()
+    assert "traceability (required for >90% gate)" in template.lower()
+    assert "runtime proof (required for >90% gate)" in template.lower()
     assert "production_readiness_score.py" in template.lower()
     assert "blockers" in template.lower()
     assert "adr_013_loaded" in template.lower()
