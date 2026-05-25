@@ -37,12 +37,44 @@ def test_valid_minimal_evidence():
         "evidence": {"docs": True, "implementation": True, "validation": True},
         "traceability": get_valid_traceability(),
         "signoff_evidence": ".tmp/production-readiness/latest.json",
+        "green_streak_count": 3,
     }
     result = score_readiness(input_data)
     assert result["ready"]
     assert len(result["blockers"]) == 0
     assert result["score_inputs"]["adrs_present"] == 1
     assert result["score_inputs"]["docs"] is True
+
+
+def test_green_streak_count_insufficient():
+    for count in [0, 1, 2]:
+        input_data = {
+            "adrs": ["ADR-013"],
+            "evidence": {"docs": True, "implementation": True, "validation": True},
+            "traceability": get_valid_traceability(),
+            "signoff_evidence": ".tmp/production-readiness/latest.json",
+            "green_streak_count": count,
+        }
+        result = score_readiness(input_data)
+        assert not result["ready"]
+        assert (
+            "Production gate requires 3 consecutive clean signoff runs."
+            in result["blockers"]
+        )
+
+
+def test_green_streak_count_sufficient():
+    for count in [3, 4, 10]:
+        input_data = {
+            "adrs": ["ADR-013"],
+            "evidence": {"docs": True, "implementation": True, "validation": True},
+            "traceability": get_valid_traceability(),
+            "signoff_evidence": ".tmp/production-readiness/latest.json",
+            "green_streak_count": count,
+        }
+        result = score_readiness(input_data)
+        assert result["ready"]
+        assert len(result["blockers"]) == 0
 
 
 def test_missing_implementation_and_validation():

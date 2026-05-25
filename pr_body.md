@@ -1,14 +1,21 @@
-Resolves #483.
+Resolves #484.
 
 ## Changes
-- Implemented CI evidence optional checking in `scripts/production_readiness_evidence.py`.
-- Updated `verify_production_signoff.py` adding `verify_ci_evidence` to validate strictly exact fields (`run_id`, `head_sha`, `job_name`, `conclusion`).
-- Added robust tests in `test_production_readiness_evidence.py` and `test_verify_production_signoff.py` for CI evidence verification.
+- Extend production readiness score checker to read `green_streak_count`.
+- Fail readiness when count is below 3.
+- Blocker correctly explains the three-run rule ("Production gate requires 3 consecutive clean signoff runs.").
+- Keep current production gate behavior unchanged.
+- Covered all configurations in unit testing.
 
 ## Evidence
+- Local unit tests pass.
+- ADR-013 applied first and respected throughout the scope.
+- ADR-016 / ADR-017 ownership boundaries respected.
+
+## Validation
 ```
-="../../../.venv/bin/python -m pytest tests/test_production_readiness_evidence.py tests/test_verify_production_signoff.py
-============================= test session starts ==============================
-18 passed in 0.22s
+14 passed in 0.21s
 ```
-Architecture decisions (ADR-013) were treated as authority.
+```
+Local CI-parity checks passed.
+```

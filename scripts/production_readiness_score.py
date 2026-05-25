@@ -36,6 +36,10 @@ def score_readiness(input_data: Dict[str, Any]) -> Dict[str, Any]:
     if not input_data.get("signoff_evidence"):
         blockers.append("Missing signoff evidence pointer/verifier output.")
 
+    green_streak_count = input_data.get("green_streak_count", 0)
+    if green_streak_count < 3:
+        blockers.append("Production gate requires 3 consecutive clean signoff runs.")
+
     input_score = {
         "adrs_present": len(input_data.get("adrs", [])),
         "docs": has_docs,

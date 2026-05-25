@@ -16,6 +16,7 @@ def valid_review_input() -> Dict[str, Any]:
         "evidence": {"docs": True, "implementation": True, "validation": True},
         "traceability": traceability,
         "signoff_evidence": "verified",
+        "green_streak_count": 3,
     }
 
 
