@@ -6,5 +6,9 @@ Resolves #483.
 - Added robust tests in `test_production_readiness_evidence.py` and `test_verify_production_signoff.py` for CI evidence verification.
 
 ## Evidence
-Local CI-parity checks passed.
+```
+="../../../.venv/bin/python -m pytest tests/test_production_readiness_evidence.py tests/test_verify_production_signoff.py
+============================= test session starts ==============================
+18 passed in 0.22s
+```
 Architecture decisions (ADR-013) were treated as authority.
