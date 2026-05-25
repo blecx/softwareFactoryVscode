@@ -107,3 +107,33 @@ def test_aggregate_evidence_ci_evidence_failure(mock_verify, valid_review_input)
     assert len(result["blockers"]) > 0
     assert any("Missing required CI field: 'run_url'" in b for b in result["blockers"])
     assert any("CI signoff conclusion is not success" in b for b in result["blockers"])
+
+
+def test_aggregate_evidence_strict_missing_ci(valid_review_input, valid_signoff_file):
+    result = aggregate_evidence(
+        valid_review_input, valid_signoff_file, strict_verification=True
+    )
+    assert result["ready"] is False
+    assert any(
+        "GitHub verification is missing in authoritative mode" in b
+        for b in result["blockers"]
+    )
+    assert result["references"]["authoritative"] is False
+    assert result["references"]["mode"] == "strict"
+
+
+@patch("scripts.production_readiness_evidence.verify_ci_evidence")
+def test_aggregate_evidence_strict_with_ci(
+    mock_verify, valid_review_input, valid_ci_evidence
+):
+    mock_verify.return_value = {"valid": True, "blockers": []}
+    result = aggregate_evidence(
+        valid_review_input,
+        "non_existent_file.json",
+        ci_evidence=valid_ci_evidence,
+        strict_verification=True,
+    )
+    assert result["ready"] is True
+    assert len(result["blockers"]) == 0
+    assert result["references"]["authoritative"] is True
+    assert result["references"]["mode"] == "strict"

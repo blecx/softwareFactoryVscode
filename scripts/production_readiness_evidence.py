@@ -19,10 +19,15 @@ def aggregate_evidence(
     review_input: Dict[str, Any],
     signoff_filepath: str,
     ci_evidence: Dict[str, Any] = None,
+    strict_verification: bool = False,
 ) -> Dict[str, Any]:
+    blockers = []
+    authoritative = False
+
     if ci_evidence is not None:
         signoff_result = verify_ci_evidence(ci_evidence)
         source = "github-ci"
+        authoritative = True
 
         # Inject computed streak evidence
         from verify_production_signoff import fetch_github_history
@@ -62,14 +67,21 @@ def aggregate_evidence(
     else:
         signoff_result = verify_signoff(signoff_filepath)
         source = "local-file"
+        authoritative = False
+
+    if strict_verification and not authoritative:
+        blockers.append("GitHub verification is missing in authoritative mode.")
 
     score_result = score_readiness(review_input)
 
-    blockers = []
     blockers.extend(signoff_result.get("blockers", []))
     blockers.extend(score_result.get("blockers", []))
 
-    references = {"source": source}
+    references = {
+        "source": source,
+        "authoritative": authoritative,
+        "mode": "strict" if strict_verification else "offline/fixture",
+    }
     if source == "local-file":
         references["signoff_file"] = signoff_filepath
     else:
@@ -107,6 +119,11 @@ def main():
         default=None,
         help="JSON string or file path containing CI evidence",
     )
+    parser.add_argument(
+        "--strict-verification",
+        action="store_true",
+        help="Enforce authoritative mode for CI evidence",
+    )
     args = parser.parse_args()
 
     try:
@@ -131,7 +148,12 @@ def main():
             print(json.dumps({"error": f"Invalid JSON CI evidence: {e}"}))
             sys.exit(1)
 
-    result = aggregate_evidence(input_data, args.signoff_file, ci_evidence_data)
+    result = aggregate_evidence(
+        input_data,
+        args.signoff_file,
+        ci_evidence_data,
+        strict_verification=args.strict_verification,
+    )
     print(json.dumps(result, indent=2))
 
     if not result["ready"]:
