@@ -59,6 +59,27 @@ def check_dict_for_secrets(data: Dict[str, Any], path: str = "") -> List[str]:
     return violations
 
 
+def verify_ci_evidence(ci_evidence: Dict[str, Any]) -> Dict[str, Any]:
+    if not ci_evidence:
+        return {"valid": False, "blockers": ["No CI evidence provided."]}
+
+    blockers = []
+    required_fields = ["run_id", "head_sha", "job_name", "conclusion"]
+    for field in required_fields:
+        if field not in ci_evidence:
+            blockers.append(f"Missing required CI field: '{field}'")
+
+    if "conclusion" in ci_evidence and ci_evidence["conclusion"] != "success":
+        blockers.append(
+            f"CI signoff conclusion is not success: {ci_evidence['conclusion']}"
+        )
+
+    secret_violations = check_dict_for_secrets(ci_evidence)
+    blockers.extend(secret_violations)
+
+    return {"valid": len(blockers) == 0, "blockers": blockers}
+
+
 def verify_signoff(filepath: str) -> Dict[str, Any]:
     if not os.path.exists(filepath):
         return {
