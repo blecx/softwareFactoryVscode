@@ -86,3 +86,16 @@ class SubagentResultGuard:
             )
 
         return data
+
+
+if __name__ == "__main__":
+    import sys
+
+    payload = sys.stdin.read()
+    try:
+        SubagentResultGuard.validate_result(payload)
+        print("OK")
+        sys.exit(0)
+    except SubagentNoOpError as e:
+        print(f"Subagent No-Op Error: {e}", file=sys.stderr)
+        sys.exit(1)
