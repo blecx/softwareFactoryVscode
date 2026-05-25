@@ -25,6 +25,13 @@ def run_preflight(
         else os.path.join(os.path.dirname(__file__), "..", manifest_path)
     )
 
+    if not os.path.exists(target_manifest):
+        return {
+            "safe_to_continue": False,
+            "required_agent": c_result.get("required_agent"),
+            "blockers": [f"Missing routing manifest: {manifest_path}"],
+        }
+
     try:
         with open(target_manifest, "r", encoding="utf-8") as f:
             routing_manifest = json.load(f)
