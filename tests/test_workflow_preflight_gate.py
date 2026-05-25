@@ -100,3 +100,63 @@ def test_verify_preflight_evidence_passes(repo_root):
 
     record_preflight_evidence("auth-key", "@test-agent", "passed", repo_root)
     verify_preflight_evidence("auth-key", "@test-agent", 300, repo_root)
+
+
+def test_exact_state_matching_passes(repo_root):
+    record_preflight_evidence(
+        "auth-key",
+        "@test-agent",
+        "passed",
+        repo_root,
+        issue_number="533",
+        branch="issue-533",
+    )
+
+    result = require_safe_preflight(
+        "auth-key",
+        "@test-agent",
+        300,
+        repo_root,
+        exact_state={"issue_number": "533", "branch": "issue-533"},
+    )
+    assert result["safe_to_continue"]
+    assert not result["blockers"]
+
+
+def test_exact_state_missing_blocks(repo_root):
+    record_preflight_evidence(
+        "auth-key", "@test-agent", "passed", repo_root, issue_number="533"
+    )  # Missing branch
+
+    result = require_safe_preflight(
+        "auth-key",
+        "@test-agent",
+        300,
+        repo_root,
+        exact_state={"issue_number": "533", "branch": "issue-533"},
+    )
+    assert not result["safe_to_continue"]
+    assert any("missing expected field 'branch'" in b for b in result["blockers"])
+
+
+def test_exact_state_mismatch_blocks(repo_root):
+    record_preflight_evidence(
+        "auth-key",
+        "@test-agent",
+        "passed",
+        repo_root,
+        issue_number="533",
+        branch="main",
+    )
+
+    result = require_safe_preflight(
+        "auth-key",
+        "@test-agent",
+        300,
+        repo_root,
+        exact_state={"issue_number": "533", "branch": "issue-533"},
+    )
+    assert not result["safe_to_continue"]
+    assert any(
+        "Exact state validation failed for 'branch'" in b for b in result["blockers"]
+    )
