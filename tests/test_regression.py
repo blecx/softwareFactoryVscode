@@ -2832,12 +2832,13 @@ def test_adr_catalog_summarizes_current_architecture_authority() -> None:
     assert "complements [`INDEX.md`](INDEX.md)" in adr_index
     assert "accepted ADRs are the normative architecture source" in adr_index
     assert "## Status summary" in adr_index
-    assert "| Accepted ADRs | 16 |" in adr_index
+    assert "| Accepted ADRs | 17 |" in adr_index
     assert "| Superseded historical ADR notes | 1 |" in adr_index
     assert "| Proposed ADRs | 0 |" in adr_index
     assert "## Accepted ADR catalog" in adr_index
     assert "ADR-001-AI-Workflow-Guardrails.md" in adr_index
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in adr_index
+    assert "ADR-017-Host-Project-Ubiquitous-Language-Boundary.md" in adr_index
     assert (
         "ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md"
         in adr_index
@@ -5396,6 +5397,26 @@ def test_adr_016_workflow_language_policy_present():
     )
     assert "ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md" in adr_index
     assert "Accepted" in content
+
+
+def test_adr_017_machine_readable_boundary_persists():
+    from pathlib import Path
+
+    repo_root = Path(__file__).parent.parent
+    adr_path = (
+        repo_root
+        / "docs"
+        / "architecture"
+        / "ADR-017-Host-Project-Ubiquitous-Language-Boundary.md"
+    )
+    assert adr_path.exists(), "ADR-017 must exist"
+    content = adr_path.read_text(encoding="utf-8")
+    assert "ADR-012" in content
+    assert "ADR-013" in content
+    assert "ADR-016" in content
+    assert ".copilot/project-language.yml" in content
+    assert "MUST NOT" in content
+    assert "host project owns its ubiquitous domain language" in content.lower()
 
 
 def test_workflow_ubiquitous_language_guide_anchors():
