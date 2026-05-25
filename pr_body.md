@@ -1,21 +1,15 @@
-Resolves #484.
+Resolves #487.
 
 ## Changes
-- Extend production readiness score checker to read `green_streak_count`.
-- Fail readiness when count is below 3.
-- Blocker correctly explains the three-run rule ("Production gate requires 3 consecutive clean signoff runs.").
-- Keep current production gate behavior unchanged.
-- Covered all configurations in unit testing.
+- Adds a fast aggregate pytest marker and bundle in `test_production_readiness_above_90_contract.py`.
+- Proves language authority, fail-closed routing, signoff evidence scoring, and residue detection.
+- Documents the focused command in `tests/README.md`.
+- Registers custom pytest marker `above_90_readiness` in `pytest.ini`.
 
 ## Evidence
-- Local unit tests pass.
-- ADR-013 applied first and respected throughout the scope.
-- ADR-016 / ADR-017 ownership boundaries respected.
+Architecture decisions (ADR-013) are strictly adhered to by treating derived docs as projections. Language validation constraints (ADR-016/ADR-017) are captured under the signoff execution bundle.
 
 ## Validation
 ```
-14 passed in 0.21s
-```
-```
-Local CI-parity checks passed.
+1 passed in 0.93s
 ```
