@@ -6,6 +6,23 @@ if [[ "$1" == "--force-bypass" ]]; then
   exit 0
 fi
 
+# Run python preflight gate
+if ! python3 -c "
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd())))
+from scripts.workflow_preflight_gate import verify_preflight_evidence
+try:
+    verify_preflight_evidence('issue-workflow', 'copilot-workspace', 300)
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+    print(f'Preflight gate failed: {e}', file=sys.stderr)
+    sys.exit(1)
+"; then
+    exit 1
+fi
+
 if [[ ! -f ".tmp/validation-receipt.json" ]]; then
   echo "❌ Missing .tmp/validation-receipt.json! You must validate first."
   exit 1
