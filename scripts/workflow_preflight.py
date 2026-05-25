@@ -10,6 +10,68 @@ except ImportError:
     from workflow_task_classifier import WorkflowTaskClassifier
 
 
+def load_and_validate_manifest(manifest_path):
+    """
+    Loads the routing manifest and validates its schema inline.
+    Returns (manifest_data, blockers_list)
+    """
+    if not os.path.exists(manifest_path):
+        return None, [f"Missing routing manifest: {manifest_path}"]
+
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            routing_manifest = json.load(f)
+    except json.JSONDecodeError as e:
+        return None, [f"Routing manifest contains invalid JSON: {e}"]
+    except Exception as e:
+        return None, [f"Failed to load routing manifest: {e}"]
+
+    if not routing_manifest:
+        return routing_manifest, ["Routing manifest is empty"]
+
+    if not isinstance(routing_manifest, list):
+        return routing_manifest, [
+            "Routing manifest schema validation failed: Routing manifest must be a JSON array"
+        ]
+
+    schema_blockers = []
+    seen_agents = set()
+    for i, route in enumerate(routing_manifest):
+        if not isinstance(route, dict):
+            schema_blockers.append(f"Route[{i}] is not an object")
+            continue
+
+        agent = route.get("agent")
+        if agent is not None:
+            if agent in seen_agents:
+                schema_blockers.append(f"Invalid route {agent}: duplicate agent name")
+            seen_agents.add(agent)
+
+        missing = []
+        for field in ["agent", "task_kinds", "requirements", "human_only"]:
+            if field not in route:
+                missing.append(field)
+
+        task_kinds = route.get("task_kinds")
+        if task_kinds is not None and not task_kinds:
+            schema_blockers.append(
+                f"Invalid route {agent or f'Route[{i}]'}: task_kinds cannot be empty"
+            )
+
+        if missing:
+            name = agent or f"Route[{i}]"
+            schema_blockers.append(
+                f"Invalid route {name}: missing {', '.join(missing)}"
+            )
+
+    if schema_blockers:
+        return routing_manifest, [
+            f"Routing manifest schema validation failed: {'; '.join(schema_blockers)}"
+        ]
+
+    return routing_manifest, []
+
+
 def run_preflight(
     request_text,
     is_human_activated,
@@ -25,76 +87,12 @@ def run_preflight(
         else os.path.join(os.path.dirname(__file__), "..", manifest_path)
     )
 
-    if not os.path.exists(target_manifest):
+    routing_manifest, manifest_blockers = load_and_validate_manifest(target_manifest)
+    if manifest_blockers:
         return {
             "safe_to_continue": False,
             "required_agent": c_result.get("required_agent"),
-            "blockers": [f"Missing routing manifest: {manifest_path}"],
-        }
-
-    try:
-        with open(target_manifest, "r", encoding="utf-8") as f:
-            routing_manifest = json.load(f)
-    except Exception as e:
-        routing_manifest = []
-
-    # Validate routing manifest shape
-    schema_blockers = []
-    if isinstance(routing_manifest, list):
-        for i, route in enumerate(routing_manifest):
-            if not isinstance(route, dict):
-                schema_blockers.append(f"Route[{i}] is not an object")
-                continue
-            missing = []
-            for field in ["agent", "task_kinds", "requirements", "human_only"]:
-                if field not in route:
-                    missing.append(field)
-            if missing:
-                name = route.get("agent", f"Route[{i}]")
-                schema_blockers.append(
-                    f"Invalid route {name}: missing {', '.join(missing)}"
-                )
-    else:
-        schema_blockers.append("Routing manifest must be a JSON array")
-
-    if schema_blockers:
-        return {
-            "safe_to_continue": False,
-            "required_agent": c_result.get("required_agent"),
-            "blockers": [
-                f"Routing manifest schema validation failed: {'; '.join(schema_blockers)}"
-            ],
-        }
-
-    # Validate routing manifest shape
-    schema_path = os.path.join(
-        os.path.dirname(__file__), "..", "schemas", "agent-routing-contract.schema.json"
-    )
-    # Actually, the issue says: Load existing routing schema if present, or add a minimal validation helper.
-    # Reject missing agent, task_kinds, requirements, or human_only fields.
-    # Return blockers in preflight JSON.
-    schema_blockers = []
-    if isinstance(routing_manifest, list):
-        for i, route in enumerate(routing_manifest):
-            missing = []
-            for field in ["agent", "task_kinds", "requirements", "human_only"]:
-                if field not in route:
-                    missing.append(field)
-            if missing:
-                name = route.get("agent", f"Route[{i}]")
-                schema_blockers.append(
-                    f"Invalid route {name}: missing {', '.join(missing)}"
-                )
-    else:
-        schema_blockers.append("Routing manifest must be a JSON array.")
-
-    if schema_blockers:
-        return {
-            "safe_to_continue": False,
-            "required_agent": c_result.get("required_agent"),
-            "blockers": [
-                f"Routing manifest schema validation failed: {'; '.join(schema_blockers)}"
-            ],
+            "blockers": manifest_blockers,
         }
 
     # Initialize response
@@ -125,17 +123,31 @@ def run_preflight(
             result["blockers"].append(msg)
 
     # Map explicit issue request to resolve-issue route
+    # (Note: earlier code did this before looking at routing_manifest)
     if c_result.get("task_kind") == "issue":
         result["required_agent"] = "@resolve-issue"
 
+    if not routing_manifest:
+        result["safe_to_continue"] = False
+        result["blockers"].append("Routing manifest is empty")
+        return result
+
     # Evaluate against routing manifest
+    agent_found = False
     for route in routing_manifest:
         if route.get("agent") == result.get("required_agent"):
+            agent_found = True
             if route.get("human_only") and not is_human_activated:
                 result["safe_to_continue"] = False
                 msg = f"{route.get('agent')} requires explicit human evidence."
                 if msg not in result["blockers"]:
                     result["blockers"].append(msg)
+
+    if result.get("required_agent") and not agent_found:
+        result["safe_to_continue"] = False
+        result["blockers"].append(
+            f"Required agent '{result.get('required_agent')}' not found in routing manifest."
+        )
 
     return result
 
