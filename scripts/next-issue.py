@@ -43,6 +43,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from factory_runtime.agents.tooling.gh_throttle import run_gh_throttled
+from scripts.workflow_preflight_gate import verify_preflight_evidence
 
 PLACEHOLDER_REPOS = {"YOUR_ORG/YOUR_REPO", "YOUR_ORG/YOUR_CLIENT_REPO"}
 
@@ -1008,6 +1009,11 @@ def format_issue_recommendation(
 
 def main():
     """Main entry point with timeout protection"""
+    from scripts.workflow_preflight_gate import verify_preflight_evidence
+
+    verify_preflight_evidence(
+        "issue-workflow", "copilot-workspace", 300, str(REPO_ROOT)
+    )
     import argparse
 
     parser = argparse.ArgumentParser(

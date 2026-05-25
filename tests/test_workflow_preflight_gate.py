@@ -82,3 +82,21 @@ def test_corrupted_evidence(repo_root):
     result = require_safe_preflight("auth-key", "@test-agent", 300, repo_root)
     assert not result["safe_to_continue"]
     assert any("Failed to read preflight evidence" in b for b in result["blockers"])
+
+
+def test_verify_preflight_evidence_exits_on_failure(repo_root):
+    with pytest.raises(SystemExit) as exc_info:
+        from scripts.workflow_preflight_gate import verify_preflight_evidence
+
+        verify_preflight_evidence("missing-key", "@test-agent", 300, repo_root)
+    assert exc_info.value.code == 1
+
+
+def test_verify_preflight_evidence_passes(repo_root):
+    from scripts.workflow_preflight_gate import (
+        record_preflight_evidence,
+        verify_preflight_evidence,
+    )
+
+    record_preflight_evidence("auth-key", "@test-agent", "passed", repo_root)
+    verify_preflight_evidence("auth-key", "@test-agent", 300, repo_root)
