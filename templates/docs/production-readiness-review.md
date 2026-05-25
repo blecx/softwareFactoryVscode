@@ -25,5 +25,8 @@
 - **Score (Required for >90% gate)**: (Must cite the output of `scripts/production_readiness_score.py` proving a passing score)
 - **Traceability (Required for >90% gate)**: (Confirm that there are no "Evidence gap" values across all required traceability requirements)
 - **Runtime Proof (Required for >90% gate)**: (Confirm presence of runtime diagnostics and operational runbook proof covering the capability space)
+- **ADR-016/ADR-017 Authority (Required for >90% gate)**: (Must cite boundary validation compliance with accepted ADR-016/017 rules)
+- **Fail-closed preflight (Required for >90% gate)**: (Must cite proof of fail-closed preflight verification)
+- **Workflow residue (Required for >90% gate)**: (Confirm there is no stale workflow residue via tests or GitHub truth check)
 - **Blockers**: (Any remaining issues blocking immediate production rollout)
 

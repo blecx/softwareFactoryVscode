@@ -5461,3 +5461,31 @@ def test_subagent_no_op_fallback_routing_rule_is_documented():
         in workflow_doc
     )
     assert "forbids drifting to bypass or unbounded plan execution" in workflow_doc
+
+
+def test_production_readiness_checklist_adr016_017_preflight_residue():
+    repo_root = Path(__file__).parent.parent
+    checklist_path = (
+        repo_root / "docs" / "maintainer" / "PRODUCTION-READINESS-REVIEW-CHECKLIST.md"
+    )
+    content = checklist_path.read_text(encoding="utf-8")
+    assert (
+        "ADR-016/017" in content
+        or "ADR-016 and ADR-017" in content
+        or "ADR-016/ADR-017" in content
+    )
+    assert "fail-closed preflight" in content.lower()
+    assert "workflow residue" in content.lower()
+
+
+def test_production_readiness_template_adr016_017_preflight_residue():
+    repo_root = Path(__file__).parent.parent
+    template = repo_root / "templates" / "docs" / "production-readiness-review.md"
+    content = template.read_text(encoding="utf-8")
+    assert (
+        "ADR-016/017" in content
+        or "ADR-016 and ADR-017" in content
+        or "ADR-016/ADR-017" in content
+    )
+    assert "fail-closed preflight" in content.lower()
+    assert "workflow residue" in content.lower()
