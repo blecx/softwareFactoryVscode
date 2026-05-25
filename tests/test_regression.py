@@ -2832,9 +2832,9 @@ def test_adr_catalog_summarizes_current_architecture_authority() -> None:
     assert "complements [`INDEX.md`](INDEX.md)" in adr_index
     assert "accepted ADRs are the normative architecture source" in adr_index
     assert "## Status summary" in adr_index
-    assert "| Accepted ADRs | 15 |" in adr_index
+    assert "| Accepted ADRs | 16 |" in adr_index
     assert "| Superseded historical ADR notes | 1 |" in adr_index
-    assert "| Proposed ADRs | 1 |" in adr_index
+    assert "| Proposed ADRs | 0 |" in adr_index
     assert "## Accepted ADR catalog" in adr_index
     assert "ADR-001-AI-Workflow-Guardrails.md" in adr_index
     assert "ADR-013-Architecture-Authority-and-Plan-Separation.md" in adr_index
@@ -5395,6 +5395,7 @@ def test_adr_016_workflow_language_policy_present():
         encoding="utf-8"
     )
     assert "ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md" in adr_index
+    assert "Accepted" in content
 
 
 def test_workflow_ubiquitous_language_guide_anchors():

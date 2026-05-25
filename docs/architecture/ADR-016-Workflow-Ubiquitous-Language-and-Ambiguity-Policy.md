@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -17,7 +17,7 @@ Proposed
 
 ### 1. Authority / precedence
 
-- **Rule:** The definitive meaning of architecturally significant workflow terms (e.g., umbrella issue, execution slice, plan) MUST be defined in accepted ADRs.
+- **Rule:** The definitive meaning of architecturally significant workflow terms (e.g., umbrella issue, execution slice, plan) MUST be defined in accepted ADRs. This policy governs factory workflow and control-plane terms only (it does not dictate application-level business language for end users).
 - **Rule:** Derived docs, prompts, and maintainer maps MAY project but MUST NOT redefine workflow architecture terms.
 
 ### 2. Canonical form / contract
