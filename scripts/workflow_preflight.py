@@ -38,6 +38,65 @@ def run_preflight(
     except Exception as e:
         routing_manifest = []
 
+    # Validate routing manifest shape
+    schema_blockers = []
+    if isinstance(routing_manifest, list):
+        for i, route in enumerate(routing_manifest):
+            if not isinstance(route, dict):
+                schema_blockers.append(f"Route[{i}] is not an object")
+                continue
+            missing = []
+            for field in ["agent", "task_kinds", "requirements", "human_only"]:
+                if field not in route:
+                    missing.append(field)
+            if missing:
+                name = route.get("agent", f"Route[{i}]")
+                schema_blockers.append(
+                    f"Invalid route {name}: missing {', '.join(missing)}"
+                )
+    else:
+        schema_blockers.append("Routing manifest must be a JSON array")
+
+    if schema_blockers:
+        return {
+            "safe_to_continue": False,
+            "required_agent": c_result.get("required_agent"),
+            "blockers": [
+                f"Routing manifest schema validation failed: {'; '.join(schema_blockers)}"
+            ],
+        }
+
+    # Validate routing manifest shape
+    schema_path = os.path.join(
+        os.path.dirname(__file__), "..", "schemas", "agent-routing-contract.schema.json"
+    )
+    # Actually, the issue says: Load existing routing schema if present, or add a minimal validation helper.
+    # Reject missing agent, task_kinds, requirements, or human_only fields.
+    # Return blockers in preflight JSON.
+    schema_blockers = []
+    if isinstance(routing_manifest, list):
+        for i, route in enumerate(routing_manifest):
+            missing = []
+            for field in ["agent", "task_kinds", "requirements", "human_only"]:
+                if field not in route:
+                    missing.append(field)
+            if missing:
+                name = route.get("agent", f"Route[{i}]")
+                schema_blockers.append(
+                    f"Invalid route {name}: missing {', '.join(missing)}"
+                )
+    else:
+        schema_blockers.append("Routing manifest must be a JSON array.")
+
+    if schema_blockers:
+        return {
+            "safe_to_continue": False,
+            "required_agent": c_result.get("required_agent"),
+            "blockers": [
+                f"Routing manifest schema validation failed: {'; '.join(schema_blockers)}"
+            ],
+        }
+
     # Initialize response
     result = {
         "safe_to_continue": True,
