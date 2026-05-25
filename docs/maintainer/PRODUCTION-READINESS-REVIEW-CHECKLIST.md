@@ -27,4 +27,7 @@ For any mismatch or missing readiness requirement, classify the gap into one of 
 - [ ] **Traceability Complete:** Are there zero "Evidence gap" placeholders remaining across all traceability requirements?
 - [ ] **Runtime Proof:** Are runtime diagnostics and operational runbooks proven for the changes?
 - [ ] **Signoff Evidence:** Is the final signoff durable and recorded?
+- [ ] **ADR-016/017 Gate:** Has the component explicitly passed the accepted ADR-016/ADR-017 boundary validation?
+- [ ] **Fail-closed Preflight:** Has the fail-closed preflight proof been verified?
+- [ ] **No Workflow Residue:** Has a workflow residue check or equivalent GitHub truth check run successfully?
 
