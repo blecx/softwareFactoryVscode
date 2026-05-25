@@ -27,9 +27,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 async def main():
     """Main entry point."""
-    import argparse
-
     _ensure_venv_and_reexec()
+
+    from scripts.workflow_preflight_gate import verify_preflight_evidence
+
+    verify_preflight_evidence(
+        "issue-workflow", "copilot-workspace", 300, str(Path(__file__).parent.parent)
+    )
+    import argparse
 
     # Import after venv re-exec so dependencies are available
     from factory_runtime.agents.agent_registry import create_issue_agent
@@ -708,8 +713,6 @@ def _check_prerequisites() -> bool:
     # Return True if all checks passed
     return all("✅" in status for _, status in checks)
 
-
-def _ensure_venv_and_reexec() -> None:
     """Ensure .venv exists and re-exec this script under the .venv interpreter.
 
     This keeps agent runs reproducible and guarantees Python 3.12 for this repo.

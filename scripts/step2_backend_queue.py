@@ -394,4 +394,12 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    from scripts.workflow_preflight_gate import verify_preflight_evidence
+
+    verify_preflight_evidence(
+        "issue-workflow",
+        "copilot-workspace",
+        300,
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    )
     raise SystemExit(main(sys.argv[1:]))

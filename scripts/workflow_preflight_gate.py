@@ -86,3 +86,22 @@ def require_safe_preflight(
         blockers.append("Preflight evidence is from the future (invalid timestamp).")
 
     return {"safe_to_continue": len(blockers) == 0, "blockers": blockers}
+
+
+def verify_preflight_evidence(
+    evidence_key: str, required_agent: str, ttl_seconds: int = 300, repo_root: str = "."
+) -> None:
+    """Verifies preflight evidence and exits if not safe to continue."""
+    import sys
+
+    result = require_safe_preflight(
+        evidence_key, required_agent, ttl_seconds, repo_root
+    )
+    if not result.get("safe_to_continue"):
+        print(
+            f"Preflight gate failed for '{evidence_key}' and agent '{required_agent}':",
+            file=sys.stderr,
+        )
+        for blocker in result.get("blockers", []):
+            print(f" - {blocker}", file=sys.stderr)
+        sys.exit(1)
