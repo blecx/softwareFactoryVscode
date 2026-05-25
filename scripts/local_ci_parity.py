@@ -2227,6 +2227,8 @@ def build_production_readiness_summary_markdown(
         f"- Current run status: `{report_data['status']}`",
         f"- Final sign-off status: `{report_data['final_signoff_status']}`",
         f"- Durable evidence pointer: `{report_data.get('durable_evidence_hint', 'none')}`",
+        f"- GitHub Run URL: `{report_data.get('github_run_url') or 'N/A'}`",
+        f"- GitHub Job: `{report_data.get('github_job_summary') or 'N/A'}`",
         (
             "- Consecutive clean runs: "
             f"`{report_data['current_green_streak']}/{report_data['required_green_runs']}`"
@@ -2306,6 +2308,17 @@ def write_production_readiness_bundle(
     run_directory = runs_dir / f"{timestamp}-{sanitized_head}"
     run_directory.mkdir(parents=True, exist_ok=True)
 
+    github_run_id = os.environ.get("GITHUB_RUN_ID", "")
+    github_server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+    github_repository = os.environ.get("GITHUB_REPOSITORY", "")
+    github_job = os.environ.get("GITHUB_JOB", "")
+
+    github_run_url = ""
+    if github_run_id and github_repository:
+        github_run_url = (
+            f"{github_server_url}/{github_repository}/actions/runs/{github_run_id}"
+        )
+
     error_count = sum(1 for finding in findings if finding.severity == "error")
     warning_count = sum(1 for finding in findings if finding.severity == "warning")
     green_run = error_count == 0 and warning_count == 0
@@ -2358,6 +2371,9 @@ def write_production_readiness_bundle(
         "green_run": green_run,
         "final_signoff_status": final_signoff_status,
         "durable_evidence_hint": f"ci-artifact-proof-{timestamp}-{head_rev[:8]}",
+        "github_run_url": github_run_url,
+        "github_run_id": github_run_id,
+        "github_job_summary": github_job,
         "required_green_runs": PRODUCTION_READINESS_REQUIRED_GREEN_RUNS,
         "current_green_streak": current_green_streak,
         "base_rev": base_rev,
