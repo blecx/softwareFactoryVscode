@@ -13,9 +13,9 @@ Maintained synthesis docs, implementation plans, and historical notes remain sub
 
 | ADR status | Count | How to use it |
 | --- | ---: | --- |
-| Accepted ADRs | 15 | Current normative architecture guardrails and terminology. |
+| Accepted ADRs | 16 | Current normative architecture guardrails and terminology. |
 | Superseded historical ADR notes | 1 | Historical traceability only; not a current authority source. |
-| Proposed ADRs | 1 | Current candidate in `docs/architecture/`. |
+| Proposed ADRs | 0 | Current candidate in `docs/architecture/`. |
 
 ## Accepted ADR catalog
 
@@ -36,6 +36,7 @@ Maintained synthesis docs, implementation plans, and historical notes remain sub
 | [`ADR-013-Architecture-Authority-and-Plan-Separation.md`](ADR-013-Architecture-Authority-and-Plan-Separation.md) | Accepted | Separates accepted ADR authority from synthesis docs, plans, and derived operator docs. | Prevents shadow architecture sources from competing with accepted decisions. |
 | [`ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md`](ADR-014-MCP-Workspace-Runtime-Lifecycle-Prompt-Coordination-and-Resource-Governance.md) | Accepted | Defines one authoritative runtime manager, snapshot, readiness, repair, and suspend/resume vocabulary. | Centralizes MCP runtime truth outside prompt logic and ad hoc status checks. |
 | [`ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md`](ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md) | Accepted | Defines provider-facing quota authority and hierarchical budget inheritance for multi-requester LLM usage. | Prevents quota handling from turning into a shadow runtime controller. |
+| [`ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md`](ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md) | Accepted | Defines workflow ubiquitous language policy. | Prevents ambiguous workflow terminology from drifting in derived docs. |
 
 ## Historical note on duplicate ADR-007 numbering
 
@@ -45,6 +46,5 @@ Keep using the accepted [`ADR-007-Workspace-Port-Allocation-and-Generated-MCP-En
 
 ## Proposed ADR catalog
 
-| ADR | Status | What it means | Why it matters |
-| --- | --- | --- | --- |
-| [`ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md`](ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md) | Proposed | Defines workflow ubiquitous language policy. | Prevents ambiguous workflow terminology from drifting in derived docs. |
+None
+
