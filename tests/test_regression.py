@@ -2691,6 +2691,32 @@ def test_adr_014_clarifies_current_suspend_boundary() -> None:
     assert "`resume-safe`, `resume-unsafe`, or `manual-recovery-required`" in adr_014
 
 
+def test_release_manifest_contains_production_signoff_pointer():
+    import json
+    from pathlib import Path
+
+    repo_root = Path(__file__).parent.parent
+    manifest_path = repo_root / "manifests" / "release-manifest.json"
+    assert manifest_path.exists()
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    assert manifest["schema_version"] == 1
+    assert "production_signoff_pointer" in manifest["latest"]
+    assert (
+        manifest["latest"]["production_signoff_pointer"]
+        == ".tmp/production-readiness/latest.json"
+    )
+
+    for channel in manifest["channels"].values():
+        assert "production_signoff_pointer" in channel
+        assert (
+            channel["production_signoff_pointer"]
+            == ".tmp/production-readiness/latest.json"
+        )
+
+
 def test_release_template_distinguishes_practical_vs_open_rollout_scope():
     repo_root = Path(__file__).parent.parent
     release_template = (repo_root / ".github" / "releases" / "TEMPLATE.md").read_text(
@@ -5242,6 +5268,19 @@ def test_production_readiness_checklist_anchors():
     assert (
         "non-normative" in content
     ), "Checklist must declare itself explicitly non-normative"
+    assert (
+        "production_readiness_score.py" in content
+    ), "Checklist must explicitly demand script execution"
+    assert (
+        ">90 percent production gate" in content.lower()
+    ), "Checklist must include >90 percent gate"
+    assert (
+        "traceability complete" in content.lower()
+    ), "Checklist must check for traceability gaps"
+    assert "runtime proof" in content.lower(), "Checklist must check for runtime proof"
+    assert (
+        "signoff evidence" in content.lower()
+    ), "Checklist must check for signoff evidence"
 
 
 def test_production_readiness_review_template_fields() -> None:
@@ -5254,8 +5293,11 @@ def test_production_readiness_review_template_fields() -> None:
     assert "validation sources" in template.lower()
     assert "derived docs checked" in template.lower()
     assert "mismatch classification" in template.lower()
-    assert "signoff evidence" in template.lower()
-    assert "score" in template.lower()
+    assert "signoff evidence (required for >90% gate)" in template.lower()
+    assert "score (required for >90% gate)" in template.lower()
+    assert "traceability (required for >90% gate)" in template.lower()
+    assert "runtime proof (required for >90% gate)" in template.lower()
+    assert "production_readiness_score.py" in template.lower()
     assert "blockers" in template.lower()
     assert "adr_013_loaded" in template.lower()
     assert (
@@ -5278,7 +5320,8 @@ def test_runtime_authority_traceability_matrix_anchors() -> None:
     assert "Implementation Surface" in traceability_doc
     assert "Test / Proof" in traceability_doc
     assert "Derived Docs" in traceability_doc
-    assert "**Evidence gap**" in traceability_doc
+    assert "tests/test_ops_runbook_contract.py" in traceability_doc
+    assert "tests/test_factory_stack_diagnostics.py" in traceability_doc
 
 
 def test_production_fresh_checkout_command_construction_preserves_boundaries() -> None:
@@ -5378,3 +5421,17 @@ def test_workflow_ubiquitous_language_guide_anchors():
     assert "closeout" in content.lower()
     assert "bypass" in content.lower()
     assert "production ready" in content.lower()
+
+
+def test_subagent_no_op_fallback_routing_rule_is_documented():
+    repo_root = Path(__file__).parent.parent
+    workflow_doc = (repo_root / "docs" / "WORK-ISSUE-WORKFLOW.md").read_text(
+        encoding="utf-8"
+    )
+    assert "silent subagent no-op triggers exactly one targeted retry" in workflow_doc
+    assert "direct per-issue routing or a hard blocker" in workflow_doc
+    assert (
+        "not** silently drift back into unbounded `execute-approved-plan`"
+        in workflow_doc
+    )
+    assert "forbids drifting to bypass or unbounded plan execution" in workflow_doc

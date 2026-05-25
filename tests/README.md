@@ -181,3 +181,13 @@ If you are starting a new AI coding session (e.g., via Copilot or another Agent)
 > 3. Third, if everything works and looks correct, write a brief README section advising the host project on how to start their first task via the Factory workspace.
 >
 > Do not modify the VS Code or Docker configurations unless the integration test explicitly fails or points to an issue."
+
+## Harness resistance aggregate bundle
+To prove the 7-point hallucination resistance target (>80% mitigation rating), you can run the aggregate bundle which verifies preflight, language, routing, queue, bypass, no-op, and readiness score guards:
+```bash
+./.venv/bin/python -m pytest tests/test_harness_resistance_contract.py
+```
+Or use the pytest marker:
+```bash
+./.venv/bin/python -m pytest -m harness_resistance
+```

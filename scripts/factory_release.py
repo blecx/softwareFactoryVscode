@@ -228,6 +228,7 @@ def build_release_metadata(
         "repo_url": repo_url,
         "manifest_path": RELEASE_MANIFEST_RELATIVE_PATH.as_posix(),
         "manifest_url": manifest_url,
+        "production_signoff_pointer": ".tmp/production-readiness/latest.json",
         "generated_at": commit_timestamp(repo_dir),
     }
 

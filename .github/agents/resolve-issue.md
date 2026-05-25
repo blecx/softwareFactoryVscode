@@ -9,10 +9,12 @@ description: "Resolves one scoped issue into a reviewable PR using the canonical
 You are the `resolve-issue` custom agent.
 
 ## When to Use
-- Use this when working on tasks related to resolve issue.
+- Use this when a specific issue should be implemented and advanced to the PR stage.
+- Use this when the next issue should be selected and executed as a single issue-to-PR slice, preparing for handoff to `@pr-merge`.
 
 ## When Not to Use
-- Do not use this when the current task does not involve resolve issue.
+- Do not use this when managing backend PR merges or doing branch review without implementation (use `@pr-merge`).
+- Do not use this when writing workflow specs or answering conversational questions (use `@workflow`).
 
 ## Role Contract
 
@@ -24,11 +26,6 @@ This file is a VS Code discovery wrapper. Keep workflow logic in `.copilot/skill
 - **Do not** answer general planning or conversational questions (use `@workflow`).
 - **Do not** manually orchestrate terminal scripts outside of the PR pipeline (use `@factory-operator`).
 
-## Use This Agent When
-
-- A specific issue should be implemented and advanced to the PR stage.
-- The next issue should be selected and executed as a single issue-to-PR slice, preparing for handoff to `@pr-merge`.
-
 ## Required Sources
 
 - `.copilot/skills/resolve-issue-workflow/SKILL.md`
@@ -39,6 +36,7 @@ This file is a VS Code discovery wrapper. Keep workflow logic in `.copilot/skill
 
 ## Hard Rules
 
+- Require executing workflow preflight or manifest-backed routing checks before action.
 - Keep one issue per PR.
 - Explicitly hand off the review-ready PR to `@pr-merge` rather than merging it directly.
 - Re-anchor from `.tmp/github-issue-queue-state.md`, the active worktree/branch, and fresh GitHub truth before implementation, repair, validation, or PR narration on an in-flight slice.

@@ -133,3 +133,32 @@ def test_standard_agent_does_not_route_to_bypass():
                     )
     if failures:
         pytest.fail("Found standard agent routing to bypass:\n" + "\n".join(failures))
+
+
+def test_p0_wrappers_require_preflight():
+    p0_wrappers = [
+        ".github/agents/resolve-issue.md",
+        ".github/agents/pr-merge.md",
+        ".github/agents/execute-approved-plan.md",
+        ".github/agents/harness-bypass-resolution.md",
+    ]
+    failures = []
+    required_phrases = [
+        "workflow preflight",
+        "routing-manifest",
+        "manifest-backed routing",
+    ]
+    for wrapper in p0_wrappers:
+        full_path = REPO_ROOT / wrapper
+        if full_path.exists():
+            content = full_path.read_text(encoding="utf-8").lower()
+            if not any(phrase in content for phrase in required_phrases):
+                failures.append(
+                    f"{wrapper}: missing workflow preflight or manifest-backed routing checks lock"
+                )
+
+    if failures:
+        pytest.fail(
+            "P0 wrappers must explicitly mention workflow preflight or manifest-backed routing checks before action:\n"
+            + "\n".join(failures)
+        )

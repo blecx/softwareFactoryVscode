@@ -19,3 +19,12 @@ For any mismatch or missing readiness requirement, classify the gap into one of 
 - [ ] Does local validation mirror CI and pass flawlessly?
 - [ ] Have derived documents been updated to reflect the new truth?
 - [ ] Is concrete evidence provided (test outputs, PR status checks) to prove readiness?
+- [ ] Has `scripts/production_readiness_score.py` been executed and the required score met, or an explicit reason recorded why it is N/A?
+
+## 4. >90 Percent Production Gate
+
+- [ ] **Score Checker Pass:** Has `scripts/production_readiness_score.py` been executed and explicitly passed?
+- [ ] **Traceability Complete:** Are there zero "Evidence gap" placeholders remaining across all traceability requirements?
+- [ ] **Runtime Proof:** Are runtime diagnostics and operational runbooks proven for the changes?
+- [ ] **Signoff Evidence:** Is the final signoff durable and recorded?
+
