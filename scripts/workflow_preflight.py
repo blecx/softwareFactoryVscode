@@ -45,6 +45,13 @@ def run_preflight(
         "blockers": [],
     }
 
+    if c_result.get("language_config_missing"):
+        return {
+            "safe_to_continue": False,
+            "required_agent": None,
+            "blockers": [f"Missing factory workflow language config: {config_path}"],
+        }
+
     # Reject bypass without human-only evidence
     if c_result.get("task_kind") == "bypass" and not is_human_activated:
         result["safe_to_continue"] = False

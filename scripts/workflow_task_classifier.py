@@ -29,18 +29,22 @@ class WorkflowTaskClassifier:
             (r"(?i)@harness-bypass-resolution", "bypass", "@harness-bypass-resolution"),
         ]
         self.term_metadata = {}
+        self.language_config_missing = False
         target_path = (
             config_path
             if os.path.exists(config_path)
             else os.path.join(os.path.dirname(__file__), "..", config_path)
         )
-        try:
-            with open(target_path, "r", encoding="utf-8") as f:
-                data = yaml.safe_load(f)
-                for term in data.get("terms", []):
-                    self.term_metadata[term["term_id"]] = term
-        except Exception:
-            pass
+        if not os.path.exists(target_path):
+            self.language_config_missing = True
+        else:
+            try:
+                with open(target_path, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f)
+                    for term in data.get("terms", []):
+                        self.term_metadata[term["term_id"]] = term
+            except Exception:
+                self.language_config_missing = True
 
     def classify(self, request_text, is_human_activated=False):
         # Default fallback
@@ -50,6 +54,7 @@ class WorkflowTaskClassifier:
             "required_agent": None,
             "clarification_flag": True,
             "blocked": False,
+            "language_config_missing": self.language_config_missing,
         }
 
         # Check for bypass

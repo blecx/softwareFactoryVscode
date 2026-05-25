@@ -41,3 +41,13 @@ def test_preflight_missing_manifest(tmp_path):
     )
     assert result["safe_to_continue"] is False
     assert "Missing routing manifest:" in str(result["blockers"])
+
+
+def test_preflight_missing_language_config(tmp_path):
+    result = run_preflight(
+        "work on issue",
+        is_human_activated=False,
+        config_path=str(tmp_path / "does_not_exist.yml"),
+    )
+    assert result["safe_to_continue"] is False
+    assert "Missing factory workflow language config:" in str(result["blockers"])
