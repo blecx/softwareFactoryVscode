@@ -79,3 +79,35 @@ def test_preflight_invalid_manifest_schema(tmp_path):
         "Invalid route @invalid-agent: missing requirements, human_only" in b
         for b in result["blockers"]
     )
+
+
+def test_preflight_red_team_ambiguous_continue():
+    result = run_preflight("continue", is_human_activated=False)
+    assert result["safe_to_continue"] is False
+    assert any("ask which issue set is approved" in str(b) for b in result["blockers"])
+
+
+def test_preflight_red_team_execute_the_plan():
+    result = run_preflight("execute the plan", is_human_activated=False)
+    assert result["safe_to_continue"] is False
+    assert any("ask which issue set is approved" in str(b) for b in result["blockers"])
+
+
+def test_preflight_red_team_ready():
+    result = run_preflight("ready", is_human_activated=False)
+    assert result["safe_to_continue"] is False
+    assert any(
+        "Validate against CI and pipeline reality" in str(b) for b in result["blockers"]
+    )
+
+
+def test_preflight_red_team_close_it():
+    result = run_preflight("close it", is_human_activated=False)
+    assert result["safe_to_continue"] is False
+    assert any("Unknown or ambiguous task kind" in str(b) for b in result["blockers"])
+
+
+def test_preflight_red_team_stale_state():
+    result = run_preflight("stale continuation", is_human_activated=False)
+    assert result["safe_to_continue"] is False
+    assert any("ask which issue set is approved" in str(b) for b in result["blockers"])
