@@ -23,6 +23,42 @@ def aggregate_evidence(
     if ci_evidence is not None:
         signoff_result = verify_ci_evidence(ci_evidence)
         source = "github-ci"
+
+        # Inject computed streak evidence
+        from verify_production_signoff import fetch_github_history
+
+        try:
+            branch = ci_evidence.get("branch")
+            workflow_name = ci_evidence.get("workflow_name")
+            head_sha = ci_evidence.get("head_sha")
+
+            if branch and workflow_name and head_sha:
+                history = fetch_github_history(branch, workflow_name)
+                # Convert back to dict for score_readiness to parse if needed
+                history_dicts = []
+                for h in history:
+                    history_dicts.append(
+                        {
+                            "run_id": h.run_id,
+                            "branch": h.branch,
+                            "head_sha": h.head_sha,
+                            "status": h.status,
+                            "conclusion": h.conclusion,
+                            "jobs": [
+                                {"name": j.name, "conclusion": j.conclusion}
+                                for j in h.jobs
+                            ],
+                        }
+                    )
+
+                review_input["green_streak_evidence"] = {
+                    "history": history_dicts,
+                    "target_branch": branch,
+                    "target_sha": head_sha,
+                    "required_jobs": [],  # we can extract this if passed, but typically empty
+                }
+        except Exception:
+            pass
     else:
         signoff_result = verify_signoff(signoff_filepath)
         source = "local-file"
