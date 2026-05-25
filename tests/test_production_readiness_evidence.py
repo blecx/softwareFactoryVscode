@@ -1,9 +1,8 @@
-from unittest.mock import patch
-
 import json
 import os
 import tempfile
 from typing import Any, Dict
+from unittest.mock import patch
 
 import pytest
 
@@ -72,7 +71,9 @@ def valid_ci_evidence() -> Dict[str, Any]:
 
 
 @patch("scripts.production_readiness_evidence.verify_ci_evidence")
-def test_aggregate_evidence_ci_evidence_success(mock_verify, valid_review_input, valid_ci_evidence):
+def test_aggregate_evidence_ci_evidence_success(
+    mock_verify, valid_review_input, valid_ci_evidence
+):
     mock_verify.return_value = {"valid": True, "blockers": []}
     result = aggregate_evidence(
         valid_review_input, "non_existent_file.json", ci_evidence=valid_ci_evidence
@@ -91,7 +92,13 @@ def test_aggregate_evidence_ci_evidence_failure(mock_verify, valid_review_input)
         "head_sha": "abcdef123456",
         "conclusion": "failed",
     }
-    mock_verify.return_value = {"valid": False, "blockers": ["Missing required CI field: 'run_url'", "CI signoff conclusion is not success"]}
+    mock_verify.return_value = {
+        "valid": False,
+        "blockers": [
+            "Missing required CI field: 'run_url'",
+            "CI signoff conclusion is not success",
+        ],
+    }
     result = aggregate_evidence(
         valid_review_input, "non_existent_file.json", ci_evidence=invalid_ci
     )
