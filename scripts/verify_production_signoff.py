@@ -308,3 +308,204 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+@dataclass
+class NormalizedRunEvidence:
+    run_id: str
+    branch: str
+    head_sha: str
+    status: str
+    conclusion: str
+    jobs: List[JobEvidence]
+
+
+def compute_green_streak(
+    history: List[NormalizedRunEvidence],
+    target_branch: str,
+    target_sha: str,
+    required_jobs: List[str],
+) -> Tuple[int, List[str]]:
+    streak = 0
+    blockers = []
+
+    for run in history:
+        if run.branch != target_branch:
+            continue
+
+        if run.head_sha != target_sha:
+            break
+
+        if run.status != "completed":
+            blockers.append(
+                f"Run {run.run_id} is pending/unknown (status: {run.status})."
+            )
+            break
+
+        if run.conclusion != "success":
+            blockers.append(f"Run {run.run_id} failed (conclusion: {run.conclusion}).")
+            break
+
+        run_jobs_map = {j.name: j for j in run.jobs}
+        job_failed = False
+        for rj in required_jobs:
+            if rj not in run_jobs_map:
+                blockers.append(f"Run {run.run_id} missing required job: {rj}")
+                job_failed = True
+            elif run_jobs_map[rj].conclusion != "success":
+                blockers.append(f"Run {run.run_id} required job {rj} failed")
+                job_failed = True
+
+        if job_failed:
+            break
+
+        streak += 1
+
+    return streak, blockers
+
+
+def get_github_history(branch: str, workflow_name: str) -> List[NormalizedRunEvidence]:
+    history = []
+    # run gh query
+    try:
+        gh_cmd = [
+            "gh",
+            "run",
+            "list",
+            "--branch",
+            branch,
+            "--workflow",
+            workflow_name,
+            "--json",
+            "databaseId,headSha,status,conclusion,jobs,headBranch",
+            "--limit",
+            "10",  # should be enough to fetch history of current sha
+        ]
+        result = subprocess.run(gh_cmd, capture_output=True, text=True, check=True)
+        runs = json.loads(result.stdout)
+    except Exception:
+        return []
+
+    for r in runs:
+        jobs = []
+        # gh run list --json jobs doesnt actually return job details for each run directly sometimes,
+        # we might need to fetch jobs for each run if they aren't included
+        # Actually gh run list with --json jobs is supported as of recently? Let's check
+        # If not, maybe we just assume jobs are there or we don't have them in the bulk query.
+        pass
+    return history
+
+
+def fetch_github_history(
+    branch: str, workflow_name: str, limit: int = 10
+) -> List[NormalizedRunEvidence]:
+    import json
+    import subprocess
+
+    # We first fetch the recent runs
+    cmd = [
+        "gh",
+        "run",
+        "list",
+        "--branch",
+        branch,
+        "--workflow",
+        workflow_name,
+        "--limit",
+        str(limit),
+        "--json",
+        "databaseId,headSha,headBranch,status,conclusion",
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        runs_data = json.loads(res.stdout)
+    except Exception:
+        return []
+
+    history = []
+    for r in runs_data:
+        jobs = []
+        # get jobs for each run
+        try:
+            cmd_jobs = ["gh", "run", "view", str(r["databaseId"]), "--json", "jobs"]
+            res_jobs = subprocess.run(
+                cmd_jobs, capture_output=True, text=True, check=True
+            )
+            jobs_data = json.loads(res_jobs.stdout)
+            for j in jobs_data.get("jobs", []):
+                jobs.append(
+                    JobEvidence(name=j.get("name"), conclusion=j.get("conclusion"))
+                )
+        except Exception:
+            pass
+
+        history.append(
+            NormalizedRunEvidence(
+                run_id=str(r["databaseId"]),
+                branch=r.get("headBranch", ""),
+                head_sha=r.get("headSha", ""),
+                status=r.get("status", ""),
+                conclusion=r.get("conclusion", ""),
+                jobs=jobs,
+            )
+        )
+
+    return history
+
+
+def fetch_github_history(
+    branch: str, workflow_name: str, limit: int = 10
+) -> List[NormalizedRunEvidence]:
+    import json
+    import subprocess
+
+    cmd = [
+        "gh",
+        "run",
+        "list",
+        "--branch",
+        branch,
+        "--workflow",
+        workflow_name,
+        "--limit",
+        str(limit),
+        "--json",
+        "databaseId,headSha,headBranch,status,conclusion",
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        runs_data = json.loads(res.stdout)
+    except Exception:
+        return []
+
+    history = []
+    for r in runs_data:
+        jobs = []
+        try:
+            cmd_jobs = ["gh", "run", "view", str(r["databaseId"]), "--json", "jobs"]
+            res_jobs = subprocess.run(
+                cmd_jobs, capture_output=True, text=True, check=True
+            )
+            jobs_data = json.loads(res_jobs.stdout)
+            for j in jobs_data.get("jobs", []):
+                jobs.append(
+                    JobEvidence(
+                        name=str(j.get("name", "")),
+                        conclusion=str(j.get("conclusion", "")),
+                    )
+                )
+        except Exception:
+            pass
+
+        history.append(
+            NormalizedRunEvidence(
+                run_id=str(r["databaseId"]),
+                branch=r.get("headBranch", ""),
+                head_sha=r.get("headSha", ""),
+                status=r.get("status", ""),
+                conclusion=r.get("conclusion", ""),
+                jobs=jobs,
+            )
+        )
+
+    return history

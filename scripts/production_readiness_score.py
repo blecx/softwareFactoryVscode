@@ -37,6 +37,46 @@ def score_readiness(input_data: Dict[str, Any]) -> Dict[str, Any]:
         blockers.append("Missing signoff evidence pointer/verifier output.")
 
     green_streak_count = input_data.get("green_streak_count", 0)
+
+    streak_evidence = input_data.get("green_streak_evidence")
+    if streak_evidence:
+        try:
+            # We import here to avoid circular imports if any, and access the helper
+            from verify_production_signoff import (
+                JobEvidence,
+                NormalizedRunEvidence,
+                compute_green_streak,
+            )
+
+            history = []
+            for item in streak_evidence.get("history", []):
+                jobs = [
+                    JobEvidence(
+                        name=j.get("name", ""), conclusion=j.get("conclusion", "")
+                    )
+                    for j in item.get("jobs", [])
+                ]
+                history.append(
+                    NormalizedRunEvidence(
+                        run_id=str(item.get("run_id", "")),
+                        branch=str(item.get("branch", "")),
+                        head_sha=str(item.get("head_sha", "")),
+                        status=str(item.get("status", "")),
+                        conclusion=str(item.get("conclusion", "")),
+                        jobs=jobs,
+                    )
+                )
+            computed_streak, computed_blockers = compute_green_streak(
+                history,
+                streak_evidence.get("target_branch", ""),
+                streak_evidence.get("target_sha", ""),
+                streak_evidence.get("required_jobs", []),
+            )
+            green_streak_count = computed_streak
+            blockers.extend(computed_blockers)
+        except Exception as e:
+            blockers.append(f"Failed to compute green streak: {e}")
+
     if green_streak_count < 3:
         blockers.append("Production gate requires 3 consecutive clean signoff runs.")
 
