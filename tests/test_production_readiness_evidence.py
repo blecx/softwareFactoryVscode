@@ -56,3 +56,41 @@ def test_aggregate_evidence_traceability_gap(valid_review_input, valid_signoff_f
     result = aggregate_evidence(valid_review_input, valid_signoff_file)
     assert result["ready"] is False
     assert any("Evidence gap" in b for b in result["blockers"])
+
+
+@pytest.fixture
+def valid_ci_evidence() -> Dict[str, Any]:
+    return {
+        "run_id": "12345",
+        "head_sha": "abcdef123456",
+        "job_name": "production-validation",
+        "conclusion": "success",
+    }
+
+
+def test_aggregate_evidence_ci_evidence_success(valid_review_input, valid_ci_evidence):
+    result = aggregate_evidence(
+        valid_review_input, "non_existent_file.json", ci_evidence=valid_ci_evidence
+    )
+    assert result["ready"] is True
+    assert result["signoff_valid"] is True
+    assert len(result["blockers"]) == 0
+    assert result["references"]["source"] == "github-ci"
+    assert result["references"]["ci_evidence"] == valid_ci_evidence
+
+
+def test_aggregate_evidence_ci_evidence_failure(valid_review_input):
+    invalid_ci = {
+        "run_id": "12345",
+        "head_sha": "abcdef123456",
+        # missing job_name
+        "conclusion": "failed",
+    }
+    result = aggregate_evidence(
+        valid_review_input, "non_existent_file.json", ci_evidence=invalid_ci
+    )
+    assert result["ready"] is False
+    assert result["signoff_valid"] is False
+    assert len(result["blockers"]) > 0
+    assert any("Missing required CI field: 'job_name'" in b for b in result["blockers"])
+    assert any("CI signoff conclusion is not success" in b for b in result["blockers"])

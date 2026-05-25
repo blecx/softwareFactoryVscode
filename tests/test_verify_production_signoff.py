@@ -144,3 +144,59 @@ def test_safe_secret_key():
         assert result["valid"]
     finally:
         os.unlink(filepath)
+
+
+from scripts.verify_production_signoff import verify_ci_evidence
+
+
+def test_verify_ci_evidence_success():
+    ci_evidence = {
+        "run_id": "12345",
+        "head_sha": "abcdef123456",
+        "job_name": "production-validation",
+        "conclusion": "success",
+    }
+    result = verify_ci_evidence(ci_evidence)
+    assert result["valid"] is True
+    assert len(result["blockers"]) == 0
+
+
+def test_verify_ci_evidence_missing_fields():
+    ci_evidence = {"run_id": "12345", "conclusion": "success"}
+    result = verify_ci_evidence(ci_evidence)
+    assert result["valid"] is False
+    assert any("Missing required CI field: 'head_sha'" in b for b in result["blockers"])
+    assert any("Missing required CI field: 'job_name'" in b for b in result["blockers"])
+
+
+def test_verify_ci_evidence_failure_conclusion():
+    ci_evidence = {
+        "run_id": "12345",
+        "head_sha": "abcdef",
+        "job_name": "job",
+        "conclusion": "failure",
+    }
+    result = verify_ci_evidence(ci_evidence)
+    assert result["valid"] is False
+    assert any(
+        "CI signoff conclusion is not success: failure" in b for b in result["blockers"]
+    )
+
+
+def test_verify_ci_evidence_with_secrets():
+    ci_evidence = {
+        "run_id": "12345",
+        "head_sha": "abcdef",
+        "job_name": "job",
+        "conclusion": "success",
+        "api_key": "ghp_123456789012345678901234567890123456",
+    }
+    result = verify_ci_evidence(ci_evidence)
+    assert result["valid"] is False
+    assert any("Key 'api_key' looks like a secret" in b for b in result["blockers"])
+
+
+def test_verify_ci_evidence_empty():
+    result = verify_ci_evidence({})
+    assert result["valid"] is False
+    assert "No CI evidence provided." in result["blockers"]
