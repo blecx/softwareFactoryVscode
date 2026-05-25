@@ -5435,6 +5435,10 @@ def test_workflow_ubiquitous_language_guide_anchors():
     assert "ADR-013" in content, "Guide must reference ADR-013 for non-normative status"
     assert "ADR-016" in content, "Guide must reference ADR-016 for policy"
     assert "config" in content.lower(), "Guide must mention workflow language config"
+    assert "ADR-017" in content, "Guide must reference ADR-017"
+    assert (
+        ".copilot/project-language.yml" in content
+    ), "Guide must mention project-language.yml"
 
     # Assert expected examples are represented
     assert "execute the plan" in content.lower()

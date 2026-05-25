@@ -8,9 +8,23 @@ When executing or coordinating work within the repository, we use a strict "ubiq
 
 When an AI agent or maintainer encounters ambiguous workflow requests, the correct action is always to **stop and ask for clarification** or apply the required evidence standards from the workflow language configuration, rather than guessing intent.
 
+## Factory vs Host Project Boundary
+
+Following [ADR-017](../architecture/ADR-017-Host-Project-Ubiquitous-Language-Boundary.md), this guide applies to internal **Software Factory workflow** terminology only. The factory must not overwrite or dictate the **host project's** domain language.
+
+Host projects define their own ubiquitous language in their host-owned `.copilot/project-language.yml` file. When executing work within a host project, the factory's workflow terminology (managing how issues become PRs) exists alongside the host project's domain language (managing business logic terms).
+
+If you are unsure whether a term refers to a factory workflow mechanic (e.g., `resolve-issue`, `bypass`) or a host project business concept, consult the host's `.copilot/project-language.yml` first.
+
 ## Examples of Ambiguous Requests and Required Actions
 
 The [workflow language config](../../configs/workflow_language.yml) maintains the exact definitions, but here are concrete examples applying those constraints to common conversational shorthand.
+
+### `domain language` or `business logic term`
+
+- **Ambiguous meaning:** Assuming the factory's rules apply to the host's business architecture.
+- **Ubiquitous language:** Host-owned terminology defined in `.copilot/project-language.yml`.
+- **Required Action:** Do not manage host domain terms inside `configs/workflow_language.yml` or factory prompt files. The factory update mechanism must leave the host's `.copilot/project-language.yml` intact. Defer to the host project's definitions for business rules.
 
 ### `execute the plan`
 
