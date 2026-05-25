@@ -59,23 +59,121 @@ def check_dict_for_secrets(data: Dict[str, Any], path: str = "") -> List[str]:
     return violations
 
 
-def verify_ci_evidence(ci_evidence: Dict[str, Any]) -> Dict[str, Any]:
-    if not ci_evidence:
-        return {"valid": False, "blockers": ["No CI evidence provided."]}
+from dataclasses import dataclass, field
+from typing import Optional, Tuple
+
+
+@dataclass
+class JobEvidence:
+    name: str
+    conclusion: str
+
+
+@dataclass
+class ArtifactEvidence:
+    name: str
+    url: str
+
+
+@dataclass
+class GitHubCIEvidence:
+    run_id: str
+    run_url: str
+    head_sha: str
+    branch: str
+    workflow_name: str
+    jobs: List[JobEvidence]
+    artifacts: List[ArtifactEvidence] = field(default_factory=list)
+
+
+def parse_ci_evidence(
+    payload: Dict[str, Any]
+) -> Tuple[Optional[GitHubCIEvidence], List[str]]:
+    if not payload:
+        return None, ["No CI evidence provided."]
 
     blockers = []
-    required_fields = ["run_id", "head_sha", "job_name", "conclusion"]
-    for field in required_fields:
-        if field not in ci_evidence:
-            blockers.append(f"Missing required CI field: '{field}'")
+    secret_violations = check_dict_for_secrets(payload)
+    if secret_violations:
+        blockers.extend(secret_violations)
 
-    if "conclusion" in ci_evidence and ci_evidence["conclusion"] != "success":
-        blockers.append(
-            f"CI signoff conclusion is not success: {ci_evidence['conclusion']}"
+    required_fields = [
+        "run_id",
+        "run_url",
+        "head_sha",
+        "branch",
+        "workflow_name",
+        "jobs",
+    ]
+    for f in required_fields:
+        if f not in payload:
+            blockers.append(f"Missing required field: '{f}'")
+        elif payload[f] is None or payload[f] == "":
+            blockers.append(f"Field '{f}' cannot be empty.")
+
+    if blockers:
+        return None, blockers
+
+    jobs = []
+    jobs_payload = payload.get("jobs", [])
+    if not isinstance(jobs_payload, list) or len(jobs_payload) == 0:
+        blockers.append("Jobs must be a non-empty list.")
+    else:
+        for i, j in enumerate(jobs_payload):
+            if not isinstance(j, dict):
+                blockers.append(f"Job at index {i} is malformed.")
+                continue
+            name = j.get("name")
+            conclusion = j.get("conclusion")
+            if not name or not conclusion:
+                blockers.append(f"Job at index {i} is missing name or conclusion.")
+            else:
+                jobs.append(JobEvidence(name=str(name), conclusion=str(conclusion)))
+
+    artifacts = []
+    artifacts_payload = payload.get("artifacts", [])
+    if isinstance(artifacts_payload, list):
+        for i, a in enumerate(artifacts_payload):
+            if not isinstance(a, dict):
+                blockers.append(f"Artifact at index {i} is malformed.")
+                continue
+            name = a.get("name")
+            url = a.get("url")
+            if not name or not url:
+                blockers.append(f"Artifact at index {i} is missing name or url.")
+            else:
+                artifacts.append(ArtifactEvidence(name=str(name), url=str(url)))
+    elif artifacts_payload:
+        blockers.append("Artifacts must be a list if provided.")
+
+    if blockers:
+        return None, blockers
+
+    try:
+        model = GitHubCIEvidence(
+            run_id=str(payload["run_id"]),
+            run_url=str(payload["run_url"]),
+            head_sha=str(payload["head_sha"]),
+            branch=str(payload["branch"]),
+            workflow_name=str(payload["workflow_name"]),
+            jobs=jobs,
+            artifacts=artifacts,
         )
+        return model, []
+    except Exception as e:
+        return None, [f"Failed to parse CI evidence model: {str(e)}"]
 
-    secret_violations = check_dict_for_secrets(ci_evidence)
-    blockers.extend(secret_violations)
+
+def verify_ci_evidence(ci_evidence: Dict[str, Any]) -> Dict[str, Any]:
+    model, blockers = parse_ci_evidence(ci_evidence)
+    if not model:
+        return {"valid": False, "blockers": blockers}
+
+    for job in model.jobs:
+        if job.conclusion != "success":
+            blockers.append(
+                f"CI signoff conclusion is not success: {job.conclusion} for job {job.name}"
+            )
 
     return {"valid": len(blockers) == 0, "blockers": blockers}
 
