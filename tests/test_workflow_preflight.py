@@ -51,3 +51,31 @@ def test_preflight_missing_language_config(tmp_path):
     )
     assert result["safe_to_continue"] is False
     assert "Missing factory workflow language config:" in str(result["blockers"])
+
+
+def test_preflight_invalid_manifest_schema(tmp_path):
+    manifest_path = tmp_path / "invalid_manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            [
+                {
+                    "agent": "@valid-agent",
+                    "task_kinds": ["test"],
+                    "requirements": [],
+                    "human_only": False,
+                },
+                {"agent": "@invalid-agent", "task_kinds": ["test"]},
+            ]
+        )
+    )
+    result = run_preflight(
+        "work on issue", is_human_activated=False, manifest_path=str(manifest_path)
+    )
+    assert result["safe_to_continue"] is False
+    assert any(
+        "Routing manifest schema validation failed" in b for b in result["blockers"]
+    )
+    assert any(
+        "Invalid route @invalid-agent: missing requirements, human_only" in b
+        for b in result["blockers"]
+    )

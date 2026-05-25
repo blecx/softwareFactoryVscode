@@ -42,7 +42,8 @@
     "authority_rank",
     "canonical_skill",
     "requirements",
-    "forbidden_routes"
+    "forbidden_routes",
+    "human_only"
   ],
   "additionalProperties": false
 }
