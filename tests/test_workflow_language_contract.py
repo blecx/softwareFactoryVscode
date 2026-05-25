@@ -162,3 +162,40 @@ def test_ambiguity_sensitive_phrases_coverage():
 
     missing = set(required_phrases) - found_phrases
     assert not missing, f"Missing coverage for ambiguity-sensitive phrases: {missing}"
+
+
+def test_factory_language_blocks_host_domain_terms():
+    """
+    Ensure the factory workflow language config does not contain project-specific
+    product or business terms (e.g. customer, invoice, tenant, cart).
+    This enforces the ADR-017 ownership boundary: factory config is for software
+    factory orchestrations, while host-owned domain terms belong in
+    .copilot/project-language.yml.
+    """
+    import yaml
+
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    blocked_terms = [
+        "customer",
+        "invoice",
+        "tenant-product",
+        "cart",
+        "domain entity",
+    ]
+
+    for term in config.get("terms", []):
+        term_id = term.get("term_id", "").lower()
+        phrases = [p.lower() for p in term.get("allowed_phrases", [])]
+
+        for blocked in blocked_terms:
+            assert blocked not in term_id, (
+                f"ADR-017 Violation: Factory config must not define host domain "
+                f"term '{blocked}'. Found in term_id '{term_id}'"
+            )
+            for phrase in phrases:
+                assert blocked not in phrase, (
+                    f"ADR-017 Violation: Factory config must not define host domain "
+                    f"term '{blocked}'. Found in phrase '{phrase}' for term '{term_id}'"
+                )
