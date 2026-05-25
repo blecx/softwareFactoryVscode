@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Host Project Language Schema",
+  "description": "Schema for machine-readable host-owned project language terms.",
+  "type": "object",
+  "properties": {
+    "term_id": {
+      "type": "string",
+      "description": "The unique identifier for the host project term."
+    },
+    "definition": {
+      "type": "string",
+      "description": "The exact definition of the host project term."
+    },
+    "bounded_context": {
+      "type": "string",
+      "description": "The logical boundary or module where this term applies."
+    },
+    "authority_source": {
+      "type": "string",
+      "description": "The host project document, ADR, or domain expert that defines this term."
+    },
+    "aliases": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Acceptable aliases or phrases referencing this term."
+    },
+    "forbidden_meanings": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Negative examples or contexts where this term does not apply."
+    },
+    "ambiguity_action": {
+      "type": "string",
+      "description": "Fallback action required immediately if meaning or intent is ambiguous."
+    }
+  },
+  "required": [
+    "term_id",
+    "definition",
+    "bounded_context",
+    "authority_source",
+    "aliases",
+    "forbidden_meanings",
+    "ambiguity_action"
+  ]
+}
