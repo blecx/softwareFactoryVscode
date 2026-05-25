@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from typing import Any, Dict, List
 
@@ -164,26 +166,87 @@ def parse_ci_evidence(
         return None, [f"Failed to parse CI evidence model: {str(e)}"]
 
 
-def verify_ci_evidence(ci_evidence: Dict[str, Any]) -> Dict[str, Any]:
+def verify_ci_evidence(
+    ci_evidence: Dict[str, Any], required_jobs: List[str] = None
+) -> Dict[str, Any]:
     model, blockers = parse_ci_evidence(ci_evidence)
     if not model:
         return {"valid": False, "blockers": blockers}
 
+    if required_jobs is None:
+        required_jobs = []
+
+    # Run gh run view
+    try:
+        gh_cmd = [
+            "gh",
+            "run",
+            "view",
+            model.run_id,
+            "--json",
+            "conclusion,headSha,jobs,status",
+        ]
+        result = subprocess.run(gh_cmd, capture_output=True, text=True, check=True)
+        gh_data = json.loads(result.stdout)
+    except subprocess.CalledProcessError as e:
+        blockers.append(
+            f"GitHub CLI query failed: {e.stderr.strip() if e.stderr else e.strerror}"
+        )
+        return {"valid": False, "blockers": blockers}
+    except json.JSONDecodeError:
+        blockers.append("Failed to parse GitHub CLI JSON output")
+        return {"valid": False, "blockers": blockers}
+
+    if gh_data.get("headSha") != model.head_sha:
+        blockers.append(
+            f"SHA mismatch: GitHub run {model.run_id} head_sha {gh_data.get('headSha')} != provided {model.head_sha}"
+        )
+
+    if gh_data.get("conclusion") != "success":
+        blockers.append(
+            f"GitHub run {model.run_id} conclusion is not success (it is {gh_data.get('conclusion')})"
+        )
+
+    if gh_data.get("status") not in ("completed", "success"):
+        # "success" is conclusion, but just making sure it's completed
+        if gh_data.get("status") != "completed":
+            blockers.append(
+                f"GitHub run {model.run_id} is not completed (status: {gh_data.get('status')})"
+            )
+
+    gh_jobs = gh_data.get("jobs", [])
+    gh_jobs_map = {j["name"]: j for j in gh_jobs}
+
+    for rj in required_jobs:
+        if rj not in gh_jobs_map:
+            blockers.append(
+                f"Required job '{rj}' was not found in GitHub run {model.run_id}"
+            )
+        else:
+            job_data = gh_jobs_map[rj]
+            if job_data.get("conclusion") != "success":
+                blockers.append(
+                    f"Required job '{rj}' did not succeed (conclusion: {job_data.get('conclusion')})"
+                )
+
     for job in model.jobs:
         if job.conclusion != "success":
             blockers.append(
-                f"CI signoff conclusion is not success: {job.conclusion} for job {job.name}"
+                f"CI signoff conclusion is not success: {job.conclusion} for provided job {job.name}"
             )
 
     return {"valid": len(blockers) == 0, "blockers": blockers}
 
 
-def verify_signoff(filepath: str) -> Dict[str, Any]:
+def verify_signoff(filepath: str, required_jobs: List[str] = None) -> Dict[str, Any]:
     if not os.path.exists(filepath):
         return {
             "valid": False,
             "blockers": [
-                f"No production signoff evidence found at {filepath}. Please generate production-readiness evidence first."
+                (
+                    f"No production signoff evidence found at {filepath}. "
+                    "Please generate production-readiness evidence first."
+                )
             ],
         }
 
@@ -195,12 +258,17 @@ def verify_signoff(filepath: str) -> Dict[str, Any]:
 
     blockers = []
     required_fields = ["command", "status", "timestamp", "evidence"]
-    for field in required_fields:
-        if field not in data:
-            blockers.append(f"Missing required field: '{field}'")
+    for field_name in required_fields:
+        if field_name not in data:
+            blockers.append(f"Missing required field: '{field_name}'")
 
     if "status" in data and data["status"] != "success":
         blockers.append(f"Signoff status is not success: {data['status']}")
+
+    if "evidence" in data and "github_ci" in data["evidence"]:
+        ci_result = verify_ci_evidence(data["evidence"]["github_ci"], required_jobs)
+        if not ci_result["valid"]:
+            blockers.extend(ci_result.get("blockers", []))
 
     secret_violations = check_dict_for_secrets(data)
     blockers.extend(secret_violations)
@@ -209,8 +277,25 @@ def verify_signoff(filepath: str) -> Dict[str, Any]:
 
 
 def main():
-    filepath = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SIGN_OFF_FILE
-    result = verify_signoff(filepath)
+    parser = argparse.ArgumentParser(description="Verify Production Signoff")
+    parser.add_argument(
+        "filepath",
+        nargs="?",
+        default=DEFAULT_SIGN_OFF_FILE,
+        help="Path to signoff JSON file",
+    )
+    parser.add_argument(
+        "--required-job",
+        action="append",
+        default=[],
+        help="Required CI job name. Can be specified multiple times.",
+    )
+    args = parser.parse_args()
+
+    filepath = args.filepath
+    required_jobs = args.required_job
+
+    result = verify_signoff(filepath, required_jobs)
     if not result["valid"]:
         print("Production signoff verification failed:")
         for blocker in result["blockers"]:

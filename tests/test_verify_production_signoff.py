@@ -1,6 +1,7 @@
 import json
 import os
 import tempfile
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -149,7 +150,24 @@ def test_safe_secret_key():
 from scripts.verify_production_signoff import verify_ci_evidence
 
 
-def test_verify_ci_evidence_success():
+@patch("subprocess.run")
+def test_verify_ci_evidence_success(mock_run):
+    gh_out = {
+        "headSha": "abcdef123456",
+        "conclusion": "success",
+        "status": "completed",
+        "jobs": [
+            {
+                "name": "production-validation",
+                "conclusion": "success",
+                "status": "completed",
+            }
+        ],
+    }
+    m = MagicMock()
+    m.stdout = json.dumps(gh_out)
+    mock_run.return_value = m
+
     ci_evidence = {
         "run_id": "12345",
         "run_url": "https://github.com/...",
@@ -158,7 +176,7 @@ def test_verify_ci_evidence_success():
         "workflow_name": "CI",
         "jobs": [{"name": "production-validation", "conclusion": "success"}],
     }
-    result = verify_ci_evidence(ci_evidence)
+    result = verify_ci_evidence(ci_evidence, ["production-validation"])
     assert result["valid"] is True
     assert len(result["blockers"]) == 0
 
@@ -174,7 +192,18 @@ def test_verify_ci_evidence_missing_fields():
     assert any("Missing required field: 'run_url'" in b for b in result["blockers"])
 
 
-def test_verify_ci_evidence_failure_conclusion():
+@patch("subprocess.run")
+def test_verify_ci_evidence_failure_conclusion(mock_run):
+    gh_out = {
+        "headSha": "abcdef",
+        "conclusion": "success",
+        "status": "completed",
+        "jobs": [{"name": "job", "conclusion": "failure", "status": "completed"}],
+    }
+    m = MagicMock()
+    m.stdout = json.dumps(gh_out)
+    mock_run.return_value = m
+
     ci_evidence = {
         "run_id": "12345",
         "run_url": "https://github.com/...",
@@ -183,15 +212,27 @@ def test_verify_ci_evidence_failure_conclusion():
         "workflow_name": "CI",
         "jobs": [{"name": "job", "conclusion": "failure"}],
     }
-    result = verify_ci_evidence(ci_evidence)
+    result = verify_ci_evidence(ci_evidence, ["job"])
     assert result["valid"] is False
     assert any(
-        "CI signoff conclusion is not success: failure for job job" in b
+        "Required job 'job' did not succeed (conclusion: failure)" in b
+        or "CI signoff conclusion is not success: failure for provided job job" in b
         for b in result["blockers"]
     )
 
 
-def test_verify_ci_evidence_with_secrets():
+@patch("subprocess.run")
+def test_verify_ci_evidence_with_secrets(mock_run):
+    gh_out = {
+        "headSha": "abcdef",
+        "conclusion": "success",
+        "status": "completed",
+        "jobs": [{"name": "job", "conclusion": "success", "status": "completed"}],
+    }
+    m = MagicMock()
+    m.stdout = json.dumps(gh_out)
+    mock_run.return_value = m
+
     ci_evidence = {
         "run_id": "12345",
         "run_url": "https://github.com/...",
@@ -209,4 +250,103 @@ def test_verify_ci_evidence_with_secrets():
 def test_verify_ci_evidence_empty():
     result = verify_ci_evidence({})
     assert result["valid"] is False
-    assert "No CI evidence provided." in result["blockers"]
+
+
+@patch("subprocess.run")
+def test_verify_ci_evidence_sha_mismatch(mock_run):
+    gh_out = {
+        "headSha": "badbadbad",
+        "conclusion": "success",
+        "status": "completed",
+        "jobs": [{"name": "job", "conclusion": "success", "status": "completed"}],
+    }
+    m = MagicMock()
+    m.stdout = json.dumps(gh_out)
+    mock_run.return_value = m
+
+    ci_evidence = {
+        "run_id": "12345",
+        "run_url": "https://github.com/...",
+        "head_sha": "abcdef",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [{"name": "job", "conclusion": "success"}],
+    }
+    result = verify_ci_evidence(ci_evidence, ["job"])
+    assert result["valid"] is False
+    assert any("SHA mismatch" in b for b in result["blockers"])
+
+
+@patch("subprocess.run")
+def test_verify_ci_evidence_missing_job(mock_run):
+    gh_out = {
+        "headSha": "abcdef",
+        "conclusion": "success",
+        "status": "completed",
+        "jobs": [
+            {"name": "some-other-job", "conclusion": "success", "status": "completed"}
+        ],
+    }
+    m = MagicMock()
+    m.stdout = json.dumps(gh_out)
+    mock_run.return_value = m
+
+    ci_evidence = {
+        "run_id": "12345",
+        "run_url": "https://github.com/...",
+        "head_sha": "abcdef",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [{"name": "job", "conclusion": "success"}],
+    }
+    result = verify_ci_evidence(ci_evidence, ["job"])
+    assert result["valid"] is False
+    assert any("Required job 'job' was not found" in b for b in result["blockers"])
+
+
+@patch("subprocess.run")
+def test_verify_ci_evidence_gh_query_failure(mock_run):
+    import subprocess
+
+    mock_run.side_effect = subprocess.CalledProcessError(1, "gh", stderr="Not found")
+
+    ci_evidence = {
+        "run_id": "12345",
+        "run_url": "https://github.com/...",
+        "head_sha": "abcdef",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [{"name": "job", "conclusion": "success"}],
+    }
+    result = verify_ci_evidence(ci_evidence, ["job"])
+    assert result["valid"] is False
+    assert any("GitHub CLI query failed" in b for b in result["blockers"])
+
+
+@patch("subprocess.run")
+def test_verify_ci_evidence_cancelled_run(mock_run):
+    gh_out = {
+        "headSha": "abcdef",
+        "conclusion": "cancelled",
+        "status": "completed",
+        "jobs": [{"name": "job", "conclusion": "cancelled", "status": "completed"}],
+    }
+    m = MagicMock()
+    m.stdout = json.dumps(gh_out)
+    mock_run.return_value = m
+
+    ci_evidence = {
+        "run_id": "12345",
+        "run_url": "https://github.com/...",
+        "head_sha": "abcdef",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [
+            {"name": "job", "conclusion": "success"}
+        ],  # provider says success, diff truth
+    }
+    result = verify_ci_evidence(ci_evidence, ["job"])
+    assert result["valid"] is False
+    assert any(
+        "GitHub run 12345 conclusion is not success" in b for b in result["blockers"]
+    )
