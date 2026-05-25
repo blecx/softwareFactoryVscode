@@ -1,7 +1,7 @@
 import json
 import os
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 def get_evidence_path(evidence_key: str, repo_root: str = ".") -> str:
@@ -21,7 +21,19 @@ def get_evidence_path(evidence_key: str, repo_root: str = ".") -> str:
 
 
 def record_preflight_evidence(
-    evidence_key: str, agent: str, status: str, repo_root: str = "."
+    evidence_key: str,
+    agent: str,
+    status: str,
+    repo_root: str = ".",
+    # exact-state optional fields
+    issue_number: Optional[str] = None,
+    pr_number: Optional[str] = None,
+    branch: Optional[str] = None,
+    worktree: Optional[str] = None,
+    request_hash: Optional[str] = None,
+    checkpoint_hash: Optional[str] = None,
+    github_truth_timestamp: Optional[str] = None,
+    expiration_metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Records workflow preflight evidence into a JSON file under .tmp/
@@ -35,12 +47,33 @@ def record_preflight_evidence(
         "timestamp": time.time(),
     }
 
+    if issue_number is not None:
+        evidence["issue_number"] = issue_number
+    if pr_number is not None:
+        evidence["pr_number"] = pr_number
+    if branch is not None:
+        evidence["branch"] = branch
+    if worktree is not None:
+        evidence["worktree"] = worktree
+    if request_hash is not None:
+        evidence["request_hash"] = request_hash
+    if checkpoint_hash is not None:
+        evidence["checkpoint_hash"] = checkpoint_hash
+    if github_truth_timestamp is not None:
+        evidence["github_truth_timestamp"] = github_truth_timestamp
+    if expiration_metadata is not None:
+        evidence["expiration_metadata"] = expiration_metadata
+
     with open(path, "w", encoding="utf-8") as f:
         json.dump(evidence, f, indent=2)
 
 
 def require_safe_preflight(
-    evidence_key: str, required_agent: str, ttl_seconds: int = 300, repo_root: str = "."
+    evidence_key: str,
+    required_agent: str,
+    ttl_seconds: int = 300,
+    repo_root: str = ".",
+    exact_state: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Validates fresh workflow preflight evidence.
@@ -85,17 +118,35 @@ def require_safe_preflight(
     elif current_time < timestamp - 60:
         blockers.append("Preflight evidence is from the future (invalid timestamp).")
 
+    if exact_state:
+        for k, expected_v in exact_state.items():
+            if expected_v is None:
+                continue
+            actual_v = evidence.get(k)
+            if actual_v is None:
+                blockers.append(
+                    f"Exact state validation failed: missing expected field '{k}'."
+                )
+            elif str(actual_v) != str(expected_v):
+                blockers.append(
+                    f"Exact state validation failed for '{k}': expected '{expected_v}', got '{actual_v}'."
+                )
+
     return {"safe_to_continue": len(blockers) == 0, "blockers": blockers}
 
 
 def verify_preflight_evidence(
-    evidence_key: str, required_agent: str, ttl_seconds: int = 300, repo_root: str = "."
+    evidence_key: str,
+    required_agent: str,
+    ttl_seconds: int = 300,
+    repo_root: str = ".",
+    exact_state: Optional[Dict[str, Any]] = None,
 ) -> None:
     """Verifies preflight evidence and exits if not safe to continue."""
     import sys
 
     result = require_safe_preflight(
-        evidence_key, required_agent, ttl_seconds, repo_root
+        evidence_key, required_agent, ttl_seconds, repo_root, exact_state=exact_state
     )
     if not result.get("safe_to_continue"):
         print(
