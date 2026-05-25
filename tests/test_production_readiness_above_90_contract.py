@@ -22,7 +22,11 @@ def test_aggregate_above_90_readiness_bundle():
         "tests/test_workflow_language_contract.py",
         "tests/test_ai_authority_routing.py",  # Routing proxy
         "tests/test_production_readiness_score.py",  # Signoff evidence
-        "tests/test_verify_production_signoff.py",  # Signoff evidence
+        "tests/test_verify_production_signoff.py",  # Signoff evidence, cancelled-run classification array, durable signoff pointer
+        "tests/test_github_ci_evidence.py",  # GitHub evidence verification fixtures
+        "tests/test_green_streak.py",  # computed streak
+        "tests/test_production_readiness_evidence.py",
+        "tests/test_workflow_preflight.py",  # fail-closed preflight
         "tests/test_workflow_residue_check.py",  # Residue detection
     ]
 

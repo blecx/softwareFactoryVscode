@@ -399,6 +399,8 @@ def compute_green_streak(
         elif classification == "non_production_lane":
             pass
 
+    return streak, blockers
+
 
 def get_github_history(branch: str, workflow_name: str) -> List[NormalizedRunEvidence]:
     history = []
