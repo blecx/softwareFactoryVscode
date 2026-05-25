@@ -3,10 +3,16 @@ import json
 from scripts.production_readiness_score import score_readiness
 
 
+def get_valid_traceability():
+    return {f"req_{i}": f"tests/test_{i}.py" for i in range(1, 10)}
+
+
 def test_missing_adr_013():
     input_data = {
         "adrs": ["ADR-001"],
         "evidence": {"docs": True, "implementation": True, "validation": True},
+        "traceability": get_valid_traceability(),
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
     }
     result = score_readiness(input_data)
     assert not result["ready"]
@@ -17,6 +23,8 @@ def test_docs_only():
     input_data = {
         "adrs": ["ADR-013"],
         "evidence": {"docs": True, "implementation": False, "validation": False},
+        "traceability": get_valid_traceability(),
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
     }
     result = score_readiness(input_data)
     assert not result["ready"]
@@ -27,6 +35,8 @@ def test_valid_minimal_evidence():
     input_data = {
         "adrs": ["ADR-013"],
         "evidence": {"docs": True, "implementation": True, "validation": True},
+        "traceability": get_valid_traceability(),
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
     }
     result = score_readiness(input_data)
     assert result["ready"]
@@ -36,12 +46,56 @@ def test_valid_minimal_evidence():
 
 
 def test_missing_implementation_and_validation():
-    # If docs is false, then docs_only won't trigger, but implementation/validation blockers should.
     input_data = {
         "adrs": ["ADR-013"],
         "evidence": {"docs": False, "implementation": False, "validation": False},
+        "traceability": get_valid_traceability(),
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
     }
     result = score_readiness(input_data)
     assert not result["ready"]
     assert "Missing implementation evidence." in result["blockers"]
     assert "Missing validation evidence." in result["blockers"]
+
+
+def test_traceability_evidence_gap():
+    traceability = get_valid_traceability()
+    traceability["req_5"] = "Evidence gap"
+    input_data = {
+        "adrs": ["ADR-013"],
+        "evidence": {"docs": True, "implementation": True, "validation": True},
+        "traceability": traceability,
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
+    }
+    result = score_readiness(input_data)
+    assert not result["ready"]
+    assert "Traceability row req_5 still says Evidence gap." in result["blockers"]
+
+
+def test_missing_signoff_evidence():
+    input_data = {
+        "adrs": ["ADR-013"],
+        "evidence": {"docs": True, "implementation": True, "validation": True},
+        "traceability": get_valid_traceability(),
+        # Missing signoff_evidence
+    }
+    result = score_readiness(input_data)
+    assert not result["ready"]
+    assert "Missing signoff evidence pointer/verifier output." in result["blockers"]
+
+
+def test_missing_traceability():
+    traceability = get_valid_traceability()
+    del traceability["req_9"]
+    input_data = {
+        "adrs": ["ADR-013"],
+        "evidence": {"docs": True, "implementation": True, "validation": True},
+        "traceability": traceability,
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
+    }
+    result = score_readiness(input_data)
+    assert not result["ready"]
+    assert (
+        "Missing one or more of the 9 blocking requirements evidence."
+        in result["blockers"]
+    )

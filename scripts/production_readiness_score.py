@@ -26,6 +26,16 @@ def score_readiness(input_data: Dict[str, Any]) -> Dict[str, Any]:
     if not has_validation:
         blockers.append("Missing validation evidence.")
 
+    traceability = input_data.get("traceability", {})
+    if len(traceability) < 9:
+        blockers.append("Missing one or more of the 9 blocking requirements evidence.")
+    for key, value in traceability.items():
+        if isinstance(value, str) and value.lower() == "evidence gap":
+            blockers.append(f"Traceability row {key} still says Evidence gap.")
+
+    if not input_data.get("signoff_evidence"):
+        blockers.append("Missing signoff evidence pointer/verifier output.")
+
     input_score = {
         "adrs_present": len(input_data.get("adrs", [])),
         "docs": has_docs,
