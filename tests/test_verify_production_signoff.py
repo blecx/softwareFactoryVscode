@@ -152,9 +152,11 @@ from scripts.verify_production_signoff import verify_ci_evidence
 def test_verify_ci_evidence_success():
     ci_evidence = {
         "run_id": "12345",
+        "run_url": "https://github.com/...",
         "head_sha": "abcdef123456",
-        "job_name": "production-validation",
-        "conclusion": "success",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [{"name": "production-validation", "conclusion": "success"}],
     }
     result = verify_ci_evidence(ci_evidence)
     assert result["valid"] is True
@@ -162,33 +164,41 @@ def test_verify_ci_evidence_success():
 
 
 def test_verify_ci_evidence_missing_fields():
-    ci_evidence = {"run_id": "12345", "conclusion": "success"}
+    ci_evidence = {
+        "run_id": "12345",
+        "jobs": [{"name": "production-validation", "conclusion": "success"}],
+    }
     result = verify_ci_evidence(ci_evidence)
     assert result["valid"] is False
-    assert any("Missing required CI field: 'head_sha'" in b for b in result["blockers"])
-    assert any("Missing required CI field: 'job_name'" in b for b in result["blockers"])
+    assert any("Missing required field: 'head_sha'" in b for b in result["blockers"])
+    assert any("Missing required field: 'run_url'" in b for b in result["blockers"])
 
 
 def test_verify_ci_evidence_failure_conclusion():
     ci_evidence = {
         "run_id": "12345",
+        "run_url": "https://github.com/...",
         "head_sha": "abcdef",
-        "job_name": "job",
-        "conclusion": "failure",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [{"name": "job", "conclusion": "failure"}],
     }
     result = verify_ci_evidence(ci_evidence)
     assert result["valid"] is False
     assert any(
-        "CI signoff conclusion is not success: failure" in b for b in result["blockers"]
+        "CI signoff conclusion is not success: failure for job job" in b
+        for b in result["blockers"]
     )
 
 
 def test_verify_ci_evidence_with_secrets():
     ci_evidence = {
         "run_id": "12345",
+        "run_url": "https://github.com/...",
         "head_sha": "abcdef",
-        "job_name": "job",
-        "conclusion": "success",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [{"name": "job", "conclusion": "success"}],
         "api_key": "ghp_123456789012345678901234567890123456",
     }
     result = verify_ci_evidence(ci_evidence)
