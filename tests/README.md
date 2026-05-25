@@ -191,3 +191,13 @@ Or use the pytest marker:
 ```bash
 ./.venv/bin/python -m pytest -m harness_resistance
 ```
+
+## Final readiness aggregate above-90 bundle
+To prove that language authority, fail-closed routing, signoff evidence scoring, and residue detection all participate in the >90 percent gate, you can run the aggregate bundle:
+```bash
+./.venv/bin/python -m pytest tests/test_production_readiness_above_90_contract.py
+```
+Or use the pytest marker:
+```bash
+./.venv/bin/python -m pytest -m above_90_readiness
+```
