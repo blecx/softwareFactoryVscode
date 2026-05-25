@@ -180,7 +180,7 @@ When delegating to a subagent, the workflow must enforce a strict no-op detectio
   **Rule:** Local execution uses the identical bundle composition and skip logic as the `ci.yml` pipeline. Local validation exists primarily to make GitHub CI pass by using the same official bundles first, with GitHub rerunning the same structure as final authority. Any intentional skip is an explicit exception defined in the shared resolver.
   **Rule:** All validation is subject to the **bounded-runtime/watchdog rule** (hard cap of 45 minutes). A runtime timeout is a blocked state, not a prompt to wait indefinitely.
 
-  Canonical local PR-readiness evidence for issue handoff / merge-readiness narration:
+  Canonical local PR-readiness evidence for issue handoff / merge-readiness narration (must also include preflight result evidence):
 
   ```text
   ./.venv/bin/python ./scripts/local_ci_parity.py --level merge

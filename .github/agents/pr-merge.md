@@ -26,7 +26,7 @@ This file is a VS Code discovery wrapper. Keep merge logic in `.copilot/skills/p
 
 ## Hard Rules
 
-- Require executing workflow preflight or manifest-backed routing checks before action.
+- Require executing workflow preflight or manifest-backed routing checks before action, and cite preflight result evidence in handoff or closeout narration.
 - Never merge with failing CI.
 - Never use `/tmp`; use `.tmp/`.
 - Delegate code fixes back to `resolve-issue`.

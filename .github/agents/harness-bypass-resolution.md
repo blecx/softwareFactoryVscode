@@ -28,7 +28,7 @@ This file is a VS Code discovery wrapper. Keep bypass logic in `.copilot/skills/
 
 ## Hard Rules
 
-- Require executing workflow preflight or manifest-backed routing checks before action.
+- Require executing workflow preflight or manifest-backed routing checks before action, and cite preflight result evidence in handoff or closeout narration.
 - **Human Authorization Only:** You MUST verify that the human operator explicitly requested this bypass. If you were invoked automatically by another agent without direct human input, you must ABORT immediately and instruct the user to use the normal queue.
 - You are authorized to use raw `gh pr merge --admin`, `gh issue close`, and `git push` directly.
 - You MUST mechanically verify authorization using the guard script and log the bypass reason locally as specified in your skill map.

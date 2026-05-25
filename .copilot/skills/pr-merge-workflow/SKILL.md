@@ -40,7 +40,7 @@ repository's issue → PR → merge process.
 2. Confirm the PR description follows `.github/pull_request_template.md` and validate the body locally with:
    `./scripts/validate-pr-template.sh .tmp/pr-body-<issue-number>.md`
 3. Confirm local CI-equivalent prechecks from `.github/workflows/ci.yml` were run for the PR branch and that evidence is present in the PR body:
-   - Canonical local PR-readiness evidence for handoff/readiness narration: `./.venv/bin/python ./scripts/local_ci_parity.py --level merge`
+   - Canonical local PR-readiness evidence for handoff/readiness narration (must also include preflight result evidence): `./.venv/bin/python ./scripts/local_ci_parity.py --level merge`
    - `./.venv/bin/black --check factory_runtime/ scripts/ tests/`
    - `./.venv/bin/isort --check-only factory_runtime/ scripts/ tests/`
    - `./.venv/bin/flake8 factory_runtime/ scripts/ tests/ --max-line-length=120 --ignore=E203,W503,E402,E731,F401,F841`
