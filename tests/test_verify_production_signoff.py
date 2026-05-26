@@ -564,3 +564,12 @@ def test_verify_ci_evidence_strict_fails_without_repo():
     result = verify_ci_evidence(ci_evidence, strict=True)
     assert result["valid"] is False
     assert any("Missing explicit repo in strict mode" in b for b in result["blockers"])
+
+
+def test_fetch_github_history_strict_fails_without_repo():
+    import pytest
+
+    from scripts.verify_production_signoff import fetch_github_history
+
+    with pytest.raises(ValueError, match="Repo binding is explicit in strict mode"):
+        fetch_github_history("main", "CI", strict=True)

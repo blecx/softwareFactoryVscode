@@ -439,38 +439,6 @@ def compute_green_streak(
     return streak, blockers
 
 
-def get_github_history(branch: str, workflow_name: str) -> List[NormalizedRunEvidence]:
-    history = []
-    # run gh query
-    try:
-        gh_cmd = [
-            "gh",
-            "run",
-            "list",
-            "--branch",
-            branch,
-            "--workflow",
-            workflow_name,
-            "--json",
-            "databaseId,headSha,status,conclusion,jobs,headBranch",
-            "--limit",
-            "10",  # should be enough to fetch history of current sha
-        ]
-        result = subprocess.run(gh_cmd, capture_output=True, text=True, check=True)
-        runs = json.loads(result.stdout)
-    except Exception:
-        return []
-
-    for r in runs:
-        jobs = []
-        # gh run list --json jobs doesnt actually return job details for each run directly sometimes,
-        # we might need to fetch jobs for each run if they aren't included
-        # Actually gh run list with --json jobs is supported as of recently? Let's check
-        # If not, maybe we just assume jobs are there or we don't have them in the bulk query.
-        pass
-    return history
-
-
 def fetch_github_history(
     branch: str,
     workflow_name: str,
@@ -482,9 +450,9 @@ def fetch_github_history(
     import subprocess
 
     if strict and not repo:
-        return (
-            []
-        )  # or raise an error, but let's return empty to fail gracefully initially, actually no wait, let's keep it
+        raise ValueError(
+            "Repo binding is explicit in strict mode; missing repo fails closed with diagnostics."
+        )
 
     # We first fetch the recent runs
     cmd = [
