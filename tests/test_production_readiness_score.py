@@ -131,3 +131,29 @@ def test_missing_traceability():
         "Missing one or more of the 9 blocking requirements evidence."
         in result["blockers"]
     )
+
+
+def test_strict_rejects_manual_green_streak():
+    data = {
+        "adrs": ["ADR-013"],
+        "evidence": {"implementation": True, "validation": True},
+        "traceability": {
+            "1": "passed",
+            "2": "passed",
+            "3": "passed",
+            "4": "passed",
+            "5": "passed",
+            "6": "passed",
+            "7": "passed",
+            "8": "passed",
+            "9": "passed",
+        },
+        "signoff_evidence": "yes",
+        "green_streak_count": 3,
+    }
+    result = score_readiness(data, strict=True)
+    assert not result["ready"]
+    assert any(
+        "Authoritative readiness requires computed GitHub streak evidence" in b
+        for b in result["blockers"]
+    )
