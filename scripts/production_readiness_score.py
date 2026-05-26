@@ -121,6 +121,11 @@ def main():
         required=True,
         help="JSON string or file path containing review input",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Run strict mode for authoritative readiness binding.",
+    )
     args = parser.parse_args()
 
     try:
@@ -133,7 +138,7 @@ def main():
         print(json.dumps({"error": f"Invalid JSON input: {e}"}))
         sys.exit(1)
 
-    result = score_readiness(input_data)
+    result = score_readiness(input_data, strict=args.strict)
     print(json.dumps(result, indent=2))
 
     if not result["ready"]:
