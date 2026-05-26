@@ -229,3 +229,27 @@ def test_future_dated_evidence_blocks(repo_root):
     result = require_safe_preflight("auth-key", "@test-agent", 300, repo_root)
     assert not result["safe_to_continue"]
     assert any("future" in b for b in result["blockers"])
+
+
+def test_step2_backend_evidence_binding(repo_root):
+    record_preflight_evidence(
+        "step2-backend",
+        "copilot-workspace",
+        "pass",
+        repo_root,
+        exact_state={
+            "issue_number": "563",
+            "branch": "feat/563-step2-preflight",
+            "checkpoint": "session-12345",
+        },
+    )
+
+    path = get_evidence_path("step2-backend", repo_root)
+    import json
+
+    with open(path, "r", encoding="utf-8") as f:
+        evidence = json.load(f)
+
+    valid, blockers = validate_against_schema(evidence, repo_root)
+    assert valid, blockers
+    assert evidence["exact_state"]["checkpoint"] == "session-12345"

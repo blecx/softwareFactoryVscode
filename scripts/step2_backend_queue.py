@@ -395,9 +395,16 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     import json
+    import os
     import re
+    import sys
 
-    from scripts.workflow_preflight_gate import verify_preflight_evidence
+    from scripts.workflow_preflight_gate import (
+        record_preflight_evidence,
+        verify_preflight_evidence,
+    )
+
+    is_apply_mode = "--apply" in sys.argv or "--sync-tracker" in sys.argv
 
     exact = {}
     try:
@@ -407,16 +414,27 @@ if __name__ == "__main__":
                 chk = json.loads(match.group(1))
                 if chk.get("active_branch"):
                     exact["branch"] = str(chk["active_branch"])
+                elif chk.get("branch"):
+                    exact["branch"] = str(chk["branch"])
                 if chk.get("active_issue"):
                     exact["issue_number"] = str(chk["active_issue"])
+                if chk.get("execution_lease_id"):
+                    exact["checkpoint"] = str(chk["execution_lease_id"])
     except Exception:
         pass
 
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    if not is_apply_mode:
+        record_preflight_evidence(
+            "step2-backend", "copilot-workspace", "pass", repo_root, exact_state=exact
+        )
+
     verify_preflight_evidence(
-        "issue-workflow",
+        "step2-backend",
         "copilot-workspace",
         300,
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        repo_root,
         exact_state=exact,
     )
     raise SystemExit(main(sys.argv[1:]))
