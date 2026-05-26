@@ -20,12 +20,15 @@ def aggregate_evidence(
     signoff_filepath: str,
     ci_evidence: Dict[str, Any] = None,
     strict_verification: bool = False,
+    repo: str = None,
 ) -> Dict[str, Any]:
     blockers = []
     authoritative = False
 
     if ci_evidence is not None:
-        signoff_result = verify_ci_evidence(ci_evidence)
+        signoff_result = verify_ci_evidence(
+            ci_evidence, repo=repo, strict=strict_verification
+        )
         source = "github-ci"
         authoritative = True
 
@@ -38,7 +41,9 @@ def aggregate_evidence(
             head_sha = ci_evidence.get("head_sha")
 
             if branch and workflow_name and head_sha:
-                history = fetch_github_history(branch, workflow_name)
+                history = fetch_github_history(
+                    branch, workflow_name, repo=repo, strict=strict_verification
+                )
                 # Convert back to dict for score_readiness to parse if needed
                 history_dicts = []
                 for h in history:
@@ -65,7 +70,9 @@ def aggregate_evidence(
         except Exception:
             pass
     else:
-        signoff_result = verify_signoff(signoff_filepath)
+        signoff_result = verify_signoff(
+            signoff_filepath, repo=repo, strict=strict_verification
+        )
         source = "local-file"
         authoritative = False
 
@@ -118,6 +125,12 @@ def main():
         type=str,
         default=None,
         help="JSON string or file path containing CI evidence",
+    )
+    parser.add_argument(
+        "--repo",
+        type=str,
+        default=None,
+        help="Explicit repository (e.g. owner/repo) to verify against",
     )
     parser.add_argument(
         "--strict-verification",
