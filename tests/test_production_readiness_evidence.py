@@ -246,3 +246,19 @@ def test_main_passes_repo_to_aggregate(tmp_path, monkeypatch):
     assert captured["repo"] == "owner/repo"
     assert captured["strict_verification"] is True
     assert captured["ci_evidence"] == {"run_id": "12345"}
+
+
+@patch("scripts.production_readiness_evidence.fetch_github_history")
+def test_aggregate_evidence_strict_github_fetch_failure(mock_fetch, valid_review_input):
+    mock_fetch.side_effect = ValueError("GitHub CLI command failed")
+
+    result = aggregate_evidence(
+        review_input=valid_review_input,
+        signoff_filepath="dummy.md",
+        ci_evidence={"branch": "main", "workflow_name": "Test", "head_sha": "abc1234"},
+        repo="test/repo",
+        strict_verification=True,
+    )
+
+    assert result["is_ready"] is False
+    assert "GitHub CLI command failed" in result["blockers"]
