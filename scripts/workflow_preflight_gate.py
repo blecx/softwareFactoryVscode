@@ -1,7 +1,9 @@
 import json
 import os
+import sys
 import time
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional, Tuple
 
 
 def get_evidence_path(evidence_key: str, repo_root: str = ".") -> str:
@@ -10,7 +12,6 @@ def get_evidence_path(evidence_key: str, repo_root: str = ".") -> str:
     if not os.path.exists(tmp_dir):
         os.makedirs(tmp_dir, exist_ok=True)
 
-    # Sanitize key to prevent path traversal
     safe_key = "".join(
         c for c in evidence_key if c.isalnum() or c in ("-", "_")
     ).strip()
@@ -20,21 +21,70 @@ def get_evidence_path(evidence_key: str, repo_root: str = ".") -> str:
     return os.path.join(tmp_dir, f"workflow_preflight_{safe_key}.json")
 
 
+def _get_schema_path(repo_root: str = ".") -> str:
+    return os.path.join(repo_root, "schemas", "workflow-preflight-evidence.schema.json")
+
+
+def validate_against_schema(
+    evidence: Dict[str, Any], repo_root: str = "."
+) -> Tuple[bool, list[str]]:
+    schema_path = _get_schema_path(repo_root)
+    if not os.path.exists(schema_path):
+        return False, [f"Schema not found at {schema_path}"]
+
+    try:
+        with open(schema_path, "r", encoding="utf-8") as f:
+            schema = json.load(f)
+    except Exception as e:
+        return False, [f"Failed to load schema: {e}"]
+
+    try:
+        import jsonschema
+
+        jsonschema.validate(instance=evidence, schema=schema)
+    except ImportError:
+        errors = []
+        required = schema.get("required", [])
+        for req in required:
+            if req not in evidence:
+                errors.append(f"Missing required field: {req}")
+
+        allowed_props = set(schema.get("properties", {}).keys())
+        for k in evidence.keys():
+            if k not in allowed_props:
+                errors.append(f"Additional property not allowed: {k}")
+
+        verdict_enum = schema.get("properties", {}).get("verdict", {}).get("enum", [])
+        if evidence.get("verdict") not in verdict_enum:
+            errors.append(f"Invalid verdict: {evidence.get('verdict')}")
+
+        exact_state_schema = schema.get("properties", {}).get("exact_state", {})
+        exact_state = evidence.get("exact_state")
+        if exact_state is not None:
+            if not isinstance(exact_state, dict):
+                errors.append("exact_state must be an object")
+            else:
+                allowed_es_props = set(exact_state_schema.get("properties", {}).keys())
+                for ek in exact_state.keys():
+                    if ek not in allowed_es_props:
+                        errors.append(
+                            f"Additional exact_state property not allowed: {ek}"
+                        )
+
+        if errors:
+            return False, errors
+    except Exception as e:
+        return False, [f"Schema validation failed: {str(e)}"]
+
+    return True, []
+
+
 def record_preflight_evidence(
     evidence_key: str,
-    agent: str,
-    status: str,
+    identity: str,
+    verdict: str,
     repo_root: str = ".",
-    # exact-state optional fields
-    issue_number: Optional[str] = None,
-    pr_number: Optional[str] = None,
-    branch: Optional[str] = None,
-    worktree: Optional[str] = None,
-    request_hash: Optional[str] = None,
-    checkpoint_hash: Optional[str] = None,
-    github_truth_timestamp: Optional[str] = None,
-    expiration_metadata: Optional[Dict[str, Any]] = None,
-    bypass_reason: Optional[str] = None,
+    exact_state: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
     Records workflow preflight evidence into a JSON file under .tmp/
@@ -42,30 +92,19 @@ def record_preflight_evidence(
     path = get_evidence_path(evidence_key, repo_root)
 
     evidence = {
-        "evidence_key": evidence_key,
-        "agent": agent,
-        "status": status,
-        "timestamp": time.time(),
+        "identity": identity,
+        "verdict": verdict,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-    if issue_number is not None:
-        evidence["issue_number"] = issue_number
-    if pr_number is not None:
-        evidence["pr_number"] = pr_number
-    if branch is not None:
-        evidence["branch"] = branch
-    if worktree is not None:
-        evidence["worktree"] = worktree
-    if request_hash is not None:
-        evidence["request_hash"] = request_hash
-    if checkpoint_hash is not None:
-        evidence["checkpoint_hash"] = checkpoint_hash
-    if github_truth_timestamp is not None:
-        evidence["github_truth_timestamp"] = github_truth_timestamp
-    if expiration_metadata is not None:
-        evidence["expiration_metadata"] = expiration_metadata
-    if bypass_reason is not None:
-        evidence["bypass_reason"] = bypass_reason
+    if exact_state:
+        clean_exact_state = {k: v for k, v in exact_state.items() if v is not None}
+        if clean_exact_state:
+            evidence["exact_state"] = clean_exact_state
+
+    is_valid, errs = validate_against_schema(evidence, repo_root)
+    if not is_valid:
+        raise ValueError(f"Failed to generate valid evidence: {errs}")
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(evidence, f, indent=2)
@@ -73,7 +112,7 @@ def record_preflight_evidence(
 
 def require_safe_preflight(
     evidence_key: str,
-    required_agent: str,
+    required_identity: str,
     ttl_seconds: int = 300,
     repo_root: str = ".",
     exact_state: Optional[Dict[str, Any]] = None,
@@ -99,19 +138,30 @@ def require_safe_preflight(
             "blockers": [f"Failed to read preflight evidence: {e}"],
         }
 
+    valid_schema, schema_blockers = validate_against_schema(evidence, repo_root)
+    if not valid_schema:
+        return {"safe_to_continue": False, "blockers": schema_blockers}
+
     blockers = []
 
-    status = evidence.get("status")
-    if status != "passed":
-        blockers.append(f"Preflight evidence status is '{status}', expected 'passed'.")
+    verdict = evidence.get("verdict")
+    if verdict != "pass":
+        blockers.append(f"Preflight evidence verdict is '{verdict}', expected 'pass'.")
 
-    agent = evidence.get("agent")
-    if required_agent and agent != required_agent:
+    identity = evidence.get("identity")
+    if required_identity and identity != required_identity:
         blockers.append(
-            f"Mismatched agent. Required '{required_agent}', but evidence was recorded for '{agent}'."
+            f"Mismatched identity. Required '{required_identity}', but evidence was recorded for '{identity}'."
         )
 
-    timestamp = evidence.get("timestamp", 0)
+    timestamp_str = evidence.get("timestamp")
+    try:
+        timestamp = datetime.fromisoformat(
+            timestamp_str.replace("Z", "+00:00")
+        ).timestamp()
+    except Exception:
+        timestamp = 0
+
     current_time = time.time()
 
     if current_time - timestamp > ttl_seconds:
@@ -122,10 +172,11 @@ def require_safe_preflight(
         blockers.append("Preflight evidence is from the future (invalid timestamp).")
 
     if exact_state:
+        actual_exact_state = evidence.get("exact_state", {})
         for k, expected_v in exact_state.items():
             if expected_v is None:
                 continue
-            actual_v = evidence.get(k)
+            actual_v = actual_exact_state.get(k)
             if actual_v is None:
                 blockers.append(
                     f"Exact state validation failed: missing expected field '{k}'."
@@ -140,20 +191,17 @@ def require_safe_preflight(
 
 def verify_preflight_evidence(
     evidence_key: str,
-    required_agent: str,
+    required_identity: str,
     ttl_seconds: int = 300,
     repo_root: str = ".",
     exact_state: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """Verifies preflight evidence and exits if not safe to continue."""
-    import sys
-
     result = require_safe_preflight(
-        evidence_key, required_agent, ttl_seconds, repo_root, exact_state=exact_state
+        evidence_key, required_identity, ttl_seconds, repo_root, exact_state=exact_state
     )
     if not result.get("safe_to_continue"):
         print(
-            f"Preflight gate failed for '{evidence_key}' and agent '{required_agent}':",
+            f"Preflight gate failed for '{evidence_key}' and identity '{required_identity}':",
             file=sys.stderr,
         )
         for blocker in result.get("blockers", []):

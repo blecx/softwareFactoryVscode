@@ -13,7 +13,7 @@ Maintained synthesis docs, implementation plans, and historical notes remain sub
 
 | ADR status | Count | How to use it |
 | --- | ---: | --- |
-| Accepted ADRs | 17 | Current normative architecture guardrails and terminology. |
+| Accepted ADRs | 18 | Current normative architecture guardrails and terminology. |
 | Superseded historical ADR notes | 1 | Historical traceability only; not a current authority source. |
 | Proposed ADRs | 0 | Current candidate in `docs/architecture/`. |
 
@@ -38,6 +38,7 @@ Maintained synthesis docs, implementation plans, and historical notes remain sub
 | [`ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md`](ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md) | Accepted | Defines provider-facing quota authority and hierarchical budget inheritance for multi-requester LLM usage. | Prevents quota handling from turning into a shadow runtime controller. |
 | [`ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md`](ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md) | Accepted | Defines workflow ubiquitous language policy. | Prevents ambiguous workflow terminology from drifting in derived docs. |
 | [`ADR-017-Host-Project-Ubiquitous-Language-Boundary.md`](ADR-017-Host-Project-Ubiquitous-Language-Boundary.md) | Accepted | Defines a distinct host-owned language surface that survives factory updates. | Prevents automated SDK updates from overwriting host project domain terminology. |
+| [`ADR-018-Workflow-Preflight-Evidence.md`](ADR-018-Workflow-Preflight-Evidence.md) | Accepted | Defines the workflow preflight evidence schema and consumer matrix. | Prevents issue, PR, queue, and break-glass preflight evidence from drifting across workflow entrypoints. |
 
 ## Historical note on duplicate ADR-007 numbering
 

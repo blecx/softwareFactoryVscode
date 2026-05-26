@@ -2,12 +2,21 @@ import json
 import os
 import subprocess
 import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 
 @pytest.fixture
 def repo_root(tmp_path):
+    import shutil
+
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.makedirs(os.path.join(tmp_path, "schemas"), exist_ok=True)
+    shutil.copy(
+        os.path.join(repo, "schemas", "workflow-preflight-evidence.schema.json"),
+        os.path.join(tmp_path, "schemas", "workflow-preflight-evidence.schema.json"),
+    )
     return str(tmp_path)
 
 
@@ -46,10 +55,9 @@ def test_prmerge_fails_on_stale_preflight(setup_prmerge_env, repo_root):
 
     path = ".tmp/workflow_preflight_issue-workflow.json"
     evidence = {
-        "evidence_key": "issue-workflow",
-        "agent": "copilot-workspace",
-        "status": "passed",
-        "timestamp": time.time() - 1000,  # Stale
+        "identity": "copilot-workspace",
+        "verdict": "pass",
+        "timestamp": (datetime.now(timezone.utc) - timedelta(seconds=1000)).isoformat(),
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(evidence, f)
@@ -72,10 +80,9 @@ def test_prmerge_fails_on_failed_preflight(setup_prmerge_env, repo_root):
 
     path = ".tmp/workflow_preflight_issue-workflow.json"
     evidence = {
-        "evidence_key": "issue-workflow",
-        "agent": "copilot-workspace",
-        "status": "failed",
-        "timestamp": time.time(),
+        "identity": "copilot-workspace",
+        "verdict": "fail",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(evidence, f)
@@ -89,7 +96,7 @@ def test_prmerge_fails_on_failed_preflight(setup_prmerge_env, repo_root):
 
     assert result.returncode == 1
     assert "Preflight gate failed" in result.stderr
-    assert "expected 'passed'" in result.stderr
+    assert "expected 'pass'" in result.stderr
 
 
 def test_prmerge_fails_on_exact_state_mismatch(setup_prmerge_env, repo_root):
@@ -99,9 +106,9 @@ def test_prmerge_fails_on_exact_state_mismatch(setup_prmerge_env, repo_root):
     record_preflight_evidence(
         "issue-workflow",
         "copilot-workspace",
-        "passed",
+        "pass",
         repo_root,
-        branch="wrong-branch",
+        exact_state={"branch": "wrong-branch"},
     )
 
     script_path = os.path.abspath(
@@ -142,10 +149,13 @@ def test_prmerge_force_bypass_passes_with_evidence(
     record_preflight_evidence(
         "force-bypass",
         "human-operator",
-        "passed",
+        "pass",
         repo_root,
-        branch=curr_branch,
-        bypass_reason="Emergency break-glass",
+        exact_state={
+            "branch": curr_branch,
+            "break_glass": True,
+            "bypass_evidence": "Emergency break-glass",
+        },
     )
 
     script_path = os.path.abspath(

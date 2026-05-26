@@ -2832,7 +2832,7 @@ def test_adr_catalog_summarizes_current_architecture_authority() -> None:
     assert "complements [`INDEX.md`](INDEX.md)" in adr_index
     assert "accepted ADRs are the normative architecture source" in adr_index
     assert "## Status summary" in adr_index
-    assert "| Accepted ADRs | 17 |" in adr_index
+    assert "| Accepted ADRs | 18 |" in adr_index
     assert "| Superseded historical ADR notes | 1 |" in adr_index
     assert "| Proposed ADRs | 0 |" in adr_index
     assert "## Accepted ADR catalog" in adr_index
@@ -2847,6 +2847,7 @@ def test_adr_catalog_summarizes_current_architecture_authority() -> None:
         "ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md"
         in adr_index
     )
+    assert "ADR-018-Workflow-Preflight-Evidence.md" in adr_index
     assert "## Historical note on duplicate ADR-007 numbering" in adr_index
     assert "ADR-007-Multi-Workspace-and-Shared-Services.md" in adr_index
     assert "must not be used as a current architecture authority" in adr_index

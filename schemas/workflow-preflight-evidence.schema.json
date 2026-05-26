@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workflow Preflight Evidence Schema",
+  "description": "Schema for preflight evidence payloads across all workflow components. Validated by workflow_preflight_gate.py",
+  "type": "object",
+  "properties": {
+    "identity": {
+      "type": "string",
+      "description": "Identifier of the agent or tool emitting the evidence"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["pass", "fail", "incomplete"],
+      "description": "The result verdict of the preflight check"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO8601 timestamp of when the evidence was captured"
+    },
+    "exact_state": {
+      "type": "object",
+      "properties": {
+        "issue_number": { "type": "string" },
+        "pr_number": { "type": "string" },
+        "branch": { "type": "string" },
+        "worktree": { "type": "string" },
+        "request": { "type": "string" },
+        "request_hash": { "type": "string" },
+        "checkpoint": { "type": "string" },
+        "checkpoint_hash": { "type": "string" },
+        "github_truth_timestamp": { "type": "string", "format": "date-time" },
+        "expiration": { "type": "string", "format": "date-time" },
+        "break_glass": { "type": "boolean" },
+        "bypass_evidence": { "type": "string" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["identity", "verdict", "timestamp"],
+  "additionalProperties": false
+}
