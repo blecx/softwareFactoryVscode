@@ -22,6 +22,7 @@ def test_missing_adr_013():
 def test_docs_only():
     input_data = {
         "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
         "evidence": {"docs": True, "implementation": False, "validation": False},
         "traceability": get_valid_traceability(),
         "signoff_evidence": ".tmp/production-readiness/latest.json",
@@ -34,6 +35,7 @@ def test_docs_only():
 def test_valid_minimal_evidence():
     input_data = {
         "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
         "evidence": {"docs": True, "implementation": True, "validation": True},
         "traceability": get_valid_traceability(),
         "signoff_evidence": ".tmp/production-readiness/latest.json",
@@ -50,6 +52,7 @@ def test_green_streak_count_insufficient():
     for count in [0, 1, 2]:
         input_data = {
             "adrs": ["ADR-013"],
+            "docs_anchors": ["ADR-013"],
             "evidence": {"docs": True, "implementation": True, "validation": True},
             "traceability": get_valid_traceability(),
             "signoff_evidence": ".tmp/production-readiness/latest.json",
@@ -67,6 +70,7 @@ def test_green_streak_count_sufficient():
     for count in [3, 4, 10]:
         input_data = {
             "adrs": ["ADR-013"],
+            "docs_anchors": ["ADR-013"],
             "evidence": {"docs": True, "implementation": True, "validation": True},
             "traceability": get_valid_traceability(),
             "signoff_evidence": ".tmp/production-readiness/latest.json",
@@ -80,6 +84,7 @@ def test_green_streak_count_sufficient():
 def test_missing_implementation_and_validation():
     input_data = {
         "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
         "evidence": {"docs": False, "implementation": False, "validation": False},
         "traceability": get_valid_traceability(),
         "signoff_evidence": ".tmp/production-readiness/latest.json",
@@ -95,6 +100,7 @@ def test_traceability_evidence_gap():
     traceability["req_5"] = "Evidence gap"
     input_data = {
         "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
         "evidence": {"docs": True, "implementation": True, "validation": True},
         "traceability": traceability,
         "signoff_evidence": ".tmp/production-readiness/latest.json",
@@ -107,6 +113,7 @@ def test_traceability_evidence_gap():
 def test_missing_signoff_evidence():
     input_data = {
         "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
         "evidence": {"docs": True, "implementation": True, "validation": True},
         "traceability": get_valid_traceability(),
         # Missing signoff_evidence
@@ -121,6 +128,7 @@ def test_missing_traceability():
     del traceability["req_9"]
     input_data = {
         "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
         "evidence": {"docs": True, "implementation": True, "validation": True},
         "traceability": traceability,
         "signoff_evidence": ".tmp/production-readiness/latest.json",
@@ -136,6 +144,7 @@ def test_missing_traceability():
 def test_strict_rejects_manual_green_streak():
     data = {
         "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
         "evidence": {"implementation": True, "validation": True},
         "traceability": {
             "1": "passed",
@@ -157,3 +166,48 @@ def test_strict_rejects_manual_green_streak():
         "Authoritative readiness requires computed GitHub streak evidence" in b
         for b in result["blockers"]
     )
+
+
+def test_missing_docs_anchors_strict():
+    input_data = {
+        "adrs": ["ADR-013"],
+        "evidence": {"docs": True, "implementation": True, "validation": True},
+        "traceability": get_valid_traceability(),
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
+        "green_streak_count": 3,
+    }
+    result = score_readiness(input_data, strict=True)
+    assert not result["ready"]
+    assert (
+        "Authoritative readiness requires explicit docs anchors." in result["blockers"]
+    )
+
+
+def test_missing_docs_anchors_reduces_readiness():
+    input_data = {
+        "adrs": ["ADR-013"],
+        "evidence": {"docs": True, "implementation": True, "validation": True},
+        "traceability": get_valid_traceability(),
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
+        "green_streak_count": 3,
+    }
+    result = score_readiness(input_data, strict=False)
+    # the readiness isn't strictly blocked, but the score drops
+    assert result["ready"]
+    assert result["score_inputs"]["docs"] is False
+    assert result["score_inputs"]["docs_anchors_present"] == 0
+
+
+def test_provided_docs_anchors():
+    input_data = {
+        "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
+        "evidence": {"docs": True, "implementation": True, "validation": True},
+        "traceability": get_valid_traceability(),
+        "signoff_evidence": ".tmp/production-readiness/latest.json",
+        "green_streak_count": 3,
+    }
+    result = score_readiness(input_data, strict=False)
+    assert result["ready"]
+    assert result["score_inputs"]["docs"] is True
+    assert result["score_inputs"]["docs_anchors_present"] == 1

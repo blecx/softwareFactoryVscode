@@ -17,6 +17,14 @@ def score_readiness(input_data: Dict[str, Any], strict: bool = False) -> Dict[st
     has_implementation = evidence.get("implementation", False)
     has_validation = evidence.get("validation", False)
 
+    docs_anchors = input_data.get("docs_anchors", [])
+
+    if strict and not docs_anchors:
+        blockers.append("Authoritative readiness requires explicit docs anchors.")
+
+    if not docs_anchors:
+        has_docs = False
+
     if has_docs and not (has_implementation or has_validation):
         blockers.append("Rejected docs-only readiness scoring.")
 
@@ -89,6 +97,7 @@ def score_readiness(input_data: Dict[str, Any], strict: bool = False) -> Dict[st
 
     input_score = {
         "adrs_present": len(input_data.get("adrs", [])),
+        "docs_anchors_present": len(docs_anchors),
         "docs": has_docs,
         "implementation": has_implementation,
         "validation": has_validation,
