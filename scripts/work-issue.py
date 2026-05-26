@@ -29,12 +29,23 @@ async def main():
     """Main entry point."""
     _ensure_venv_and_reexec()
 
+    import argparse
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--issue", type=int)
+    early_args, _ = parser.parse_known_args()
+
     from scripts.workflow_preflight_gate import verify_preflight_evidence
 
     verify_preflight_evidence(
-        "issue-workflow", "copilot-workspace", 300, str(Path(__file__).parent.parent)
+        "issue-workflow",
+        "copilot-workspace",
+        300,
+        str(Path(__file__).parent.parent),
+        exact_state=(
+            {"issue_number": str(early_args.issue)} if early_args.issue else None
+        ),
     )
-    import argparse
 
     # Import after venv re-exec so dependencies are available
     from factory_runtime.agents.agent_registry import create_issue_agent

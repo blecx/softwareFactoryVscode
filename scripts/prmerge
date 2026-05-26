@@ -6,6 +6,10 @@ if [[ "$1" == "--force-bypass" ]]; then
   exit 0
 fi
 
+# Determine branch
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+export CURRENT_BRANCH
+
 # Run python preflight gate
 if ! python3 -c "
 import sys
@@ -13,7 +17,8 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd())))
 from scripts.workflow_preflight_gate import verify_preflight_evidence
 try:
-    verify_preflight_evidence('issue-workflow', 'copilot-workspace', 300)
+    exact = {'branch': os.environ.get('CURRENT_BRANCH')}
+    verify_preflight_evidence('issue-workflow', 'copilot-workspace', 300, exact_state=exact)
 except Exception as e:
     import traceback
     traceback.print_exc()
