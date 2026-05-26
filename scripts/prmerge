@@ -1,6 +1,25 @@
 #!/bin/bash
 set -e
 if [[ "$1" == "--force-bypass" ]]; then
+  CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  export CURRENT_BRANCH
+
+  if ! python3 -c "
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd())))
+from scripts.workflow_preflight_gate import verify_preflight_evidence
+try:
+    exact = {'branch': os.environ.get('CURRENT_BRANCH')}
+    verify_preflight_evidence('force-bypass', 'human-operator', 600, exact_state=exact)
+except Exception as e:
+    import traceback
+    traceback.print_exc()
+    print(f'Hard-gate bypass failed: {e}', file=sys.stderr)
+    sys.exit(1)
+"; then
+      exit 1
+  fi
   echo "Bypass authorized."
   gh pr merge --squash
   exit 0

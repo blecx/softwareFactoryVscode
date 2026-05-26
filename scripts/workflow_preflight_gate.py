@@ -34,6 +34,7 @@ def record_preflight_evidence(
     checkpoint_hash: Optional[str] = None,
     github_truth_timestamp: Optional[str] = None,
     expiration_metadata: Optional[Dict[str, Any]] = None,
+    bypass_reason: Optional[str] = None,
 ) -> None:
     """
     Records workflow preflight evidence into a JSON file under .tmp/
@@ -63,6 +64,8 @@ def record_preflight_evidence(
         evidence["github_truth_timestamp"] = github_truth_timestamp
     if expiration_metadata is not None:
         evidence["expiration_metadata"] = expiration_metadata
+    if bypass_reason is not None:
+        evidence["bypass_reason"] = bypass_reason
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(evidence, f, indent=2)
