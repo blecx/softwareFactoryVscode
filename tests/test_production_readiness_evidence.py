@@ -16,6 +16,7 @@ def valid_review_input() -> Dict[str, Any]:
     traceability = {str(i): "Valid evidence" for i in range(1, 10)}
     return {
         "adrs": ["ADR-013"],
+        "docs_anchors": ["ADR-013"],
         "evidence": {"docs": True, "implementation": True, "validation": True},
         "traceability": traceability,
         "signoff_evidence": "verified",
