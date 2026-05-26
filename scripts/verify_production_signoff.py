@@ -89,7 +89,7 @@ class GitHubCIEvidence:
 
 
 def parse_ci_evidence(
-    payload: Dict[str, Any]
+    payload: Dict[str, Any],
 ) -> Tuple[Optional[GitHubCIEvidence], List[str]]:
     if not payload:
         return None, ["No CI evidence provided."]

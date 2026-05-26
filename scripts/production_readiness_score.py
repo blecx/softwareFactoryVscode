@@ -4,7 +4,7 @@ import sys
 from typing import Any, Dict
 
 
-def score_readiness(input_data: Dict[str, Any]) -> Dict[str, Any]:
+def score_readiness(input_data: Dict[str, Any], strict: bool = False) -> Dict[str, Any]:
     blockers = []
 
     # 1. Fail when ADR-013 is missing
@@ -36,7 +36,9 @@ def score_readiness(input_data: Dict[str, Any]) -> Dict[str, Any]:
     if not input_data.get("signoff_evidence"):
         blockers.append("Missing signoff evidence pointer/verifier output.")
 
-    green_streak_count = input_data.get("green_streak_count", 0)
+    green_streak_count = 0
+    if not strict:
+        green_streak_count = input_data.get("green_streak_count", 0)
 
     streak_evidence = input_data.get("green_streak_evidence")
     if streak_evidence:
@@ -76,6 +78,11 @@ def score_readiness(input_data: Dict[str, Any]) -> Dict[str, Any]:
             blockers.extend(computed_blockers)
         except Exception as e:
             blockers.append(f"Failed to compute green streak: {e}")
+
+    if strict and not streak_evidence:
+        blockers.append(
+            "Authoritative readiness requires computed GitHub streak evidence, but none was provided."
+        )
 
     if green_streak_count < 3:
         blockers.append("Production gate requires 3 consecutive clean signoff runs.")
