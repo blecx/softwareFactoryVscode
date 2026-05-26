@@ -38,8 +38,15 @@ async def main():
     parser.add_argument("--issue", type=int)
     early_args, _ = parser.parse_known_args()
 
-    from scripts.workflow_preflight_gate import verify_preflight_evidence
+    from scripts.workflow_preflight_gate import (
+        record_preflight_evidence,
+        verify_preflight_evidence,
+    )
 
+    exact = {"issue_number": str(early_args.issue)} if early_args.issue else None
+    record_preflight_evidence(
+        "issue-workflow", "copilot-workspace", "pass", exact_state=exact
+    )
     verify_preflight_evidence(
         "issue-workflow",
         "copilot-workspace",
