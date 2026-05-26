@@ -1190,6 +1190,16 @@ def _main_impl(args):
         }
         knowledge.save_knowledge()
 
+        from scripts.workflow_preflight_gate import record_preflight_evidence
+
+        record_preflight_evidence(
+            "issue-workflow",
+            "copilot-workspace",
+            "pass",
+            str(REPO_ROOT),
+            exact_state={"issue_number": str(next_issue["number"])},
+        )
+
     return 0
 
 

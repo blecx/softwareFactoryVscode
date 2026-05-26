@@ -328,6 +328,28 @@ Token Budget Mode:
         if args.interactive and success:
             await _interactive_mode(agent)
 
+        if success:
+            from scripts.workflow_preflight_gate import record_preflight_evidence
+
+            try:
+                active_branch = subprocess.check_output(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
+                ).strip()
+            except Exception:
+                active_branch = None
+
+            record_preflight_evidence(
+                "issue-workflow",
+                "copilot-workspace",
+                "pass",
+                str(Path(__file__).parent.parent),
+                exact_state=(
+                    {"issue_number": str(args.issue), "branch": active_branch}
+                    if active_branch
+                    else {"issue_number": str(args.issue)}
+                ),
+            )
+
         exit_code = 0 if success else 1
 
     except KeyboardInterrupt:
