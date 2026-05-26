@@ -42,6 +42,7 @@ def valid_signoff_file():
 
 def test_aggregate_evidence_success(valid_review_input, valid_signoff_file):
     result = aggregate_evidence(valid_review_input, valid_signoff_file)
+    print(result)
     assert result["ready"] is True
     assert len(result["blockers"]) == 0
     assert result["signoff_valid"] is True
@@ -92,7 +93,24 @@ def successful_history(count: int = 3):
             head_sha=f"sha-{i}",
             status="completed",
             conclusion="success",
-            jobs=[SimpleNamespace(name="production-validation", conclusion="success")],
+            jobs=[
+                SimpleNamespace(
+                    name="Python Code Quality (Lint & Format)", conclusion="success"
+                ),
+                SimpleNamespace(
+                    name="Architectural Boundary Tests", conclusion="success"
+                ),
+                SimpleNamespace(name="PR Template Conformance", conclusion="success"),
+                SimpleNamespace(name="Production Docs Contract", conclusion="success"),
+                SimpleNamespace(
+                    name="Production Docker Build Parity", conclusion="success"
+                ),
+                SimpleNamespace(name="Production Runtime Proofs", conclusion="success"),
+                SimpleNamespace(
+                    name="Internal Production Gate — Docker Parity & Recovery Proofs",
+                    conclusion="success",
+                ),
+            ],
         )
         for i in range(count, 0, -1)
     ]
@@ -106,6 +124,7 @@ def test_aggregate_evidence_ci_evidence_success(
     result = aggregate_evidence(
         valid_review_input, "non_existent_file.json", ci_evidence=valid_ci_evidence
     )
+    print(result)
     assert result["ready"] is True
     assert result["signoff_valid"] is True
     assert len(result["blockers"]) == 0
@@ -164,6 +183,7 @@ def test_aggregate_evidence_strict_with_ci(
             strict_verification=True,
             repo="owner/repo",
         )
+    print(result)
     assert result["ready"] is True
     assert len(result["blockers"]) == 0
     assert result["references"]["authoritative"] is True

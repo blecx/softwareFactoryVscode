@@ -18,6 +18,17 @@ SECRET_PATTERNS = [
 SECRET_KEY_WORDS = ["secret", "token", "password", "api_key", "apikey"]
 
 
+CANONICAL_PRODUCTION_JOBS = [
+    "Python Code Quality (Lint & Format)",
+    "Architectural Boundary Tests",
+    "PR Template Conformance",
+    "Production Docs Contract",
+    "Production Docker Build Parity",
+    "Production Runtime Proofs",
+    "Internal Production Gate — Docker Parity & Recovery Proofs",
+]
+
+
 def contains_secret(val: Any) -> bool:
     if isinstance(val, str):
         for pattern in SECRET_PATTERNS:
@@ -178,6 +189,12 @@ def verify_ci_evidence(
 
     if required_jobs is None:
         required_jobs = []
+
+    if strict:
+        # Strict mode mandates the canonical jobs
+        for cj in CANONICAL_PRODUCTION_JOBS:
+            if cj not in required_jobs:
+                required_jobs.append(cj)
 
     # Check repo in strict mode
     if strict and not repo:
