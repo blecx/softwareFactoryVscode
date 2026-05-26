@@ -45,6 +45,18 @@ def test_success_failure_success():
     assert "Run 2 failed" in str(blockers)
 
 
+def test_success_success_success_older_failure_does_not_block_required_streak():
+    history = [
+        make_run(4, conclusion="success"),
+        make_run(3, conclusion="success"),
+        make_run(2, conclusion="success"),
+        make_run(1, conclusion="failure"),
+    ]
+    streak, blockers = compute_green_streak(history, "main", "123", ["build"])
+    assert streak == 3
+    assert not blockers
+
+
 def test_pending_latest():
     history = [
         make_run(3, status="in_progress", conclusion=""),

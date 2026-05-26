@@ -3,7 +3,7 @@ import argparse
 import json
 import os
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -18,9 +18,9 @@ from verify_production_signoff import (
 def aggregate_evidence(
     review_input: Dict[str, Any],
     signoff_filepath: str,
-    ci_evidence: Dict[str, Any] = None,
+    ci_evidence: Optional[Dict[str, Any]] = None,
     strict_verification: bool = False,
-    repo: str = None,
+    repo: Optional[str] = None,
 ) -> Dict[str, Any]:
     blockers = []
     authoritative = False
@@ -79,7 +79,7 @@ def aggregate_evidence(
     if strict_verification and not authoritative:
         blockers.append("GitHub verification is missing in authoritative mode.")
 
-    score_result = score_readiness(review_input)
+    score_result = score_readiness(review_input, strict=strict_verification)
 
     blockers.extend(signoff_result.get("blockers", []))
     blockers.extend(score_result.get("blockers", []))
@@ -103,7 +103,7 @@ def aggregate_evidence(
     }
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Production Readiness Evidence Aggregate Command"
     )
@@ -137,7 +137,7 @@ def main():
         action="store_true",
         help="Enforce authoritative mode for CI evidence",
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     try:
         try:
@@ -166,6 +166,7 @@ def main():
         args.signoff_file,
         ci_evidence_data,
         strict_verification=args.strict_verification,
+        repo=args.repo,
     )
     print(json.dumps(result, indent=2))
 

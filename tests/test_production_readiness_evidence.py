@@ -1,11 +1,13 @@
 import json
 import os
 import tempfile
+from types import SimpleNamespace
 from typing import Any, Dict
 from unittest.mock import patch
 
 import pytest
 
+import scripts.production_readiness_evidence as evidence_module
 from scripts.production_readiness_evidence import aggregate_evidence
 
 
@@ -70,6 +72,32 @@ def valid_ci_evidence() -> Dict[str, Any]:
     }
 
 
+@pytest.fixture
+def valid_authoritative_ci_evidence() -> Dict[str, Any]:
+    return {
+        "run_id": "12345",
+        "run_url": "https://github.example/runs/12345",
+        "head_sha": "abcdef123456",
+        "branch": "main",
+        "workflow_name": "Software Factory CI",
+        "jobs": [{"name": "production-validation", "conclusion": "success"}],
+    }
+
+
+def successful_history(count: int = 3):
+    return [
+        SimpleNamespace(
+            run_id=str(i),
+            branch="main",
+            head_sha=f"sha-{i}",
+            status="completed",
+            conclusion="success",
+            jobs=[SimpleNamespace(name="production-validation", conclusion="success")],
+        )
+        for i in range(count, 0, -1)
+    ]
+
+
 @patch("scripts.production_readiness_evidence.verify_ci_evidence")
 def test_aggregate_evidence_ci_evidence_success(
     mock_verify, valid_review_input, valid_ci_evidence
@@ -124,16 +152,77 @@ def test_aggregate_evidence_strict_missing_ci(valid_review_input, valid_signoff_
 
 @patch("scripts.production_readiness_evidence.verify_ci_evidence")
 def test_aggregate_evidence_strict_with_ci(
-    mock_verify, valid_review_input, valid_ci_evidence
+    mock_verify, valid_review_input, valid_authoritative_ci_evidence
 ):
     mock_verify.return_value = {"valid": True, "blockers": []}
-    result = aggregate_evidence(
-        valid_review_input,
-        "non_existent_file.json",
-        ci_evidence=valid_ci_evidence,
-        strict_verification=True,
-    )
+    with patch("verify_production_signoff.fetch_github_history") as mock_history:
+        mock_history.return_value = successful_history()
+        result = aggregate_evidence(
+            valid_review_input,
+            "non_existent_file.json",
+            ci_evidence=valid_authoritative_ci_evidence,
+            strict_verification=True,
+            repo="owner/repo",
+        )
     assert result["ready"] is True
     assert len(result["blockers"]) == 0
     assert result["references"]["authoritative"] is True
     assert result["references"]["mode"] == "strict"
+
+
+@patch("scripts.production_readiness_evidence.verify_ci_evidence")
+def test_aggregate_evidence_strict_passes_repo_to_github_verifier(
+    mock_verify, valid_review_input, valid_authoritative_ci_evidence
+):
+    mock_verify.return_value = {"valid": True, "blockers": []}
+    with patch("verify_production_signoff.fetch_github_history") as mock_history:
+        mock_history.return_value = successful_history()
+        aggregate_evidence(
+            valid_review_input,
+            "non_existent_file.json",
+            ci_evidence=valid_authoritative_ci_evidence,
+            strict_verification=True,
+            repo="owner/repo",
+        )
+
+    mock_verify.assert_called_once_with(
+        valid_authoritative_ci_evidence, repo="owner/repo", strict=True
+    )
+
+
+def test_main_passes_repo_to_aggregate(tmp_path, monkeypatch):
+    input_path = tmp_path / "input.json"
+    ci_path = tmp_path / "ci.json"
+    input_path.write_text(json.dumps({"adrs": ["ADR-013"]}))
+    ci_path.write_text(json.dumps({"run_id": "12345"}))
+    captured = {}
+
+    def fake_aggregate(
+        review_input,
+        signoff_filepath,
+        ci_evidence=None,
+        strict_verification=False,
+        repo=None,
+    ):
+        captured["repo"] = repo
+        captured["strict_verification"] = strict_verification
+        captured["ci_evidence"] = ci_evidence
+        return {"ready": True, "blockers": []}
+
+    monkeypatch.setattr(evidence_module, "aggregate_evidence", fake_aggregate)
+
+    evidence_module.main(
+        [
+            "--input",
+            str(input_path),
+            "--ci-evidence",
+            str(ci_path),
+            "--strict-verification",
+            "--repo",
+            "owner/repo",
+        ]
+    )
+
+    assert captured["repo"] == "owner/repo"
+    assert captured["strict_verification"] is True
+    assert captured["ci_evidence"] == {"run_id": "12345"}

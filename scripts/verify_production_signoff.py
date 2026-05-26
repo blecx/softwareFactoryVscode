@@ -169,7 +169,7 @@ def parse_ci_evidence(
 def verify_ci_evidence(
     ci_evidence: Dict[str, Any],
     required_jobs: List[str] = None,
-    repo: str = None,
+    repo: Optional[str] = None,
     strict: bool = False,
 ) -> Dict[str, Any]:
     model, blockers = parse_ci_evidence(ci_evidence)
@@ -251,7 +251,7 @@ def verify_ci_evidence(
 def verify_signoff(
     filepath: str,
     required_jobs: List[str] = None,
-    repo: str = None,
+    repo: Optional[str] = None,
     strict: bool = False,
 ) -> Dict[str, Any]:
     if not os.path.exists(filepath):
@@ -398,6 +398,7 @@ def compute_green_streak(
     target_branch: str,
     target_sha: str,
     required_jobs: List[str],
+    minimum_required_streak: int = 3,
 ) -> Tuple[int, List[str]]:
     streak = 0
     blockers = []
@@ -409,18 +410,26 @@ def compute_green_streak(
         if classification == "eligible_success":
             streak += 1
         elif classification == "eligible_failure":
+            if streak >= minimum_required_streak:
+                break
             blockers.append(f"Run {run.run_id} failed: {reason}")
             break
         elif classification == "cancelled_blocking_unknown":
+            if streak >= minimum_required_streak:
+                break
             blockers.append(f"Run {run.run_id} cancelled: {reason}")
             break
         elif classification == "pending":
+            if streak >= minimum_required_streak:
+                break
             blockers.append(f"Run {run.run_id} pending: {reason}")
             break
         elif classification == "cancelled_superseded":
             pass
         elif classification == "skipped":
             if run.head_sha == target_sha:
+                if streak >= minimum_required_streak:
+                    break
                 blockers.append(f"Run {run.run_id} skipped: {reason}")
                 break
             # older runs being skipped do not interrupt streak, we keep evaluating older ones
@@ -466,7 +475,7 @@ def fetch_github_history(
     branch: str,
     workflow_name: str,
     limit: int = 10,
-    repo: str = None,
+    repo: Optional[str] = None,
     strict: bool = False,
 ) -> List[NormalizedRunEvidence]:
     import json
