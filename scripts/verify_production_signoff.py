@@ -490,7 +490,16 @@ def fetch_github_history(
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         runs_data = json.loads(res.stdout)
-    except Exception:
+    except subprocess.CalledProcessError as e:
+        if strict:
+            err_msg = e.stderr.strip() if e.stderr else str(e)
+            raise ValueError(
+                f"GitHub history fetch failed for {workflow_name} on {branch} in {repo}: {err_msg}"
+            )
+        return []
+    except Exception as e:
+        if strict:
+            raise ValueError(f"Failed to fetch or parse GitHub history: {str(e)}")
         return []
 
     history = []
@@ -509,7 +518,18 @@ def fetch_github_history(
                 jobs.append(
                     JobEvidence(name=j.get("name"), conclusion=j.get("conclusion"))
                 )
-        except Exception:
+        except subprocess.CalledProcessError as e:
+            if strict:
+                err_msg = e.stderr.strip() if e.stderr else str(e)
+                raise ValueError(
+                    f"GitHub jobs fetch failed for run {r['databaseId']} in {repo}: {err_msg}"
+                )
+            pass
+        except Exception as e:
+            if strict:
+                raise ValueError(
+                    f"Failed to fetch or parse GitHub jobs for run {r['databaseId']}: {str(e)}"
+                )
             pass
 
         history.append(

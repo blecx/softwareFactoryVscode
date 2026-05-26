@@ -72,8 +72,20 @@ def aggregate_evidence(
                         CANONICAL_PRODUCTION_JOBS if strict_verification else []
                     ),
                 }
-        except Exception:
-            pass
+            elif strict_verification:
+                missing = [
+                    f
+                    for f in ["branch", "workflow_name", "head_sha"]
+                    if not ci_evidence.get(f)
+                ]
+                blockers.append(
+                    f"Missing required fields for authoritative history: {', '.join(missing)}"
+                )
+        except Exception as e:
+            if strict_verification:
+                blockers.append(str(e))
+            else:
+                pass
     else:
         signoff_result = verify_signoff(
             signoff_filepath, repo=repo, strict=strict_verification
