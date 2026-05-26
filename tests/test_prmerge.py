@@ -24,6 +24,8 @@ def repo_root(tmp_path):
 def setup_prmerge_env(repo_root, monkeypatch):
     monkeypatch.chdir(repo_root)
     os.makedirs(".tmp", exist_ok=True)
+    subprocess.run(["git", "init", "-b", "main"], cwd=repo_root)
+    subprocess.run(["git", "commit", "--allow-empty", "-m", "init"], cwd=repo_root)
 
     # We need PYTHONPATH to point to real repo root so it can find "scripts.workflow_preflight_gate"
     real_repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -179,3 +181,39 @@ def test_prmerge_force_bypass_passes_with_evidence(
     )
     assert result.returncode == 0
     assert "Bypass authorized." in result.stdout
+
+
+def test_prmerge_force_bypass_fails_without_bypass_evidence_string(
+    setup_prmerge_env, repo_root, monkeypatch
+):
+    import subprocess
+    import time
+
+    from scripts.workflow_preflight_gate import record_preflight_evidence
+
+    curr_branch = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
+    ).stdout.strip()
+    record_preflight_evidence(
+        "force-bypass",
+        "human-operator",
+        "pass",
+        repo_root,
+        exact_state={
+            "branch": curr_branch,
+            "break_glass": True,
+            "bypass_evidence": "",
+        },
+    )
+
+    script_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "scripts", "prmerge")
+    )
+    result = subprocess.run(
+        [script_path, "--force-bypass"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "bypass_evidence is empty or missing" in result.stderr
