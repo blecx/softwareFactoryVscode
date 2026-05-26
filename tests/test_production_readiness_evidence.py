@@ -248,7 +248,7 @@ def test_main_passes_repo_to_aggregate(tmp_path, monkeypatch):
     assert captured["ci_evidence"] == {"run_id": "12345"}
 
 
-@patch("scripts.production_readiness_evidence.fetch_github_history")
+@patch("verify_production_signoff.fetch_github_history")
 def test_aggregate_evidence_strict_github_fetch_failure(mock_fetch, valid_review_input):
     mock_fetch.side_effect = ValueError("GitHub CLI command failed")
 
@@ -260,5 +260,5 @@ def test_aggregate_evidence_strict_github_fetch_failure(mock_fetch, valid_review
         strict_verification=True,
     )
 
-    assert result["is_ready"] is False
+    assert result["ready"] is False
     assert "GitHub CLI command failed" in result["blockers"]

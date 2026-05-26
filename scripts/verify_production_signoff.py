@@ -505,9 +505,10 @@ def fetch_github_history(
     history = []
     for r in runs_data:
         jobs = []
+        run_id = r.get("databaseId", "unknown")
         # get jobs for each run
         try:
-            cmd_jobs = ["gh", "run", "view", str(r["databaseId"]), "--json", "jobs"]
+            cmd_jobs = ["gh", "run", "view", str(run_id), "--json", "jobs"]
             if repo:
                 cmd_jobs.extend(["--repo", repo])
             res_jobs = subprocess.run(
@@ -522,19 +523,19 @@ def fetch_github_history(
             if strict:
                 err_msg = e.stderr.strip() if e.stderr else str(e)
                 raise ValueError(
-                    f"GitHub jobs fetch failed for run {r['databaseId']} in {repo}: {err_msg}"
+                    f"GitHub jobs fetch failed for run {run_id} in {repo}: {err_msg}"
                 )
             pass
         except Exception as e:
             if strict:
                 raise ValueError(
-                    f"Failed to fetch or parse GitHub jobs for run {r['databaseId']}: {str(e)}"
+                    f"Failed to fetch or parse GitHub jobs for run {run_id}: {str(e)}"
                 )
             pass
 
         history.append(
             NormalizedRunEvidence(
-                run_id=str(r["databaseId"]),
+                run_id=str(run_id),
                 branch=r.get("headBranch", ""),
                 head_sha=r.get("headSha", ""),
                 status=r.get("status", ""),
