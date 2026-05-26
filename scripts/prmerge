@@ -7,14 +7,20 @@ if [[ "$1" == "--force-bypass" ]]; then
   if ! python3 -c "
 import sys
 import os
+import json
 sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd())))
-from scripts.workflow_preflight_gate import verify_preflight_evidence
+from scripts.workflow_preflight_gate import verify_preflight_evidence, get_evidence_path
 try:
-    exact = {'branch': os.environ.get('CURRENT_BRANCH')}
+    exact = {'branch': os.environ.get('CURRENT_BRANCH'), 'break_glass': True}
     verify_preflight_evidence('force-bypass', 'human-operator', 600, exact_state=exact)
+    evidence_path = get_evidence_path('force-bypass')
+    with open(evidence_path, 'r') as f:
+        evidence = json.load(f)
+    bypass_ev = evidence.get('exact_state', {}).get('bypass_evidence', '')
+    if not bypass_ev or len(str(bypass_ev).strip()) == 0:
+        print('Hard-gate bypass failed: bypass_evidence is empty or missing in the recorded evidence.', file=sys.stderr)
+        sys.exit(1)
 except Exception as e:
-    import traceback
-    traceback.print_exc()
     print(f'Hard-gate bypass failed: {e}', file=sys.stderr)
     sys.exit(1)
 "; then
