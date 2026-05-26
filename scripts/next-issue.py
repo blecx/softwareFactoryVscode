@@ -1009,10 +1009,26 @@ def format_issue_recommendation(
 
 def main():
     """Main entry point with timeout protection"""
+    import json
+    import re
+
     from scripts.workflow_preflight_gate import verify_preflight_evidence
 
+    exact = {}
+    try:
+        with open(".tmp/github-issue-queue-state.md", "r") as f:
+            match = re.search(r"```json\s*(\{.*?\})\s*```", f.read(), re.DOTALL)
+            if match:
+                chk = json.loads(match.group(1))
+                if chk.get("active_branch"):
+                    exact["branch"] = str(chk["active_branch"])
+                if chk.get("active_issue"):
+                    exact["issue_number"] = str(chk["active_issue"])
+    except Exception:
+        pass
+
     verify_preflight_evidence(
-        "issue-workflow", "copilot-workspace", 300, str(REPO_ROOT)
+        "issue-workflow", "copilot-workspace", 300, str(REPO_ROOT), exact_state=exact
     )
     import argparse
 

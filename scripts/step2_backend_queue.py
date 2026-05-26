@@ -394,12 +394,29 @@ def main(argv: list[str]) -> int:
 
 
 if __name__ == "__main__":
+    import json
+    import re
+
     from scripts.workflow_preflight_gate import verify_preflight_evidence
+
+    exact = {}
+    try:
+        with open(".tmp/github-issue-queue-state.md", "r") as f:
+            match = re.search(r"```json\s*(\{.*?\})\s*```", f.read(), re.DOTALL)
+            if match:
+                chk = json.loads(match.group(1))
+                if chk.get("active_branch"):
+                    exact["branch"] = str(chk["active_branch"])
+                if chk.get("active_issue"):
+                    exact["issue_number"] = str(chk["active_issue"])
+    except Exception:
+        pass
 
     verify_preflight_evidence(
         "issue-workflow",
         "copilot-workspace",
         300,
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        exact_state=exact,
     )
     raise SystemExit(main(sys.argv[1:]))
