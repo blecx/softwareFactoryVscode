@@ -41,3 +41,13 @@ def test_closed_issue_with_open_branch():
     blockers = detect_residues(issues, [], branches)
     assert len(blockers) == 1
     assert "CLOSED but branch 'issue-3' is still open" in blockers[0]
+
+
+def test_closed_issue_with_worktree_and_checkpoint():
+    issues = [{"number": 4, "state": "CLOSED"}]
+    worktrees = ["/tmp/q/issue-4"]
+    checkpoint = {"active_issue": 4, "status": "working"}
+    blockers = detect_residues(issues, [], [], worktrees, checkpoint)
+    assert len(blockers) == 2
+    assert any("worktree '/tmp/q/issue-4' is still active" in b for b in blockers)
+    assert any("claims active execution" in b for b in blockers)

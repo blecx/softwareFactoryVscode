@@ -216,4 +216,4 @@ def test_prmerge_force_bypass_fails_without_bypass_evidence_string(
         text=True,
     )
     assert result.returncode == 1
-    assert "bypass_evidence is empty or missing" in result.stderr
+    assert "bypass_evidence is empty" in result.stderr
