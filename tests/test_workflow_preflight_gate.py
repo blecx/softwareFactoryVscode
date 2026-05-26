@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from datetime import datetime, timezone
 
 import pytest
 
@@ -8,11 +9,20 @@ from scripts.workflow_preflight_gate import (
     get_evidence_path,
     record_preflight_evidence,
     require_safe_preflight,
+    validate_against_schema,
 )
 
 
 @pytest.fixture
 def repo_root(tmp_path):
+    import shutil
+
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    os.makedirs(os.path.join(tmp_path, "schemas"), exist_ok=True)
+    shutil.copy(
+        os.path.join(repo, "schemas", "workflow-preflight-evidence.schema.json"),
+        os.path.join(tmp_path, "schemas", "workflow-preflight-evidence.schema.json"),
+    )
     return str(tmp_path)
 
 
@@ -34,7 +44,7 @@ def test_missing_evidence(repo_root):
 
 
 def test_record_and_require_safe_evidence(repo_root):
-    record_preflight_evidence("auth-key", "@test-agent", "passed", repo_root)
+    record_preflight_evidence("auth-key", "@test-agent", "pass", repo_root)
 
     result = require_safe_preflight("auth-key", "@test-agent", 300, repo_root)
     assert result["safe_to_continue"]
@@ -42,19 +52,19 @@ def test_record_and_require_safe_evidence(repo_root):
 
 
 def test_failed_status_blocks(repo_root):
-    record_preflight_evidence("auth-key", "@test-agent", "failed", repo_root)
+    record_preflight_evidence("auth-key", "@test-agent", "fail", repo_root)
 
     result = require_safe_preflight("auth-key", "@test-agent", 300, repo_root)
     assert not result["safe_to_continue"]
-    assert any("expected 'passed'" in b for b in result["blockers"])
+    assert any("expected 'pass'" in b for b in result["blockers"])
 
 
 def test_mismatched_agent_blocks(repo_root):
-    record_preflight_evidence("auth-key", "@wrong-agent", "passed", repo_root)
+    record_preflight_evidence("auth-key", "@wrong-agent", "pass", repo_root)
 
     result = require_safe_preflight("auth-key", "@test-agent", 300, repo_root)
     assert not result["safe_to_continue"]
-    assert any("Mismatched agent" in b for b in result["blockers"])
+    assert any("Mismatched identity" in b for b in result["blockers"])
 
 
 def test_stale_evidence_blocks(repo_root, monkeypatch):
@@ -64,7 +74,7 @@ def test_stale_evidence_blocks(repo_root, monkeypatch):
     def mock_time():
         return current_time + 600
 
-    record_preflight_evidence("auth-key", "@test-agent", "passed", repo_root)
+    record_preflight_evidence("auth-key", "@test-agent", "pass", repo_root)
 
     monkeypatch.setattr(time, "time", mock_time)
 
@@ -98,7 +108,7 @@ def test_verify_preflight_evidence_passes(repo_root):
         verify_preflight_evidence,
     )
 
-    record_preflight_evidence("auth-key", "@test-agent", "passed", repo_root)
+    record_preflight_evidence("auth-key", "@test-agent", "pass", repo_root)
     verify_preflight_evidence("auth-key", "@test-agent", 300, repo_root)
 
 
@@ -106,10 +116,9 @@ def test_exact_state_matching_passes(repo_root):
     record_preflight_evidence(
         "auth-key",
         "@test-agent",
-        "passed",
+        "pass",
         repo_root,
-        issue_number="533",
-        branch="issue-533",
+        exact_state={"issue_number": "533", "branch": "issue-533"},
     )
 
     result = require_safe_preflight(
@@ -125,8 +134,12 @@ def test_exact_state_matching_passes(repo_root):
 
 def test_exact_state_missing_blocks(repo_root):
     record_preflight_evidence(
-        "auth-key", "@test-agent", "passed", repo_root, issue_number="533"
-    )  # Missing branch
+        "auth-key",
+        "@test-agent",
+        "pass",
+        repo_root,
+        exact_state={"issue_number": "533"},
+    )
 
     result = require_safe_preflight(
         "auth-key",
@@ -143,10 +156,9 @@ def test_exact_state_mismatch_blocks(repo_root):
     record_preflight_evidence(
         "auth-key",
         "@test-agent",
-        "passed",
+        "pass",
         repo_root,
-        issue_number="533",
-        branch="main",
+        exact_state={"issue_number": "533", "branch": "main"},
     )
 
     result = require_safe_preflight(
@@ -160,3 +172,60 @@ def test_exact_state_mismatch_blocks(repo_root):
     assert any(
         "Exact state validation failed for 'branch'" in b for b in result["blockers"]
     )
+
+
+def test_strict_schema_rejects_additional_exact_state_properties(repo_root):
+    with pytest.raises(ValueError) as exc_info:
+        record_preflight_evidence(
+            "auth-key",
+            "@test-agent",
+            "pass",
+            repo_root,
+            exact_state={"unknown_field": "123"},
+        )
+
+    message = str(exc_info.value)
+    assert "Additional" in message
+    assert "unknown_field" in message
+
+
+def test_production_writer_emits_schema_compatible_evidence(repo_root):
+    record_preflight_evidence(
+        "issue-workflow",
+        "copilot-workspace",
+        "pass",
+        repo_root,
+        exact_state={
+            "issue_number": "561",
+            "branch": "issue-572-recovery",
+            "worktree": ".tmp/queue-worktrees/572-recovery",
+        },
+    )
+
+    path = get_evidence_path("issue-workflow", repo_root)
+    with open(path, "r", encoding="utf-8") as f:
+        evidence = json.load(f)
+
+    valid, blockers = validate_against_schema(evidence, repo_root)
+    assert valid, blockers
+    assert evidence["identity"] == "copilot-workspace"
+    assert evidence["verdict"] == "pass"
+    assert evidence["exact_state"]["issue_number"] == "561"
+
+
+def test_future_dated_evidence_blocks(repo_root):
+    path = get_evidence_path("auth-key", repo_root)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    evidence = {
+        "identity": "@test-agent",
+        "verdict": "pass",
+        "timestamp": datetime.fromtimestamp(
+            time.time() + 120, timezone.utc
+        ).isoformat(),
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(evidence, f)
+
+    result = require_safe_preflight("auth-key", "@test-agent", 300, repo_root)
+    assert not result["safe_to_continue"]
+    assert any("future" in b for b in result["blockers"])
