@@ -38,6 +38,7 @@ Maintained synthesis docs, implementation plans, and historical notes remain sub
 | [`ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md`](ADR-015-Quota-Governance-Contract-for-Multi-Requester-LLM-Access.md) | Accepted | Defines provider-facing quota authority and hierarchical budget inheritance for multi-requester LLM usage. | Prevents quota handling from turning into a shadow runtime controller. |
 | [`ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md`](ADR-016-Workflow-Ubiquitous-Language-and-Ambiguity-Policy.md) | Accepted | Defines workflow ubiquitous language policy. | Prevents ambiguous workflow terminology from drifting in derived docs. |
 | [`ADR-017-Host-Project-Ubiquitous-Language-Boundary.md`](ADR-017-Host-Project-Ubiquitous-Language-Boundary.md) | Accepted | Defines a distinct host-owned language surface that survives factory updates. | Prevents automated SDK updates from overwriting host project domain terminology. |
+| [`ADR-018-Workflow-Preflight-Evidence-Schema-and-Consumer-Matrix.md`](ADR-018-Workflow-Preflight-Evidence-Schema-and-Consumer-Matrix.md) | Accepted | Defines the strict schema and consumer matrix for workflow preflight evidence. | Makes it structurally impossible to trigger bounded orchestration without schema-validated preflight entry state. |
 
 ## Historical note on duplicate ADR-007 numbering
 

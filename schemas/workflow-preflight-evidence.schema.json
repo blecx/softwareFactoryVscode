@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Workflow Preflight Evidence Schema",
+  "description": "Schema for validating the structure of preflight evidence emitted by workflow entrypoints.",
+  "type": "object",
+  "properties": {
+    "evidence_key": {
+      "type": "string",
+      "description": "The unique identifier for the execution payload."
+    },
+    "agent": {
+      "type": "string",
+      "description": "The active AI agent or entrypoint asserting preflight."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "bypassed"
+      ],
+      "description": "The verdict of the preflight check."
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Epoch timestamp of when the evidence was evaluated."
+    },
+    "issue_number": {
+      "type": "string",
+      "description": "Exact issue identifier linked to the execution."
+    },
+    "pr_number": {
+      "type": "string",
+      "description": "Exact PR identifier linked to the execution."
+    },
+    "branch": {
+      "type": "string",
+      "description": "The active git branch tied to the execution."
+    },
+    "worktree": {
+      "type": "string",
+      "description": "The isolated git worktree tied to the execution."
+    },
+    "request_hash": {
+      "type": "string",
+      "description": "Cryptographic hash of the triggering user intent or prompt."
+    },
+    "checkpoint_hash": {
+      "type": "string",
+      "description": "Cryptographic hash of the current queue or queue segment."
+    },
+    "github_truth_timestamp": {
+      "type": "string",
+      "description": "Timestamp measuring staleness of external GitHub truth."
+    },
+    "expiration_metadata": {
+      "type": "object",
+      "description": "Custom payload adjusting TTL constraints."
+    },
+    "bypass_reason": {
+      "type": "string",
+      "description": "Formal explanation when an operator bypasses preflight."
+    }
+  },
+  "required": [
+    "evidence_key",
+    "agent",
+    "status",
+    "timestamp"
+  ],
+  "additionalProperties": false
+}
