@@ -167,7 +167,10 @@ def parse_ci_evidence(
 
 
 def verify_ci_evidence(
-    ci_evidence: Dict[str, Any], required_jobs: List[str] = None
+    ci_evidence: Dict[str, Any],
+    required_jobs: List[str] = None,
+    repo: str = None,
+    strict: bool = False,
 ) -> Dict[str, Any]:
     model, blockers = parse_ci_evidence(ci_evidence)
     if not model:
@@ -175,6 +178,11 @@ def verify_ci_evidence(
 
     if required_jobs is None:
         required_jobs = []
+
+    # Check repo in strict mode
+    if strict and not repo:
+        blockers.append("Missing explicit repo in strict mode")
+        return {"valid": False, "blockers": blockers}
 
     # Run gh run view
     try:
@@ -186,6 +194,8 @@ def verify_ci_evidence(
             "--json",
             "conclusion,headSha,jobs,status",
         ]
+        if repo:
+            gh_cmd.extend(["--repo", repo])
         result = subprocess.run(gh_cmd, capture_output=True, text=True, check=True)
         gh_data = json.loads(result.stdout)
     except subprocess.CalledProcessError as e:
@@ -238,7 +248,12 @@ def verify_ci_evidence(
     return {"valid": len(blockers) == 0, "blockers": blockers}
 
 
-def verify_signoff(filepath: str, required_jobs: List[str] = None) -> Dict[str, Any]:
+def verify_signoff(
+    filepath: str,
+    required_jobs: List[str] = None,
+    repo: str = None,
+    strict: bool = False,
+) -> Dict[str, Any]:
     if not os.path.exists(filepath):
         return {
             "valid": False,
@@ -266,7 +281,9 @@ def verify_signoff(filepath: str, required_jobs: List[str] = None) -> Dict[str, 
         blockers.append(f"Signoff status is not success: {data['status']}")
 
     if "evidence" in data and "github_ci" in data["evidence"]:
-        ci_result = verify_ci_evidence(data["evidence"]["github_ci"], required_jobs)
+        ci_result = verify_ci_evidence(
+            data["evidence"]["github_ci"], required_jobs, repo=repo, strict=strict
+        )
         if not ci_result["valid"]:
             blockers.extend(ci_result.get("blockers", []))
 
@@ -285,6 +302,17 @@ def main():
         help="Path to signoff JSON file",
     )
     parser.add_argument(
+        "--repo",
+        type=str,
+        default=None,
+        help="Explicit repository (e.g. owner/repo) to verify against",
+    )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Enable strict verification mode (requires --repo)",
+    )
+    parser.add_argument(
         "--required-job",
         action="append",
         default=[],
@@ -295,7 +323,7 @@ def main():
     filepath = args.filepath
     required_jobs = args.required_job
 
-    result = verify_signoff(filepath, required_jobs)
+    result = verify_signoff(filepath, required_jobs, repo=args.repo, strict=args.strict)
     if not result["valid"]:
         print("Production signoff verification failed:")
         for blocker in result["blockers"]:
@@ -435,10 +463,19 @@ def get_github_history(branch: str, workflow_name: str) -> List[NormalizedRunEvi
 
 
 def fetch_github_history(
-    branch: str, workflow_name: str, limit: int = 10
+    branch: str,
+    workflow_name: str,
+    limit: int = 10,
+    repo: str = None,
+    strict: bool = False,
 ) -> List[NormalizedRunEvidence]:
     import json
     import subprocess
+
+    if strict and not repo:
+        return (
+            []
+        )  # or raise an error, but let's return empty to fail gracefully initially, actually no wait, let's keep it
 
     # We first fetch the recent runs
     cmd = [
@@ -454,6 +491,8 @@ def fetch_github_history(
         "--json",
         "databaseId,headSha,headBranch,status,conclusion",
     ]
+    if repo:
+        cmd.extend(["--repo", repo])
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, check=True)
         runs_data = json.loads(res.stdout)
@@ -466,6 +505,8 @@ def fetch_github_history(
         # get jobs for each run
         try:
             cmd_jobs = ["gh", "run", "view", str(r["databaseId"]), "--json", "jobs"]
+            if repo:
+                cmd_jobs.extend(["--repo", repo])
             res_jobs = subprocess.run(
                 cmd_jobs, capture_output=True, text=True, check=True
             )

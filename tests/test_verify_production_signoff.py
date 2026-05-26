@@ -147,7 +147,7 @@ def test_safe_secret_key():
         os.unlink(filepath)
 
 
-from scripts.verify_production_signoff import verify_ci_evidence
+from scripts.verify_production_signoff import fetch_github_history, verify_ci_evidence
 
 
 @patch("subprocess.run")
@@ -482,3 +482,85 @@ def test_classify_success():
     )
     classification, reason = classify_run(run, "main", "abc", ["test"])
     assert classification == "eligible_success"
+
+
+@patch("subprocess.run")
+def test_verify_ci_evidence_with_repo(mock_run):
+    gh_out = {
+        "headSha": "abcdef123456",
+        "conclusion": "success",
+        "status": "completed",
+        "jobs": [
+            {
+                "name": "production-validation",
+                "conclusion": "success",
+                "status": "completed",
+            }
+        ],
+    }
+    m = MagicMock()
+    m.stdout = json.dumps(gh_out)
+    mock_run.return_value = m
+
+    ci_evidence = {
+        "run_id": "12345",
+        "run_url": "https://github.com/...",
+        "head_sha": "abcdef123456",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [{"name": "production-validation", "conclusion": "success"}],
+    }
+    result = verify_ci_evidence(ci_evidence, repo="blecx/softwareFactoryVscode")
+    assert result["valid"] is True
+
+    # Extract the gh cmd that was called
+    gh_cmd = mock_run.call_args[0][0]
+    assert "--repo" in gh_cmd
+    assert "blecx/softwareFactoryVscode" in gh_cmd
+
+
+@patch("subprocess.run")
+def test_fetch_github_history_with_repo(mock_run):
+    import json
+
+    gh_out = [
+        {
+            "databaseId": 123,
+            "headSha": "a",
+            "headBranch": "main",
+            "status": "completed",
+            "conclusion": "success",
+        }
+    ]
+    m = MagicMock()
+    m.stdout = json.dumps(gh_out)
+
+    gh_jobs_out = {"jobs": [{"name": "job1", "conclusion": "success"}]}
+    m_jobs = MagicMock()
+    m_jobs.stdout = json.dumps(gh_jobs_out)
+
+    mock_run.side_effect = [m, m_jobs]
+
+    res = fetch_github_history("main", "CI", repo="blecx/softwareFactoryVscode")
+    assert len(res) == 1
+    gh_cmd = mock_run.call_args_list[0][0][0]
+    assert "--repo" in gh_cmd
+    assert "blecx/softwareFactoryVscode" in gh_cmd
+
+    gh_cmd2 = mock_run.call_args_list[1][0][0]
+    assert "--repo" in gh_cmd2
+    assert "blecx/softwareFactoryVscode" in gh_cmd2
+
+
+def test_verify_ci_evidence_strict_fails_without_repo():
+    ci_evidence = {
+        "run_id": "12345",
+        "run_url": "https://github.com/...",
+        "head_sha": "abcdef123456",
+        "branch": "main",
+        "workflow_name": "CI",
+        "jobs": [{"name": "production-validation", "conclusion": "success"}],
+    }
+    result = verify_ci_evidence(ci_evidence, strict=True)
+    assert result["valid"] is False
+    assert any("Missing explicit repo in strict mode" in b for b in result["blockers"])
