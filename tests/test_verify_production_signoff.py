@@ -573,3 +573,58 @@ def test_fetch_github_history_strict_fails_without_repo():
 
     with pytest.raises(ValueError, match="Repo binding is explicit in strict mode"):
         fetch_github_history("main", "CI", strict=True)
+
+
+def test_compute_green_streak_missing_job():
+    from scripts.verify_production_signoff import (
+        JobEvidence,
+        NormalizedRunEvidence,
+        compute_green_streak,
+    )
+
+    # Missing job
+    rj = ["Job1", "Job2"]
+    history = [
+        NormalizedRunEvidence(
+            run_id="1",
+            branch="main",
+            head_sha="abc",
+            status="completed",
+            conclusion="success",
+            jobs=[JobEvidence(name="Job1", conclusion="success")],
+        )
+    ]
+    streak, blockers = compute_green_streak(
+        history, "main", "abc", required_jobs=rj, minimum_required_streak=1
+    )
+    assert streak == 0
+    assert any("missing" in b for b in blockers)
+
+
+def test_compute_green_streak_failed_job():
+    from scripts.verify_production_signoff import (
+        JobEvidence,
+        NormalizedRunEvidence,
+        compute_green_streak,
+    )
+
+    # Failed job
+    rj = ["Job1", "Job2"]
+    history = [
+        NormalizedRunEvidence(
+            run_id="1",
+            branch="main",
+            head_sha="abc",
+            status="completed",
+            conclusion="success",
+            jobs=[
+                JobEvidence(name="Job1", conclusion="success"),
+                JobEvidence(name="Job2", conclusion="failure"),
+            ],
+        )
+    ]
+    streak, blockers = compute_green_streak(
+        history, "main", "abc", required_jobs=rj, minimum_required_streak=1
+    )
+    assert streak == 0
+    assert any("failed" in b and "Job2" in b for b in blockers)

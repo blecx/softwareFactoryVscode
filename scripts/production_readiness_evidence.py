@@ -33,7 +33,10 @@ def aggregate_evidence(
         authoritative = True
 
         # Inject computed streak evidence
-        from verify_production_signoff import fetch_github_history
+        from verify_production_signoff import (
+            CANONICAL_PRODUCTION_JOBS,
+            fetch_github_history,
+        )
 
         try:
             branch = ci_evidence.get("branch")
@@ -65,7 +68,9 @@ def aggregate_evidence(
                     "history": history_dicts,
                     "target_branch": branch,
                     "target_sha": head_sha,
-                    "required_jobs": [],  # we can extract this if passed, but typically empty
+                    "required_jobs": (
+                        CANONICAL_PRODUCTION_JOBS if strict_verification else []
+                    ),
                 }
         except Exception:
             pass
