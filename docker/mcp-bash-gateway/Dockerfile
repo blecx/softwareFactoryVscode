@@ -11,14 +11,14 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /factory
-COPY factory_runtime/ /factory/factory_runtime/
-ENV PYTHONPATH="/factory"
 
 RUN pip install --no-cache-dir \
     mcp==1.25.0 \
     uvicorn[standard]==0.44.0 \
     pyyaml==6.0.1
 
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 EXPOSE 3011
 
 CMD ["python", "-m", "factory_runtime.apps.mcp.bash_gateway.mcp_server"]

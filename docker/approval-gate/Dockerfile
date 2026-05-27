@@ -14,9 +14,9 @@ RUN pip install --no-cache-dir \
     pydantic==2.5.3 \
     websockets==12.0
 
+
 COPY factory_runtime/ /factory/factory_runtime/
 ENV PYTHONPATH="/factory"
-
 EXPOSE 8001
 
 CMD ["python", "-m", "factory_runtime.apps.approval_gate.main"]

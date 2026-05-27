@@ -57,7 +57,7 @@ def _url_is_reachable(url: str, timeout: float = 4.0) -> bool:
         return False
 
 
-def _wait_until_reachable(url: str, max_wait_seconds: int = 30) -> bool:
+def _wait_until_reachable(url: str, max_wait_seconds: int = 120) -> bool:
     deadline = time.time() + max_wait_seconds
     while time.time() < deadline:
         if _url_is_reachable(url):

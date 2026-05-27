@@ -14,9 +14,9 @@ COPY factory_runtime/agents/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source keeping package structure
-COPY factory_runtime/ /factory/factory_runtime/
-ENV PYTHONPATH="/factory"
 
 # Workspace is mounted at runtime via volume
 # CMD runs the orchestrator queue loop
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 CMD ["python", "-m", "factory_runtime.agents.factory_cli", "run-queue"]

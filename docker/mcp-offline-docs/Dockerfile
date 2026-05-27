@@ -6,13 +6,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     OFFLINE_DOCS_MCP_REPO_ROOT=/target
 
 WORKDIR /factory
-COPY factory_runtime/ /factory/factory_runtime/
-ENV PYTHONPATH="/factory"
 
 RUN pip install --no-cache-dir \
     mcp==1.25.0 \
     uvicorn[standard]==0.44.0
 
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 EXPOSE 3017
 
 CMD ["python", "-m", "factory_runtime.apps.mcp.offline_docs.server"]

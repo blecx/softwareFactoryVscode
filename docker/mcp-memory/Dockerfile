@@ -13,11 +13,11 @@ RUN pip install --no-cache-dir \
     mcp==1.25.0 \
     uvicorn[standard]==0.44.0
 
-COPY factory_runtime/ /factory/factory_runtime/
-ENV PYTHONPATH="/factory"
 
 VOLUME ["/data"]
 
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 EXPOSE 3030
 
 CMD ["python", "-m", "factory_runtime.apps.mcp.memory.mcp_server"]
