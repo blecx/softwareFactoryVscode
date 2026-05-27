@@ -9,7 +9,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Unreleased Summary
 
-No unreleased changes recorded yet after `2.7`.
+No unreleased changes recorded yet after `2.8`.
+
+## [2.8] — 2026-05-27
+
+### Summary for 2.8
+
+Release 2.8 brings end-to-end authoritative readiness scoring, workflow preflight evidence gating, and strict production authority contracts. The factory now enforces explicit preflight readiness boundaries across all major workflow entrypoints, limits autonomous PR force-bypasses via break-glass evidence checks, implements automated closeout residue and lifecycle constraints, and structures ubiquitous workflow vocabulary to eliminate AI ambiguity. Over 110 commits shipped since the 2.7 baseline, closing several critical feature umbrellas.
 
 ## [2.7] — 2026-05-03
 
