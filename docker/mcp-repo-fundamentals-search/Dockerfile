@@ -6,8 +6,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     REPO_FUNDAMENTALS_REPO_ROOT=/target
 
 WORKDIR /factory
-COPY factory_runtime/ /factory/factory_runtime/
-ENV PYTHONPATH="/factory"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ripgrep && \
@@ -17,6 +15,8 @@ RUN pip install --no-cache-dir \
     mcp==1.25.0 \
     uvicorn[standard]==0.44.0
 
+COPY factory_runtime/ /factory/factory_runtime/
+ENV PYTHONPATH="/factory"
 EXPOSE 3013
 
 CMD ["python", "-m", "factory_runtime.apps.mcp.repo_fundamentals.search_server"]

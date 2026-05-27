@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-25T00:57:49+02:00",
+  "generated_at": "2026-05-27T03:19:14+02:00",
   "source": {
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "default_branch": "main",
@@ -9,38 +9,38 @@
   },
   "latest": {
     "schema_version": 1,
-    "version_core": "2.7",
-    "normalized_version": "2.7.0",
-    "display_version": "2.7+322.g4f1d655",
+    "version_core": "2.8",
+    "normalized_version": "2.8.0",
+    "display_version": "2.8+380.ge11952b",
     "channel": "stable",
-    "build_number": 322,
-    "commit_sha": "4f1d6552dddabadf146ca74189532223c108388d",
-    "commit_short": "4f1d655",
+    "build_number": 380,
+    "commit_sha": "e11952be572fe52c8c087292a15ca00601f83b52",
+    "commit_short": "e11952b",
     "version_tag": "",
     "source_ref": "main",
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "manifest_path": "manifests/release-manifest.json",
     "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
     "production_signoff_pointer": ".tmp/production-readiness/latest.json",
-    "generated_at": "2026-05-25T00:57:49+02:00"
+    "generated_at": "2026-05-27T03:19:14+02:00"
   },
   "channels": {
     "stable": {
       "schema_version": 1,
-      "version_core": "2.7",
-      "normalized_version": "2.7.0",
-      "display_version": "2.7+322.g4f1d655",
+      "version_core": "2.8",
+      "normalized_version": "2.8.0",
+      "display_version": "2.8+380.ge11952b",
       "channel": "stable",
-      "build_number": 322,
-      "commit_sha": "4f1d6552dddabadf146ca74189532223c108388d",
-      "commit_short": "4f1d655",
+      "build_number": 380,
+      "commit_sha": "e11952be572fe52c8c087292a15ca00601f83b52",
+      "commit_short": "e11952b",
       "version_tag": "",
       "source_ref": "main",
       "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
       "manifest_path": "manifests/release-manifest.json",
       "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
       "production_signoff_pointer": ".tmp/production-readiness/latest.json",
-      "generated_at": "2026-05-25T00:57:49+02:00"
+      "generated_at": "2026-05-27T03:19:14+02:00"
     }
   },
   "update_policy": {

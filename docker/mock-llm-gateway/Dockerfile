@@ -10,9 +10,9 @@ RUN pip install --no-cache-dir \
     uvicorn==0.27.0 \
     pydantic==2.5.3
 
+
 COPY factory_runtime/ /factory/factory_runtime/
 ENV PYTHONPATH="/factory"
-
 EXPOSE 9090
 
 CMD ["uvicorn", "factory_runtime.apps.mock_llm_gateway.main:app", "--host", "0.0.0.0", "--port", "9090"]
