@@ -38,7 +38,7 @@ This file is a VS Code discovery wrapper. Use `docs/maintainer/WIKI-PUBLISHING.m
 - Do not teach or use raw `git push` for normal wiki publication; use `scripts/publish_wiki.py` instead.
 - Publish only from the canonical `.tmp/wiki-launch/live-wiki` clone, never from another checkout or a scratch copy.
 - Require a clean committed wiki clone and ready-to-publish evidence before calling the helper.
-- Confirm `Restrict editing to collaborators only` when the setting is accessible; otherwise record it as manual verification evidence instead of guessing.
+- You MUST use browser automation tools (like Playwright, `open_browser_page`, `read_page`, or similar) to navigate to the repository settings and verify that `Restrict editing to collaborators only` is enabled for the Wiki before publishing. Do not treat this as an optional step or fallback to manual verification by the user.
 - If the wiki clone is stale, dirty, or not aligned with approved repo truth, stop and hand the work back to `@wiki-update`.
 
 ## Completion Contract
