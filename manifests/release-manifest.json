@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-27T03:19:14+02:00",
+  "generated_at": "2026-05-29T20:20:32+02:00",
   "source": {
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "default_branch": "main",
@@ -11,36 +11,36 @@
     "schema_version": 1,
     "version_core": "2.8",
     "normalized_version": "2.8.0",
-    "display_version": "2.8+380.ge11952b",
+    "display_version": "2.8+1.g483c392",
     "channel": "stable",
-    "build_number": 380,
-    "commit_sha": "e11952be572fe52c8c087292a15ca00601f83b52",
-    "commit_short": "e11952b",
-    "version_tag": "",
+    "build_number": 1,
+    "commit_sha": "483c39284ee34ca3db8d698c9e825e5185c5778b",
+    "commit_short": "483c392",
+    "version_tag": "v2.8",
     "source_ref": "main",
     "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
     "manifest_path": "manifests/release-manifest.json",
     "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
     "production_signoff_pointer": ".tmp/production-readiness/latest.json",
-    "generated_at": "2026-05-27T03:19:14+02:00"
+    "generated_at": "2026-05-29T20:20:32+02:00"
   },
   "channels": {
     "stable": {
       "schema_version": 1,
       "version_core": "2.8",
       "normalized_version": "2.8.0",
-      "display_version": "2.8+380.ge11952b",
+      "display_version": "2.8+1.g483c392",
       "channel": "stable",
-      "build_number": 380,
-      "commit_sha": "e11952be572fe52c8c087292a15ca00601f83b52",
-      "commit_short": "e11952b",
-      "version_tag": "",
+      "build_number": 1,
+      "commit_sha": "483c39284ee34ca3db8d698c9e825e5185c5778b",
+      "commit_short": "483c392",
+      "version_tag": "v2.8",
       "source_ref": "main",
       "repo_url": "https://github.com/blecx/softwareFactoryVscode.git",
       "manifest_path": "manifests/release-manifest.json",
       "manifest_url": "https://raw.githubusercontent.com/blecx/softwareFactoryVscode/main/manifests/release-manifest.json",
       "production_signoff_pointer": ".tmp/production-readiness/latest.json",
-      "generated_at": "2026-05-27T03:19:14+02:00"
+      "generated_at": "2026-05-29T20:20:32+02:00"
     }
   },
   "update_policy": {
