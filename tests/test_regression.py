@@ -2401,6 +2401,15 @@ def test_wiki_update_and_publish_wrappers_define_repo_owned_execution_split() ->
     assert "raw `git push`" in publish_wrapper
     assert "clean committed `.tmp/wiki-launch/live-wiki` clone" in publish_wrapper
     assert "repo-owned helper" in lowered_publish
+    assert "browser automation tools" in publish_wrapper
+    assert (
+        "verify that `Restrict editing to collaborators only` is enabled"
+        in publish_wrapper
+    )
+    assert (
+        "Do not treat this as an optional step or fallback to manual verification"
+        in publish_wrapper
+    )
 
 
 def test_docs_roadmap_separates_current_direction_from_historical_plans():
