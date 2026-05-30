@@ -10,6 +10,12 @@ import subprocess
 import sys
 from typing import Any, Dict, Optional, Tuple
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from factory_runtime.secret_safety import redact_secret_text
+
 
 def get_git_remote_url() -> Optional[str]:
     try:
@@ -187,16 +193,52 @@ def probe_signing() -> Dict[str, Any]:
     }
 
 
+def probe_github_api() -> Dict[str, Any]:
+    sources = []
+    for env_var in ["GITHUB_TOKEN", "GH_TOKEN", "GITHUB_PAT"]:
+        if os.environ.get(env_var):
+            sources.append(env_var)
+
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "status"], capture_output=True, text=True
+        )
+
+        stdout_redacted = redact_secret_text(result.stdout)
+        stderr_redacted = redact_secret_text(result.stderr)
+
+        output = stdout_redacted if stdout_redacted.strip() else stderr_redacted
+
+        if result.returncode == 0:
+            notes = "GitHub API is ready."
+            if sources:
+                notes += f" Sources: {', '.join(sources)}."
+            return {"status": "ready", "notes": notes, "details": output.strip()}
+        else:
+            return {
+                "status": "blocked",
+                "notes": "GitHub API authentication failed. Please run 'gh auth login' or set GITHUB_TOKEN.",
+                "details": output.strip(),
+            }
+    except FileNotFoundError:
+        return {
+            "status": "blocked",
+            "notes": "'gh' command not found. Please install GitHub CLI or set GITHUB_TOKEN.",
+        }
+    except Exception as e:
+        return {
+            "status": "blocked",
+            "notes": f"gh auth status failed: {redact_secret_text(str(e))}",
+        }
+
+
 def get_status() -> Dict[str, Any]:
     """Return the placeholder status for GitHub access credential lanes."""
     return {
         "lanes": {
             "git_transport": probe_git_transport(),
             "signing": probe_signing(),
-            "github_api": {
-                "status": "unknown",
-                "notes": "Detailed probe pending (ADR-019 token/App isolation)",
-            },
+            "github_api": probe_github_api(),
         }
     }
 

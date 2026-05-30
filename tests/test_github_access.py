@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from scripts.github_access import (
     probe_git_transport,
+    probe_github_api,
     probe_gpg_signing,
     probe_signing,
     probe_ssh_signing,
@@ -34,9 +35,6 @@ def test_github_access_status_json_shape():
         assert lane in lanes
         assert "status" in lanes[lane]
         assert "notes" in lanes[lane]
-
-        if lane == "github_api":
-            assert lanes[lane]["status"] == "unknown"
 
 
 def test_github_access_status_human():
@@ -149,3 +147,47 @@ def test_probe_signing_override_priority(mock_gpg, mock_ssh):
         assert result["primary"] == "gpg"
         assert result["status"] == "blocked"
         assert "Fallback backend 'ssh' is ready" in result["notes"]
+
+
+@patch("subprocess.run")
+def test_probe_github_api_ready_env_only(mock_run):
+    mock_run.return_value.returncode = 0
+    mock_run.return_value.stdout = (
+        "Logged in to github.com account (GITHUB_TOKEN)\nToken: github_pat_11AAAAA"
+    )
+    mock_run.return_value.stderr = ""
+
+    with patch.dict(os.environ, {"GITHUB_TOKEN": "github_pat_11AAAAA"}, clear=True):
+        result = probe_github_api()
+
+    assert result["status"] == "ready"
+    assert "Sources: GITHUB_TOKEN" in result["notes"]
+    assert "github_pat_11AAAAA" not in result["details"]
+    assert "[REDACTED]" in result["details"]
+
+
+@patch("subprocess.run")
+def test_probe_github_api_blocked(mock_run):
+    mock_run.return_value.returncode = 1
+    mock_run.return_value.stdout = ""
+    mock_run.return_value.stderr = (
+        "You are not logged into any GitHub hosts.\nTo log in, run: gh auth login"
+    )
+
+    with patch.dict(os.environ, {}, clear=True):
+        result = probe_github_api()
+
+    assert result["status"] == "blocked"
+    assert "GitHub API authentication failed" in result["notes"]
+    assert "gh auth login" in result["details"]
+
+
+@patch("subprocess.run")
+def test_probe_github_api_not_found(mock_run):
+    mock_run.side_effect = FileNotFoundError()
+
+    with patch.dict(os.environ, {}, clear=True):
+        result = probe_github_api()
+
+    assert result["status"] == "blocked"
+    assert "'gh' command not found" in result["notes"]
