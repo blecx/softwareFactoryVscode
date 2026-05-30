@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from unittest.mock import patch
 
 import pytest
 
@@ -133,3 +135,28 @@ def test_openai_images_client_rejects_override_file_in_production_mode(
         match="override files via LLM_OVERRIDE_PATH are disabled",
     ):
         OpenAIImagesClient()
+
+
+@patch("factory_runtime.agents.llm_client.subprocess.run")
+def test_llm_client_retries_gh_token_after_empty_result(mock_run) -> None:
+    LLMClientFactory.clear_github_token_cache()
+
+    empty_result = type(
+        "CompletedProcessLike",
+        (),
+        {"returncode": 0, "stdout": "\n", "stderr": ""},
+    )()
+    token_result = type(
+        "CompletedProcessLike",
+        (),
+        {"returncode": 0, "stdout": "ghp_retry_token", "stderr": ""},
+    )()
+    mock_run.side_effect = [empty_result, token_result]
+
+    with patch.dict(os.environ, {}, clear=True):
+        first = LLMClientFactory.resolve_github_api_key("")
+        second = LLMClientFactory.resolve_github_api_key("")
+
+    assert first == ""
+    assert second == "ghp_retry_token"
+    assert mock_run.call_count == 2
