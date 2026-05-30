@@ -169,6 +169,14 @@ Before installation, verify you have the following installed on your local host:
 - `docker` and `docker compose`
 - VS Code
 
+### GitHub Access Policies
+
+Before proceeding with agent-driven workflows, your GitHub access must be configured correctly. The repository requires three separate lanes of authentication as specified in [ADR-019](architecture/ADR-019-GitHub-Access-Credential-Lanes.md). See the [GitHub Access Runbook](ops/GITHUB-ACCESS.md) for full setup instructions mapping to these policies:
+
+- **Git Transport**: SSH transport (`git@github.com:...`).
+- **Commit Signing**: SSH-first signing is expected. A GPG-first switch is permitted. Plaintext commits are rejected.
+- **API Access**: GitHub API credential fallback (e.g., via `gh auth login`, `GITHUB_TOKEN`, etc.) is required for commands when the agent requests it (for PRs / Issues).
+
 ### VS Code AI setup by version
 
 For the AI-assisted workflow described in this repository:

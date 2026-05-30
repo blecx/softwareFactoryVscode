@@ -14,6 +14,8 @@ Press `Ctrl+Shift+P` (or `Cmd+Shift+P`), choose `Run Task`, then pick:
 - `🧭 Runtime: Preflight` — inspect runtime readiness, config drift, and effective endpoint alignment before probing live services
 - `🐳 Docker: Build & Start` — build and start the runtime explicitly
 - `🛑 Docker: Stop` — stop the current workspace runtime
+- `🛂 Verify: GitHub Access` — verify SSH transport, signing, and API credentials
+- `🔑 Setup: GitHub Access (Guided)` — interactive setup for missing GitHub credentials
 - `🛂 Verify: Installation Compliance` — validate the namespace-first install contract
 - `🩺 Verify: Runtime Compliance` — validate runtime health against generated endpoints
 - `🩺 Verify: Runtime Compliance + MCP` — runtime validation plus VS Code MCP endpoint checks

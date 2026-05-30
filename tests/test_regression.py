@@ -5551,3 +5551,34 @@ def test_production_readiness_template_adr016_017_preflight_residue():
     )
     assert "fail-closed preflight" in content.lower()
     assert "workflow residue" in content.lower()
+
+
+def test_docs_github_access_wire_into_install_and_quickstart():
+    repo_root = Path(__file__).parent.parent
+    install_doc = (repo_root / "docs" / "INSTALL.md").read_text(encoding="utf-8")
+    readme_doc = (repo_root / "README.md").read_text(encoding="utf-8")
+    handout_doc = (repo_root / "docs" / "HANDOUT.md").read_text(encoding="utf-8")
+    cheat_sheet_doc = (repo_root / "docs" / "CHEAT_SHEET.md").read_text(
+        encoding="utf-8"
+    )
+    setup_repo_doc = (repo_root / "docs" / "setup-github-repository.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "GitHub Access Policies" in install_doc
+    assert "ADR-019" in install_doc
+    assert "SSH transport" in install_doc
+    assert "GPG-first switch" in install_doc
+    assert "API credential fallback" in install_doc
+    assert "SSH-first signing" in install_doc
+
+    assert "GitHub Access" in readme_doc
+    assert "ADR-019" in readme_doc
+
+    assert "ops/GITHUB-ACCESS.md" in handout_doc
+    assert "verify your GitHub access" in handout_doc
+
+    assert "Verify: GitHub Access" in cheat_sheet_doc
+
+    assert "GitHub Access Runbook" in setup_repo_doc
+    assert "gh auth login" in setup_repo_doc
