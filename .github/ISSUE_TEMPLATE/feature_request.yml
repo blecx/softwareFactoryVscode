@@ -52,3 +52,10 @@ body:
       description: Which docs/manifests/templates need to change?
     validations:
       required: true
+  - type: textarea
+    id: compact_packet
+    attributes:
+      label: Compact execution packet
+      description: Target files, conceptual domain, read-first context, authority anchors, narrow validation, diff size, and downstream status.
+    validations:
+      required: true

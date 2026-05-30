@@ -35,3 +35,10 @@ body:
       description: Include failing commands, logs, or screenshots as needed.
     validations:
       required: false
+  - type: textarea
+    id: compact_packet
+    attributes:
+      label: Compact execution packet
+      description: Target files, conceptual domain, read-first context, authority anchors, narrow validation, diff size, and downstream status.
+    validations:
+      required: true
