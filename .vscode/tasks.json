@@ -518,7 +518,7 @@
     {
       "label": "🛂 Verify: GitHub Access",
       "type": "shell",
-      "command": "python3",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "${workspaceFolder}/scripts/workspace_surface_guard.py",
         "verify-github-access",
@@ -540,7 +540,7 @@
     {
       "label": "🔑 Setup: GitHub Access (Guided)",
       "type": "shell",
-      "command": "python3",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "${workspaceFolder}/scripts/workspace_surface_guard.py",
         "setup-github-access-guided",
