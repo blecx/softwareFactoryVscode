@@ -1,10 +1,16 @@
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.github_access import probe_git_transport
+from scripts.github_access import (
+    probe_git_transport,
+    probe_gpg_signing,
+    probe_signing,
+    probe_ssh_signing,
+)
 
 
 def test_github_access_status_json_shape():
@@ -29,7 +35,7 @@ def test_github_access_status_json_shape():
         assert "status" in lanes[lane]
         assert "notes" in lanes[lane]
 
-        if lane != "git_transport":
+        if lane == "github_api":
             assert lanes[lane]["status"] == "unknown"
 
 
@@ -82,3 +88,64 @@ def test_probe_git_transport_no_sock(mock_sock, mock_remote):
     result = probe_git_transport()
     assert result["status"] == "blocked"
     assert "SSH_AUTH_SOCK is missing" in result["notes"]
+
+
+@patch("scripts.github_access.get_git_version")
+@patch("scripts.github_access.get_git_config")
+def test_probe_ssh_signing_blocked_by_version(mock_config, mock_version):
+    mock_version.return_value = (2, 30)
+    result = probe_ssh_signing()
+    assert result["status"] == "blocked"
+    assert "below 2.34" in result["notes"]
+
+
+@patch("scripts.github_access.get_git_version")
+@patch("scripts.github_access.get_git_config")
+def test_probe_ssh_signing_ready(mock_config, mock_version):
+    mock_version.return_value = (2, 34)
+    mock_config.return_value = "ssh-ed25519 AAA..."
+    result = probe_ssh_signing()
+    assert result["status"] == "ready"
+
+
+@patch("scripts.github_access.get_git_config")
+@patch("subprocess.run")
+def test_probe_gpg_signing_ready(mock_run, mock_config):
+    mock_config.return_value = "DEADBEEF"
+    mock_run.return_value.returncode = 0
+    result = probe_gpg_signing()
+    assert result["status"] == "ready"
+
+
+@patch("scripts.github_access.get_git_config")
+@patch("subprocess.run")
+def test_probe_gpg_signing_missing_key(mock_run, mock_config):
+    mock_config.return_value = "DEADBEEF"
+    mock_run.return_value.returncode = 2
+    result = probe_gpg_signing()
+    assert result["status"] == "blocked"
+
+
+@patch("scripts.github_access.probe_ssh_signing")
+@patch("scripts.github_access.probe_gpg_signing")
+def test_probe_signing_default_priority(mock_gpg, mock_ssh):
+    mock_ssh.return_value = {"status": "ready", "notes": "ssh ok"}
+    mock_gpg.return_value = {"status": "blocked", "notes": "gpg fail"}
+
+    with patch.dict(os.environ, {}, clear=True):
+        result = probe_signing()
+        assert result["primary"] == "ssh"
+        assert result["status"] == "ready"
+
+
+@patch("scripts.github_access.probe_ssh_signing")
+@patch("scripts.github_access.probe_gpg_signing")
+def test_probe_signing_override_priority(mock_gpg, mock_ssh):
+    mock_ssh.return_value = {"status": "ready", "notes": "ssh ok"}
+    mock_gpg.return_value = {"status": "blocked", "notes": "gpg fail"}
+
+    with patch.dict(os.environ, {"FACTORY_GIT_SIGNING_PRIORITY": "gpg,ssh"}):
+        result = probe_signing()
+        assert result["primary"] == "gpg"
+        assert result["status"] == "blocked"
+        assert "Fallback backend 'ssh' is ready" in result["notes"]

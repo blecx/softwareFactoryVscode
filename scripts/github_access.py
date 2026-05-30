@@ -88,15 +88,111 @@ def probe_git_transport() -> Dict[str, str]:
         }
 
 
+def get_git_config(key: str) -> Optional[str]:
+    try:
+        result = subprocess.run(
+            ["git", "config", "--get", key], capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def get_git_version() -> Tuple[int, int]:
+    try:
+        result = subprocess.run(["git", "--version"], capture_output=True, text=True)
+        parts = result.stdout.strip().split()
+        if len(parts) >= 3:
+            v_parts = parts[2].split(".")
+            return int(v_parts[0]), int(v_parts[1])
+    except Exception:
+        pass
+    return (0, 0)
+
+
+def probe_ssh_signing() -> Dict[str, str]:
+    version = get_git_version()
+    if version < (2, 34):
+        return {
+            "status": "blocked",
+            "notes": "Git version below 2.34 does not support SSH signing.",
+        }
+
+    signingkey = get_git_config("user.signingkey")
+    if not signingkey:
+        return {
+            "status": "blocked",
+            "notes": "user.signingkey is not configured for SSH.",
+        }
+
+    return {"status": "ready", "notes": "SSH signing is configured."}
+
+
+def probe_gpg_signing() -> Dict[str, str]:
+    signingkey = get_git_config("user.signingkey")
+    if not signingkey:
+        return {
+            "status": "blocked",
+            "notes": "user.signingkey is not configured for GPG.",
+        }
+
+    try:
+        result = subprocess.run(
+            ["gpg", "--list-secret-keys", signingkey],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return {"status": "ready", "notes": "GPG secret key is available."}
+        else:
+            return {
+                "status": "blocked",
+                "notes": "GPG secret key not available locally.",
+            }
+    except Exception:
+        return {"status": "blocked", "notes": "gpg command not found or failed."}
+
+
+def probe_signing() -> Dict[str, Any]:
+    priority_str = os.environ.get("FACTORY_GIT_SIGNING_PRIORITY", "ssh,gpg")
+    priority_list = [p.strip().lower() for p in priority_str.split(",") if p.strip()]
+    if not priority_list:
+        priority_list = ["ssh", "gpg"]
+
+    primary = priority_list[0]
+
+    ssh_status = probe_ssh_signing()
+    gpg_status = probe_gpg_signing()
+
+    backends = {"ssh": ssh_status, "gpg": gpg_status}
+
+    primary_status = backends.get(
+        primary, {"status": "blocked", "notes": "Unknown backend."}
+    )
+    overall_status = primary_status["status"]
+
+    notes = f"Primary backend '{primary}' is {primary_status['status']}."
+    if overall_status == "blocked" and len(priority_list) > 1:
+        fallback = priority_list[1]
+        fallback_status = backends.get(fallback, {"status": "blocked"})
+        notes += f" Fallback backend '{fallback}' is {fallback_status['status']}."
+
+    return {
+        "status": overall_status,
+        "notes": notes,
+        "backends": backends,
+        "primary": primary,
+    }
+
+
 def get_status() -> Dict[str, Any]:
     """Return the placeholder status for GitHub access credential lanes."""
     return {
         "lanes": {
             "git_transport": probe_git_transport(),
-            "signing": {
-                "status": "unknown",
-                "notes": "Detailed probe pending (ADR-019 ssh/gpg priority)",
-            },
+            "signing": probe_signing(),
             "github_api": {
                 "status": "unknown",
                 "notes": "Detailed probe pending (ADR-019 token/App isolation)",
