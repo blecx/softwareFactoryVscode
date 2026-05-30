@@ -1,0 +1,37 @@
+{
+  "github-mini": {
+    "file_cap": 5,
+    "diff_budget": 250,
+    "domain_cap": 1,
+    "context_class": "narrow",
+    "fallback_actions": [
+      "split-issue",
+      "escalate-to-full"
+    ],
+    "tool_subset": [
+      "read_file",
+      "replace_string_in_file",
+      "run_in_terminal",
+      "github_api"
+    ]
+  },
+  "github-full": {
+    "file_cap": 20,
+    "diff_budget": 1000,
+    "domain_cap": 3,
+    "context_class": "wide",
+    "fallback_actions": [
+      "request-human-review",
+      "split-issue"
+    ],
+    "tool_subset": [
+      "read_file",
+      "replace_string_in_file",
+      "run_in_terminal",
+      "github_api",
+      "architectural_search",
+      "semantic_search",
+      "create_file"
+    ]
+  }
+}

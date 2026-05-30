@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Model Execution Profiles",
+  "description": "Schema for defining different model execution capability profiles.",
+  "type": "object",
+  "patternProperties": {
+    "^[a-zA-Z0-9_-]+$": {
+      "type": "object",
+      "properties": {
+        "file_cap": {
+          "type": "integer",
+          "description": "Maximum number of files allowed to be edited."
+        },
+        "diff_budget": {
+          "type": "integer",
+          "description": "Maximum number of lines allowed in the implementation diff."
+        },
+        "domain_cap": {
+          "type": "integer",
+          "description": "Maximum number of conceptual domains this profile can handle in a single slice."
+        },
+        "context_class": {
+          "type": "string",
+          "description": "The expected context window requirements."
+        },
+        "fallback_actions": {
+          "type": "array",
+          "description": "List of actions to take if the issue exceeds the capability profile.",
+          "items": { "type": "string" }
+        },
+        "tool_subset": {
+          "type": "array",
+          "description": "List of tools or capabilities allowed for this profile.",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["file_cap", "diff_budget", "domain_cap", "context_class", "fallback_actions", "tool_subset"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
