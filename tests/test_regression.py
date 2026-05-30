@@ -1379,6 +1379,34 @@ def test_setup_repo_doc_matches_current_ci_checks():
     assert "Internal Production Gate — Docker Parity & Recovery Proofs" in setup_doc
 
 
+def test_setup_repo_script_uses_repo_tmp_and_matches_required_checks():
+    repo_root = Path(__file__).parent.parent
+    setup_doc = (repo_root / "docs" / "setup-github-repository.md").read_text(
+        encoding="utf-8"
+    )
+    setup_script = (repo_root / "scripts" / "setup-github-repo.sh").read_text(
+        encoding="utf-8"
+    )
+
+    required_checks = [
+        "Python Code Quality (Lint & Format)",
+        "Architectural Boundary Tests",
+        "PR Template Conformance",
+        "Production Docs Contract",
+        "Production Docker Build Parity",
+        "Production Runtime Proofs",
+        "Internal Production Gate — Docker Parity & Recovery Proofs",
+    ]
+
+    assert 'PAYLOAD_PATH="$TMP_DIR/branch-protection-payload.json"' in setup_script
+    assert 'mkdir -p "$TMP_DIR"' in setup_script
+    assert "/tmp/branch-protection-payload.json" not in setup_script
+
+    for check in required_checks:
+        assert check in setup_doc
+        assert check in setup_script
+
+
 def test_integration_regression_script_uses_repo_local_tmp_guardrail():
     repo_root = Path(__file__).parent.parent
     integration_script = (repo_root / "tests" / "run-integration-test.sh").read_text(
