@@ -21,6 +21,9 @@ Use these Copilot agents in VS Code Chat:
 
 ## Loop rules
 
+- Small-Model Boundaries (ADR-018): Execute compact slices. Keep to 1-3 target files and NEVER exceed 5. Target only one conceptual domain per issue. Use a diff budget of 150-250 lines. Splitting is required if the budget is breached.
+- Implement narrow validation first: Run the narrowest applicable local tests (e.g. grep, focused unit tests) before you widen to broader validation.
+- Slice handoffs must explicitly declare whether the completed issue unlocks a next downstream issue.
 - One issue = one PR = one merge.
 - Approved-plan and queue execution must also keep one issue = one dedicated branch = one registered isolated worktree.
 - Stop immediately on blocked PRs, CI failures, merge conflicts, or workflow errors.
