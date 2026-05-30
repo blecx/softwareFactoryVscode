@@ -1,16 +1,16 @@
 ## Summary
 
-Implement `github_access.py` Git Transport SSH probes, fulfilling ADR-019 for SSH readiness. 
-This checks git remote URL, ssh-agent sock, key loaded status, and runs a bounded git@github.com probe.
+Implement `github_access.py` GitHub API credential readiness probe, fulfilling the ADR-019 requirement to separate GitHub API credential lane validation from SSH/GPG.
+This checks for the presence of token env variables and validates the login status smoothly with redaction of tokens.
 
 ## Linked issue
 
-Fixes #595
+Fixes #597
 
 ## Scope and affected areas
 
-- Runtime: Updated `scripts/github_access.py` to probe transport status.
-- Tests: Updated `tests/test_github_access.py` with mock-based tests for Git Transport.
+- Runtime: Updated `scripts/github_access.py` to add `probe_github_api()`. Added `factory_runtime.secret_safety` dependency.
+- Tests: Updated `tests/test_github_access.py` to mock `subprocess.run` and test the return format of `probe_github_api()` ensuring tokens are redacted.
 - Docs / manifests: None.
 - GitHub remote assets: None.
 
@@ -25,4 +25,4 @@ Fixes #595
 
 ## Follow-ups
 
-- Next credential lanes probes will be added in further issues.
+- Further refinements to credential isolation as per ADR-019 if required.
