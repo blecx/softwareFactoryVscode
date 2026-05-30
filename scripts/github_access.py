@@ -5,18 +5,94 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
+
+
+def get_git_remote_url() -> Optional[str]:
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
+def has_ssh_auth_sock() -> bool:
+    return "SSH_AUTH_SOCK" in os.environ
+
+
+def get_ssh_add_status() -> Tuple[bool, str]:
+    try:
+        result = subprocess.run(["ssh-add", "-l"], capture_output=True, text=True)
+        if result.returncode == 0:
+            return True, "Keys loaded."
+        elif result.returncode == 1:
+            return False, "Agent has no keys."
+        else:
+            return False, f"Could not contact agent: {result.stderr.strip()}"
+    except Exception as e:
+        return False, f"ssh-add command failed: {e}"
+
+
+def probe_github_ssh() -> Tuple[bool, str]:
+    try:
+        result = subprocess.run(
+            ["ssh", "-T", "-o", "ConnectTimeout=5", "git@github.com"],
+            capture_output=True,
+            text=True,
+        )
+        output = result.stderr + result.stdout
+        if "successfully authenticated" in output.lower():
+            return True, "Successfully authenticated to GitHub."
+        else:
+            return False, "SSH connection to GitHub failed."
+    except Exception as e:
+        return False, f"SSH command failed: {e}"
+
+
+def probe_git_transport() -> Dict[str, str]:
+    remote_url = get_git_remote_url()
+    if not remote_url:
+        return {"status": "unknown", "notes": "No git remote 'origin' found."}
+
+    if remote_url.startswith("https://"):
+        return {
+            "status": "action_required",
+            "notes": "HTTPS remote detected. Expected SSH. Please change remote URL.",
+        }
+
+    if not has_ssh_auth_sock():
+        return {
+            "status": "blocked",
+            "notes": "SSH_AUTH_SOCK is missing. Please forward ssh-agent.",
+        }
+
+    has_keys, key_msg = get_ssh_add_status()
+    if not has_keys:
+        return {"status": "blocked", "notes": f"SSH key check failed: {key_msg}"}
+
+    ssh_ready, ssh_msg = probe_github_ssh()
+    if ssh_ready:
+        return {"status": "ready", "notes": "SSH transport is ready and authenticated."}
+    else:
+        return {
+            "status": "blocked",
+            "notes": "SSH authentication failed. Ensure public key is in GitHub.",
+        }
 
 
 def get_status() -> Dict[str, Any]:
     """Return the placeholder status for GitHub access credential lanes."""
     return {
         "lanes": {
-            "git_transport": {
-                "status": "unknown",
-                "notes": "Detailed probe pending (ADR-019 SSH remote default)",
-            },
+            "git_transport": probe_git_transport(),
             "signing": {
                 "status": "unknown",
                 "notes": "Detailed probe pending (ADR-019 ssh/gpg priority)",
