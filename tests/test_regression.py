@@ -2973,6 +2973,7 @@ def test_bash_gateway_default_policy_matches_profile_schema():
     assert set(policy.profiles) == {"safe-readonly", "repo-maintenance"}
     assert "scripts/validate-pr-template.sh" in policy.profiles["safe-readonly"].scripts
     assert "setup.sh" in policy.profiles["repo-maintenance"].scripts
+    assert "scripts/github_access.py" in policy.profiles["repo-maintenance"].scripts
 
 
 def test_mcp_multi_client_performs_streamable_http_handshake():

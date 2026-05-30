@@ -10,6 +10,7 @@ profiles:
   repo-maintenance:
     scripts:
       - scripts/archive-goals-safe.sh
+      - scripts/github_access.py
       - scripts/setup-github-repo.sh
       - setup.sh
     default_timeout_sec: 300
