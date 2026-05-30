@@ -88,3 +88,8 @@ Remember: **You solve nothing if you fix one bug by creating architectural debt 
 ## 10. Autonomous Delegation Guardrails
 - **Restricted Bypass Agent:** You (the AI) must **NEVER** automatically delegate to, invoke, or suggest the `@harness-bypass-resolution` agent to escape failing validation or stuck states. 
 - The bypass agent is an operator-only tool. It may **ONLY** be activated by a direct, explicit prompt from the human user (e.g., typing `@harness-bypass-resolution`). Standard agents MUST remain strictly within the `local_ci_parity` workflow.
+
+## 11. Small-Model Execution Boundaries (ADR-018)
+- **Target limits:** Prefer 1-3 files, strictly <= 5 files per issue. Prefer 150-250 lines diff budget. Focus on exactly ONE conceptual domain. Stop and split if breached.
+- **Validation First:** Run the narrowest applicable local validation (e.g., grep, structural verification, or focused tests) before running wider CI parity validations.
+- **Handoff evidence:** Each compact execution packet MUST declare whether the slice unlocks a subsequent downstream issue.

@@ -20,6 +20,8 @@ issue → PR → merge process.
 - Do not use this when the current task is NOT focused on implementing an active issue and turning it into a PR.
 
 ## Guardrails
+- Enforce ADR-018: Keep execution slices compact (1-3 target files, never > 5). Keep focus strictly on one conceptual domain. Adhere to a 150-250 line diff budget. Stop and split the issue if exceeded.
+- Enforce ADR-018: Run narrowest applicable local validation before widening to the local CI parity.
 - Validate issue spec (strict sections + body-size limit) for roadmap specs.
 - Keep scope to small CI-safe slices (single issue, minimal domains), no architecture regressions outside scope.
 - Avoid unrelated refactors.
@@ -35,6 +37,7 @@ Return a concise result that states:
 - implemented issue,
 - validation status,
 - PR or blocking condition,
+- whether the execution packet unlocks a subsequent downstream issue (Unlock-next-issue constraint),
 - any follow-up split/dependency if scope exceeded the slice.
 
 ## Instructions

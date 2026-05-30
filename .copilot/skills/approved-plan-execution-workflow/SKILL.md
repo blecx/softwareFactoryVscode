@@ -36,6 +36,9 @@ explicit approved issue list, or an already-published bounded queue.
 - `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md`
 
 ## Guardrails
+- Respect small-model boundaries (ADR-018): Prefer 1-3 target files, max 5. One domain focus. 150-250 lines diff budget. If these limits are exceeded, stop and split the issue.
+- Require narrowest local validation to pass before running full local CI-equivalent validation.
+- Require handoffs/continue actions to observe whether the previous step explicitly unblocked a subsequent linked issue.
 - Only continue queue work backed by template-compliant GitHub issues.
 - Treat `.github/pull_request_template.md` and `./scripts/validate-pr-template.sh` as mandatory PR handoff gates.
 - Require local CI-equivalent validation from `.github/workflows/ci.yml` before handing a slice from resolve to merge.
