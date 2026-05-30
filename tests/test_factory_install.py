@@ -8558,6 +8558,8 @@ def test_workspace_sensitive_tasks_use_surface_guard() -> None:
         "🛂 Verify: Installation Compliance": "verify-install",
         "🩺 Verify: Runtime Compliance": "verify-runtime",
         "🩺 Verify: Runtime Compliance + MCP": "verify-runtime-mcp",
+        "🛂 Verify: GitHub Access": "verify-github-access",
+        "🔑 Setup: GitHub Access (Guided)": "setup-github-access-guided",
         "🔎 Check: Factory Updates": "update-check",
         "⬆️ Update: Factory Install": "update-apply",
     }

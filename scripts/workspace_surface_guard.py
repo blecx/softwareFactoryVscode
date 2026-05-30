@@ -45,6 +45,16 @@ OPERATIONS: dict[str, RoutedOperation] = {
         script_name="verify_factory_install.py",
         command_args=("--runtime", "--check-vscode-mcp"),
     ),
+    "verify-github-access": RoutedOperation(
+        name="🛂 Verify: GitHub Access",
+        script_name="verify_factory_install.py",
+        command_args=("--github-access", "--no-smoke-prompt"),
+    ),
+    "setup-github-access-guided": RoutedOperation(
+        name="🔑 Setup: GitHub Access (Guided)",
+        script_name="verify_factory_install.py",
+        command_args=("--github-access",),
+    ),
     "update-check": RoutedOperation(
         name="🔎 Check: Factory Updates",
         script_name="factory_update.py",
