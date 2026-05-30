@@ -75,3 +75,32 @@ if __name__ == "__main__":
     import pytest
 
     sys.exit(pytest.main(["-v", __file__]))
+
+
+def test_github_access_skill_and_prompt_compliance() -> None:
+    repo_root = Path(__file__).parent.parent
+    skill_path = (
+        repo_root / ".copilot" / "skills" / "github-access-workflow" / "SKILL.md"
+    )
+    prompt_path = repo_root / ".github" / "prompts" / "github-access-setup.prompt.md"
+
+    assert skill_path.exists(), "github-access-workflow/SKILL.md is missing"
+    assert prompt_path.exists(), "github-access-setup.prompt.md is missing"
+
+    skill_content = skill_path.read_text(encoding="utf-8")
+    assert (
+        "name: github-access-workflow" in skill_content
+    ), "Missing correct frontmatter in SKILL.md"
+    assert "## Objective" in skill_content, "Missing ## Objective in SKILL.md"
+    assert (
+        "docs/ops/GITHUB-ACCESS.md" in skill_content or "ADR-019" in skill_content
+    ), "Missing required source links in SKILL.md"
+
+    prompt_content = prompt_path.read_text(encoding="utf-8")
+    assert (
+        "name: github-access-setup" in prompt_content
+    ), "Missing correct frontmatter in prompt"
+    assert "## Objective" in prompt_content, "Missing ## Objective in prompt"
+    assert (
+        ".copilot/skills/github-access-workflow/SKILL.md" in prompt_content
+    ), "Missing delegation to skill in prompt"
