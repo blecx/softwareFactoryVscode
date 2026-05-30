@@ -22,6 +22,7 @@ if str(SCRIPT_DIR) not in sys.path:
 import bootstrap_host
 import factory_stack
 import factory_workspace
+import github_access
 
 DEFAULT_WORKSPACE_FILENAME = "software-factory.code-workspace"
 DEFAULT_RUNTIME_TIMEOUT = 2.0
@@ -77,6 +78,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--runtime",
         action="store_true",
         help="Also verify the core runtime stack after services have been started.",
+    )
+    parser.add_argument(
+        "--github-access",
+        action="store_true",
+        help="Verify GitHub access credential lanes alongside the installation.",
     )
     parser.add_argument(
         "--check-vscode-mcp",
@@ -689,9 +695,28 @@ def check_legacy_install_artifacts(target_dir: Path, violations: list[str]) -> N
             )
 
 
+def check_github_credentials(violations: list[str]) -> None:
+    print("  -> Checking GitHub access...")
+    status_data = github_access.get_status()
+    lanes = status_data.get("lanes", {})
+    failed_any = False
+    for lane_name, lane_info in lanes.items():
+        lane_status = lane_info.get("status")
+        if lane_status in ("action_required", "blocked", "error"):
+            failed_any = True
+            notes = lane_info.get("notes", "Unknown error")
+            violations.append(f"GitHub Access [{lane_name}]: {notes}")
+
+    if failed_any:
+        print("  -> GitHub access: FAIL")
+    else:
+        print("  -> GitHub access: PASS")
+
+
 def verify_installation(
     target_dir: Path,
     *,
+    check_github_access: bool = False,
     workspace_file: str,
     skip_workspace_check: bool,
     skip_gitignore_check: bool,
@@ -708,6 +733,9 @@ def verify_installation(
         skip_workspace_check=skip_workspace_check,
         violations=violations,
     )
+    if check_github_access:
+        check_github_credentials(violations)
+
     check_gitignore(
         target_dir,
         skip_gitignore_check=skip_gitignore_check,
@@ -916,6 +944,7 @@ def main(argv: list[str] | None = None) -> int:
         workspace_file=args.workspace_file,
         skip_workspace_check=args.skip_workspace_check,
         skip_gitignore_check=args.skip_gitignore_check,
+        check_github_access=args.github_access,
     )
     if violations:
         print("❌ Installation compliance failed:")
