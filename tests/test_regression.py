@@ -5616,3 +5616,33 @@ def test_github_access_cross_surface_compliance() -> None:
         repo_root / ".copilot" / "skills" / "github-access-workflow" / "SKILL.md"
     ).read_text(encoding="utf-8")
     assert "ADR-019" in skill_md or "github-access" in skill_md.lower()
+
+
+def test_issue_templates_require_compact_execution_packet():
+    repo_root = Path(__file__).parent.parent
+    feature_template = (
+        repo_root / ".github" / "ISSUE_TEMPLATE" / "feature_request.yml"
+    ).read_text(encoding="utf-8")
+    bug_template = (
+        repo_root / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "Compact execution packet" in feature_template
+    assert "Target files, conceptual domain, read-first context" in feature_template
+    assert "Compact execution packet" in bug_template
+    assert "Target files, conceptual domain, read-first context" in bug_template
+
+
+def test_work_issue_split_generates_compact_execution_packet():
+    repo_root = Path(__file__).parent.parent
+    split_script = (repo_root / "scripts" / "work_issue_split.py").read_text(
+        encoding="utf-8"
+    )
+    assert "## Compact execution packet" in split_script
+    assert "- **Target Files:**" in split_script
+    assert "- **Conceptual Domain:**" in split_script
+    assert "- **Read First:**" in split_script
+    assert "- **Authority Anchors:**" in split_script
+    assert "- **Validation First:**" in split_script
+    assert "- **Expected Diff Size:**" in split_script
+    assert "- **Unlocks Next Issue?:**" in split_script
