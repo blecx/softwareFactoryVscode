@@ -10,6 +10,7 @@ from http.client import RemoteDisconnected
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -310,6 +311,14 @@ def create_source_factory_repo(path: Path) -> None:
     )
     (path / "scripts" / "install_factory.py").write_text(
         INSTALL_SCRIPT.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (path / "scripts" / "github_access.py").write_text(
+        (REPO_ROOT / "scripts" / "github_access.py").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    (path / "scripts" / "github_access.py").write_text(
+        (REPO_ROOT / "scripts" / "github_access.py").read_text(encoding="utf-8"),
         encoding="utf-8",
     )
     (path / "scripts" / "bootstrap_host.py").write_text(
@@ -8625,3 +8634,33 @@ def test_build_runtime_config_preserves_github_access_overrides(
 
     assert config.env_values["FACTORY_GIT_REMOTE_TRANSPORT"] == "https"
     assert config.env_values["FACTORY_GIT_SIGNING_PRIORITY"] == "gpg,ssh"
+
+
+@patch("scripts.verify_factory_install.github_access.get_status")
+def test_check_github_credentials_success(mock_get_status) -> None:
+    from scripts.verify_factory_install import check_github_credentials
+
+    mock_get_status.return_value = {
+        "status": "operational",
+        "lanes": {
+            "ssh_transport": {"status": "ready", "notes": ""},
+        },
+    }
+    violations = []
+    check_github_credentials(violations)
+    assert not violations
+
+
+@patch("scripts.verify_factory_install.github_access.get_status")
+def test_check_github_credentials_failure(mock_get_status) -> None:
+    from scripts.verify_factory_install import check_github_credentials
+
+    mock_get_status.return_value = {
+        "status": "degraded",
+        "lanes": {
+            "ssh_transport": {"status": "blocked", "notes": "No SSH key found."},
+        },
+    }
+    violations = []
+    check_github_credentials(violations)
+    assert violations == ["GitHub Access [ssh_transport]: No SSH key found."]
