@@ -162,6 +162,8 @@ MANAGED_ENV_KEYS = [
     "FACTORY_INSTANCE_ID",
     "FACTORY_PORT_INDEX",
     RUNTIME_MODE_ENV_KEY,
+    "FACTORY_GIT_REMOTE_TRANSPORT",
+    "FACTORY_GIT_SIGNING_PRIORITY",
     *PORT_LAYOUT.keys(),
 ]
 
@@ -987,6 +989,12 @@ def build_runtime_config(
         "FACTORY_PORT_INDEX": str(port_index),
         RUNTIME_MODE_ENV_KEY: normalize_runtime_mode(
             existing_env.get(RUNTIME_MODE_ENV_KEY, "")
+        ),
+        "FACTORY_GIT_REMOTE_TRANSPORT": existing_env.get(
+            "FACTORY_GIT_REMOTE_TRANSPORT", "ssh"
+        ),
+        "FACTORY_GIT_SIGNING_PRIORITY": existing_env.get(
+            "FACTORY_GIT_SIGNING_PRIORITY", "ssh,gpg"
         ),
         **{key: str(value) for key, value in ports.items()},
     }

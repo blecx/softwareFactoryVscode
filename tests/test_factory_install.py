@@ -8583,3 +8583,45 @@ def test_runtime_compose_agent_worker_exports_work_issue_quota_overrides() -> No
         == "${WORK_ISSUE_FOREGROUND_SHARE:-}"
     )
     assert worker_env.get("WORK_ISSUE_RESERVE_SHARE") == "${WORK_ISSUE_RESERVE_SHARE:-}"
+
+
+def test_build_runtime_config_injects_github_access_defaults(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+
+    assert config.env_values["FACTORY_GIT_REMOTE_TRANSPORT"] == "ssh"
+    assert config.env_values["FACTORY_GIT_SIGNING_PRIORITY"] == "ssh,gpg"
+
+
+def test_build_runtime_config_preserves_github_access_overrides(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    registry_path = tmp_path / "registry.json"
+    monkeypatch.setenv("SOFTWARE_FACTORY_REGISTRY_PATH", str(registry_path))
+    monkeypatch.setattr(factory_workspace, "ports_available", lambda ports: True)
+
+    target_repo = tmp_path / "target-project"
+    repo_root = target_repo / ".copilot/softwareFactoryVscode"
+    repo_root.mkdir(parents=True)
+
+    env_file = repo_root / ".factory.env"
+    env_file.write_text(
+        "FACTORY_GIT_REMOTE_TRANSPORT=https\nFACTORY_GIT_SIGNING_PRIORITY=gpg,ssh\n",
+        encoding="utf-8",
+    )
+
+    config = factory_workspace.build_runtime_config(target_repo, factory_dir=repo_root)
+
+    assert config.env_values["FACTORY_GIT_REMOTE_TRANSPORT"] == "https"
+    assert config.env_values["FACTORY_GIT_SIGNING_PRIORITY"] == "gpg,ssh"
