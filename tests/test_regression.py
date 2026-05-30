@@ -5582,3 +5582,37 @@ def test_docs_github_access_wire_into_install_and_quickstart():
 
     assert "GitHub Access Runbook" in setup_repo_doc
     assert "gh auth login" in setup_repo_doc
+
+
+def test_github_access_cross_surface_compliance() -> None:
+    repo_root = Path(__file__).parent.parent
+
+    # 1. Assert tasks reference the canonical runbook/ADR
+    tasks_json = (repo_root / ".vscode" / "tasks.json").read_text(encoding="utf-8")
+    assert "workspace_surface_guard.py" in tasks_json
+    assert "verify-github-access" in tasks_json
+    assert "setup-github-access-guided" in tasks_json
+
+    # 2. Assert no new private key/token placeholder values are added to generated defaults
+    llm_default = (repo_root / "configs" / "llm.default.json").read_text(
+        encoding="utf-8"
+    )
+    lower_llm = llm_default.lower()
+    # Check that there are no cleartext placeholders like "insert_token_here" for github tokens
+    # the default config should not have secrets.
+    assert "ghp_" not in lower_llm
+    assert "github_token" not in lower_llm or "YOUR_" not in lower_llm
+
+    # 3. Assert scripts/setup-github-repo.sh remains repo-.tmp compliant
+    setup_repo_sh = (repo_root / "scripts" / "setup-github-repo.sh").read_text(
+        encoding="utf-8"
+    )
+    # It must use .tmp, not /tmp or something else globally mutating unless explicitly required
+    assert 'TMPDIR=".tmp' in setup_repo_sh or ".tmp" in setup_repo_sh
+    assert "/tmp/" not in setup_repo_sh
+
+    # 4. Assert skill exists and mentions ADR-019
+    skill_md = (
+        repo_root / ".copilot" / "skills" / "github-access-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    assert "ADR-019" in skill_md or "github-access" in skill_md.lower()

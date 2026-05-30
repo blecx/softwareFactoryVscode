@@ -232,6 +232,18 @@
     ]
   },
   {
+    "file": ".copilot/skills/github-access-workflow/SKILL.md",
+    "form": "Form B",
+    "name": "github-access-workflow",
+    "description": "Workflow or rule module extracted from .copilot/skills/github-access-workflow/SKILL.md",
+    "domain": "github-access-workflow",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/github-access-workflow/SKILL.md",
+      "docs/architecture/ADR-019-GitHub-Access-Credential-Lanes.md"
+    ]
+  },
+  {
     "file": ".copilot/skills/multi-step-planning-checklist/SKILL.md",
     "form": "Form B",
     "name": "multi-step-planning-checklist",
@@ -405,6 +417,17 @@
     "domain": "prompts",
     "authority_owner": "Unknown",
     "authority_references": []
+  },
+  {
+    "file": ".github/prompts/github-access-setup.prompt.md",
+    "form": "Form B",
+    "name": "github-access-setup",
+    "description": "Prompt to verify and guide GitHub SSH/GPG/API access setup.",
+    "domain": "prompts",
+    "authority_owner": "Unknown",
+    "authority_references": [
+      ".copilot/skills/github-access-workflow/SKILL.md"
+    ]
   },
   {
     "file": ".github/agents/tutorial-author.md",
