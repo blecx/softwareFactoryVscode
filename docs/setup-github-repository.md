@@ -4,14 +4,14 @@ Because the `softwareFactoryVscode` heavily relies on GitHub Flow (GitOps) to ma
 
 ## Automated Setup (Recommended)
 
-You can run the provided GitHub CLI script to automatically configure your repository:
+You can run the provided GitHub CLI script to automatically configure your repository settings:
 
 ```bash
 chmod +x scripts/setup-github-repo.sh
 ./scripts/setup-github-repo.sh
 ```
 
-_(Note: Requires the GitHub CLI `gh` to be installed and authenticated: `gh auth login`)_
+> **Important Setup Distinction:** This script only configures repository settings (branch protection, PR rules). It does **not** handle your local Git transport, commit signing, or full API credentials. You must follow the [GitHub Access Runbook](ops/GITHUB-ACCESS.md) to set up your SSH transport, signing, and API credentials before interacting with the repository. Relying solely on `gh auth login` is insufficient for this repository's security policies.
 
 ## Manual Setup Requirements
 

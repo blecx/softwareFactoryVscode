@@ -94,6 +94,7 @@ These verifier commands use the same manager-backed readiness vocabulary as `pre
 When you move from overview to action, go straight to these runbooks instead of
 searching around the docs tree:
 
+- [`docs/ops/GITHUB-ACCESS.md`](ops/GITHUB-ACCESS.md) — verify your GitHub access (SSH transport, commit signing, API fallback) before beginning any issue or PR workflows.
 - [`docs/ops/MONITORING.md`](ops/MONITORING.md) — machine-readable diagnostics,
   `preflight --json` / `status --json` field guidance, and monitoring intent.
 - [`docs/ops/INCIDENT-RESPONSE.md`](ops/INCIDENT-RESPONSE.md) — the supported
