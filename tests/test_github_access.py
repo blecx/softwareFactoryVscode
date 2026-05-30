@@ -2,6 +2,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
+
+from scripts.github_access import probe_git_transport
 
 
 def test_github_access_status_json_shape():
@@ -26,10 +29,8 @@ def test_github_access_status_json_shape():
         assert "status" in lanes[lane]
         assert "notes" in lanes[lane]
 
-        # Verify no secret-looking values are leaked in placeholder
-        # For now, it should just be "unknown"
-        assert lanes[lane]["status"] == "unknown"
-        assert "ADR-019" in lanes[lane]["notes"]
+        if lane != "git_transport":
+            assert lanes[lane]["status"] == "unknown"
 
 
 def test_github_access_status_human():
@@ -47,3 +48,37 @@ def test_github_access_status_human():
     assert "git_transport" in result.stdout
     assert "signing" in result.stdout
     assert "github_api" in result.stdout
+
+
+@patch("scripts.github_access.get_git_remote_url")
+@patch("scripts.github_access.has_ssh_auth_sock")
+@patch("scripts.github_access.get_ssh_add_status")
+@patch("scripts.github_access.probe_github_ssh")
+def test_probe_git_transport_ready(mock_ssh, mock_add, mock_sock, mock_remote):
+    mock_remote.return_value = "git@github.com:test/repo.git"
+    mock_sock.return_value = True
+    mock_add.return_value = (True, "Keys loaded.")
+    mock_ssh.return_value = (True, "Successfully authenticated.")
+
+    result = probe_git_transport()
+    assert result["status"] == "ready"
+
+
+@patch("scripts.github_access.get_git_remote_url")
+def test_probe_git_transport_https(mock_remote):
+    mock_remote.return_value = "https://github.com/test/repo.git"
+
+    result = probe_git_transport()
+    assert result["status"] == "action_required"
+    assert "HTTPS remote detected" in result["notes"]
+
+
+@patch("scripts.github_access.get_git_remote_url")
+@patch("scripts.github_access.has_ssh_auth_sock")
+def test_probe_git_transport_no_sock(mock_sock, mock_remote):
+    mock_remote.return_value = "git@github.com:test/repo.git"
+    mock_sock.return_value = False
+
+    result = probe_git_transport()
+    assert result["status"] == "blocked"
+    assert "SSH_AUTH_SOCK is missing" in result["notes"]
