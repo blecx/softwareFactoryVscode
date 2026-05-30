@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Compact Execution Slice Constraints",
+  "description": "Schema for validating bounded small-model execution slices as defined by ADR-018.",
+  "type": "object",
+  "properties": {
+    "target_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 5,
+      "description": "List of target files. Must not exceed 5."
+    },
+    "conceptual_domains": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "description": "Must be exactly one conceptual domain."
+    },
+    "diff_size_budget_lines": {
+      "type": "integer",
+      "description": "Expected diff size budget (lines). Preferably 150-250."
+    },
+    "read_first_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "authority_anchors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unlocks_next_issue": {
+      "type": "boolean",
+      "description": "Whether this issue unlocks the next pipeline issue."
+    }
+  },
+  "required": [
+    "target_files",
+    "conceptual_domains"
+  ]
+}
