@@ -297,8 +297,13 @@ class LLMClientFactory:
         )
 
     @staticmethod
+    def clear_github_token_cache() -> None:
+        """Clear the cached GitHub auth token to force a retry on next request."""
+        LLMClientFactory._cached_github_token = None
+
+    @staticmethod
     def _get_github_token_from_gh_cli() -> str:
-        if LLMClientFactory._cached_github_token is not None:
+        if LLMClientFactory._cached_github_token:
             return LLMClientFactory._cached_github_token
 
         try:
@@ -315,7 +320,6 @@ class LLMClientFactory:
         except Exception:
             pass
 
-        LLMClientFactory._cached_github_token = ""
         return ""
 
     @staticmethod
