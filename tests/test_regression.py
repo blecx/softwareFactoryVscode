@@ -2860,6 +2860,29 @@ def test_architecture_index_clarifies_authority_and_duplicate_adr_007_numbering(
     assert "two active ADR-007 authority sources" in index_doc
 
 
+def test_github_access_runbook_has_stable_lane_and_operator_action_anchors() -> None:
+    repo_root = Path(__file__).parent.parent
+    runbook = (repo_root / "docs" / "ops" / "GITHUB-ACCESS.md").read_text(
+        encoding="utf-8"
+    )
+    lowered = runbook.lower()
+    assert "# GitHub Access Setup and Troubleshooting" in runbook
+    assert "ADR-019" in runbook
+    assert "## Lane 1: Git transport over SSH via ssh-agent" in runbook
+    assert "ssh-agent" in lowered
+    assert "scripts/github_access.py status --json" in runbook
+    assert "## Lane 2: Commit/tag signing priority" in runbook
+    assert "FACTORY_GIT_SIGNING_PRIORITY=ssh,gpg" in runbook
+    assert "FACTORY_GIT_SIGNING_PRIORITY=gpg,ssh" in runbook
+    assert "## Lane 3: GitHub API credentials (token/gh fallback)" in runbook
+    assert "gh auth status" in runbook
+    assert "GITHUB_TOKEN" in runbook
+    assert "sso" in lowered
+    assert "## What chat sessions can do vs explicit operator action" in runbook
+    assert "explicit operator actions" in lowered
+    assert "gh auth login" in runbook
+
+
 def test_adr_catalog_summarizes_current_architecture_authority() -> None:
     repo_root = Path(__file__).parent.parent
     adr_index = (repo_root / "docs" / "architecture" / "ADR-INDEX.md").read_text(
