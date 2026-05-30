@@ -1,15 +1,27 @@
-Resolves #487.
+## Summary
 
-## Changes
-- Adds a fast aggregate pytest marker and bundle in `test_production_readiness_above_90_contract.py`.
-- Proves language authority, fail-closed routing, signoff evidence scoring, and residue detection.
-- Documents the focused command in `tests/README.md`.
-- Registers custom pytest marker `above_90_readiness` in `pytest.ini`.
+Add default non-secret GitHub access profile settings `FACTORY_GIT_REMOTE_TRANSPORT` and `FACTORY_GIT_SIGNING_PRIORITY` to the generated `.factory.env`, while preserving operator overrides and avoiding the generation of private key or secret material.
 
-## Evidence
-Architecture decisions (ADR-013) are strictly adhered to by treating derived docs as projections. Language validation constraints (ADR-016/ADR-017) are captured under the signoff execution bundle.
+## Linked issue
 
-## Validation
-```
-1 passed in 0.93s
-```
+Fixes #593
+
+## Scope and affected areas
+
+- Runtime: No direct runtime impact, config projection only.
+- Workspace / projection: `scripts/factory_workspace.py` updated to inject defaults.
+- Docs / manifests: None.
+- GitHub remote assets: None.
+
+## Validation / evidence
+
+- `./.venv/bin/python ./scripts/local_ci_parity.py --level merge`: Pending.
+- Unit tests added to `tests/test_factory_install.py`.
+
+## Cross-repo impact
+
+- Related repos/services impacted: None.
+
+## Follow-ups
+
+- None
