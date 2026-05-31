@@ -471,6 +471,33 @@ class LLMClientFactory:
             )
         except Exception:
             request_diagnostics = {}
+
+        provider = config.get("provider") or ""
+        if not provider and "models.github.ai" in config.get(
+            "base_url", config.get("api_base", "")
+        ):
+            provider = "github"
+        provider = provider or "github"
+
+        provider_diagnostic = {"status": "unknown", "reason": ""}
+        if provider.lower() not in LLMClientFactory._llm_provider_registry:
+            provider_diagnostic["status"] = "unavailable"
+            provider_diagnostic["reason"] = f"Provider '{provider}' is unregistered"
+        elif provider.lower() == "github":
+            provider_diagnostic["status"] = "production-ready"
+            provider_diagnostic["reason"] = "Standard GitHub Models provider"
+        else:
+            if _production_runtime_mode_enabled():
+                provider_diagnostic["status"] = "blocked-in-production"
+                provider_diagnostic["reason"] = (
+                    f"Local provider '{provider}' is not eligible for production execution under ADR-014"
+                )
+            else:
+                provider_diagnostic["status"] = "development-only"
+                provider_diagnostic["reason"] = (
+                    f"Local provider '{provider}' is active in development mode"
+                )
+
         return {
             "config_path": config_path,
             "provider": config.get("provider", ""),
@@ -484,6 +511,7 @@ class LLMClientFactory:
             "request_diagnostics": request_diagnostics,
             "role_endpoints": role_endpoints,
             "role_request_policies": role_request_policies,
+            "provider_diagnostic": provider_diagnostic,
         }
 
     @staticmethod
