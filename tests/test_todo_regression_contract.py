@@ -204,6 +204,27 @@ def test_semantic_rubric_rejects_missing_persistence_behavior():
     assert "persistence behavior" in result.missing_checks
 
 
+def test_semantic_rubric_accepts_eligible_local_provider():
+    module = _load_todo_regression_module()
+    case = {
+        "id": "local-llama-3-2",
+        "provider": "local",
+        "model": "ollama/llama3.2",
+        "response": (
+            "Create the todo app in .tmp/todo-regression-run/workspace with create, edit, "
+            "complete/incomplete, delete, empty state, and persistence after reload."
+        ),
+    }
+
+    result = module.evaluate_compatibility_case(
+        case,
+        allowed_workspace_markers=module.approved_workspace_markers(),
+    )
+
+    assert result.passed is True
+    assert not result.missing_checks
+
+
 def test_semantic_rubric_rejects_unsupported_provider():
     module = _load_todo_regression_module()
     case = {
@@ -614,3 +635,24 @@ def test_run_regression_with_ci_simulation_drift_detected_yields_drift_warning(
     assert (
         report["ci_simulation"]["drift_findings"][0]["category"] == "LOCAL_PASS_CI_FAIL"
     )
+
+
+def test_semantic_rubric_rejects_ineligible_local_provider():
+    module = _load_todo_regression_module()
+    case = {
+        "id": "local-ineligible-test",
+        "provider": "local",
+        "model": "ollama/some-untested-model",
+        "response": (
+            "Create the todo app in .tmp/todo-regression-run/workspace with create, edit, "
+            "complete/incomplete, delete, empty state, and persistence after reload."
+        ),
+    }
+
+    result = module.evaluate_compatibility_case(
+        case,
+        allowed_workspace_markers=module.approved_workspace_markers(),
+    )
+
+    assert result.passed is False
+    assert "eligible local model" in result.missing_checks

@@ -14,7 +14,11 @@ from typing import Any
 
 SOURCE_CHECKOUT_MODE = "source-checkout"
 INSTALLED_HOST_MODE = "installed-host"
-SUPPORTED_PROVIDER = "github"
+SUPPORTED_PROVIDERS = {"github", "local"}
+ELIGIBLE_LOCAL_MODELS = {
+    "ollama/llama3.2",
+    "ollama/qwen2.5-coder",
+}
 SOURCE_THROWAWAY_ROOT = Path(".tmp") / "todo-regression-run"
 INSTALLED_THROWAWAY_ROOT = (
     Path(".copilot") / "softwareFactoryVscode" / ".tmp" / "todo-regression-run"
@@ -303,9 +307,11 @@ def evaluate_compatibility_case(
     response = str(case.get("response", "")).lower()
     missing: list[str] = []
 
-    if provider.lower() != SUPPORTED_PROVIDER:
+    if provider.lower() not in SUPPORTED_PROVIDERS:
         missing.append("supported provider")
-    if not model or model in {"*", "your-model-name"}:
+    if provider.lower() == "local" and model not in ELIGIBLE_LOCAL_MODELS:
+        missing.append("eligible local model")
+    elif not model or model in {"*", "your-model-name"}:
         missing.append("configured model")
     if not any(marker.lower() in response for marker in allowed_workspace_markers):
         missing.append("approved throwaway workspace")
