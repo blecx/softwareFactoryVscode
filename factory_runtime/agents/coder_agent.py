@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
+from factory_runtime.agents.context_compaction import compact_context_packet
 from factory_runtime.text_write_normalization import normalize_repo_text_for_write
 
 if TYPE_CHECKING:
@@ -291,9 +292,10 @@ class CoderAgent:
 
     async def _generate_plan(self, packet: dict[str, Any]) -> dict[str, Any]:
         """Ask LLM to produce an implementation plan from the context packet."""
+        compact_packet = compact_context_packet(packet)
         prompt = (
             f"Issue #{packet['run']['issue_number']} in {packet['run']['repo']}.\n\n"
-            f"Context packet:\n```json\n{json.dumps(packet, indent=2)}\n```\n\n"
+            f"Context packet:\n```json\n{compact_packet}\n```\n\n"
             "Produce a planning phase response."
         )
         raw = await self._chat(prompt)
@@ -310,8 +312,9 @@ class CoderAgent:
     async def _implement(self, run_id: str, packet: dict[str, Any]) -> list[str]:
         """Ask LLM to produce file edits and apply them. Returns list of changed paths."""
         feedback = (packet.get("plan") or {}).get("feedback", "")
+        compact_packet = compact_context_packet(packet)
         prompt = (
-            f"Approved context packet:\n```json\n{json.dumps(packet, indent=2)}\n```\n"
+            f"Approved context packet:\n```json\n{compact_packet}\n```\n"
             + (f"\nReviewer feedback: {feedback}\n" if feedback else "")
             + "\nProduce a coding phase response with all file edits."
         )
