@@ -82,7 +82,7 @@ The current production secret/config contract covered by the manager-backed read
 
 - `CONTEXT7_API_KEY` must be present and non-placeholder for the `context7` service.
 - one live GitHub Models credential must be available for the agent-worker path via `GITHUB_TOKEN`, `GH_TOKEN`, `GITHUB_PAT`, or a non-placeholder `api_key` resolved from `LLM_CONFIG_PATH`.
-- explicitly eligible local-model providers (e.g., via `provider: local`) may be substituted for execution slices if they satisfy the semantic regression contract and existing factory execution limits (ADR-019).
+- explicitly eligible local-model providers (e.g., `ollama/llama3.2`, `ollama/qwen2.5-coder` running via `provider: local`) may be substituted for execution slices if they satisfy the semantic regression contract and existing factory execution limits (ADR-019).
 - `GITHUB_OPS_ALLOWED_REPOS` must contain real `owner/repo` entries for `github-ops-mcp`; placeholders such as `YOUR_ORG/YOUR_REPO` are rejected in production mode.
 - `LLM_CONFIG_PATH`, when used for production credentials, must resolve to a readable JSON object rather than a missing or malformed file.
 - `LLM_OVERRIDE_PATH` override files and dynamic live-key injection flows such as `bus_set_live_key` are development-only and blocked in production mode.
