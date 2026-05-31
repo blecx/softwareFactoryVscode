@@ -26,6 +26,7 @@ from mcp.server.fastmcp import Context, FastMCP
 
 from factory_runtime.secret_safety import production_runtime_mode_enabled
 from factory_runtime.shared_tenancy import (
+    TenantIdentityError,
     default_project_id,
     header_workspace_id,
     resolve_tenant_identity,
@@ -106,8 +107,12 @@ def bus_create_run(
     Returns:
         {"run_id": str}  — UUID identifying this run throughout its lifecycle.
     """
+    try:
+        project_id = extract_project_id(ctx)
+    except TenantIdentityError as exc:
+        return {"ok": False, "error": str(exc)}
     run_id = _bus.create_run(
-        issue_number=issue_number, repo=repo, project_id=extract_project_id(ctx)
+        issue_number=issue_number, repo=repo, project_id=project_id
     )
     return {"run_id": run_id}
 
@@ -128,8 +133,12 @@ def bus_set_status(run_id: str, status: str, ctx: Context = None) -> dict[str, A
         {"ok": True} on success.
     """
     try:
+        project_id = extract_project_id(ctx)
+    except TenantIdentityError as exc:
+        return {"ok": False, "error": str(exc)}
+    try:
         _bus.set_status(
-            run_id=run_id, status=status, project_id=extract_project_id(ctx)
+            run_id=run_id, status=status, project_id=project_id
         )
     except InvalidStatusTransitionError as exc:
         raise ValueError(str(exc)) from exc
@@ -143,7 +152,11 @@ def bus_list_pending_approval(ctx: Context = None) -> dict[str, Any]:
     Returns:
         {"runs": [{"run_id", "issue_number", "repo", "status", "created_ts"}, ...]}
     """
-    return {"runs": _bus.list_pending_approval(project_id=extract_project_id(ctx))}
+    try:
+        project_id = extract_project_id(ctx)
+    except TenantIdentityError as exc:
+        return {"ok": False, "error": str(exc)}
+    return {"runs": _bus.list_pending_approval(project_id=project_id)}
 
 
 # ---------------------------------------------------------------------------
@@ -207,8 +220,12 @@ def bus_approve_run(
         {"ok": True}
     """
     try:
+        project_id = extract_project_id(ctx)
+    except TenantIdentityError as exc:
+        return {"ok": False, "error": str(exc)}
+    try:
         _bus.approve_run(
-            run_id=run_id, feedback=feedback, project_id=extract_project_id(ctx)
+            run_id=run_id, feedback=feedback, project_id=project_id
         )
     except InvalidStatusTransitionError as exc:
         raise ValueError(str(exc)) from exc
@@ -243,7 +260,11 @@ def bus_read_context_packet(run_id: str, ctx: Context = None) -> dict[str, Any]:
           "checkpoints": [{"label", "metadata", "ts"}, ...]
         }
     """
-    return _bus.read_context_packet(run_id=run_id, project_id=extract_project_id(ctx))
+    try:
+        project_id = extract_project_id(ctx)
+    except TenantIdentityError as exc:
+        return {"ok": False, "error": str(exc)}
+    return _bus.read_context_packet(run_id=run_id, project_id=project_id)
 
 
 # ---------------------------------------------------------------------------
@@ -382,7 +403,10 @@ def bus_purge_workspace(project_id: str, ctx: Context = None) -> dict[str, Any]:
     """Purges all data for a specific workspace tenant from the bus.
     Requires the caller to be accessing the server with the matching x-workspace-id header as a basic security check.
     """
-    caller_tenant = extract_project_id(ctx)
+    try:
+        caller_tenant = extract_project_id(ctx)
+    except TenantIdentityError as exc:
+        return {"ok": False, "error": str(exc)}
     if caller_tenant != project_id:
         return {
             "ok": False,
