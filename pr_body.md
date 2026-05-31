@@ -1,28 +1,20 @@
 ## Summary
-
-Implement `github_access.py` GitHub API credential readiness probe, fulfilling the ADR-019 requirement to separate GitHub API credential lane validation from SSH/GPG.
-This checks for the presence of token env variables and validates the login status smoothly with redaction of tokens.
+This implements the feature to route execution through the model-fit policy as required by the execution constraints. It implements model tier resolution and integrates it within `RouterAgent`.
 
 ## Linked issue
-
-Fixes #597
+Fixes #632
 
 ## Scope and affected areas
-
-- Runtime: Updated `scripts/github_access.py` to add `probe_github_api()`. Added `factory_runtime.secret_safety` dependency.
-- Tests: Updated `tests/test_github_access.py` to mock `subprocess.run` and test the return format of `probe_github_api()` ensuring tokens are redacted.
-- Docs / manifests: None.
-- GitHub remote assets: None.
+- Added `factory_runtime/agents/model_selection_policy.py`
+- Added `tests/test_model_selection_policy.py`
+- Updated `factory_runtime/agents/router_agent.py`
 
 ## Validation / evidence
-
-- `.venv/bin/python ./scripts/local_ci_parity.py --level merge` format and mock tests pass.
-- Bounded target validation run locally.
+Targeted unit tests for model selection policy pass. Focused tests (`test_model_selection_policy.py`) for fitness and fallback actions successful. Full `test_regression.py` suite passed with no regressions.
+NOTE: This issue unlocks the next issue (audit/tool selection work).
 
 ## Cross-repo impact
-
-- Related repos/services impacted: None.
+None.
 
 ## Follow-ups
-
-- Further refinements to credential isolation as per ADR-019 if required.
+Unlocks the next step in model capability selection downstream.

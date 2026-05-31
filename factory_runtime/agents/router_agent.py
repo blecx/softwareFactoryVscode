@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from factory_runtime.agents.mcp_client import MCPMultiClient
 
 from factory_runtime.agents.complexity_scorer import ComplexityScorer
+from factory_runtime.agents.model_selection_policy import ModelSelectionPolicy
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -41,6 +42,9 @@ class RoutingDecision:
     similar_issues: list[dict[str, Any]] = field(default_factory=list)
     memory_adjustment: int = 0  # ±adjustment applied from memory lookup
     estimated_minutes: Optional[int] = None
+    action_required: str = "fits-selected-model"
+    is_fit: bool = True
+    fit_reason: str = "Fits selected model"
 
 
 # ---------------------------------------------------------------------------
@@ -66,9 +70,13 @@ class RouterAgent:
         self,
         mcp_client: "MCPMultiClient",
         scorer: Optional[ComplexityScorer] = None,
+        policy: Optional[ModelSelectionPolicy] = None,
     ) -> None:
         self._mcp = mcp_client
         self._scorer = scorer or ComplexityScorer()
+        self._policy = policy or ModelSelectionPolicy(
+            "configs/model-execution-profiles.json"
+        )
 
     async def route(
         self,
@@ -116,6 +124,15 @@ class RouterAgent:
         )
         tier = ComplexityScorer.model_tier(raw_score)
 
+        # Step 3.5: evaluate model fit
+        profile_name = f"github-{tier}"
+        fit_result = self._policy.evaluate(
+            profile_name=profile_name,
+            file_count=len(hinted_files),
+            domain_count=breakdown.domain_count_score + 1,  # roughly domain_count
+            violates_authority=False,  # can be extended to check authority blocks
+        )
+
         # Step 4: create task run on agent-bus
         run_result = await self._mcp.call_tool(
             "bus_create_run",
@@ -144,6 +161,9 @@ class RouterAgent:
             similar_issues=similar,
             memory_adjustment=memory_adj,
             estimated_minutes=max(5, raw_score * _MINUTES_PER_SCORE),
+            action_required=fit_result.action_required,
+            is_fit=fit_result.is_fit,
+            fit_reason=fit_result.reason,
         )
 
     # ------------------------------------------------------------------
