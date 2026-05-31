@@ -45,6 +45,12 @@ class RoutingDecision:
     action_required: str = "fits-selected-model"
     is_fit: bool = True
     fit_reason: str = "Fits selected model"
+    fallback_recommendation: list[str] = __import__("dataclasses").field(
+        default_factory=list
+    )
+    compact_tool_subset: list[str] = __import__("dataclasses").field(
+        default_factory=list
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -164,6 +170,8 @@ class RouterAgent:
             action_required=fit_result.action_required,
             is_fit=fit_result.is_fit,
             fit_reason=fit_result.reason,
+            fallback_recommendation=fit_result.fallback_recommendation,
+            compact_tool_subset=fit_result.compact_tool_subset,
         )
 
     # ------------------------------------------------------------------
