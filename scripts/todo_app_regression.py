@@ -14,7 +14,7 @@ from typing import Any
 
 SOURCE_CHECKOUT_MODE = "source-checkout"
 INSTALLED_HOST_MODE = "installed-host"
-SUPPORTED_PROVIDER = "github"
+SUPPORTED_PROVIDERS = {"github", "local"}
 SOURCE_THROWAWAY_ROOT = Path(".tmp") / "todo-regression-run"
 INSTALLED_THROWAWAY_ROOT = (
     Path(".copilot") / "softwareFactoryVscode" / ".tmp" / "todo-regression-run"
@@ -303,7 +303,7 @@ def evaluate_compatibility_case(
     response = str(case.get("response", "")).lower()
     missing: list[str] = []
 
-    if provider.lower() != SUPPORTED_PROVIDER:
+    if provider.lower() not in SUPPORTED_PROVIDERS:
         missing.append("supported provider")
     if not model or model in {"*", "your-model-name"}:
         missing.append("configured model")

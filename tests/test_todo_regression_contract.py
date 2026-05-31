@@ -204,6 +204,27 @@ def test_semantic_rubric_rejects_missing_persistence_behavior():
     assert "persistence behavior" in result.missing_checks
 
 
+def test_semantic_rubric_accepts_eligible_local_provider():
+    module = _load_todo_regression_module()
+    case = {
+        "id": "local-generic-test",
+        "provider": "local",
+        "model": "local-model-v1",
+        "response": (
+            "Create the todo app in .tmp/todo-regression-run/workspace with create, edit, "
+            "complete/incomplete, delete, empty state, and persistence after reload."
+        ),
+    }
+
+    result = module.evaluate_compatibility_case(
+        case,
+        allowed_workspace_markers=module.approved_workspace_markers(),
+    )
+
+    assert result.passed is True
+    assert not result.missing_checks
+
+
 def test_semantic_rubric_rejects_unsupported_provider():
     module = _load_todo_regression_module()
     case = {

@@ -35,6 +35,13 @@
       "model": "*",
       "template": true,
       "response": "Use only {workspace} for the throwaway run. The todo-app deliverable must include create, edit, complete/incomplete, delete, empty-state, and persistence behavior so a supported GitHub model {model} still satisfies the semantic regression contract."
+    },
+    {
+      "id": "local-generic-template",
+      "provider": "local",
+      "model": "*",
+      "template": true,
+      "response": "Use only {workspace} for the throwaway run. The todo-app deliverable must include create, edit, complete/incomplete, delete, empty-state, and persistence behavior so a supported local model {model} still satisfies the semantic regression contract."
     }
   ]
 }
