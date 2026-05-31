@@ -1,6 +1,6 @@
 ---
 name: github-access-workflow
-description: "Workflow or rule module extracted from .copilot/skills/github-access-workflow/SKILL.md"
+description: "Provides context and instructions to verify and guide GitHub SSH, GPG, and API token setup."
 ---
 
 # GitHub Access Workflow

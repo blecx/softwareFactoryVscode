@@ -235,11 +235,10 @@
     "file": ".copilot/skills/github-access-workflow/SKILL.md",
     "form": "Form B",
     "name": "github-access-workflow",
-    "description": "Workflow or rule module extracted from .copilot/skills/github-access-workflow/SKILL.md",
+    "description": "Provides context and instructions to verify and guide GitHub SSH, GPG, and API token setup.",
     "domain": "github-access-workflow",
     "authority_owner": "Unknown",
     "authority_references": [
-      ".copilot/skills/github-access-workflow/SKILL.md",
       "docs/architecture/ADR-019-GitHub-Access-Credential-Lanes.md"
     ]
   },
