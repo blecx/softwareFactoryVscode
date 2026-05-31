@@ -115,6 +115,7 @@ class OrchestratorResult:
     model_tier: str = "mini"
     tests_passed: bool = False
     error: Optional[str] = None
+    routing_audit: dict = __import__("dataclasses").field(default_factory=dict)
 
     @property
     def success(self) -> bool:
@@ -231,6 +232,12 @@ class FactoryOrchestrator:
                     complexity_score=decision.complexity_score,
                     model_tier=decision.coder_model_tier,
                     error=coder_result.error,
+                    routing_audit={
+                        "is_fit": decision.is_fit,
+                        "action_required": decision.action_required,
+                        "fallback_recommendation": decision.fallback_recommendation,
+                        "compact_tool_subset": decision.compact_tool_subset,
+                    },
                 )
 
             # ── 3. Create PR ──────────────────────────────────────────
@@ -264,6 +271,12 @@ class FactoryOrchestrator:
                 complexity_score=decision.complexity_score,
                 model_tier=decision.coder_model_tier,
                 tests_passed=coder_result.tests_passed,
+                routing_audit={
+                    "is_fit": decision.is_fit,
+                    "action_required": decision.action_required,
+                    "fallback_recommendation": decision.fallback_recommendation,
+                    "compact_tool_subset": decision.compact_tool_subset,
+                },
             )
 
     # ------------------------------------------------------------------

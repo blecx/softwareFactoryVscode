@@ -22,6 +22,12 @@ class ExecutionFitResult:
     is_fit: bool
     reason: str
     action_required: str  # "fits-selected-model", "split-issue-required", "upgrade-model-recommended", "blocked-by-authority-contract"
+    fallback_recommendation: list[str] = __import__("dataclasses").field(
+        default_factory=list
+    )
+    compact_tool_subset: list[str] = __import__("dataclasses").field(
+        default_factory=list
+    )
 
 
 class ModelSelectionPolicy:
@@ -58,6 +64,8 @@ class ModelSelectionPolicy:
                 is_fit=False,
                 reason="Execution slice violates authority contract",
                 action_required="blocked-by-authority-contract",
+                fallback_recommendation=[],
+                compact_tool_subset=[],
             )
 
         profile = self.profiles.get(profile_name)
@@ -68,11 +76,15 @@ class ModelSelectionPolicy:
                     is_fit=False,
                     reason="Exceeds ADR-018 fallback limits",
                     action_required="split-issue-required",
+                    fallback_recommendation=[],
+                    compact_tool_subset=[],
                 )
             return ExecutionFitResult(
                 is_fit=True,
                 reason="Fits fallback limits",
                 action_required="fits-selected-model",
+                fallback_recommendation=[],
+                compact_tool_subset=[],
             )
 
         if file_count > profile.file_cap or domain_count > profile.domain_cap:
@@ -81,15 +93,21 @@ class ModelSelectionPolicy:
                     is_fit=False,
                     reason=f"Exceeds cap for {profile_name}, upgrade recommended",
                     action_required="upgrade-model-recommended",
+                    fallback_recommendation=profile.fallback_actions,
+                    compact_tool_subset=profile.tool_subset,
                 )
             return ExecutionFitResult(
                 is_fit=False,
                 reason=f"Exceeds cap for {profile_name}",
                 action_required="split-issue-required",
+                fallback_recommendation=profile.fallback_actions,
+                compact_tool_subset=profile.tool_subset,
             )
 
         return ExecutionFitResult(
             is_fit=True,
             reason="Fits selected model",
             action_required="fits-selected-model",
+            fallback_recommendation=profile.fallback_actions,
+            compact_tool_subset=profile.tool_subset,
         )

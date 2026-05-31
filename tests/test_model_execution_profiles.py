@@ -1,7 +1,8 @@
 import json
+from pathlib import Path
+
 import jsonschema
 import pytest
-from pathlib import Path
 
 
 def test_model_execution_profiles():
