@@ -196,12 +196,17 @@ class LLMClientFactory:
     _shared_request_throttles: Dict[
         tuple[str, str, float, float], _LLMRequestThrottle
     ] = {}
+    _llm_provider_registry = {}
     _default_role_models = {
         # gpt-5.2 does not exist on GitHub Models; use gpt-4o as the capable default.
         "planning": "openai/gpt-4o",
         "coding": "openai/gpt-4o-mini",
         "review": "openai/gpt-4o-mini",
     }
+
+    @classmethod
+    def register_provider(cls, provider: str, factory_method):
+        cls._llm_provider_registry[provider.lower()] = factory_method
 
     @staticmethod
     def _parse_positive_float(value: str, fallback: float) -> float:
@@ -378,6 +383,53 @@ class LLMClientFactory:
                 "review": LLMClientFactory._default_role_models["review"],
             }
 
+    @classmethod
+    def _create_github_provider(
+        cls,
+        api_key: str,
+        role: str,
+        role_config: dict,
+        lane: str,
+        requester_class: str | None,
+        run_id: str | None,
+        parent_run_id: str | None,
+        requester_id: str | None,
+    ) -> AsyncOpenAI:
+        if cls._looks_like_placeholder(api_key):
+            if _production_runtime_mode_enabled():
+                raise ValueError(
+                    "GitHub Models credentials are required when "
+                    "FACTORY_RUNTIME_MODE=production; mock fallback is disabled. "
+                    "Set GITHUB_TOKEN, GH_TOKEN, GITHUB_PAT, or a non-placeholder api_key."
+                )
+            # Fallback to Mock LLM Gateway
+            return AsyncOpenAI(
+                base_url=os.getenv("MOCK_LLM_URL", "http://localhost:9090/v1"),
+                api_key="sk-dummy-test",
+                http_client=cls._create_rate_limited_http_client(
+                    role,
+                    role_config=role_config,
+                    lane=lane,
+                    requester_class=requester_class,
+                    run_id=run_id,
+                    parent_run_id=parent_run_id,
+                    requester_id=requester_id,
+                ),
+            )
+        return AsyncOpenAI(
+            base_url="https://models.github.ai/inference",
+            api_key=api_key,
+            http_client=cls._create_rate_limited_http_client(
+                role,
+                role_config=role_config,
+                lane=lane,
+                requester_class=requester_class,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                requester_id=requester_id,
+            ),
+        )
+
     @staticmethod
     def get_startup_report() -> dict:
         """Safe, non-secret model/config info suitable for printing at startup."""
@@ -485,46 +537,26 @@ class LLMClientFactory:
             api_key = override_api_key
         # -------------------------------
 
-        # GitHub Models
-        if provider == "github" or "models.github.ai" in base_url:
-            if LLMClientFactory._looks_like_placeholder(api_key):
-                if _production_runtime_mode_enabled():
-                    raise ValueError(
-                        "GitHub Models credentials are required when "
-                        "FACTORY_RUNTIME_MODE=production; mock fallback is disabled. "
-                        "Set GITHUB_TOKEN, GH_TOKEN, GITHUB_PAT, or a non-placeholder api_key."
-                    )
-                # Fallback to Mock LLM Gateway
-                return AsyncOpenAI(
-                    base_url=os.getenv("MOCK_LLM_URL", "http://localhost:9090/v1"),
-                    api_key="sk-dummy-test",
-                    http_client=LLMClientFactory._create_rate_limited_http_client(
-                        role,
-                        role_config=role_config,
-                        lane=lane,
-                        requester_class=requester_class,
-                        run_id=run_id,
-                        parent_run_id=parent_run_id,
-                        requester_id=requester_id,
-                    ),
-                )
-            return AsyncOpenAI(
-                base_url="https://models.github.ai/inference",
+        if not provider and "models.github.ai" in base_url:
+            provider = "github"
+        provider = provider or "github"
+
+        if provider in LLMClientFactory._llm_provider_registry:
+            return LLMClientFactory._llm_provider_registry[provider](
                 api_key=api_key,
-                http_client=LLMClientFactory._create_rate_limited_http_client(
-                    role,
-                    role_config=role_config,
-                    lane=lane,
-                    requester_class=requester_class,
-                    run_id=run_id,
-                    parent_run_id=parent_run_id,
-                    requester_id=requester_id,
-                ),
+                role=role,
+                role_config=role_config,
+                lane=lane,
+                requester_class=requester_class,
+                run_id=run_id,
+                parent_run_id=parent_run_id,
+                requester_id=requester_id,
             )
 
         # Everything else is intentionally unsupported in this repo.
         raise ValueError(
-            "Unsupported LLM provider/config. This project only supports GitHub Models (provider=github)."
+            f"Unsupported LLM provider/config: '{provider}'. "
+            "This project only supports registered providers (default: github)."
         )
 
     @staticmethod
@@ -590,3 +622,6 @@ class LLMClientFactory:
             pass
 
         return LLMClientFactory._default_role_models["planning"]
+
+
+LLMClientFactory.register_provider("github", LLMClientFactory._create_github_provider)
