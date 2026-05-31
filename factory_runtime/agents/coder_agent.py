@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from factory_runtime.agents.context_compaction import compact_context_packet
+from factory_runtime.agents.model_selection_policy import ModelSelectionPolicy
 from factory_runtime.text_write_normalization import normalize_repo_text_for_write
 
 if TYPE_CHECKING:
@@ -133,6 +134,15 @@ class CoderAgent:
         self._model = _MODEL_MAP.get(model_tier, "gpt-4o-mini")
         self._llm = llm_client  # set lazily if None
         self._root = workspace_root or Path.cwd()
+
+        policy = ModelSelectionPolicy(
+            profiles_path=str(self._root / "configs" / "model-execution-profiles.json")
+        )
+        profile_name = (
+            f"github-{model_tier}" if model_tier in ("mini", "full") else "github-mini"
+        )
+        profile = policy.profiles.get(profile_name)
+        self._max_context_chars = (profile.context_budget * 4) if profile else 16000
         self._messages: list[dict[str, str]] = []
 
     # ------------------------------------------------------------------
@@ -292,7 +302,9 @@ class CoderAgent:
 
     async def _generate_plan(self, packet: dict[str, Any]) -> dict[str, Any]:
         """Ask LLM to produce an implementation plan from the context packet."""
-        compact_packet = compact_context_packet(packet)
+        compact_packet = compact_context_packet(
+            packet, max_chars=self._max_context_chars
+        )
         prompt = (
             f"Issue #{packet['run']['issue_number']} in {packet['run']['repo']}.\n\n"
             f"Context packet:\n```json\n{compact_packet}\n```\n\n"
@@ -312,7 +324,9 @@ class CoderAgent:
     async def _implement(self, run_id: str, packet: dict[str, Any]) -> list[str]:
         """Ask LLM to produce file edits and apply them. Returns list of changed paths."""
         feedback = (packet.get("plan") or {}).get("feedback", "")
-        compact_packet = compact_context_packet(packet)
+        compact_packet = compact_context_packet(
+            packet, max_chars=self._max_context_chars
+        )
         prompt = (
             f"Approved context packet:\n```json\n{compact_packet}\n```\n"
             + (f"\nReviewer feedback: {feedback}\n" if feedback else "")

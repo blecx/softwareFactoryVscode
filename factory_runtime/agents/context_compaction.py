@@ -3,13 +3,13 @@ from typing import Any
 
 
 def compact_context_packet(packet: dict[str, Any], max_chars: int = 16000) -> str:
-    """Summarizes or trims a context packet to fit within a given budget."""
+    """Summarizes or trims a context packet to fit within a given budget.
+    Raises ValueError if it cannot be compacted within budget.
+    """
     raw = json.dumps(packet, indent=2)
     if len(raw) <= max_chars:
         return raw
 
-    # Strategy: trim lower-priority fields explicitly (like file contents if too large)
-    # We create a shallow copy to manipulate
     compact = dict(packet)
 
     # 1. Try removing plan feedback if any
@@ -25,16 +25,8 @@ def compact_context_packet(packet: dict[str, Any], max_chars: int = 16000) -> st
         if len(raw) <= max_chars:
             return raw
 
-    # 2. Add an explicit error if it's still too large so it gets blocked or handled
-    # But wait, issue says "summarized/trimmed or blocked before request creation"
-    # To truly truncate, we might just truncate the raw string.
-    raw = json.dumps(compact, indent=2)
-    if len(raw) > max_chars:
-        half = max_chars // 2
-        return (
-            raw[:half]
-            + "\n\n... [CONTENT TRUNCATED DUE TO CONTEXT WINDOW LIMIT] ...\n\n"
-            + raw[-half:]
-        )
-
-    return raw
+    # If it is still too large, it is out of budget bounds.
+    # Return an error to prevent context window explosion or broken JSON.
+    raise ValueError(
+        f"Context packet size ({len(raw)} chars) exceeds context budget limit of {max_chars} chars."
+    )
