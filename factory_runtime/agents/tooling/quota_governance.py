@@ -86,6 +86,7 @@ class ProviderQuotaEnvelope:
     quota_source: str
     requests_per_second_ceiling: float
     token_quota_per_minute: int | None = None
+    context_window_tokens: int | None = None
     concurrency_lease_limit: int | None = None
 
 
@@ -229,6 +230,8 @@ def build_default_quota_governance_contract(
             quota_source=policy.quota_source,
             requests_per_second_ceiling=policy.quota_ceiling_rps,
             concurrency_lease_limit=policy.concurrency_lease_limit,
+            token_quota_per_minute=policy.token_quota_per_minute,
+            context_window_tokens=policy.context_window_tokens,
         ),
         budget_hierarchy=(
             QuotaBudgetLevel(

@@ -30,6 +30,8 @@ class LLMQuotaPolicy:
     jitter_ratio: float
     max_wait_seconds: float
     rate_limit_cooldown_seconds: float
+    token_quota_per_minute: int | None = None
+    context_window_tokens: int | None = None
 
     def to_dict(self) -> dict[str, float | str]:
         return asdict(self)
@@ -191,6 +193,15 @@ def resolve_quota_policy(
         _DEFAULT_RATE_LIMIT_COOLDOWN_SECONDS,
     )
 
+    token_quota_per_minute = _parse_positive_int(
+        runtime_env.get("WORK_ISSUE_TOKEN_QUOTA_PER_MINUTE"),
+        0,
+    )
+    context_window_tokens = _parse_positive_int(
+        runtime_env.get("WORK_ISSUE_CONTEXT_WINDOW_TOKENS"),
+        0,
+    )
+
     return LLMQuotaPolicy(
         provider=normalized_provider,
         model=(model or "").strip(),
@@ -199,6 +210,8 @@ def resolve_quota_policy(
         quota_source=quota_source,
         quota_ceiling_rps=quota_ceiling_rps,
         concurrency_lease_limit=concurrency_lease_limit,
+        token_quota_per_minute=token_quota_per_minute if token_quota_per_minute > 0 else None,
+        context_window_tokens=context_window_tokens if context_window_tokens > 0 else None,
         foreground_share=foreground_share,
         reserve_share=reserve_share,
         foreground_lane_rps=foreground_lane_rps,

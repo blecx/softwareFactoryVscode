@@ -15,6 +15,11 @@ class ModelProfile:
     context_class: str
     fallback_actions: list[str]
     tool_subset: list[str]
+    prompt_budget: int = 8192
+    completion_budget: int = 2048
+    context_budget: int = 16384
+    warning_threshold: float = 0.8
+    blocking_threshold: float = 1.0
 
 
 @dataclass
@@ -50,6 +55,11 @@ class ModelSelectionPolicy:
                     context_class=v.get("context_class", "narrow"),
                     fallback_actions=v.get("fallback_actions", []),
                     tool_subset=v.get("tool_subset", []),
+                    prompt_budget=v.get("prompt_budget", 8192),
+                    completion_budget=v.get("completion_budget", 2048),
+                    context_budget=v.get("context_budget", 16384),
+                    warning_threshold=float(v.get("warning_threshold", 0.8)),
+                    blocking_threshold=float(v.get("blocking_threshold", 1.0)),
                 )
 
     def evaluate(
@@ -58,6 +68,9 @@ class ModelSelectionPolicy:
         file_count: int,
         domain_count: int,
         violates_authority: bool = False,
+        prompt_tokens: int = 0,
+        completion_tokens: int = 0,
+        context_tokens: int = 0,
     ) -> ExecutionFitResult:
         if violates_authority:
             return ExecutionFitResult(
@@ -79,6 +92,18 @@ class ModelSelectionPolicy:
                     fallback_recommendation=[],
                     compact_tool_subset=[],
                 )
+            if (
+                context_tokens > 8192
+                or prompt_tokens > 4096
+                or completion_tokens > 1024
+            ):
+                return ExecutionFitResult(
+                    is_fit=False,
+                    reason="Exceeds fallback token budget limits",
+                    action_required="split-issue-required",
+                    fallback_recommendation=[],
+                    compact_tool_subset=[],
+                )
             return ExecutionFitResult(
                 is_fit=True,
                 reason="Fits fallback limits",
@@ -87,11 +112,38 @@ class ModelSelectionPolicy:
                 compact_tool_subset=[],
             )
 
+        if context_tokens > profile.context_budget * profile.blocking_threshold:
+            return ExecutionFitResult(
+                is_fit=False,
+                reason=f"Exceeds context blocking threshold for {profile_name}",
+                action_required="split-issue-required",
+                fallback_recommendation=profile.fallback_actions,
+                compact_tool_subset=profile.tool_subset,
+            )
+
+        if prompt_tokens > profile.prompt_budget * profile.blocking_threshold:
+            return ExecutionFitResult(
+                is_fit=False,
+                reason=f"Exceeds prompt blocking threshold for {profile_name}",
+                action_required="split-issue-required",
+                fallback_recommendation=profile.fallback_actions,
+                compact_tool_subset=profile.tool_subset,
+            )
+
+        if completion_tokens > profile.completion_budget * profile.blocking_threshold:
+            return ExecutionFitResult(
+                is_fit=False,
+                reason=f"Exceeds completion blocking threshold for {profile_name}",
+                action_required="split-issue-required",
+                fallback_recommendation=profile.fallback_actions,
+                compact_tool_subset=profile.tool_subset,
+            )
+
         if file_count > profile.file_cap or domain_count > profile.domain_cap:
             if "escalate-to-full" in profile.fallback_actions:
                 return ExecutionFitResult(
                     is_fit=False,
-                    reason=f"Exceeds cap for {profile_name}, upgrade recommended",
+                    reason=f"Exceeds cap for {profile_name}, upgrade recommended\n",
                     action_required="upgrade-model-recommended",
                     fallback_recommendation=profile.fallback_actions,
                     compact_tool_subset=profile.tool_subset,
@@ -104,9 +156,21 @@ class ModelSelectionPolicy:
                 compact_tool_subset=profile.tool_subset,
             )
 
+        warnings = []
+        if context_tokens > profile.context_budget * profile.warning_threshold:
+            warnings.append("context usage nearing threshold")
+        if prompt_tokens > profile.prompt_budget * profile.warning_threshold:
+            warnings.append("prompt usage nearing threshold")
+        if completion_tokens > profile.completion_budget * profile.warning_threshold:
+            warnings.append("completion usage nearing threshold")
+
+        reason = "Fits selected model"
+        if warnings:
+            reason += " (WARNING: " + ", ".join(warnings) + ")"
+
         return ExecutionFitResult(
             is_fit=True,
-            reason="Fits selected model",
+            reason=reason,
             action_required="fits-selected-model",
             fallback_recommendation=profile.fallback_actions,
             compact_tool_subset=profile.tool_subset,
