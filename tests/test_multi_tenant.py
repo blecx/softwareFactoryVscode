@@ -327,6 +327,45 @@ def test_shared_service_extractors_require_explicit_identity_in_shared_mode(
         approval_gate_main.websocket_project_id(websocket)
 
 
+def test_agent_bus_mcp_server_catches_tenant_identity_error_and_returns_controlled_failure(
+    monkeypatch,
+):
+    monkeypatch.setenv("FACTORY_TENANCY_MODE", "shared")
+
+    agent_bus_mcp_server = _agent_bus_mcp_server()
+    ctx = _FakeMCPContext()
+
+    res_list = agent_bus_mcp_server.bus_list_pending_approval(ctx)
+    assert res_list.get("ok") is False
+    assert "requires an explicit tenant" in res_list.get("error", "")
+
+    res_create = agent_bus_mcp_server.bus_create_run(
+        issue_number=1, repo="org/repo", ctx=ctx
+    )
+    assert res_create.get("ok") is False
+    assert "requires an explicit tenant" in res_create.get("error", "")
+
+    res_set = agent_bus_mcp_server.bus_set_status(
+        run_id="run-1", status="approved", ctx=ctx
+    )
+    assert res_set.get("ok") is False
+    assert "requires an explicit tenant" in res_set.get("error", "")
+
+    res_approve = agent_bus_mcp_server.bus_approve_run(
+        run_id="run-1", feedback="", ctx=ctx
+    )
+    assert res_approve.get("ok") is False
+    assert "requires an explicit tenant" in res_approve.get("error", "")
+
+    res_read = agent_bus_mcp_server.bus_read_context_packet(run_id="run-1", ctx=ctx)
+    assert res_read.get("ok") is False
+    assert "requires an explicit tenant" in res_read.get("error", "")
+
+    res_purge = agent_bus_mcp_server.bus_purge_workspace(project_id="tenant-1", ctx=ctx)
+    assert res_purge.get("ok") is False
+    assert "requires an explicit tenant" in res_purge.get("error", "")
+
+
 def test_shared_service_extractors_accept_explicit_identity_in_shared_mode(
     monkeypatch,
 ):

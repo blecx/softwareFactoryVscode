@@ -55,6 +55,7 @@ PORT_LAYOUT: dict[str, int] = {
     "AGENT_BUS_PORT": 3031,
     "APPROVAL_GATE_PORT": 8001,
     "PORT_TUI": 9090,
+    "MOCK_LLM_PORT": 9091,
 }
 
 SHARED_SERVICE_MODE_ENV_KEY = "FACTORY_SHARED_SERVICE_MODE"
@@ -90,7 +91,7 @@ MCP_SERVER_PORT_KEYS: dict[str, str] = {
 
 RUNTIME_SERVICE_CONTRACT: dict[str, dict[str, Any]] = {
     "mock-llm-gateway": {
-        "port_key": "PORT_TUI",
+        "port_key": "MOCK_LLM_PORT",
         "health_path": "/admin/mocks",
         "require_healthy_status": True,
         "allow_http_error": False,

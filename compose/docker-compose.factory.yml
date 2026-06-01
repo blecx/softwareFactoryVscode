@@ -30,7 +30,7 @@ services:
     image: factory/mock-llm-gateway:latest
     restart: unless-stopped
     ports:
-      - "${PORT_TUI:-9090}:9090"
+      - "${MOCK_LLM_PORT:-9091}:9090"
     networks:
       - factory_net
     healthcheck:
