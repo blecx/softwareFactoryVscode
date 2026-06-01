@@ -5646,3 +5646,37 @@ def test_work_issue_split_generates_compact_execution_packet():
     assert "- **Validation First:**" in split_script
     assert "- **Expected Diff Size:**" in split_script
     assert "- **Unlocks Next Issue?:**" in split_script
+
+
+def test_missing_persistent_shell_re_anchor_rules():
+    """
+    Ensure that approved-plan execution and PR merge loops explicitly
+    require a direct persistent-shell re-anchor before queue worktree cleanup.
+    Verify that relying on child-shell cleanup logic alone is rejected.
+    """
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parent.parent
+    approved_plan_skill = (
+        repo_root
+        / ".copilot"
+        / "skills"
+        / "approved-plan-execution-workflow"
+        / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    pr_merge_skill = (
+        repo_root / ".copilot" / "skills" / "pr-merge-workflow" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+
+    assert (
+        "child-shell-only cleanup" in approved_plan_skill
+    ), "Missing child-shell cleanup disclaimer in approved-plan skill."
+    assert (
+        "child-shell-only cleanup" in pr_merge_skill
+    ), "Missing child-shell cleanup disclaimer in pr-merge skill."
+    assert (
+        "direct persistent-shell re-anchor" in approved_plan_skill
+    ), "Missing direct persistent-shell re-anchor requirement in approved-plan skill."
+    assert (
+        "direct persistent-shell re-anchor" in pr_merge_skill
+    ), "Missing direct persistent-shell re-anchor requirement in pr-merge skill."
