@@ -64,7 +64,7 @@ def build_catalog() -> RuntimeCatalog:
             profiles=(RuntimeProfileName.WORKSPACE_DEFAULT,),
             readiness=_http_semantics("/admin/mocks"),
             repair_policy_class=RepairPolicyClass.CORE,
-            port_env_key="PORT_TUI",
+            port_env_key="MOCK_LLM_PORT",
         ),
         "mcp-memory": ServiceCatalogEntry(
             name="mcp-memory",

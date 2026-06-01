@@ -57,7 +57,7 @@ def build_full_service_inventory(
         "mock-llm-gateway": {
             "status": "Up 10 seconds (healthy)",
             "image": "factory/mock-llm-gateway:latest",
-            "published_ports": [config.ports["PORT_TUI"]],
+            "published_ports": [config.ports["MOCK_LLM_PORT"]],
         },
         "mcp-memory": {
             "status": "Up 10 seconds (healthy)",
