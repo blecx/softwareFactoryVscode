@@ -137,9 +137,7 @@ def bus_set_status(run_id: str, status: str, ctx: Context = None) -> dict[str, A
     except TenantIdentityError as exc:
         return {"ok": False, "error": str(exc)}
     try:
-        _bus.set_status(
-            run_id=run_id, status=status, project_id=project_id
-        )
+        _bus.set_status(run_id=run_id, status=status, project_id=project_id)
     except InvalidStatusTransitionError as exc:
         raise ValueError(str(exc)) from exc
     return {"ok": True}
@@ -224,9 +222,7 @@ def bus_approve_run(
     except TenantIdentityError as exc:
         return {"ok": False, "error": str(exc)}
     try:
-        _bus.approve_run(
-            run_id=run_id, feedback=feedback, project_id=project_id
-        )
+        _bus.approve_run(run_id=run_id, feedback=feedback, project_id=project_id)
     except InvalidStatusTransitionError as exc:
         raise ValueError(str(exc)) from exc
     return {"ok": True}
