@@ -1,23 +1,28 @@
 # Interruption Recovery Workflow
 
 ## Objective
+
 Provide a deterministic resume path after a Copilot chat interruption, restart, compaction event, or operator handoff.
 
 ## When to Use
+
 - The current issue/PR workflow was interrupted and the next safe action is unclear.
 - The agent must re-anchor from repo-owned state instead of guessing from transcript fragments.
 - Runtime or MCP-sensitive work needs a fresh local service snapshot before resuming.
 
 ## Guardrails
+
 - Use `.tmp/`, never `/tmp`.
 - Treat same-issue concurrent-session collisions as blockers. If the `execution_lease_id` belongs to another session, stop and request handoff or a fresh surface.
 - Treat GitHub as the source of truth for issue state, PR state, merge state, and CI/check state.
 - Treat `./.venv/bin/python ./scripts/noninteractive_gh.py ...` as the canonical GitHub-truth helper surface when refreshing or validating checkpoint provenance.
 - Treat runtime snapshots as required when the task touched Docker, MCP, workspace activation, or lifecycle status.
 - Treat the current editor/file path as advisory only. If it points under `.tmp/queue-worktrees/*` but the top-level directory is missing repo/worktree markers such as `.git`, `docs/`, or `scripts/`, classify it as a stray partial snapshot and resume from the repository root plus `.tmp/github-issue-queue-state.md` instead.
+- Treat stale/deleted cwd shell diagnostics (`getcwd`, `shell-init`, `chdir`, or localized current-directory errors) as evidence that the terminal was left inside a removed worktree. First run a direct `cd <repo-root>` in the persistent shell, then rerun the failed command from a clean cwd; do not treat those diagnostic lines as command failure evidence after the clean rerun.
 - Keep the recovery artifact throwaway and free of secrets.
 
 ## Instructions
+
 1. Read `.tmp/github-issue-queue-state.md` first if it exists.
 2. Capture a recovery artifact under `.tmp/` with:
    - `./.venv/bin/python ./scripts/capture_recovery_snapshot.py`
@@ -36,5 +41,6 @@ Provide a deterministic resume path after a Copilot chat interruption, restart, 
 6. Do not merge, close, or move to the next issue until checkpoint state and GitHub truth agree.
 
 ## Required Artifacts
+
 - `.tmp/github-issue-queue-state.md`
 - `.tmp/interruption-recovery-snapshot.md`

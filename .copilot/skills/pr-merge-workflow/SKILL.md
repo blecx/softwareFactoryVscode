@@ -2,24 +2,29 @@
 name: pr-merge-workflow
 description: "Workflow or rule module for reviewing, validating, and merging GitHub PRs."
 ---
+
 # PR Merge Workflow (Module)
 
 ## Objective
+
 Provides context and instructions for the `pr-merge-workflow` skill module.
 
 This is the canonical PR-validation, merge, and closeout half of the
 repository's issue → PR → merge process.
 
 ## When to Use
+
 - A PR is ready or nearly ready and needs merge validation.
 - An issue number needs to be resolved through PR discovery and merge.
 - A PR has CI or merge-readiness issues that need triage before deciding
   whether to merge or hand back to implementation.
 
 ## When Not to Use
+
 - Do not use this when the current task does not involve concluding, reviewing, or merging PRs.
 
 ## Guardrails
+
 - If `prmerge` reports no PR found for the issue, treat that as a complete answer (nothing to merge). Do not prompt for a manual PR number.
 - Mandatory PR review before merge.
 - Do not fix failing code/tests in this workflow.
@@ -32,6 +37,7 @@ repository's issue → PR → merge process.
 - If the remote repository is not enforcing the documented branch protections and required status checks, treat that as an operational risk and report it explicitly.
 
 ## Instructions
+
 1. Verify PR is open, mergeable, and not draft using pager-free JSON queries:
    `./.venv/bin/python ./scripts/noninteractive_gh.py pr-view <PR_NUMBER>`
    - Prefer this helper (or another pager-free `gh ... --json ...` pattern) over watch/web flows while you are inside an automation loop.
@@ -63,9 +69,11 @@ repository's issue → PR → merge process.
 6. Comment and close linked issue (if needed).
 7. Clean transient `.tmp` files MANDATORILY using:
    `rm -f .tmp/pr-body-<issue-number>.md .tmp/issue-<issue-number>-*.md`
-8. Sync local `main` via `git checkout main && git pull` and verify final state.
+8. If merge cleanup removes an isolated queue worktree, first re-anchor the persistent shell to the repository root with a direct `cd <repo-root>` and verify `pwd`. Do not delete the active shell's current directory, and do not rely on child-shell-only cleanup such as `bash -c 'cd <repo-root> && rm -rf .tmp/queue-worktrees/<issue>'` because the parent terminal remains in the deleted path and later commands emit `getcwd`/`shell-init` noise.
+9. Sync local `main` via `git checkout main && git pull` and verify final state.
 
 ## Required Checks
+
 - Choose the correct repo and validation gate before merge.
 - Require real validation evidence in the PR body.
 - For UI/UX-affecting changes, require recorded UX authority resolution.
@@ -73,4 +81,5 @@ repository's issue → PR → merge process.
 - Ensure the repository protections described in `docs/setup-github-repository.md` are compatible with the intended merge path (required status checks, PR-before-merge, branch cleanup).
 
 ## Checkpoint Provenance
+
 `last_github_truth` must record the exact helper command(s), selector(s), and current result summary used for the latest readiness or merge claim.

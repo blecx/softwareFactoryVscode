@@ -21,7 +21,59 @@ REPO_SURFACE_MARKERS = (
     "README.md",
     "pytest.ini",
 )
+STALE_CWD_OUTPUT_MARKERS = (
+    "getcwd",
+    "Kann das aktuelle Verzeichnis nicht wiederfinden",
+    "Konnte aktuelles Arbeitsverzeichnis nicht lesen",
+    "current working directory",
+)
 CommandRunner = Callable[[Sequence[str], Path], subprocess.CompletedProcess[str]]
+
+
+def _looks_like_stale_cwd_noise(line: str) -> bool:
+    lowered = line.lower()
+    if "getcwd" in lowered and (
+        "cannot access parent" in lowered or "übergeordneten" in lowered
+    ):
+        return True
+    if "aktuelles arbeitsverzeichnis" in lowered and "nicht" in lowered:
+        return True
+    if "aktuelle verzeichnis" in lowered and "nicht" in lowered:
+        return True
+    if "current working directory" in lowered and "deleted" in lowered:
+        return True
+    return False
+
+
+def filter_stale_cwd_shell_noise(output: str) -> str:
+    """Remove shell startup noise caused by a deleted current directory.
+
+    The workflow still treats a deleted cwd as a blocker/re-anchor signal; this
+    filter only keeps rendered recovery artifacts readable when a shell prints
+    localized getcwd/chdir diagnostics before the actual command output.
+    """
+
+    lines = output.splitlines()
+    filtered = [line for line in lines if not _looks_like_stale_cwd_noise(line)]
+    if len(filtered) == len(lines):
+        return output
+    notice = (
+        "[filtered stale deleted-cwd shell noise; re-anchor the terminal with "
+        "`cd <repo-root>` before continuing]"
+    )
+    return "\n".join([notice, *filtered]).strip()
+
+
+def resolve_current_surface_path(repo_root: Path) -> Path:
+    """Return the current execution surface, even when getcwd has gone stale."""
+
+    try:
+        return Path.cwd()
+    except FileNotFoundError:
+        pwd = os.environ.get("PWD", "").strip()
+        if pwd:
+            return Path(pwd).expanduser()
+        return repo_root
 
 
 def resolve_repo_relative_path(repo_root: Path, candidate: Path) -> Path:
@@ -66,6 +118,11 @@ def inspect_execution_surface(
     queue_root = (repo_root / ".tmp" / "queue-worktrees").resolve()
 
     try:
+        relative_candidate_queue_path = candidate.relative_to(queue_root)
+    except ValueError:
+        relative_candidate_queue_path = None
+
+    try:
         relative_queue_path = surface_dir.relative_to(queue_root)
     except ValueError:
         relative_queue_path = None
@@ -85,6 +142,55 @@ def inspect_execution_surface(
         }
 
     if repo_root in surface_dir.parents:
+        queue_parts = None
+        if (
+            relative_candidate_queue_path is not None
+            and relative_candidate_queue_path.parts
+        ):
+            queue_parts = relative_candidate_queue_path.parts
+        elif relative_queue_path is not None and relative_queue_path.parts:
+            queue_parts = relative_queue_path.parts
+
+        if queue_parts:
+            queue_surface_root = queue_root / queue_parts[0]
+            has_git_dir = (queue_surface_root / ".git").exists()
+            marker_count = sum(
+                1
+                for marker in REPO_SURFACE_MARKERS
+                if (queue_surface_root / marker).exists()
+            )
+            if has_git_dir and marker_count == len(REPO_SURFACE_MARKERS):
+                return {
+                    "surface_path": str(candidate),
+                    "surface_dir": str(surface_dir),
+                    "surface_root": str(queue_surface_root),
+                    "surface_kind": "queue-worktree",
+                    "safe_to_resume": True,
+                    "note": (
+                        "The current surface is a full queue worktree rooted "
+                        "inside `.tmp/queue-worktrees/`. Resume only after "
+                        "confirming it matches the active issue recorded in "
+                        "`.tmp/github-issue-queue-state.md`."
+                    ),
+                }
+
+            return {
+                "surface_path": str(candidate),
+                "surface_dir": str(surface_dir),
+                "surface_root": str(queue_surface_root),
+                "surface_kind": "partial-queue-snapshot",
+                "safe_to_resume": False,
+                "note": (
+                    "The current surface points at a queue worktree path under "
+                    "`.tmp/queue-worktrees/` but the worktree root is missing "
+                    "the repo/worktree markers required for safe execution "
+                    "(for example `.git`, `docs/`, or `scripts/`). This "
+                    "includes deleted queue worktrees whose terminal cwd was "
+                    "not re-anchored before cleanup. Re-anchor from the "
+                    "repository root and `.tmp/github-issue-queue-state.md`."
+                ),
+            }
+
         if relative_queue_path is not None and relative_queue_path.parts:
             queue_surface_root = queue_root / relative_queue_path.parts[0]
             has_git_dir = (queue_surface_root / ".git").exists()
@@ -171,6 +277,7 @@ def render_command_result(
     result: subprocess.CompletedProcess[str],
 ) -> str:
     output = (result.stdout or "") + (result.stderr or "")
+    output = filter_stale_cwd_shell_noise(output)
     output = output.rstrip() or "(no output)"
     return (
         f"### {title}\n\n"
@@ -508,7 +615,9 @@ def main() -> int:
         active_pr=args.pr.strip() or None,
         include_runtime_status=args.include_runtime_status,
         surface_path=(
-            Path(args.surface_path).expanduser() if args.surface_path.strip() else None
+            Path(args.surface_path).expanduser()
+            if args.surface_path.strip()
+            else resolve_current_surface_path(repo_root)
         ),
     )
     print("Recovery snapshot written to .tmp/interruption-recovery-snapshot.md")

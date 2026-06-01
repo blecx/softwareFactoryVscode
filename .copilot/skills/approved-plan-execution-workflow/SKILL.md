@@ -3,9 +3,11 @@ name: approved-plan-execution-workflow
 description: "Execute a bounded approved GitHub-backed issue plan. Use when the operator says execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set."
 argument-hint: "Approved issue set, umbrella issue, or bounded queue"
 ---
+
 # Approved Plan Execution Workflow
 
 ## Objective
+
 Provides context and instructions for the `approved-plan-execution-workflow` skill module.
 
 This is the generic executor for any approved bounded GitHub-backed issue set,
@@ -13,17 +15,20 @@ including a single approved issue, an umbrella-derived child issue set, an
 explicit approved issue list, or an already-published bounded queue.
 
 ## When to Use
+
 - A user says execute the plan, continue the plan, run the approved queue, work through the approved backlog, or finish the approved issue set.
 - A finite GitHub-backed issue set, umbrella issue, or already-published queue should be executed end-to-end.
 - The operator wants automatic continuation across slices until the bounded set is complete or a true blocker appears.
 
 ## When Not to Use
+
 - The task is only one issue-to-PR slice; use `.copilot/skills/resolve-issue-workflow/SKILL.md` instead.
 - The task is only to create issues; use `.copilot/skills/issue-creation-workflow/SKILL.md`.
 - More than one plausible plan or issue set exists and the operator has not clarified which one is approved.
 - The requested loop would exceed the explicitly approved issue set.
 
 ## Required Sources
+
 - `.copilot/skills/a2a-communication/SKILL.md`
 - `.copilot/skills/resolve-issue-workflow/SKILL.md`
 - `.copilot/skills/pr-merge-workflow/SKILL.md`
@@ -36,6 +41,7 @@ explicit approved issue list, or an already-published bounded queue.
 - `docs/architecture/ADR-006-Local-CI-Parity-Prechecks.md`
 
 ## Guardrails
+
 - Respect small-model boundaries (ADR-018): Prefer 1-3 target files, max 5. One domain focus. 150-250 lines diff budget. If these limits are exceeded, stop and split the issue.
 - Require narrowest local validation to pass before running full local CI-equivalent validation.
 - Require handoffs/continue actions to observe whether the previous step explicitly unblocked a subsequent linked issue.
@@ -55,13 +61,17 @@ explicit approved issue list, or an already-published bounded queue.
 - Prefer `./.venv/bin/python` for repo Python execution; when a justified fallback is necessary, use explicit `python3`, never bare `python`.
 - Require explicit success/failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence or ambiguous logs.
 - If command output, parser behavior, or terminal state is ambiguous, stop and report the ambiguity instead of continuing on guessed state.
+- Treat stale/deleted terminal cwd diagnostics (for example `getcwd`, `shell-init`, or localized `Kann das aktuelle Verzeichnis nicht wiederfinden` / `Konnte aktuelles Arbeitsverzeichnis nicht lesen`) as a terminal-state blocker, not as GitHub or validation output. Re-anchor the persistent shell with a direct `cd <repo-root>` command (not a nested `bash -c 'cd ...'`) before rerunning the command, and filter those lines out of status narration once the rerun is clean.
+- Before deleting or removing any `.tmp/queue-worktrees/<issue>` worktree, first move the persistent terminal to the repository root with a direct `cd /path/to/repo` and verify `pwd`. Never remove a queue worktree while the controlling terminal's cwd is inside that worktree or via a child-shell-only `bash -c 'cd <repo-root> && rm -rf ...'` cleanup.
 - Use `.tmp/`, never `/tmp`.
 - Never claim completion without merged-PR evidence and issue-state confirmation on GitHub.
 
 ## Role Contract
+
 **approved plan execution wrapper** — Manages a bounded, explicitly approved, GitHub-backed issue set end-to-end. This skill owns plan-source resolution, ordering, stop conditions, and repetition only. The single source of truth for issue-to-merge mechanics remains the canonical `resolve-issue` → `pr-merge` slice path.
 
 ## Plan Resolution Rules
+
 1. Resolve the approved plan from one of these sources only:
    - an explicit issue list provided by the operator;
    - an umbrella issue whose child issue set is explicit on GitHub;
@@ -72,6 +82,7 @@ explicit approved issue list, or an already-published bounded queue.
 5. Never continue beyond the finite approved issue set named by the operator.
 
 ## Loop Bounds and Stop Conditions
+
 - **Batch Size**: Processes one issue at a time internally (One Issue = One PR = One Merge), but keeps moving across the approved bounded set without re-asking between slices.
 - **Automatic Continuation**: Treat the operator request as approval for the full bounded issue set, not just the first slice.
 - **Error Halt**: Stop immediately on CI failures that are not yet fixed, merge conflicts, blocked PRs, template violations, missing validation evidence, workflow ambiguity, or architecture conflicts.
@@ -85,6 +96,7 @@ explicit approved issue list, or an already-published bounded queue.
 - **No Trial-and-Error Churn**: After one failed hypothesis, gather fresh evidence before applying another code change. Do not use trial-and-error churn as a repair strategy, and do not make a second repair change without new evidence.
 
 ## Delegation Boundaries
+
 - **Implementation**: MUST defer to `.copilot/skills/resolve-issue-workflow/SKILL.md`.
 - **Merge**: MUST defer to `.copilot/skills/pr-merge-workflow/SKILL.md`.
 - **Recovery**: MUST use `.copilot/skills/interruption-recovery-workflow/SKILL.md` after interruption, compaction, timeout, or continuity loss.
@@ -94,6 +106,7 @@ explicit approved issue list, or an already-published bounded queue.
 - **Legacy loops**: DO NOT use legacy shell/Python workflow loops.
 
 ## Execution Procedure
+
 1. Re-anchor from GitHub truth and `.tmp/github-issue-queue-state.md`.
 2. Resolve the bounded approved issue set.
 3. Publish the remaining queue order and identify the active issue.
@@ -103,9 +116,11 @@ explicit approved issue list, or an already-published bounded queue.
 7. Poll GitHub checks non-interactively using a bounded wait window; if the result is `pending-timeout`, stop and report the blocker instead of spinning.
 8. If checks fail, or if fresh GitHub truth shows a PR head-branch mismatch against the local/checkpoint branch provenance, inspect the exact metadata, return to the active issue through the canonical resolve workflow, reproduce the cheapest local failing gate, fix the evidenced root cause, rerun the narrow prechecks, and retry wider validation only after those pass.
 9. After merge, verify GitHub issue closure and queue checkpoint evidence, then advance automatically to the next approved issue.
-10. If interrupted, capture `.tmp/interruption-recovery-snapshot.md`, re-anchor, and resume from GitHub truth instead of guessing.
+10. Before any per-issue cleanup that removes a queue worktree, re-anchor the persistent shell to the repository root with a direct `cd`, verify `pwd`, then remove the inactive worktree from outside that path.
+11. If interrupted, capture `.tmp/interruption-recovery-snapshot.md`, re-anchor, and resume from GitHub truth instead of guessing.
 
 ## Orchestration Reporting
+
 Use this reporting template while the loop is active:
 
 ```markdown
@@ -119,6 +134,7 @@ Use this reporting template while the loop is active:
 ```
 
 ## Output Contract
+
 Return:
 
 - approved queue order,

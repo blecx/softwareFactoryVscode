@@ -468,6 +468,9 @@ def test_throwaway_runtime_uses_non_default_port_block_and_workspace_urls(
     target_repo = tmp_path / "throwaway-target"
     registry_path = tmp_path / "registry.json"
 
+    seed_dir = tmp_path / "seed"
+    seed_dir.mkdir(parents=True, exist_ok=True)
+
     seeded_registry = {
         "version": 1,
         "active_workspace": "",
@@ -624,6 +627,9 @@ def test_throwaway_runtime_strict_tenant_mode_blocks_cross_tenant_approval_leaks
 
     target_repo = tmp_path / "throwaway-target"
     registry_path = tmp_path / "registry.json"
+
+    seed_dir = tmp_path / "seed"
+    seed_dir.mkdir(parents=True, exist_ok=True)
 
     seeded_registry = {
         "version": 1,
@@ -898,6 +904,9 @@ def test_throwaway_runtime_activate_switch_back_keeps_one_active_workspace(
     target_repo_b = tmp_path / "throwaway-target-b"
     registry_path = tmp_path / "registry.json"
 
+    seed_dir = tmp_path / "seed"
+    seed_dir.mkdir(parents=True, exist_ok=True)
+
     env = os.environ.copy()
     env["SOFTWARE_FACTORY_REGISTRY_PATH"] = str(registry_path)
 
@@ -1113,6 +1122,9 @@ def test_throwaway_runtime_stop_cleanup_retains_images_and_supports_restart(
     target_repo = tmp_path / "throwaway-target"
     registry_path = tmp_path / "registry.json"
 
+    seed_dir = tmp_path / "seed"
+    seed_dir.mkdir(parents=True, exist_ok=True)
+
     env = os.environ.copy()
     env["SOFTWARE_FACTORY_REGISTRY_PATH"] = str(registry_path)
 
@@ -1265,6 +1277,9 @@ def test_throwaway_runtime_backup_restore_roundtrip_recovers_state_and_runtime_c
 
     target_repo = tmp_path / "throwaway-target"
     registry_path = tmp_path / "registry.json"
+
+    seed_dir = tmp_path / "seed"
+    seed_dir.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
     env["SOFTWARE_FACTORY_REGISTRY_PATH"] = str(registry_path)

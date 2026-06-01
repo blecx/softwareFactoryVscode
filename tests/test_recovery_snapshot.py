@@ -144,6 +144,37 @@ def test_inspect_execution_surface_rejects_partial_queue_snapshot(tmp_path):
     assert ".tmp/github-issue-queue-state.md" in assessment["note"]
 
 
+def test_inspect_execution_surface_rejects_deleted_queue_worktree_root(tmp_path):
+    module = _load_recovery_module()
+    repo_root = tmp_path / "repo"
+    queue_root = repo_root / ".tmp" / "queue-worktrees"
+    queue_root.mkdir(parents=True)
+    deleted_worktree = queue_root / "issue-639"
+
+    assessment = module.inspect_execution_surface(repo_root, deleted_worktree)
+
+    assert assessment["surface_kind"] == "partial-queue-snapshot"
+    assert assessment["safe_to_resume"] is False
+    assert "deleted queue worktrees" in assessment["note"]
+
+
+def test_filter_stale_cwd_shell_noise_keeps_actionable_output():
+    module = _load_recovery_module()
+    noisy_output = "\n".join(
+        [
+            "shell-init: Kann das aktuelle Verzeichnis nicht wiederfinden: getcwd: Kann auf die übergeordneten Verzeichnisse nicht zugreifen.: Datei oder Verzeichnis nicht gefunden",
+            "chdir: Kann das aktuelle Verzeichnis nicht wiederfinden: getcwd: Kann auf die übergeordneten Verzeichnisse nicht zugreifen.: Datei oder Verzeichnis nicht gefunden",
+            '{"state":"OPEN","number":653}',
+        ]
+    )
+
+    filtered = module.filter_stale_cwd_shell_noise(noisy_output)
+
+    assert "getcwd" not in filtered
+    assert "filtered stale deleted-cwd shell noise" in filtered
+    assert '{"state":"OPEN","number":653}' in filtered
+
+
 def test_capture_recovery_snapshot_warns_about_partial_queue_snapshot(tmp_path):
     module = _load_recovery_module()
     repo_root = tmp_path / "repo"
