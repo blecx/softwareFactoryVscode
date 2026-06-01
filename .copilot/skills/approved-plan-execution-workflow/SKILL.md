@@ -56,6 +56,7 @@ explicit approved issue list, or an already-published bounded queue.
 - Require explicit success/failure evidence from exit status, structured output, validated artifacts, or exact GitHub metadata. Do not infer success from silence or ambiguous logs.
 - If command output, parser behavior, or terminal state is ambiguous, stop and report the ambiguity instead of continuing on guessed state.
 - Use `.tmp/`, never `/tmp`.
+- When cleaning up `.tmp/queue-worktrees/<issue>`, you MUST require a direct persistent-shell re-anchor (e.g. `cd <repo-root> && pwd`) before removal. A child-shell-only cleanup (like `bash -c 'cd <repo> && rm -rf <worktree>'`) is explicitly insufficient.
 - Never claim completion without merged-PR evidence and issue-state confirmation on GitHub.
 
 ## Role Contract
