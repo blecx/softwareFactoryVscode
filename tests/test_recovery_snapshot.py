@@ -98,6 +98,7 @@ def test_capture_recovery_snapshot_writes_required_sections(tmp_path):
         checkpoint_path=checkpoint_path,
         output_path=output_path,
         include_runtime_status=True,
+        surface_path=repo_root,
         runner=fake_runner,
         generated_at="2026-04-19T20:40:00Z",
     )
