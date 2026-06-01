@@ -201,17 +201,50 @@ def run_command(command: Sequence[str], cwd: Path) -> subprocess.CompletedProces
     )
 
 
+def filter_stale_cwd_noise(output: str) -> tuple[str, bool]:
+    """
+    Separate stale-cwd shell diagnostics from real command output.
+    Returns (filtered_output, noise_detected).
+    """
+    noise_markers = {
+        "shell-init",
+        "getcwd",
+        "chdir",
+        "Konnte aktuelles",
+        "Arbeitsverzeichnis nicht",
+        "Kann das aktuelle Verzeichnis nicht wiederfinden",
+        "cannot access parent directories",
+    }
+    lines = output.splitlines()
+    filtered_lines = []
+    noise_detected = False
+
+    for line in lines:
+        if any(marker in line for marker in noise_markers):
+            noise_detected = True
+        else:
+            filtered_lines.append(line)
+
+    return "\n".join(filtered_lines), noise_detected
+
+
 def render_command_result(
     title: str,
     command: Sequence[str],
     result: subprocess.CompletedProcess[str],
 ) -> str:
     output = (result.stdout or "") + (result.stderr or "")
+    output, noise_detected = filter_stale_cwd_noise(output)
     output = output.rstrip() or "(no output)"
+
+    warning = ""
+    if noise_detected:
+        warning = "\n> ⚠️ **Warning**: Stale-cwd shell diagnostics were detected and filtered.\n"
+
     return (
         f"### {title}\n\n"
         f"- Command: `{shlex.join(command)}`\n"
-        f"- Exit code: {result.returncode}\n\n"
+        f"- Exit code: {result.returncode}\n{warning}\n"
         f"```text\n{output}\n```\n"
     )
 

@@ -50,13 +50,31 @@ def run_gh_json(args: Sequence[str]) -> Any:
         check=False,
         env=build_noninteractive_env(),
     )
+
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+
+    # Try to filter noise out if the raw stdout has issues.
+    raw_lines = stdout.splitlines()
+    filtered_raw = [
+        l
+        for l in raw_lines
+        if not (
+            "shell-init: error retrieving current directory" in l
+            or "cannot access" in l
+            or "Verzeichnis" in l
+            or "getcwd" in l
+        )
+    ]
+    raw = "\n".join(filtered_raw).strip()
+
     if result.returncode != 0:
-        output = ((result.stderr or "") + "\n" + (result.stdout or "")).strip()
+        # Re-attach stderr that was ignored for json body
+        output = (stderr + "\n" + raw).strip()
         raise RuntimeError(
             output or f"gh command failed with exit code {result.returncode}"
         )
 
-    raw = (result.stdout or "").strip()
     return json.loads(raw) if raw else None
 
 
