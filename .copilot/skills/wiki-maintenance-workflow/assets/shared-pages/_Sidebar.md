@@ -1,5 +1,3 @@
-# Sidebar template
-
 ## Start here
 - [[Home]]
 - [[primary route]]

@@ -1,5 +1,3 @@
-# [wiki home title]
-
 > **Projection note:** This page is a reader-facing projection of canonical host-repository docs.
 >
 > **Canonical source:** `docs/README.md` or another host-defined source.

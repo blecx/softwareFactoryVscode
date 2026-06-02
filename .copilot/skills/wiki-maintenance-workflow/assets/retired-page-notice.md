@@ -1,5 +1,3 @@
-# [retired wiki page title]
-
 > **Retired page:** This wiki page is no longer maintained.
 >
 > **Use instead:** `replacement wiki page or canonical source doc`.
