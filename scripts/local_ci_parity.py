@@ -1835,6 +1835,44 @@ def _legacy_shared_step_name(step: ValidationStepReport) -> str:
     return step.summary
 
 
+def _extract_docker_diagnostic(step) -> str | None:
+    import re
+
+    from factory_runtime.secret_safety import redact_secret_text
+
+    text = (step.stdout or "") + "\n" + (step.stderr or "")
+    match = re.search(
+        r"container\s+[\"']?([-a-zA-Z0-9_]+)[\"']?\s+is unhealthy",
+        text,
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+
+    container_name = match.group(1)
+
+    try:
+        import subprocess
+
+        result = subprocess.run(
+            ["docker", "logs", "--tail", "20", container_name],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        logs = (result.stdout or "") + "\n" + (result.stderr or "")
+        logs = redact_secret_text(logs).strip()
+        if not logs:
+            return f"Container `{container_name}` is unhealthy, but no logs were available."
+
+        return f"Container `{container_name}` is unhealthy. Recent logs:\n```text\n{logs}\n```"
+    except Exception as exc:
+        return (
+            f"Container `{container_name}` is unhealthy. (Failed to fetch logs: {exc})"
+        )
+
+
 def _shared_engine_findings_from_report(
     report: ValidationRunReport,
     *,
@@ -1854,12 +1892,17 @@ def _shared_engine_findings_from_report(
         terminal_cause = (
             bundle_report.terminal_cause or step.terminal_cause or "unknown"
         )
-        return (
+        summary = (
             f"Bundle `{bundle_report.bundle_id}` ended with `{bundle_report.status}` "
             f"after {bundle_report.elapsed_seconds:.3f}s against the "
             f"{bundle_report.watchdog_budget_minutes}-minute watchdog during step "
             f"`{step.step_id}` (cause: `{terminal_cause}`). {base_summary}"
         )
+        if "docker" in step.step_id or step.step_id == "docker-runtime-proofs":
+            diagnostic = _extract_docker_diagnostic(step)
+            if diagnostic:
+                summary += f"\n\nDocker Diagnostics:\n{diagnostic}"
+        return summary
 
     for bundle_report in report.bundle_reports:
         terminal_steps = tuple(

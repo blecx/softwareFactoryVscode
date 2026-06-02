@@ -595,14 +595,16 @@ def test_startup_report_exposes_request_quota_policy(monkeypatch) -> None:
         == "github-openai-standard"
     )
 
+
 def test_resolve_quota_policy_tokens():
     env = {
         "WORK_ISSUE_TOKEN_QUOTA_PER_MINUTE": "100000",
-        "WORK_ISSUE_CONTEXT_WINDOW_TOKENS": "128000"
+        "WORK_ISSUE_CONTEXT_WINDOW_TOKENS": "128000",
     }
     policy = resolve_quota_policy(provider="generic", env=env)
     assert policy.token_quota_per_minute == 100000
     assert policy.context_window_tokens == 128000
+
 
 def test_resolve_quota_policy_tokens_empty():
     policy = resolve_quota_policy(provider="generic", env={})

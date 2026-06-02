@@ -1,5 +1,10 @@
 import pytest
-from factory_runtime.agents.model_selection_policy import ModelSelectionPolicy, ModelProfile
+
+from factory_runtime.agents.model_selection_policy import (
+    ModelProfile,
+    ModelSelectionPolicy,
+)
+
 
 def test_token_budget_blocking_threshold():
     policy = ModelSelectionPolicy()
@@ -17,45 +22,60 @@ def test_token_budget_blocking_threshold():
         warning_threshold=0.8,
         blocking_threshold=1.0,
     )
-    
+
     # Under limits
-    res = policy.evaluate("tester", 1, 1, prompt_tokens=50, completion_tokens=50, context_tokens=80)
+    res = policy.evaluate(
+        "tester", 1, 1, prompt_tokens=50, completion_tokens=50, context_tokens=80
+    )
     assert res.is_fit is True
     assert "WARNING" not in res.reason
 
     # Warning for prompt
-    res = policy.evaluate("tester", 1, 1, prompt_tokens=81, completion_tokens=50, context_tokens=80)
+    res = policy.evaluate(
+        "tester", 1, 1, prompt_tokens=81, completion_tokens=50, context_tokens=80
+    )
     assert res.is_fit is True
     assert "WARNING: prompt usage nearing threshold" in res.reason
 
     # Warning for completion
-    res = policy.evaluate("tester", 1, 1, prompt_tokens=50, completion_tokens=85, context_tokens=80)
+    res = policy.evaluate(
+        "tester", 1, 1, prompt_tokens=50, completion_tokens=85, context_tokens=80
+    )
     assert res.is_fit is True
     assert "WARNING: completion usage nearing threshold" in res.reason
 
     # Warning for context
-    res = policy.evaluate("tester", 1, 1, prompt_tokens=50, completion_tokens=50, context_tokens=90)
+    res = policy.evaluate(
+        "tester", 1, 1, prompt_tokens=50, completion_tokens=50, context_tokens=90
+    )
     assert res.is_fit is True
     assert "WARNING: context usage nearing threshold" in res.reason
 
     # Blocked by prompt
-    res = policy.evaluate("tester", 1, 1, prompt_tokens=105, completion_tokens=50, context_tokens=80)
+    res = policy.evaluate(
+        "tester", 1, 1, prompt_tokens=105, completion_tokens=50, context_tokens=80
+    )
     assert res.is_fit is False
     assert "Exceeds prompt blocking threshold" in res.reason
 
     # Blocked by completion
-    res = policy.evaluate("tester", 1, 1, prompt_tokens=50, completion_tokens=105, context_tokens=80)
+    res = policy.evaluate(
+        "tester", 1, 1, prompt_tokens=50, completion_tokens=105, context_tokens=80
+    )
     assert res.is_fit is False
     assert "Exceeds completion blocking threshold" in res.reason
 
     # Blocked by context
-    res = policy.evaluate("tester", 1, 1, prompt_tokens=50, completion_tokens=50, context_tokens=105)
+    res = policy.evaluate(
+        "tester", 1, 1, prompt_tokens=50, completion_tokens=50, context_tokens=105
+    )
     assert res.is_fit is False
     assert "Exceeds context blocking threshold" in res.reason
 
+
 def test_fallback_limits():
     policy = ModelSelectionPolicy()
-    
+
     # Over fallback prompt
     res = policy.evaluate("unknown", 1, 1, prompt_tokens=5000)
     assert res.is_fit is False
@@ -68,4 +88,3 @@ def test_fallback_limits():
     res = policy.evaluate("unknown", 1, 1, context_tokens=9000)
     assert res.is_fit is False
     assert "Exceeds fallback token budget limits" in res.reason
-

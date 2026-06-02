@@ -5648,6 +5648,38 @@ def test_work_issue_split_generates_compact_execution_packet():
     assert "- **Unlocks Next Issue?:**" in split_script
 
 
+def test_extract_docker_diagnostic_returns_none_if_no_unhealthy_text():
+    class MockStep:
+        stdout = "just some logs"
+        stderr = ""
+
+    from scripts import local_ci_parity
+
+    assert local_ci_parity._extract_docker_diagnostic(MockStep()) is None
+
+
+def test_extract_docker_diagnostic_returns_formatted_logs(monkeypatch):
+    class MockStep:
+        stdout = "container test-app is unhealthy"
+        stderr = ""
+
+    class MockResult:
+        stdout = "log line 1\nGITHUB_TOKEN=your_token_here"
+        stderr = ""
+
+    import subprocess
+    from scripts import local_ci_parity
+
+    def mock_run(*args, **kwargs):
+        return MockResult()
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    result = local_ci_parity._extract_docker_diagnostic(MockStep())
+    assert "Container `test-app` is unhealthy" in result
+    assert "log line 1" in result
+    assert "[REDACTED]" in result
+
+
 def test_missing_persistent_shell_re_anchor_rules():
     """
     Ensure that approved-plan execution and PR merge loops explicitly

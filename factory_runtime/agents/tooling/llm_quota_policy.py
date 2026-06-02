@@ -210,8 +210,12 @@ def resolve_quota_policy(
         quota_source=quota_source,
         quota_ceiling_rps=quota_ceiling_rps,
         concurrency_lease_limit=concurrency_lease_limit,
-        token_quota_per_minute=token_quota_per_minute if token_quota_per_minute > 0 else None,
-        context_window_tokens=context_window_tokens if context_window_tokens > 0 else None,
+        token_quota_per_minute=(
+            token_quota_per_minute if token_quota_per_minute > 0 else None
+        ),
+        context_window_tokens=(
+            context_window_tokens if context_window_tokens > 0 else None
+        ),
         foreground_share=foreground_share,
         reserve_share=reserve_share,
         foreground_lane_rps=foreground_lane_rps,
