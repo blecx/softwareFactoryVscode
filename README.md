@@ -41,9 +41,6 @@ To use the Software Factory, you need the following:
 - A **GitHub account with GitHub Copilot access** (paid plan or Copilot Free) if you want chat, inline suggestions, or agents enabled.
 - _(Optional)_ The **GitHub Pull Requests and Issues** extension if you want GitHub PR/issue UI inside VS Code. It is not required for Copilot chat, inline suggestions, or agents.
 
-**GitHub Access & Credentials:**
-You must configure your local environment for SSH transport, commit signing, and fallback API authentication before interacting with the repository. See the [GitHub Access Runbook](docs/ops/GITHUB-ACCESS.md) ([ADR-019](docs/architecture/ADR-019-GitHub-Access-Credential-Lanes.md)) for the required setup.
-
 **Configuring Copilot for the Factory:**
 
 - **VS Code `1.116+`** — GitHub Copilot is built in. Open the Copilot status item, choose `Use AI Features`, and sign in.
