@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import re
 from pathlib import Path
 
 from factory_runtime.agents.validation_policy import (
@@ -52,3 +54,40 @@ def test_validation_policy_contract_doc_identifies_authority_and_lock_suite() ->
     assert "VALIDATION-POLICY-CONTRACT.md" in guardrails
     assert "changed-surface selection contract" in guardrails
     assert "bounded-runtime metadata" in guardrails
+
+
+def test_wiki_projection_manifest_has_unique_slug_keys() -> None:
+    """Fail CI when multiple manifest wiki_page entries normalize to the same slug.
+
+    This detects filename-drift and collisions that previously produced
+    duplicate pages on the live wiki (for example "Install and Update" vs
+    "Install-and-Update"). Keeping this in the docs-contract bundle prevents
+    regressions from being merged without maintainers noticing the collision.
+    """
+
+    repo_root = Path(__file__).resolve().parent.parent
+    manifest_path = repo_root / "manifests" / "wiki-projection-manifest.json"
+    if not manifest_path.exists():
+        # No manifest to validate in some automation contexts; don't fail noisily.
+        return
+
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    pages = [p.get("wiki_page") for p in data.get("pages", []) if p.get("wiki_page")]
+
+    def normalize(name: str) -> str:
+        base = (name + ".md") if not name.lower().endswith(".md") else name
+        key = re.sub(r"[^0-9A-Za-z]+", "-", base).strip("-")
+        return key.lower()
+
+    mapping: dict[str, list[str]] = {}
+    for p in pages:
+        k = normalize(p)
+        mapping.setdefault(k, []).append(p)
+
+    collisions = {k: v for k, v in mapping.items() if len(v) > 1}
+    if collisions:
+        msgs = [f"{k}: {v}" for k, v in collisions.items()]
+        raise AssertionError(
+            "Found wiki projection manifest slug collisions. Normalize collisions:\n"
+            + "\n".join(msgs)
+        )
