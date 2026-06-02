@@ -4,8 +4,8 @@ Welcome to the **Software Factory for VS Code**, a local, AI-powered development
 
 ## Current Release
 
-- **Latest release:** `2.8`
-- **Release notes for GitHub:** [`.github/releases/v2.8.md`](.github/releases/v2.8.md)
+- **Latest release:** `2.9`
+- **Release notes for GitHub:** [`.github/releases/v2.9.md`](.github/releases/v2.9.md)
 - **Machine-readable release metadata:** [`manifests/release-manifest.json`](manifests/release-manifest.json)
 - **Full changelog:** [`CHANGELOG.md`](CHANGELOG.md)
 
@@ -40,6 +40,10 @@ To use the Software Factory, you need the following:
 - **Visual Studio Code**. For the default AI experience documented here, VS Code `1.116+` is recommended because GitHub Copilot is built in as of that release.
 - A **GitHub account with GitHub Copilot access** (paid plan or Copilot Free) if you want chat, inline suggestions, or agents enabled.
 - _(Optional)_ The **GitHub Pull Requests and Issues** extension if you want GitHub PR/issue UI inside VS Code. It is not required for Copilot chat, inline suggestions, or agents.
+
+### GitHub Access
+
+This repository expects operators to follow the GitHub Access credential lanes defined in `ADR-019`. See the GitHub Access runbook in `docs/ops/GITHUB-ACCESS.md` for setup and troubleshooting guidance.
 
 **Configuring Copilot for the Factory:**
 

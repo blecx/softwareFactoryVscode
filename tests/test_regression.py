@@ -5668,6 +5668,7 @@ def test_extract_docker_diagnostic_returns_formatted_logs(monkeypatch):
         stderr = ""
 
     import subprocess
+
     from scripts import local_ci_parity
 
     def mock_run(*args, **kwargs):

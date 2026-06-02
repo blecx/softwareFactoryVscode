@@ -113,7 +113,30 @@ def inspect_execution_surface(
     repo_root: Path, surface_path: Path | None
 ) -> dict[str, str | bool]:
     repo_root = repo_root.resolve()
-    candidate = (surface_path or repo_root).expanduser().resolve()
+
+    # If the current working directory has been deleted, Path.cwd() will
+    # raise FileNotFoundError. Treat that situation as a deleted queue
+    # worktree and refuse to resume from it; require re-anchoring from the
+    # repository root and the queue checkpoint instead.
+    try:
+        Path.cwd()
+    except FileNotFoundError:
+        return {
+            "surface_path": str(repo_root),
+            "surface_dir": str(repo_root),
+            "surface_root": str(repo_root),
+            "surface_kind": "deleted-queue-worktree",
+            "safe_to_resume": False,
+            "note": "The current working directory was deleted. Re-anchor from the repository root and `.tmp/github-issue-queue-state.md` before continuing.",
+        }
+    # Prefer an explicit surface_path when provided; otherwise resolve the
+    # current execution surface in a way that tolerates a deleted current
+    # working directory (see `resolve_current_surface_path`).
+    if surface_path is None:
+        candidate = resolve_current_surface_path(repo_root)
+    else:
+        candidate = resolve_repo_relative_path(repo_root, surface_path)
+    candidate = Path(candidate).expanduser().resolve()
     surface_dir = candidate if candidate.is_dir() else candidate.parent
     queue_root = (repo_root / ".tmp" / "queue-worktrees").resolve()
 

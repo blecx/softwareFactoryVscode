@@ -9,7 +9,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Unreleased Summary
 
-No unreleased changes recorded yet after `2.8`.
+No unreleased changes recorded yet after `2.9`.
+
+## [2.9] — 2026-06-02
+
+### Summary for 2.9
+
+Release 2.9 is the last release that does not use local AI. It prepares the repository for the next migration by consolidating release metadata, clarifying upgrade paths, and locking the operator-facing guardrails that will remain authoritative when local AI integrations arrive. This release includes documentation, manifest, and housekeeping updates to ensure a smooth transition to the local-AI-enabled baseline in subsequent releases.
 
 ## [2.8] — 2026-05-27
 
