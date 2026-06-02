@@ -43,6 +43,7 @@ This file is a VS Code discovery wrapper. Keep generic wiki-maintenance mechanic
 - Refresh `Home`, `_Sidebar`, `_Footer`, `**Canonical source:**` / `**Canonical sources:**`, `**Projection note:**`, and `**Last synced from:**` markers as part of the same maintenance pass when the manifest requires them.
 - If the needed change is actually publication policy or canonical content, stop and route the work back through `@wiki` plus the canonical issue → PR → merge workflow before touching the live wiki clone.
 - Leave publication to `@wiki-publish`; this wrapper must stop at a clean ready-to-publish state or a precise blocker.
+ - Enforce manifest-derived filenames and clean duplicates before finishing: run the repo helper `scripts/wiki_update.py --dry-run` to preview changes, and run `scripts/wiki_update.py --apply` to enforce manifest filenames, run the normalizer (`scripts/normalize_wiki_projection.py`) and commit the cleaned worktree. This wrapper should call or instruct maintainers to run the helper as part of the update flow so filename drift is prevented.
 
 ## Completion Contract
 

@@ -113,6 +113,26 @@ def inspect_execution_surface(
     repo_root: Path, surface_path: Path | None
 ) -> dict[str, str | bool]:
     repo_root = repo_root.resolve()
+    # If the current process cwd has been deleted (e.g., a queue worktree was
+    # removed while a terminal remained inside it), Path.cwd() will raise
+    # FileNotFoundError. Detect that early and classify the surface as a
+    # deleted-queue-worktree so callers can re-anchor safely.
+    try:
+        _ = Path.cwd()
+    except FileNotFoundError:
+        return {
+            "surface_path": str(repo_root),
+            "surface_dir": str(repo_root),
+            "surface_root": str(repo_root),
+            "surface_kind": "deleted-queue-worktree",
+            "safe_to_resume": False,
+            "note": (
+                "The current working directory appears to be deleted (a queue "
+                "worktree may have been cleaned up while a terminal was still "
+                "inside it). Re-anchor from the repository root and `.tmp/github-issue-queue-state.md`."
+            ),
+        }
+
     candidate = (surface_path or repo_root).expanduser().resolve()
     surface_dir = candidate if candidate.is_dir() else candidate.parent
     queue_root = (repo_root / ".tmp" / "queue-worktrees").resolve()
