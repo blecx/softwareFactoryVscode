@@ -61,7 +61,27 @@ def inspect_execution_surface(
     repo_root: Path, surface_path: Path | None
 ) -> dict[str, str | bool]:
     repo_root = repo_root.resolve()
-    candidate = (surface_path or repo_root).expanduser().resolve()
+    if surface_path is None:
+        try:
+            cwd_candidate = Path.cwd()
+        except FileNotFoundError:
+            return {
+                "surface_path": "deleted-cwd",
+                "surface_dir": "deleted-cwd",
+                "surface_root": "deleted-cwd",
+                "surface_kind": "deleted-queue-worktree",
+                "safe_to_resume": False,
+                "note": (
+                    "The current working directory has been deleted. "
+                    "This often happens when a queue worktree is removed during cleanup. "
+                    "Resume is unsafe. Re-anchor from the repository root and the "
+                    "active worktree recorded in `.tmp/github-issue-queue-state.md`."
+                ),
+            }
+        candidate = cwd_candidate.resolve()
+    else:
+        candidate = surface_path.expanduser().resolve()
+
     surface_dir = candidate if candidate.is_dir() else candidate.parent
     queue_root = (repo_root / ".tmp" / "queue-worktrees").resolve()
 
@@ -87,6 +107,22 @@ def inspect_execution_surface(
     if repo_root in surface_dir.parents:
         if relative_queue_path is not None and relative_queue_path.parts:
             queue_surface_root = queue_root / relative_queue_path.parts[0]
+
+            if not queue_surface_root.exists():
+                return {
+                    "surface_path": str(candidate),
+                    "surface_dir": str(surface_dir),
+                    "surface_root": str(queue_surface_root),
+                    "surface_kind": "deleted-queue-worktree",
+                    "safe_to_resume": False,
+                    "note": (
+                        f"The current surface points to a deleted queue worktree (`{queue_surface_root.name}`). "
+                        "This is an unsafe execution surface. "
+                        "Re-anchor from the repository root and the active "
+                        "worktree recorded in `.tmp/github-issue-queue-state.md`."
+                    ),
+                }
+
             has_git_dir = (queue_surface_root / ".git").exists()
             marker_count = sum(
                 1
@@ -165,17 +201,50 @@ def run_command(command: Sequence[str], cwd: Path) -> subprocess.CompletedProces
     )
 
 
+def filter_stale_cwd_noise(output: str) -> tuple[str, bool]:
+    """
+    Separate stale-cwd shell diagnostics from real command output.
+    Returns (filtered_output, noise_detected).
+    """
+    noise_markers = {
+        "shell-init",
+        "getcwd",
+        "chdir",
+        "Konnte aktuelles",
+        "Arbeitsverzeichnis nicht",
+        "Kann das aktuelle Verzeichnis nicht wiederfinden",
+        "cannot access parent directories",
+    }
+    lines = output.splitlines()
+    filtered_lines = []
+    noise_detected = False
+
+    for line in lines:
+        if any(marker in line for marker in noise_markers):
+            noise_detected = True
+        else:
+            filtered_lines.append(line)
+
+    return "\n".join(filtered_lines), noise_detected
+
+
 def render_command_result(
     title: str,
     command: Sequence[str],
     result: subprocess.CompletedProcess[str],
 ) -> str:
     output = (result.stdout or "") + (result.stderr or "")
+    output, noise_detected = filter_stale_cwd_noise(output)
     output = output.rstrip() or "(no output)"
+
+    warning = ""
+    if noise_detected:
+        warning = "\n> ⚠️ **Warning**: Stale-cwd shell diagnostics were detected and filtered.\n"
+
     return (
         f"### {title}\n\n"
         f"- Command: `{shlex.join(command)}`\n"
-        f"- Exit code: {result.returncode}\n\n"
+        f"- Exit code: {result.returncode}\n{warning}\n"
         f"```text\n{output}\n```\n"
     )
 

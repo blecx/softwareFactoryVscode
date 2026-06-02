@@ -63,6 +63,7 @@ repository's issue → PR → merge process.
 6. Comment and close linked issue (if needed).
 7. Clean transient `.tmp` files MANDATORILY using:
    `rm -f .tmp/pr-body-<issue-number>.md .tmp/issue-<issue-number>-*.md`
+   Before removing `.tmp/queue-worktrees/<issue>`, you MUST require a direct persistent-shell re-anchor (e.g. `cd <repo-root> && pwd`). Explicitly reject relying on `bash -c 'cd <repo> && rm -rf <worktree>'` or child-shell-only cleanup as sufficient parent-shell re-anchor.
 8. Sync local `main` via `git checkout main && git pull` and verify final state.
 
 ## Required Checks

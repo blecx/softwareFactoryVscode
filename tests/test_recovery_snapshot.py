@@ -98,6 +98,7 @@ def test_capture_recovery_snapshot_writes_required_sections(tmp_path):
         checkpoint_path=checkpoint_path,
         output_path=output_path,
         include_runtime_status=True,
+        surface_path=repo_root,
         runner=fake_runner,
         generated_at="2026-04-19T20:40:00Z",
     )
@@ -192,3 +193,24 @@ def test_capture_recovery_snapshot_warns_about_partial_queue_snapshot(tmp_path):
     assert "- surface_kind: `partial-queue-snapshot`" in snapshot
     assert "- safe_to_resume: false" in snapshot
     assert "Do not resume from the current surface path" in snapshot
+
+
+def test_inspect_execution_surface_rejects_deleted_queue_worktree(
+    tmp_path, monkeypatch
+):
+    module = _load_recovery_module()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir(parents=True)
+
+    def raise_file_not_found():
+        raise FileNotFoundError()
+
+    monkeypatch.setattr(Path, "cwd", raise_file_not_found)
+
+    assessment = module.inspect_execution_surface(repo_root, None)
+
+    assert (
+        assessment["surface_kind"] == "deleted-queue-worktree"
+    ), "Deleted worktree should be classified as unsafe"
+    assert assessment["safe_to_resume"] is False
+    assert "Re-anchor from the repository root" in assessment["note"]
